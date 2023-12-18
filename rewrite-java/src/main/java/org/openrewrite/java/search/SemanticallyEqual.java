@@ -575,23 +575,26 @@ public class SemanticallyEqual {
         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, J j) {
             if (isEqual.get()) {
                 if (!(j instanceof J.FieldAccess)) {
-                    if (!(j instanceof J.Identifier) || !TypeUtils.isOfType(fieldAccess.getName().getFieldType(), ((J.Identifier) j).getFieldType())) {
+                    if (!(j instanceof J.Identifier) ||
+                        !TypeUtils.isOfType(fieldAccess.getName().getFieldType(), ((J.Identifier) j).getFieldType()) ||
+                        !fieldAccess.getSimpleName().equals(((J.Identifier) j).getSimpleName())) {
                         isEqual.set(false);
                     }
                     return fieldAccess;
                 }
 
                 J.FieldAccess compareTo = (J.FieldAccess) j;
-                if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType())
-                    || !TypeUtils.isOfType(fieldAccess.getName().getFieldType(), compareTo.getName().getFieldType())) {
+                if (fieldAccess.getType() instanceof JavaType.Unknown && compareTo.getType() instanceof JavaType.Unknown) {
+                    if (!fieldAccess.getSimpleName().equals(compareTo.getSimpleName())) {
+                        isEqual.set(false);
+                        return fieldAccess;
+                    }
+                } else if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType())
+                           || !TypeUtils.isOfType(fieldAccess.getName().getFieldType(), compareTo.getName().getFieldType())) {
                     isEqual.set(false);
                     return fieldAccess;
                 }
 
-                if (nullMissMatch(fieldAccess.getTarget(), compareTo.getTarget())) {
-                    isEqual.set(false);
-                    return fieldAccess;
-                }
                 visit(fieldAccess.getTarget(), compareTo.getTarget());
             }
             return fieldAccess;

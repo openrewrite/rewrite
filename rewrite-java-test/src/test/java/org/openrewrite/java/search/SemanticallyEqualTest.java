@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
@@ -25,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class SemanticallyEqualTest {
@@ -73,6 +75,99 @@ public class SemanticallyEqualTest {
     }
 
     @Test
+    void compareClassLiterals() {
+        assertExpressionsEqual(
+          """
+            import java.util.UUID;
+            class T {
+                Class<?> a = java.util.UUID.class;
+                Class<?> b = UUID.class;
+            }
+            """
+        );
+        assertExpressionsNotEqual(
+          """
+            import java.util.UUID;
+            class T {
+                Class<UUID> u = UUID.class;
+                Class<UUID> a = UUID.class;
+                Class<UUID> b = this.u;
+            }
+            """
+        );
+    }
+
+    @CartesianTest
+    void staticFieldAccess(@CartesianTest.Values(strings = {
+      "java.util.regex.Pattern.CASE_INSENSITIVE",
+      "Pattern.CASE_INSENSITIVE",
+      "CASE_INSENSITIVE",
+    }) String a, @CartesianTest.Values(strings = {
+      "java.util.regex.Pattern.CASE_INSENSITIVE",
+      "Pattern.CASE_INSENSITIVE",
+      "CASE_INSENSITIVE",
+    }) String b) {
+        assertExpressionsEqual(
+          "import java.util.regex.Pattern; import static java.util.regex.Pattern.CASE_INSENSITIVE; class T { int a = " + a + "; int b = " + b + "; }"
+        );
+    }
+
+    @CartesianTest
+    void staticMethodAccess(@CartesianTest.Values(strings = {
+      "java.util.regex.Pattern.compile",
+      "Pattern.compile",
+      "compile",
+    }) String a, @CartesianTest.Values(strings = {
+      "java.util.regex.Pattern.compile",
+      "Pattern.compile",
+      "compile",
+    }) String b) {
+        assertExpressionsEqual(
+          "import java.util.regex.Pattern; import static java.util.regex.Pattern.compile; class T { Pattern a = " + a + "(\"\"); Pattern b = " + b + "(\"\"); }"
+        );
+    }
+
+    @Test
+    void compareTypeCasts() {
+        assertExpressionsEqual(
+          """
+            class T {
+                Number a = (java.lang.Number) "";
+                Number b = (java.lang.Number) "";
+            }
+            """
+        );
+        assertExpressionsEqual(
+          """
+            class T {
+                Number a = (java.lang.Number) "";
+                Number b = (Number) "";
+            }
+            """
+        );
+        assertExpressionsEqual(
+          """
+            import java.util.List;
+            import java.util.UUID;
+            class T {
+                Number a = (List<UUID>) "";
+                Number b = (List<java.util.UUID>) "";
+            }
+            """
+        );
+        assertExpressionsEqual(
+          """
+            import java.util.List;
+            import java.util.UUID;
+            class T {
+                Number a = (List<java.util.UUID>) "";
+                Number b = (java.util.List<UUID>) "";
+            }
+            """
+        );
+    }
+
+    @Test
     void compareFieldAccess() {
         assertExpressionsEqual(
           """
@@ -112,6 +207,7 @@ public class SemanticallyEqualTest {
         J.CompilationUnit cua = (J.CompilationUnit) javaParser.parse(a).findFirst().get();
         javaParser.reset();
         J.CompilationUnit cub = (J.CompilationUnit) javaParser.parse(b).findFirst().get();
+        javaParser.reset();
         assertEqual(cua, cub);
     }
 
@@ -129,10 +225,30 @@ public class SemanticallyEqualTest {
         };
 
         Map<String, J.VariableDeclarations.NamedVariable> result = visitor.reduce(cu, new HashMap<>());
-        assertEqual(
+        assertThat(SemanticallyEqual.areEqual(
           Objects.requireNonNull(result.get("a").getInitializer()),
-          Objects.requireNonNull(result.get("b").getInitializer())
-        );
+          Objects.requireNonNull(result.get("b").getInitializer()))
+        ).isTrue();
+    }
+
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
+    private void assertExpressionsNotEqual(@Language(value = "java") String source) {
+        J.CompilationUnit cu = (J.CompilationUnit) javaParser.parse(source).findFirst().get();
+        javaParser.reset();
+
+        JavaIsoVisitor<Map<String, J.VariableDeclarations.NamedVariable>> visitor = new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Map<String, J.VariableDeclarations.NamedVariable> map) {
+                map.put(variable.getSimpleName(), variable);
+                return super.visitVariable(variable, map);
+            }
+        };
+
+        Map<String, J.VariableDeclarations.NamedVariable> result = visitor.reduce(cu, new HashMap<>());
+        assertThat(SemanticallyEqual.areEqual(
+          Objects.requireNonNull(result.get("a").getInitializer()),
+          Objects.requireNonNull(result.get("b").getInitializer()))
+        ).isFalse();
     }
 
     private void assertEqual(J a, J b) {
