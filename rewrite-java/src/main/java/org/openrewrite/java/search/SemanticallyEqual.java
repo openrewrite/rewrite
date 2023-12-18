@@ -900,6 +900,11 @@ public class SemanticallyEqual {
                 }
 
                 if (!static_) {
+                    if (nullMissMatch(method.getSelect(), compareTo.getSelect())) {
+                        isEqual.set(false);
+                        return method;
+                    }
+
                     visit(method.getSelect(), compareTo.getSelect());
                 }
                 boolean containsLiteral = false;

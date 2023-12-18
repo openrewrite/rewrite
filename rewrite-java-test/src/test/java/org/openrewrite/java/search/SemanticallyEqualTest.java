@@ -99,6 +99,28 @@ public class SemanticallyEqualTest {
     }
 
     @CartesianTest
+    void methodInvocationsWithDifferentSelect() {
+        assertExpressionsNotEqual(
+          """
+            class T {
+                static T other = new T();
+                String a = toString();
+                String b = other.toString();
+            }
+            """
+        );
+        assertExpressionsNotEqual(
+          """
+            class T {
+                static T other = new T();
+                String a = this.toString();
+                String b = other.toString();
+            }
+            """
+        );
+    }
+
+    @CartesianTest
     void staticFieldAccesses(@CartesianTest.Values(strings = {
       "java.util.regex.Pattern.CASE_INSENSITIVE",
       "Pattern.CASE_INSENSITIVE",
