@@ -406,6 +406,28 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void differentFieldAccesses() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  Object f = null;
+                  class B extends A {
+                      boolean m(Object o) {
+                          B other = (B) o;
+                          if (this.f == null || other.f == null) {
+                              return true;
+                          }
+                          return false;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void preserveComments() {
         rewriteRun(
           java(
