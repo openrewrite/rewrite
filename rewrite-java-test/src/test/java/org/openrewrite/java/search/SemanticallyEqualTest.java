@@ -34,7 +34,7 @@ public class SemanticallyEqualTest {
     private final JavaParser javaParser = JavaParser.fromJavaVersion().build();
 
     @Test
-    void compareAbstractMethods() {
+    void abstractMethods() {
         assertEqualToSelf(
           """
             abstract class A {
@@ -45,7 +45,7 @@ public class SemanticallyEqualTest {
     }
 
     @Test
-    void compareClassModifierLists() {
+    void classModifierLists() {
         assertEqual(
           """
             public abstract class A {
@@ -59,7 +59,7 @@ public class SemanticallyEqualTest {
     }
 
     @Test
-    void compareLiterals() {
+    void literals() {
         assertEqual(
           """
             class A {
@@ -75,7 +75,7 @@ public class SemanticallyEqualTest {
     }
 
     @Test
-    void compareClassLiterals() {
+    void classLiterals() {
         assertExpressionsEqual(
           """
             import java.util.UUID;
@@ -98,7 +98,7 @@ public class SemanticallyEqualTest {
     }
 
     @CartesianTest
-    void staticFieldAccess(@CartesianTest.Values(strings = {
+    void staticFieldAccesses(@CartesianTest.Values(strings = {
       "java.util.regex.Pattern.CASE_INSENSITIVE",
       "Pattern.CASE_INSENSITIVE",
       "CASE_INSENSITIVE",
@@ -113,7 +113,7 @@ public class SemanticallyEqualTest {
     }
 
     @CartesianTest
-    void staticMethodAccess(@CartesianTest.Values(strings = {
+    void staticMethodAccesses(@CartesianTest.Values(strings = {
       "java.util.regex.Pattern.compile",
       "Pattern.compile",
       "compile",
@@ -128,7 +128,7 @@ public class SemanticallyEqualTest {
     }
 
     @Test
-    void compareTypeCasts() {
+    void typeCasts() {
         assertExpressionsEqual(
           """
             class T {
@@ -168,7 +168,7 @@ public class SemanticallyEqualTest {
     }
 
     @Test
-    void compareFieldAccess() {
+    void fieldAccesses() {
         assertExpressionsEqual(
           """
             class T {
@@ -193,6 +193,17 @@ public class SemanticallyEqualTest {
                 int n = 1;
                 int a = T.this.n;
                 int b = n;
+            }
+            """
+        );
+        assertExpressionsNotEqual(
+          """
+            class T {
+                int n = 1;
+                void m(int n) {
+                    int a = T.this.n;
+                    int b = n;
+                }
             }
             """
         );
