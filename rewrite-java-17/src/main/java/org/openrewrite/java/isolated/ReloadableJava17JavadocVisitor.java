@@ -976,10 +976,14 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
         int endIndex = source.indexOf(delim, cursor);
         if (endIndex < 0) {
-            throw new IllegalStateException("Expected to be able to find " + delim);
+            // Handle the case where the delimiter is not found
+            List<Javadoc> before = whitespaceBefore();
+            cursor = source.length(); // Move the cursor to the end of the source
+            return before;
         }
+
         List<Javadoc> before = whitespaceBefore();
-        cursor += delim.length();
+        cursor = endIndex + delim.length();
         return before;
     }
 
