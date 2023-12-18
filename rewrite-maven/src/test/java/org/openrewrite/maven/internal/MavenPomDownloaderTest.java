@@ -407,9 +407,12 @@ class MavenPomDownloaderTest {
     @Test
     void deriveMetaDataFromFileRepository(@TempDir Path repoPath) throws IOException, MavenDownloadingException {
         Path fred = repoPath.resolve("fred/fred");
-        Files.createDirectories(fred.resolve("1.0.0"));
-        Files.createDirectories(fred.resolve("1.1.0"));
-        Files.createDirectories(fred.resolve("2.0.0"));
+
+        for (String version : Arrays.asList("1.0.0", "1.1.0", "2.0.0")) {
+            Path versionPath = fred.resolve(version);
+            Files.createDirectories(versionPath);
+            Files.writeString(versionPath.resolve("fred-" + version + ".pom"), "");
+        }
 
         MavenRepository repository = MavenRepository.builder()
           .id("file-based")

@@ -63,6 +63,8 @@ public class MavenRepository implements Serializable {
     @Nullable
     String snapshots;
 
+    @EqualsAndHashCode.Include
+    @With
     @NonFinal
     boolean knownToExist;
 

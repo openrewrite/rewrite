@@ -299,12 +299,13 @@ public abstract class Recipe implements Cloneable {
      */
     public Validated<Object> validate() {
         Validated<Object> validated = Validated.none();
-        List<Field> requiredFields = NullUtils.findNonNullFields(this.getClass());
+        Class<? extends Recipe> clazz = this.getClass();
+        List<Field> requiredFields = NullUtils.findNonNullFields(clazz);
         for (Field field : requiredFields) {
             try {
-                validated = validated.and(Validated.required(field.getName(), field.get(this)));
+                validated = validated.and(Validated.required(clazz.getSimpleName() + '.' + field.getName(), field.get(this)));
             } catch (IllegalAccessException e) {
-                logger.warn("Unable to validate the field [{}] on the class [{}]", field.getName(), this.getClass().getName());
+                logger.warn("Unable to validate the field [{}] on the class [{}]", field.getName(), clazz.getName());
             }
         }
         for (Recipe recipe : getRecipeList()) {

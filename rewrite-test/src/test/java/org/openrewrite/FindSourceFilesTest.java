@@ -18,6 +18,7 @@ package org.openrewrite;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -88,6 +89,35 @@ class FindSourceFilesTest implements RewriteTest {
           text(
             "hello world!",
             spec -> spec.path("a/hello.txt")
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {""})
+    @NullSource
+    void blankMatchesEverything(String filePattern) {
+        rewriteRun(
+          spec -> spec.recipe(new FindSourceFiles(filePattern)),
+          text(
+            "hello world!",
+            "~~>hello world!",
+            spec -> spec.path("hello.txt")
+          ),
+          text(
+            "hello world!",
+            "~~>hello world!",
+            spec -> spec.path("a/hello.txt")
+          ),
+          text(
+            "name: hello-world",
+            "~~>name: hello-world",
+            spec -> spec.path(".github/workflows/hello.yml")
+          ),
+          text(
+            "hello world!",
+            "~~>hello world!",
+            spec -> spec.path("C:\\Windows\\hello.txt")
           )
         );
     }
