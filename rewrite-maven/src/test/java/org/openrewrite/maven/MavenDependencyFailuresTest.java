@@ -284,7 +284,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
     private Recipe updateModel() {
         return toRecipe(() -> new MavenIsoVisitor<>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 if (document.getMarkers().findFirst(Markup.class).isEmpty()) {
                     maybeUpdateModel();
                 }

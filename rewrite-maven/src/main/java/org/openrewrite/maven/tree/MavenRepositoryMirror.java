@@ -104,7 +104,7 @@ public class MavenRepositoryMirror {
     }
 
     public MavenRepository apply(MavenRepository repo) {
-        if (repo.getUri().equals(url) && Objects.equals(id, repo.getId()) || !matches(repo)) {
+        if (Objects.equals(id, repo.getId()) && (repo.getUri().equals(url) || repo.isKnownToExist()) || !matches(repo)) {
             return repo;
         } else {
             MavenRepository repoWithMirror = repo.withUri(url)

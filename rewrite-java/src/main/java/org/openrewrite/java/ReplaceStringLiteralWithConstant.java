@@ -123,11 +123,11 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         }
 
         @Override
-        public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+        public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             // Only handle String literals
             if (!TypeUtils.isString(literal.getType()) ||
                 !Objects.equals(literalValue, literal.getValue())) {
-                return super.visitLiteral(literal, executionContext);
+                return super.visitLiteral(literal, ctx);
             }
 
             // Prevent changing constant definition
@@ -135,7 +135,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             if (classDeclaration != null &&
                 classDeclaration.getType() != null &&
                 owningType.equals(classDeclaration.getType().getFullyQualifiedName())) {
-                return super.visitLiteral(literal, executionContext);
+                return super.visitLiteral(literal, ctx);
             }
 
             maybeAddImport(owningType, false);

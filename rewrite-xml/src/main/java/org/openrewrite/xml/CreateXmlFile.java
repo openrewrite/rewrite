@@ -93,7 +93,7 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
         Path path = Paths.get(relativeFileName);
         return new XmlVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(document.getSourcePath())) {
                     if (StringUtils.isBlank(fileContents)) {
                         return document.withProlog(null).withRoot(null);

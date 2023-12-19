@@ -82,8 +82,8 @@ public class ChangePackaging extends Recipe {
             }
 
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (PROJECT_MATCHER.matches(getCursor())) {
                     if (packaging == null || "jar".equals(packaging)) {
                         t = filterTagChildren(t, it -> !"packaging".equals(it.getName()));

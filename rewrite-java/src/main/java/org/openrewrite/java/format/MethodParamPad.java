@@ -52,6 +52,12 @@ public class MethodParamPad extends Recipe {
         MethodParamPadStyle methodParamPadStyle;
 
         @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            // This visitor causes problems for Groovy sources as the `SpacesVisitor` is not aware of Groovy
+            return sourceFile instanceof J.CompilationUnit;
+        }
+
+        @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);

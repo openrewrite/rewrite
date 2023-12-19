@@ -84,7 +84,7 @@ public class FindDeprecatedClasses extends Recipe {
             }
         }, new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext executionContext) {
+            public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
                 if (getCursor().firstEnclosing(J.Import.class) == null) {
                     JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(nameTree.getType());
                     if (fqn != null && (typeMatcher == null || typeMatcher.matches(fqn))) {

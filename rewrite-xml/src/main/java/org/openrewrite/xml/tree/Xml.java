@@ -17,6 +17,7 @@ package org.openrewrite.xml.tree;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
@@ -358,11 +359,14 @@ public interface Xml extends Tree {
             if (content == null) {
                 return Optional.empty();
             }
-            if (content.size() != 1) {
-                return Optional.empty();
-            }
-            if (content.get(0) instanceof Xml.CharData) {
+            if (content.size() == 1 && content.get(0) instanceof Xml.CharData) {
                 return Optional.ofNullable(((CharData) content.get(0)).getText());
+            }
+            if (content.stream().allMatch(c -> c instanceof Xml.CharData)) {
+                return Optional.of(content.stream()
+                        .map(c -> ((CharData) c).getText())
+                        .map(StringEscapeUtils::unescapeXml)
+                        .collect(Collectors.joining()));
             }
             return Optional.empty();
         }

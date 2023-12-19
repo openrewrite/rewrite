@@ -104,7 +104,7 @@ public class ChangePlugin extends Recipe {
                     GradleSettings gradleSettings;
 
                     @Override
-                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
+                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
                         Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
                         Optional<GradleSettings> maybeGs = cu.getMarkers().findFirst(GradleSettings.class);
                         if (!maybeGp.isPresent() && !maybeGs.isPresent()) {
@@ -114,7 +114,7 @@ public class ChangePlugin extends Recipe {
                         gradleProject = maybeGp.orElse(null);
                         gradleSettings = maybeGs.orElse(null);
 
-                        G.CompilationUnit g = super.visitCompilationUnit(cu, executionContext);
+                        G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
                         if (g != cu) {
                             if (gradleProject != null) {
                                 GradleProject updatedGp = gradleProject.withPlugins(ListUtils.map(gradleProject.getPlugins(), plugin -> {

@@ -81,8 +81,8 @@ public class UpdateJavaCompatibility extends Recipe {
             final MethodMatcher javaVersionToVersionMatcher = new MethodMatcher("org.gradle.api.JavaVersion toVersion(..)");
 
             @Override
-            public J visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
-                J.Assignment a = (J.Assignment) super.visitAssignment(assignment, executionContext);
+            public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+                J.Assignment a = (J.Assignment) super.visitAssignment(assignment, ctx);
 
                 if (a.getVariable() instanceof J.Identifier) {
                     J.Identifier variable = (J.Identifier) a.getVariable();

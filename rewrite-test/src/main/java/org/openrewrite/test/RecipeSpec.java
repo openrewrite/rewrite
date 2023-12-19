@@ -162,13 +162,13 @@ public class RecipeSpec {
         return this;
     }
 
-    public RecipeSpec executionContext(ExecutionContext executionContext) {
-        this.executionContext = executionContext;
+    public RecipeSpec executionContext(ExecutionContext ctx) {
+        this.executionContext = ctx;
         return this;
     }
 
-    public RecipeSpec recipeExecutionContext(ExecutionContext executionContext) {
-        this.recipeExecutionContext = executionContext;
+    public RecipeSpec recipeExecutionContext(ExecutionContext ctx) {
+        this.recipeExecutionContext = ctx;
         return this;
     }
 

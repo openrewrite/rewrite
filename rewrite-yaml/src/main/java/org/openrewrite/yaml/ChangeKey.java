@@ -51,8 +51,8 @@ public class ChangeKey extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
-            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
-                Yaml.Mapping.Entry e = super.visitMappingEntry(entry, context);
+            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
+                Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 if (matcher.matches(getCursor())) {
                     if (e.getKey() instanceof Yaml.Scalar) {
                         e = e.withKey(((Yaml.Scalar)e.getKey()).withValue(newKey));

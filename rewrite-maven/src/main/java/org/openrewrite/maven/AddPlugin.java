@@ -105,11 +105,11 @@ public class AddPlugin extends Recipe {
     private class AddPluginVisitor extends MavenIsoVisitor<ExecutionContext> {
 
         @Override
-        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
             if (filePattern != null) {
-                return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, executionContext);
+                return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, ctx);
             }
-            return super.isAcceptable(sourceFile, executionContext);
+            return super.isAcceptable(sourceFile, ctx);
         }
 
         @Override
@@ -148,8 +148,9 @@ public class AddPlugin extends Recipe {
                 if (maybePlugin.isPresent()) {
                     Xml.Tag plugin = maybePlugin.get();
                     if (version != null && !version.equals(plugin.getChildValue("version").orElse(null))) {
-                        //noinspection OptionalGetWithoutIsPresent
-                        t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                        if (plugin.getChild("version").isPresent()) {
+                            t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                        }
                     }
                 } else {
                     Xml.Tag pluginTag = Xml.Tag.build("<plugin>\n" +
