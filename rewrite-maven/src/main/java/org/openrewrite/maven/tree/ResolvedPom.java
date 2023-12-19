@@ -545,7 +545,7 @@ public class ResolvedPom {
             while (fields.hasNext()) {
                 Map.Entry<String, JsonNode> conf = fields.next();
                 JsonNode parentConf = ret.get(conf.getKey());
-                JsonNode parentCombine = parentConf.get("combine.children");
+                JsonNode parentCombine = parentConf != null ? parentConf.get("combine.children") : null;
                 if (parentCombine != null && "append".equals(parentCombine.asText())) {
                     JsonNode selfCombine = conf.getValue().get("combine.self");
                     if (selfCombine != null && "override".equals(selfCombine.asText())) {
