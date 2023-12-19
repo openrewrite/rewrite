@@ -656,4 +656,38 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void allUseSiteCases() {
+        rewriteRun(
+          kotlin(
+            """
+              @file : Suppress ( "UNUSED_VARIABLE" )
+              class C
+
+              annotation class Ann1
+              annotation class Ann2
+              // case 0, Non use-site, regular annotation
+              @Ann1
+              val x1 = 40
+
+              // case 1, use-site, implicit bracket
+              @field : Ann1
+              val x2 = 41
+
+              // case 2, use-site, explicit bracket
+              @field : [ Ann1 ]
+              val x3 = 42
+
+              // case 3, use-site, multi annotations with explicit bracket
+              @field : [Ann1 Ann2]
+              val x4 = 43
+
+              // case 4, use-site without target
+              @[ Ann1 Ann2]
+              val x5 = 44
+              """
+          )
+        );
+    }
 }

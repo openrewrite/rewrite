@@ -323,6 +323,24 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return u;
     }
 
+    public J visitAnnotationType(K.AnnotationType annotationType, P p) {
+        K.AnnotationType at = annotationType;
+        at = at.withPrefix(visitSpace(at.getPrefix(), Space.Location.ANNOTATION_PREFIX, p));
+        at = at.withMarkers(visitMarkers(at.getMarkers(), p));
+        at = at.getPadding().withUseSite(visitRightPadded(at.getPadding().getUseSite(), JRightPadded.Location.ANNOTATION_ARGUMENT, p));
+        at = at.withCallee(visitAndCast(at.getCallee(), p));
+        return at;
+    }
+
+    public J visitMultiAnnotationType(K.MultiAnnotationType multiAnnotationType, P p) {
+        K.MultiAnnotationType mat = multiAnnotationType;
+        mat = mat.withPrefix(visitSpace(mat.getPrefix(), Space.Location.ANNOTATION_PREFIX, p));
+        mat = mat.withMarkers(visitMarkers(mat.getMarkers(), p));
+        mat = mat.getPadding().withUseSite(visitRightPadded(mat.getPadding().getUseSite(), JRightPadded.Location.ANNOTATION_ARGUMENT, p));
+        mat = mat.withAnnotations(visitContainer(mat.getAnnotations(), p));
+        return mat;
+    }
+
     public J visitWhen(K.When when, P p) {
         K.When w = when;
         w = w.withPrefix(visitSpace(w.getPrefix(), KSpace.Location.WHEN_PREFIX, p));
@@ -417,10 +435,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
     @Override
     public <M extends Marker> M visitMarker(Marker marker, P p) {
         Marker m = super.visitMarker(marker, p);
-        if (m instanceof AnnotationUseSite) {
-            AnnotationUseSite acs = (AnnotationUseSite) marker;
-            m = acs.withPrefix(visitSpace(acs.getPrefix(), KSpace.Location.ANNOTATION_CALL_SITE_PREFIX, p));
-        } else if (marker instanceof TypeReferencePrefix) {
+        if (marker instanceof TypeReferencePrefix) {
             TypeReferencePrefix tr = (TypeReferencePrefix) marker;
             m = tr.withPrefix(visitSpace(tr.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));
         }

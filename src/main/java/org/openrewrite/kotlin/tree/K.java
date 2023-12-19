@@ -2149,4 +2149,168 @@ public interface K extends J {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class AnnotationType implements K, NameTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<K.AnnotationType.Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        JRightPadded<Expression> useSite;
+
+        @Getter
+        @With
+        J.Annotation callee;
+
+        public Expression getUseSite() {
+            return useSite.getElement();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            // use site has no type
+            return null;
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) this;
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitAnnotationType(this, p);
+        }
+
+        public K.AnnotationType.Padding getPadding() {
+            K.AnnotationType.Padding p;
+            if (this.padding == null) {
+                p = new K.AnnotationType.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new K.AnnotationType.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final K.AnnotationType t;
+
+            public JRightPadded<Expression> getUseSite() {
+                return t.useSite;
+            }
+
+            public K.AnnotationType withUseSite(JRightPadded<Expression> useSite) {
+                return t.useSite == useSite ? t : new K.AnnotationType(t.id,
+                        t.prefix,
+                        t.markers,
+                        useSite,
+                        t.callee
+                );
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class MultiAnnotationType implements K, NameTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<K.MultiAnnotationType.Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        JRightPadded<Expression> useSite;
+
+        @Getter
+        @With
+        JContainer<J.Annotation> annotations;
+
+        public Expression getUseSite() {
+            return useSite.getElement();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            // use site has no type
+            return null;
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) this;
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitMultiAnnotationType(this, p);
+        }
+
+        public K.MultiAnnotationType.Padding getPadding() {
+            K.MultiAnnotationType.Padding p;
+            if (this.padding == null) {
+                p = new K.MultiAnnotationType.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new K.MultiAnnotationType.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final K.MultiAnnotationType t;
+
+            public JRightPadded<Expression> getUseSite() {
+                return t.useSite;
+            }
+
+            public K.MultiAnnotationType withUseSite(JRightPadded<Expression> useSite) {
+                return t.useSite == useSite ? t : new K.MultiAnnotationType(t.id,
+                        t.prefix,
+                        t.markers,
+                        useSite,
+                        t.annotations
+                );
+            }
+        }
+    }
+
 }

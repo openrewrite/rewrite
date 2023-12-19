@@ -22,6 +22,7 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
+@Deprecated
 @Value
 @With
 public class AnnotationUseSite implements Marker {

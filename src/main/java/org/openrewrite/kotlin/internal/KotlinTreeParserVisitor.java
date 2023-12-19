@@ -1732,32 +1732,44 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitAnnotation(KtAnnotation annotation, ExecutionContext data) {
-        if (annotation.getUseSiteTarget() == null) {
-            throw new UnsupportedOperationException("TODO, Some cases we don't know");
-        }
-        List<KtAnnotationEntry> annotationEntries = annotation.getEntries();
-        List<JRightPadded<Expression>> rpAnnotations = new ArrayList<>(annotationEntries.size());
+        Expression target;
 
+        if (annotation.getUseSiteTarget() != null) {
+            target = (J.Identifier) annotation.getUseSiteTarget().accept(this, data);
+        } else {
+            target = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
+        }
+
+        List<KtAnnotationEntry> annotationEntries = annotation.getEntries();
+        List<JRightPadded<J.Annotation>> rpAnnotations = new ArrayList<>(annotationEntries.size());
+        J.Annotation anno = null;
         for (KtAnnotationEntry ktAnnotationEntry : annotationEntries) {
-            J.Annotation anno = (J.Annotation) ktAnnotationEntry.accept(this, data);
+            anno = (J.Annotation) ktAnnotationEntry.accept(this, data);
             anno = anno.withMarkers(anno.getMarkers().addIfAbsent(new AnnotationConstructor(randomId())));
             rpAnnotations.add(padRight(anno, Space.EMPTY));
         }
 
-        PsiElement maybeLBracket = findFirstChild(annotation, anno -> anno.getNode().getElementType() == KtTokens.LBRACKET);
+        PsiElement maybeLBracket = findFirstChild(annotation, an -> an.getNode().getElementType() == KtTokens.LBRACKET);
         boolean isImplicitBracket = maybeLBracket == null;
         Space beforeLBracket = isImplicitBracket ? Space.EMPTY : prefix(maybeLBracket);
 
         if (!isImplicitBracket) {
             rpAnnotations = ListUtils.mapLast(rpAnnotations,
-                    rp -> rp.withAfter(prefix(findFirstChild(annotation, anno -> anno.getNode().getElementType() == KtTokens.RBRACKET))));
+                    rp -> rp.withAfter(prefix(findFirstChild(annotation, an -> an.getNode().getElementType() == KtTokens.RBRACKET))));
+        }
+
+        NameTree annotationType;
+        if (isImplicitBracket) {
+            annotationType = new K.AnnotationType(randomId(), Space.EMPTY, Markers.EMPTY, padRight(target, suffix(annotation.getUseSiteTarget())), anno);
+        } else {
+            annotationType = new K.MultiAnnotationType(randomId(), Space.EMPTY, Markers.EMPTY, padRight(target, suffix(annotation.getUseSiteTarget())), JContainer.build(beforeLBracket, rpAnnotations, Markers.EMPTY));
         }
 
         return mapType(new J.Annotation(randomId(),
                 Space.EMPTY,
-                Markers.EMPTY.addIfAbsent(new AnnotationUseSite(randomId(), suffix(annotation.getUseSiteTarget()), isImplicitBracket)),
-                (NameTree) annotation.getUseSiteTarget().accept(this, data),
-                JContainer.build(beforeLBracket, rpAnnotations, Markers.EMPTY)
+                Markers.EMPTY,
+                annotationType,
+                null
         ));
     }
 
@@ -1773,16 +1785,20 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         if (isUseSite) {
-            nameTree = (NameTree) annotationEntry.getUseSiteTarget().accept(this, data);
-            markers = markers.addIfAbsent(new AnnotationUseSite(randomId(), prefix(findFirstChild(annotationEntry, p -> p.getNode().getElementType() == KtTokens.COLON)), true));
-            J.Annotation argAnno = new J.Annotation(
+            J.Annotation callee = new J.Annotation(
                     randomId(),
                     Space.EMPTY,
                     Markers.EMPTY.addIfAbsent(new AnnotationConstructor(randomId())),
                     (NameTree) requireNonNull(annotationEntry.getCalleeExpression()).accept(this, data),
                     annotationEntry.getValueArgumentList() != null ? mapValueArguments(annotationEntry.getValueArgumentList(), data) : null
             );
-            args = JContainer.build(Space.EMPTY, singletonList(padRight(argAnno, Space.EMPTY)), Markers.EMPTY);
+
+            nameTree = new K.AnnotationType(randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    padRight(convertToExpression(annotationEntry.getUseSiteTarget().accept(this, data)),
+                            prefix(findFirstChild(annotationEntry, p -> p.getNode().getElementType() == KtTokens.COLON))),
+                    callee);
         } else {
             nameTree = (NameTree) requireNonNull(annotationEntry.getCalleeExpression()).accept(this, data);
             if (annotationEntry.getValueArgumentList() != null) {

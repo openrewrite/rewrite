@@ -23,7 +23,6 @@ import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.kotlin.marker.AnnotationUseSite;
 import org.openrewrite.kotlin.marker.Extension;
 import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.kotlin.tree.K;
@@ -470,7 +469,7 @@ public final class Assertions {
             return inPackageDeclaration() || inImport() || isClassName()
                    || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
                    || isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident)
-                   || isInJavaDoc(ident) || isWhenLabel();
+                   || isInJavaDoc(ident) || isWhenLabel() || isUseSite();
         }
 
         private boolean inPackageDeclaration() {
@@ -544,6 +543,11 @@ public final class Assertions {
             return getCursor().getParentTreeCursor().getValue() instanceof K.WhenBranch;
         }
 
+        private boolean isUseSite() {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof K.AnnotationType || value instanceof K.MultiAnnotationType;
+        }
+
         private boolean isLabel() {
             return getCursor().firstEnclosing(J.Label.class) != null;
         }
@@ -557,7 +561,7 @@ public final class Assertions {
         private boolean isValidated(J.Identifier i) {
             J j = getCursor().dropParentUntil(it -> it instanceof J).getValue();
             // TODO: replace with AnnotationUseSite tree.
-            return !j.getMarkers().findFirst(AnnotationUseSite.class).isPresent() && !(j instanceof K.KReturn);
+            return !(j instanceof K.KReturn);
         }
 
         private boolean isValidated(J.MethodInvocation mi) {
