@@ -999,7 +999,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     public J visitNullableType(J.NullableType nullableType, P p) {
         J.NullableType nt = nullableType;
-        nt = nt.withPrefix(visitSpace(nt.getPrefix(), Space.Location.NULLABLE_PREFIX, p));
+        nt = nt.withPrefix(visitSpace(nt.getPrefix(), Space.Location.NULLABLE_TYPE_PREFIX, p));
         nt = nt.withMarkers(visitMarkers(nt.getMarkers(), p));
         nt = nt.withAnnotations(ListUtils.map(nt.getAnnotations(), a -> visitAndCast(a, p)));
 

@@ -4423,6 +4423,7 @@ public interface J extends Tree {
         }
     }
 
+    @Incubating(since = "8.12.0")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4454,6 +4455,7 @@ public interface J extends Tree {
 
         @Override
         public @Nullable JavaType getType() {
+            // TODO also support `nullable` in type attribution
             return typeTree.getElement().getType();
         }
 
