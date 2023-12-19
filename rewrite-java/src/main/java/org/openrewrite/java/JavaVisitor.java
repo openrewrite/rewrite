@@ -137,7 +137,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Incubating(since = "8.2.0")
     public <S> S service(Class<S> service) {
-        return getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(service);
+        for (Cursor c = getCursor(); c.getParent() != null; c = c.getParent()) {
+            if (c.getValue() instanceof JavaSourceFile) {
+                return ((JavaSourceFile) c.getValue()).service(service);
+            }
+        }
+        throw new IllegalArgumentException("No JavaSourceFile parent found");
     }
 
     public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
