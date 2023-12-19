@@ -193,9 +193,14 @@ public interface J extends Tree {
         NameTree annotationType;
 
         public String getSimpleName() {
-            return annotationType instanceof Identifier ?
-                    ((Identifier) annotationType).getSimpleName() :
-                    ((J.FieldAccess) annotationType).getSimpleName();
+            if (annotationType instanceof Identifier) {
+                return ((Identifier) annotationType).getSimpleName();
+            } else if (annotationType instanceof J.FieldAccess ) {
+                return ((J.FieldAccess) annotationType).getSimpleName();
+            } else {
+                // allow for extending languages like Kotlin to supply a different representation
+                return annotationType.printTrimmed();
+            }
         }
 
         @Nullable
