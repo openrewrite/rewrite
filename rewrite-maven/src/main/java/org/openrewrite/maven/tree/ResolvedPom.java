@@ -532,7 +532,14 @@ public class ResolvedPom {
             return merged;
         }
 
-        private JsonNode mergePluginConfigurations(JsonNode configuration, JsonNode incomingConfiguration) {
+        private @Nullable JsonNode mergePluginConfigurations(@Nullable JsonNode configuration, @Nullable JsonNode incomingConfiguration) {
+            if (incomingConfiguration == null) {
+                return configuration;
+            }
+            if (configuration == null) {
+                return incomingConfiguration;
+            }
+
             ObjectNode ret = incomingConfiguration.deepCopy();
             Iterator<Map.Entry<String, JsonNode>> fields = configuration.fields();
             while (fields.hasNext()) {
