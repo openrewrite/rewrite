@@ -36,6 +36,21 @@ class IndentsTest implements RewriteTest {
         ));
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3531")
+    void multilineString() {
+        rewriteRun(
+          yaml("""
+            foo:
+              bar: >
+                A multiline string.
+              baz:
+                quz: Another string.
+            """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void indentSequence() {
