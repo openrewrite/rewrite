@@ -3646,6 +3646,9 @@ public interface J extends Tree {
             if (typeParameters != null) {
                 allAnnotations.addAll(typeParameters.getAnnotations());
             }
+            if (returnTypeExpression instanceof AnnotatedType) {
+                allAnnotations.addAll(((AnnotatedType) returnTypeExpression).getAnnotations());
+            }
             allAnnotations.addAll(name.getAnnotations());
             return allAnnotations;
         }
@@ -5765,6 +5768,9 @@ public interface J extends Tree {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
             for (J.Modifier modifier : modifiers) {
                 allAnnotations.addAll(modifier.getAnnotations());
+            }
+            if (typeExpression != null && typeExpression instanceof J.AnnotatedType) {
+                allAnnotations.addAll(((J.AnnotatedType) typeExpression).getAnnotations());
             }
             return allAnnotations;
         }
