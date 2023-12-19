@@ -533,10 +533,10 @@ public class ResolvedPom {
         }
 
         private @Nullable JsonNode mergePluginConfigurations(@Nullable JsonNode configuration, @Nullable JsonNode incomingConfiguration) {
-            if (incomingConfiguration == null) {
+            if (!(incomingConfiguration instanceof ObjectNode)) {
                 return configuration;
             }
-            if (configuration == null) {
+            if (!(configuration instanceof ObjectNode)) {
                 return incomingConfiguration;
             }
 
