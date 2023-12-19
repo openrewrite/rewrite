@@ -59,7 +59,7 @@ class ExplicitPluginVersionTest implements RewriteTest {
             <plugin>
               <groupId>org.apache.maven.plugins</groupId>
               <artifactId>maven-compiler-plugin</artifactId>
-              <version>3.11.0</version>
+              <version>3.12.0</version>
               <configuration>
                 <source>1.8</source>
                 <target>1.8</target>
