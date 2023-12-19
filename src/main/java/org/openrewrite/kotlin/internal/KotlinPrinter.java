@@ -440,6 +440,20 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitTypeAlias(K.TypeAlias typeAlias, PrintOutputCapture<P> p) {
+        beforeSyntax(typeAlias, KSpace.Location.TYPE_ALIAS_PREFIX, p);
+        visit(typeAlias.getLeadingAnnotations(), p);
+        for (J.Modifier m : typeAlias.getModifiers()) {
+            delegate.visitModifier(m, p);
+        }
+        visit(typeAlias.getName(), p);
+        delegate.visitContainer("<", typeAlias.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+        delegate.visitLeftPadded("=", typeAlias.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+        afterSyntax(typeAlias, p);
+        return typeAlias;
+    }
+
+    @Override
     public J visitWhen(K.When when, PrintOutputCapture<P> p) {
         beforeSyntax(when, KSpace.Location.WHEN_PREFIX, p);
         p.append("when");
@@ -614,6 +628,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         @Override
         public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, PrintOutputCapture<P> pPrintOutputCapture) {
             return super.visitContainer(container, loc, pPrintOutputCapture);
+        }
+
+        @Override
+        protected void visitLeftPadded(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, JLeftPadded.Location location, PrintOutputCapture<P> p) {
+            super.visitLeftPadded(prefix, leftPadded, location, p);
         }
 
         @Override

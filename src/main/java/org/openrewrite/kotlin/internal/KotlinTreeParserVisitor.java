@@ -1300,7 +1300,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Annotation> lastAnnotations = new ArrayList<>();
         Set<PsiElement> consumedSpaces = preConsumedInfix(typeAlias);
 
-        List<J.Modifier> modifiers = new ArrayList<>(mapModifiers(typeAlias.getModifierList(), leadingAnnotations, lastAnnotations, data));
+        List<J.Modifier> modifiers = mapModifiers(typeAlias.getModifierList(), leadingAnnotations, lastAnnotations, data);
         modifiers.add(new J.Modifier(randomId(), prefix(typeAlias.getTypeAliasKeyword(), consumedSpaces), markers, "typealias", J.Modifier.Type.LanguageExtension, emptyList()));
 
         if (typeAlias.getIdentifyingElement() == null) {
@@ -1308,40 +1308,27 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         J.Identifier name = createIdentifier(typeAlias.getIdentifyingElement(), type(typeAlias.getTypeReference()));
-        TypeTree typeExpression = null;
 
+        JContainer<J.TypeParameter> typeParams = null;
         if (typeAlias.getTypeParameterList() != null) {
-            typeExpression = (TypeTree) typeAlias.getTypeParameterList().accept(this, data);
+            typeParams = JContainer.build(prefix(typeAlias.getTypeParameterList()), mapTypeParameters(typeAlias.getTypeParameterList(), data), Markers.EMPTY);
         }
 
         Expression expr = convertToExpression(typeAlias.getTypeReference().accept(this, data));
 
         ASTNode node = typeAlias.getNode().findChildByType(KtTokens.EQ);
         Space prefix = node != null ? prefix(node.getPsi()) : Space.EMPTY;
-        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = padRight(
-                new J.VariableDeclarations.NamedVariable(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        name,
-                        emptyList(),
-                        padLeft(prefix, expr),
-                        null
-                ), Space.EMPTY
-        );
 
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = singletonList(namedVariable);
-
-        return new J.VariableDeclarations(
+        return new K.TypeAlias(
                 randomId(),
                 deepPrefix(typeAlias),
                 markers,
                 leadingAnnotations,
                 modifiers,
-                typeExpression,
-                null,
-                emptyList(),
-                vars
+                name,
+                typeParams,
+                padLeft(prefix, expr),
+                type(typeAlias.getTypeReference())
         );
     }
 

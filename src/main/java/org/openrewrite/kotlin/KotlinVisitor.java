@@ -82,6 +82,15 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return ae;
     }
 
+    public J visitAnnotationType(K.AnnotationType annotationType, P p) {
+        K.AnnotationType a = annotationType;
+        a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.ANNOTATION_PREFIX, p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.getPadding().withUseSite(visitRightPadded(a.getPadding().getUseSite(), JRightPadded.Location.ANNOTATION_ARGUMENT, p));
+        a = a.withCallee(visitAndCast(a.getCallee(), p));
+        return a;
+    }
+
     public J visitBinary(K.Binary binary, P p) {
         K.Binary b = binary;
         b = b.withPrefix(visitSpace(b.getPrefix(), KSpace.Location.BINARY_PREFIX, p));
@@ -254,6 +263,15 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
+    public J visitMultiAnnotationType(K.MultiAnnotationType multiAnnotationType, P p) {
+        K.MultiAnnotationType m = multiAnnotationType;
+        m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.ANNOTATION_PREFIX, p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.getPadding().withUseSite(visitRightPadded(m.getPadding().getUseSite(), JRightPadded.Location.ANNOTATION_ARGUMENT, p));
+        m = m.withAnnotations(visitContainer(m.getAnnotations(), p));
+        return m;
+    }
+
     public J visitNamedVariableInitializer(K.NamedVariableInitializer namedVariableInitializer, P p) {
         K.NamedVariableInitializer n = namedVariableInitializer;
         n = n.withPrefix(visitSpace(n.getPrefix(), KSpace.Location.NAMED_VARIABLE_INITIALIZER_PREFIX, p));
@@ -294,8 +312,35 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return s;
     }
 
+    public J visitTypeAlias(K.TypeAlias typeAlias, P p) {
+        K.TypeAlias t = typeAlias;
+        t = t.withPrefix(visitSpace(t.getPrefix(), KSpace.Location.TYPE_CONSTRAINT_PREFIX, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(t, p);
+        if (!(temp instanceof K.TypeAlias)) {
+            return temp;
+        } else {
+            t = (K.TypeAlias) temp;
+        }
+        t = t.withLeadingAnnotations(ListUtils.map(t.getLeadingAnnotations(), a -> visitAndCast(a, p)));
+        t = t.withModifiers(ListUtils.map(t.getModifiers(),
+                mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
+        t = t.withModifiers(ListUtils.map(t.getModifiers(), m -> visitAndCast(m, p)));
+        t = t.withName(visitAndCast(t.getName(), p));
+        if (t.getPadding().getTypeParameters() != null) {
+            t = t.getPadding().withTypeParameters(visitContainer(t.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
+        }
+        if (t.getPadding().getInitializer() != null) {
+            t = t.getPadding().withInitializer(visitLeftPadded(t.getPadding().getInitializer(),
+                    JLeftPadded.Location.VARIABLE_INITIALIZER, p));
+        }
+        t = t.withType(visitType(t.getType(), p));
+        return t;
+    }
+
     public J visitTypeConstraints(K.TypeConstraints typeConstraints, P p) {
         K.TypeConstraints t = typeConstraints;
+        t = t.withPrefix(visitSpace(t.getPrefix(), KSpace.Location.TYPE_CONSTRAINT_PREFIX, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
         t = t.getPadding().withConstraints(visitContainer(t.getPadding().getConstraints(), p));
         return t;
@@ -321,24 +366,6 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         u = u.withExpression(visitAndCast(u.getExpression(), p));
         u = u.withType(visitType(u.getType(), p));
         return u;
-    }
-
-    public J visitAnnotationType(K.AnnotationType annotationType, P p) {
-        K.AnnotationType at = annotationType;
-        at = at.withPrefix(visitSpace(at.getPrefix(), Space.Location.ANNOTATION_PREFIX, p));
-        at = at.withMarkers(visitMarkers(at.getMarkers(), p));
-        at = at.getPadding().withUseSite(visitRightPadded(at.getPadding().getUseSite(), JRightPadded.Location.ANNOTATION_ARGUMENT, p));
-        at = at.withCallee(visitAndCast(at.getCallee(), p));
-        return at;
-    }
-
-    public J visitMultiAnnotationType(K.MultiAnnotationType multiAnnotationType, P p) {
-        K.MultiAnnotationType mat = multiAnnotationType;
-        mat = mat.withPrefix(visitSpace(mat.getPrefix(), Space.Location.ANNOTATION_PREFIX, p));
-        mat = mat.withMarkers(visitMarkers(mat.getMarkers(), p));
-        mat = mat.getPadding().withUseSite(visitRightPadded(mat.getPadding().getUseSite(), JRightPadded.Location.ANNOTATION_ARGUMENT, p));
-        mat = mat.withAnnotations(visitContainer(mat.getAnnotations(), p));
-        return mat;
     }
 
     public J visitWhen(K.When when, P p) {

@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.kotlin.tree.K;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -54,6 +55,14 @@ public class RenameTypeAlias extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new KotlinIsoVisitor<ExecutionContext>() {
+            @Override
+            public K.TypeAlias visitTypeAlias(K.TypeAlias typeAlias, ExecutionContext executionContext) {
+                if (!aliasName.equals(typeAlias.getSimpleName()) || !TypeUtils.isOfClassType(typeAlias.getType(), fullyQualifiedAliasedType)) {
+                    return typeAlias;
+                }
+                return typeAlias.withName(typeAlias.getName().withSimpleName(newName));
+            }
+
             @Override
             public J.Identifier visitIdentifier(J.Identifier i, ExecutionContext ctx) {
                 if (!i.getSimpleName().equals(aliasName) || !TypeUtils.isOfClassType(i.getType(), fullyQualifiedAliasedType)) {

@@ -1753,6 +1753,130 @@ public interface K extends J {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TypeAlias implements K, Statement, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<K.TypeAlias.Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @With
+        @Getter
+        List<Annotation> leadingAnnotations;
+
+        @Getter
+        @With
+        List<J.Modifier> modifiers;
+
+        @With
+        @Getter
+        Identifier name;
+
+        @Nullable
+        JContainer<TypeParameter> typeParameters;
+
+        @Nullable
+        public List<TypeParameter> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElements();
+        }
+
+        public TypeAlias withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
+            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
+        }
+
+        @Getter
+        @With
+        JLeftPadded<Expression> initializer;
+
+        @Nullable
+        @Getter
+        @With
+        JavaType type;
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitTypeAlias(this, p);
+        }
+
+        // gather annotations from everywhere they may occur
+        public List<J.Annotation> getAllAnnotations() {
+            List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
+            for (J.Modifier modifier : modifiers) {
+                allAnnotations.addAll(modifier.getAnnotations());
+            }
+            return allAnnotations;
+        }
+
+        public String getSimpleName() {
+            return name.getSimpleName();
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public TypeAlias.Padding getPadding() {
+            TypeAlias.Padding p;
+            if (this.padding == null) {
+                p = new TypeAlias.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new TypeAlias.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TypeAlias t;
+
+            @Nullable
+            public JContainer<TypeParameter> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public TypeAlias withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new TypeAlias(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.name, typeParameters, t.initializer, t.type);
+            }
+
+            @Nullable
+            public JLeftPadded<Expression> getInitializer() {
+                return t.initializer;
+            }
+
+            public TypeAlias withInitializer(@Nullable JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new TypeAlias(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.name, t.typeParameters, initializer, t.type);
+            }
+        }
+    }
+
     @SuppressWarnings("unchecked")
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

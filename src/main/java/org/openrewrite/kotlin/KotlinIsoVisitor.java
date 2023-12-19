@@ -28,6 +28,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.AnnotationType visitAnnotationType(K.AnnotationType annotationType, P p) {
+        return (K.AnnotationType) super.visitAnnotationType(annotationType, p);
+    }
+
+    @Override
     public K.Binary visitBinary(K.Binary binary, P p) {
         return (K.Binary) super.visitBinary(binary, p);
     }
@@ -93,6 +98,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.MultiAnnotationType visitMultiAnnotationType(K.MultiAnnotationType multiAnnotationType, P p) {
+        return (K.MultiAnnotationType) super.visitMultiAnnotationType(multiAnnotationType, p);
+    }
+
+    @Override
     public K.ListLiteral visitListLiteral(K.ListLiteral listLiteral, P p) {
         return (K.ListLiteral) super.visitListLiteral(listLiteral, p);
     }
@@ -105,6 +115,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     @Override
     public K.SpreadArgument visitSpreadArgument(K.SpreadArgument spreadArgument, P p) {
         return (K.SpreadArgument) super.visitSpreadArgument(spreadArgument, p);
+    }
+
+    @Override
+    public K.TypeAlias visitTypeAlias(K.TypeAlias typeAlias, P p) {
+        return (K.TypeAlias) super.visitTypeAlias(typeAlias, p);
     }
 
     @Override
