@@ -53,5 +53,6 @@ public class KSpace {
         UNARY_PREFIX,
         WHEN_PREFIX,
         WHEN_BRANCH_EXPRESSION,
+        TYPE_ALIAS_INITIALIZER,
     }
 }

@@ -22,10 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.marker.*;
-import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.kotlin.tree.KContainer;
-import org.openrewrite.kotlin.tree.KRightPadded;
-import org.openrewrite.kotlin.tree.KSpace;
+import org.openrewrite.kotlin.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
@@ -314,7 +311,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public J visitTypeAlias(K.TypeAlias typeAlias, P p) {
         K.TypeAlias t = typeAlias;
-        t = t.withPrefix(visitSpace(t.getPrefix(), KSpace.Location.TYPE_CONSTRAINT_PREFIX, p));
+        t = t.withPrefix(visitSpace(t.getPrefix(), KSpace.Location.TYPE_ALIAS_PREFIX, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
         Statement temp = (Statement) visitStatement(t, p);
         if (!(temp instanceof K.TypeAlias)) {
@@ -331,8 +328,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             t = t.getPadding().withTypeParameters(visitContainer(t.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
         if (t.getPadding().getInitializer() != null) {
-            t = t.getPadding().withInitializer(visitLeftPadded(t.getPadding().getInitializer(),
-                    JLeftPadded.Location.VARIABLE_INITIALIZER, p));
+            t = t.getPadding().withInitializer(visitLeftPadded(t.getPadding().getInitializer(), p));
         }
         t = t.withType(visitType(t.getType(), p));
         return t;
