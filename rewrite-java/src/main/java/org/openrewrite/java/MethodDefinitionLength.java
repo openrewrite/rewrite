@@ -50,7 +50,7 @@ public class MethodDefinitionLength extends Recipe {
                     return md;
                 }
                 int numberOfTokens = (int) ( md.printTrimmed(getCursor()).length() / 3.5);
-                tokens.insertRow(ctx, new TokenCount.Row( md.printTrimmed(getCursor()), numberOfTokens));
+                tokens.insertRow(ctx, new TokenCount.Row( md.getSimpleName(), numberOfTokens));
                 return md;
             }
         };

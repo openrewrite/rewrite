@@ -49,7 +49,7 @@ public class ClassDefinitionLength extends Recipe {
                     return cd;
                 }
                 int numberOfTokens = (int) ( cd.printTrimmed(getCursor()).length() / 3.5);
-                tokens.insertRow(ctx, new TokenCount.Row( cd.printTrimmed(getCursor()), numberOfTokens));
+                tokens.insertRow(ctx, new TokenCount.Row( cd.getSimpleName(), numberOfTokens));
                 return cd;
             }
         };

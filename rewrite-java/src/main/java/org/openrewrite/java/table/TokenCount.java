@@ -33,8 +33,8 @@ public class TokenCount extends DataTable<TokenCount.Row> {
     @Value
     public static class Row {
 
-        @Column(displayName = "Code snippet",
-                description = "The text of code snippet.")
+        @Column(displayName = "Name of Class or Method",
+                description = "The name of the class or method.")
         String codeSnippet;
 
         @Column(displayName = "Tokens",
