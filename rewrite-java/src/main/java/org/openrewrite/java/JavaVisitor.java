@@ -997,6 +997,24 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return n;
     }
 
+    public J visitNullableType(J.NullableType nullableType, P p) {
+        J.NullableType nt = nullableType;
+        nt = nt.withPrefix(visitSpace(nt.getPrefix(), Space.Location.NULLABLE_TYPE_PREFIX, p));
+        nt = nt.withMarkers(visitMarkers(nt.getMarkers(), p));
+        nt = nt.withAnnotations(ListUtils.map(nt.getAnnotations(), a -> visitAndCast(a, p)));
+
+        Expression temp = (Expression) visitExpression(nt, p);
+        if (!(temp instanceof J.NullableType)) {
+            return temp;
+        } else {
+            nt = (J.NullableType) temp;
+        }
+
+        nt = nt.getPadding().withTypeTree(visitRightPadded(nt.getPadding().getTypeTree(), JRightPadded.Location.NULLABLE, p));
+        nt = nt.withType(visitType(nt.getType(), p));
+        return nt;
+    }
+
     public J visitPackage(J.Package pkg, P p) {
         J.Package pa = pkg;
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), Space.Location.PACKAGE_PREFIX, p));
