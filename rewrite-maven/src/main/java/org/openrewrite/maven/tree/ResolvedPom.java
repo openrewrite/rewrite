@@ -438,12 +438,12 @@ public class ResolvedPom {
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
-                    mergePluginManagement(profile.getPluginManagement());//, pom);
+                    mergePluginManagement(profile.getPluginManagement());
                     mergePlugins(profile.getPlugins());
                 }
             }
 
-            mergePluginManagement(pom.getPluginManagement());//, pom);
+            mergePluginManagement(pom.getPluginManagement());
             mergePlugins(pom.getPlugins());
 
             if (pom.getParent() != null) {
@@ -590,7 +590,7 @@ public class ResolvedPom {
         }
 
         private List<Plugin.Execution> mergePluginExecutions(List<Plugin.Execution> executions, List<Plugin.Execution> incomingExecutions) {
-            return executions; // TODO
+            return executions.isEmpty() ? incomingExecutions : executions; // TODO
         }
 
         private Plugin mergePlugins(Plugin plugin, Plugin incoming) {
