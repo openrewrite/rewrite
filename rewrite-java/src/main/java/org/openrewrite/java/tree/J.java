@@ -4435,6 +4435,94 @@ public interface J extends Tree {
         }
     }
 
+    @Incubating(since = "8.12.0")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
+    class NullableType implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<J.NullableType.Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Space prefix;
+
+        @Getter
+        Markers markers;
+
+        @Getter
+        List<J.Annotation> annotations;
+
+        JRightPadded<TypeTree> typeTree;
+
+        public TypeTree getTypeTree() {
+            return typeTree.getElement();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            // TODO also support `nullable` in type attribution
+            return typeTree.getElement().getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public NullableType withType(@Nullable JavaType type) {
+            JRightPadded<TypeTree> rp = getPadding().getTypeTree();
+            TypeTree tt = rp.getElement();
+            tt = tt.withType(type);
+            return getPadding().withTypeTree(rp.withElement(tt));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitNullableType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public J.NullableType.Padding getPadding() {
+            J.NullableType.Padding p;
+            if (this.padding == null) {
+                p = new J.NullableType.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new J.NullableType.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final J.NullableType t;
+
+            public JRightPadded<TypeTree> getTypeTree() {
+                return t.typeTree;
+            }
+
+            public J.NullableType withTypeTree(JRightPadded<TypeTree> typeTree) {
+                return t.typeTree == typeTree ? t : new J.NullableType(t.id,
+                        t.prefix,
+                        t.markers,
+                        t.annotations,
+                        typeTree);
+            }
+        }
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
