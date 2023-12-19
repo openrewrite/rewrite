@@ -55,7 +55,7 @@ public class RenameTypeAlias extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new KotlinIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Identifier visitIdentifier(J.Identifier i, ExecutionContext executionContext) {
+            public J.Identifier visitIdentifier(J.Identifier i, ExecutionContext ctx) {
                 if (!i.getSimpleName().equals(aliasName) || !TypeUtils.isOfClassType(i.getType(), fullyQualifiedAliasedType)) {
                     return i;
                 }

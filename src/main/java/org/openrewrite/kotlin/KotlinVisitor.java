@@ -144,7 +144,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             d = (K.DestructuringDeclaration) temp;
         }
         d = d.withInitializer(visitAndCast(d.getInitializer(), p));
-        d = d.getPadding().withDestructAssignments(visitContainer(d.getPadding().getDestructAssignments(), p));
+        d = d.getPadding().withDestructAssignments(visitContainer(d.getPadding().getDestructAssignments(), KContainer.Location.DESTRUCT_ASSIGNMENTS, p));
         return d;
     }
 
@@ -156,7 +156,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         f = f.withModifiers(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p)));
         f = f.withReceiver(visitRightPadded(f.getReceiver(), p));
         if (f.getPadding().getParameters() != null) {
-            f = f.getPadding().withParameters(this.visitContainer(f.getPadding().getParameters(), KContainer.Location.FUNCTION_TYPE_PARAMETERS, p));
+            f = f.getPadding().withParameters(visitContainer(f.getPadding().getParameters(), KContainer.Location.FUNCTION_TYPE_PARAMETERS, p));
         }
         f = f.withReturnType(visitRightPadded(f.getReturnType(), p));
         return f;
@@ -241,7 +241,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else {
             l = (K.ListLiteral) temp;
         }
-        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), p));
+        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), KContainer.Location.LIST_LITERAL_ELEMENTS, p));
         l = l.withType(visitType(l.getType(), p));
         return l;
     }
@@ -349,7 +349,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else {
             w = (K.WhenBranch) temp;
         }
-        w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), p));
+        w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, p));
         w = w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
         return w;
     }
@@ -420,9 +420,6 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         if (m instanceof AnnotationUseSite) {
             AnnotationUseSite acs = (AnnotationUseSite) marker;
             m = acs.withPrefix(visitSpace(acs.getPrefix(), KSpace.Location.ANNOTATION_CALL_SITE_PREFIX, p));
-        } else if (marker instanceof IsNullable) {
-            IsNullable isn = (IsNullable) marker;
-            m = isn.withPrefix(visitSpace(isn.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p));
         } else if (marker instanceof TypeReferencePrefix) {
             TypeReferencePrefix tr = (TypeReferencePrefix) marker;
             m = tr.withPrefix(visitSpace(tr.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));

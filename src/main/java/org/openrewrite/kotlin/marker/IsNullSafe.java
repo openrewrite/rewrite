@@ -15,8 +15,11 @@
  */
 package org.openrewrite.kotlin.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 
@@ -27,11 +30,14 @@ import java.util.UUID;
 public class IsNullSafe implements Marker {
     UUID id;
 
-    @Deprecated
-    Space prefix;
-
-    public IsNullSafe(UUID id, Space prefix) {
+    public IsNullSafe(UUID id) {
         this.id = id;
-        this.prefix = Space.EMPTY;
+    }
+
+    // to be dereleased
+    @Deprecated
+    @JsonCreator
+    IsNullSafe(UUID id, @Deprecated @Nullable @JsonProperty("prefix") Space prefix) {
+        this.id = id;
     }
 }

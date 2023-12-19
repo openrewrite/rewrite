@@ -905,25 +905,25 @@ class SpacesTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
               @Override
-              public Space visitSpace(Space space, KSpace.Location loc, ExecutionContext executionContext) {
+              public Space visitSpace(Space space, KSpace.Location loc, ExecutionContext ctx) {
                   if (!space.getComments().isEmpty()) {
                       return space;
                   }
-                  if (loc == KSpace.Location.TYPE_REFERENCE_PREFIX || loc == KSpace.Location.IS_NULLABLE_PREFIX || loc == KSpace.Location.CHECK_NOT_NULL_PREFIX) {
+                  if (loc == KSpace.Location.TYPE_REFERENCE_PREFIX) {
                       return space.withComments(ListUtils.concat(new TextComment(true, loc.name(), "", Markers.EMPTY), space.getComments()));
                   }
-                  return super.visitSpace(space, loc, executionContext);
+                  return super.visitSpace(space, loc, ctx);
               }
 
               @Override
-              public Space visitSpace(Space space, Space.Location loc, ExecutionContext executionContext) {
-                  Space s =  super.visitSpace(space, loc, executionContext);
+              public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
+                  Space s = super.visitSpace(space, loc, ctx);
 
                   if (!space.getComments().isEmpty()) {
                       return space;
                   }
 
-                  if (loc == Space.Location.UNARY_OPERATOR) {
+                  if (loc == Space.Location.UNARY_OPERATOR || loc == Space.Location.NULLABLE_TYPE_SUFFIX) {
                       return space.withComments(ListUtils.concat(new TextComment(true, loc.name(), "", Markers.EMPTY), space.getComments()));
                   }
                   return s;
@@ -939,7 +939,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               class A {
-                  fun method ( ) /*TYPE_REFERENCE_PREFIX*/: Int /*IS_NULLABLE_PREFIX*/? {
+                  fun method ( ) /*TYPE_REFERENCE_PREFIX*/: Int /*NULLABLE_TYPE_SUFFIX*/? {
                       return 1
                   }
               }

@@ -70,4 +70,17 @@ class ParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/494")
+    @Test
+    void crazyNestedParenthesizedAndIsNullableType() {
+        rewriteRun(
+          kotlin(
+            """
+              fun x ( input : ( (  (   (    ) ->  String ?  )     ?     ) ?  ) ) {
+              }
+              """
+          )
+        );
+    }
 }

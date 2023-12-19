@@ -26,7 +26,7 @@ import org.openrewrite.kotlin.tree.K;
 
 public class SpacesFromCompilationUnitStyle extends KotlinIsoVisitor<ExecutionContext> {
     @Override
-    public @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
+    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
         if (!(tree instanceof K.CompilationUnit)) {
             return (J) tree;
         }

@@ -52,12 +52,12 @@ public class ReplaceCharToIntWithCode extends Recipe {
         return new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method,
-                                                            ExecutionContext executionContext) {
+                                                            ExecutionContext ctx) {
                 if (CHAR_TO_INT_METHOD_MATCHER.matches(method) && method.getSelect() != null) {
                     J.FieldAccess codeTemplate = getCharCodeTemplate();
                     return codeTemplate.withTarget(method.getSelect()).withPrefix(method.getPrefix());
                 }
-                return super.visitMethodInvocation(method, executionContext);
+                return super.visitMethodInvocation(method, ctx);
             }
         };
     }

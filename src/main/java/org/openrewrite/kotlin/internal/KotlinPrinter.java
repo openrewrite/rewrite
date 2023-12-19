@@ -220,12 +220,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitFunctionType(K.FunctionType functionType, PrintOutputCapture<P> p) {
-        boolean nullable = functionType.getMarkers().findFirst(IsNullable.class).isPresent();
-
         beforeSyntax(functionType, KSpace.Location.FUNCTION_TYPE_PREFIX, p);
-        if (nullable) {
-            p.append("(");
-        }
 
         visit(functionType.getLeadingAnnotations(), p);
         for (J.Modifier modifier : functionType.getModifiers()) {
@@ -241,9 +236,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         p.append("->");
 
         visitRightPadded(functionType.getReturnType(), p);
-        if (nullable) {
-            p.append(")");
-        }
         afterSyntax(functionType, p);
         return functionType;
     }
@@ -1316,7 +1308,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         protected void afterSyntax(J j, PrintOutputCapture<P> p) {
-            kotlinPrinter.trailingMarkers(j.getMarkers(), p);
             super.afterSyntax(j, p);
         }
     }
@@ -1332,15 +1323,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             throw new UnsupportedOperationException("Class kind is not supported: " + classDecl.getKind());
         }
         return kind;
-    }
-
-    private void trailingMarkers(Markers markers, PrintOutputCapture<P> p) {
-        for (Marker marker : markers.getMarkers()) {
-            if (marker instanceof IsNullable) {
-                KotlinPrinter.this.visitSpace(((IsNullable) marker).getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
-                p.append("?");
-            }
-        }
     }
 
     @Override
@@ -1424,7 +1406,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     private void afterSyntax(J j, PrintOutputCapture<P> p) {
-        trailingMarkers(j.getMarkers(), p);
         afterSyntax(j.getMarkers(), p);
     }
 

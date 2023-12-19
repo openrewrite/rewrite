@@ -132,7 +132,7 @@ class MemberReferenceTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method ( s: List<String?> ) {
+              fun method ( s: List<String   ? > ) {
                   s.none( CharSequence  ?   :: isNullOrBlank)
               }
               """

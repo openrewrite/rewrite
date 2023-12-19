@@ -20,7 +20,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
@@ -38,8 +37,8 @@ public class AssertionsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
               @Override
-              public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
-                  J.VariableDeclarations.NamedVariable n = super.visitVariable(variable, executionContext);
+              public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+                  J.VariableDeclarations.NamedVariable n = super.visitVariable(variable, ctx);
                   if ("a".equals(n.getSimpleName())) {
                       return n.withName(n.getName().withSimpleName("b").withType(null).withFieldType(null)).withType(null).withVariableType(null);
                   }
