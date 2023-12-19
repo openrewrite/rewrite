@@ -16,6 +16,7 @@
 package org.openrewrite.java.service;
 
 import org.openrewrite.Incubating;
+import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.tree.J;
 
 import java.util.List;
@@ -24,7 +25,17 @@ import static java.util.Collections.emptyList;
 
 @Incubating(since = "8.12.0")
 public class AnnotationService {
-    public List<J .Annotation> getAllAnnotations(J j) {
+
+    public boolean matches(J j, AnnotationMatcher matcher) {
+        for (J.Annotation annotation : getAllAnnotations(j)) {
+            if (matcher.matches(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public List<J.Annotation> getAllAnnotations(J j) {
         if (j instanceof J.VariableDeclarations) {
             return ((J.VariableDeclarations) j).getAllAnnotations();
         } else if (j instanceof J.AnnotatedType) {

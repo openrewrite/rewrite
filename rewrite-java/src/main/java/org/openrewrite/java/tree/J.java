@@ -134,6 +134,7 @@ public interface J extends Tree {
             return withTypeExpression(typeExpression.withType(type));
         }
 
+        @Deprecated
         public List<Annotation> getAllAnnotations() {
             List<J.Annotation> allAnnotations = annotations;
             List<J.Annotation> moreAnnotations;
@@ -1239,6 +1240,7 @@ public interface J extends Tree {
             return v.visitClassDeclaration(this, p);
         }
 
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
@@ -3637,6 +3639,7 @@ public interface J extends Tree {
             return new CoordinateBuilder.MethodDeclaration(this);
         }
 
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
@@ -5763,6 +5766,7 @@ public interface J extends Tree {
             return new CoordinateBuilder.VariableDeclarations(this);
         }
 
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
