@@ -19,6 +19,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.Getter;
 import lombok.Value;
 import lombok.With;
@@ -342,7 +345,7 @@ public class ResolvedPom {
             if (initialRepositories != null) {
                 mergeRepositories(initialRepositories);
             }
-            resolveParentPropertiesAndRepositoriesRecursively(pomAncestry);
+            resolveParentPropertiesAndRepositoriesRecursively(new ArrayList<>(pomAncestry));
             if (initialRepositories == null) {
                 initialRepositories = repositories;
             }
@@ -360,11 +363,8 @@ public class ResolvedPom {
                 ResolvedPom.this.requested = pomReference;
             }
 
-            pomAncestry.clear();
-            pomAncestry.add(requested);
-            resolveParentDependenciesRecursively(pomAncestry);
-
-            resolveParentPluginManagementRecursively(pomAncestry);
+            resolveParentDependenciesRecursively(new ArrayList<>(pomAncestry));
+            resolveParentPluginsRecursively(new ArrayList<>(pomAncestry));
         }
 
         private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
@@ -433,10 +433,17 @@ public class ResolvedPom {
             }
         }
 
-        private void resolveParentPluginManagementRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
+        private void resolveParentPluginsRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
-            mergePluginManagement(pom.getPluginManagement());
+            for (Profile profile : pom.getProfiles()) {
+                if (profile.isActive(activeProfiles)) {
+                    mergePluginManagement(profile.getPluginManagement());//, pom);
+                    mergePlugins(profile.getPlugins());
+                }
+            }
+
+            mergePluginManagement(pom.getPluginManagement());//, pom);
             mergePlugins(pom.getPlugins());
 
             if (pom.getParent() != null) {
@@ -454,8 +461,9 @@ public class ResolvedPom {
                 }
 
                 pomAncestry.add(0, parentPom);
-                resolveParentPluginManagementRecursively(pomAncestry);
+                resolveParentPluginsRecursively(pomAncestry);
             }
+
         }
 
         private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
@@ -525,7 +533,60 @@ public class ResolvedPom {
         }
 
         private JsonNode mergePluginConfigurations(JsonNode configuration, JsonNode incomingConfiguration) {
-            return configuration; // TODO
+            ObjectNode ret = incomingConfiguration.deepCopy();
+            Iterator<Map.Entry<String, JsonNode>> fields = configuration.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> conf = fields.next();
+                JsonNode parentConf = ret.get(conf.getKey());
+                JsonNode parentCombine = parentConf.get("combine.children");
+                if (parentCombine != null && "append".equals(parentCombine.asText())) {
+                    JsonNode selfCombine = conf.getValue().get("combine.self");
+                    if (selfCombine != null && "override".equals(selfCombine.asText())) {
+                        ret.set(conf.getKey(), conf.getValue());
+                    } else {
+                        ret.set(conf.getKey(), combineLists(conf.getValue(), parentConf));
+                    }
+                } else {
+                    ret.set(conf.getKey(), conf.getValue());
+                }
+            }
+            return ret;
+        }
+
+        private JsonNode combineLists(JsonNode list, JsonNode incomingList) {
+            ObjectNode ret = incomingList.deepCopy();
+            ArrayList<String> keys = new ArrayList<>();
+            ret.fieldNames().forEachRemaining(keys::add);
+            keys.remove("combine.children");
+            // If no keys remaining, it's an empty list, we return the other one
+            if (keys.isEmpty()) {
+                return list.deepCopy();
+            }
+            // We can only have one key remaining in a list
+            String arrayElemField = keys.get(0);
+
+            // Copy elements of the list
+            JsonNode retNode = ret.get(arrayElemField);
+            JsonNode node = list.get(arrayElemField);
+            if (!(retNode instanceof ArrayNode)) {
+                ArrayNode arrayNode = JsonNodeFactory.instance.arrayNode();
+                arrayNode.add(retNode);
+                ret.set(arrayElemField, arrayNode);
+                retNode = arrayNode;
+            }
+            if (node instanceof ArrayNode) {
+                ((ArrayNode) retNode).addAll((ArrayNode) node);
+            } else if (node != null) {
+                ((ArrayNode) retNode).add(node);
+            }
+
+            // Check if combine.children is overridden
+            JsonNode listCombine = list.get("combine.children");
+            if (listCombine != null) {
+                ret.set("combine.children", listCombine);
+            }
+
+            return ret;
         }
 
         private List<Plugin.Execution> mergePluginExecutions(List<Plugin.Execution> executions, List<Plugin.Execution> incomingExecutions) {
