@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
@@ -180,6 +181,10 @@ public interface RewriteTest extends SourceSpecs {
                     .doesNotThrowAnyException();
             validateRecipeNameAndDescription(recipe);
             validateRecipeOptions(recipe);
+        }
+
+        if (printTree()) {
+            printTree(recipe);
         }
 
         int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();
@@ -622,6 +627,69 @@ public interface RewriteTest extends SourceSpecs {
                     .as("%s option `name` conflicts with the recipe's name. Please use a different field name for this option.", recipe.getName())
                     .isNotEqualTo("name");
         }
+    }
+
+    /**
+     * @return true if the recipe tree should be printed for a recipe during test.
+     */
+    default boolean printTree() {
+        return false;
+    }
+
+    /**
+     * Print the recipe tree for a recipe.
+     *
+     * @param recipe the
+     */
+    default void printTree(Recipe recipe) {
+        printRecipe(recipe.getDescriptor(), "");
+    }
+
+    /**
+     * Print the recipe tree for a recipe descriptor.
+     *
+     * @param rd the recipe descriptor
+     * @param prefix the indentation prefix
+     */
+    default void printRecipe(RecipeDescriptor rd, String prefix) {
+        Set<String> recipesToSkipChildren = recipesToSkipChildren();
+        if (recipesToSkipChildren.contains(rd.getName())) {
+            return;
+        }
+
+        StringBuilder recipeString = new StringBuilder(prefix + rd.getName());
+
+        if (!rd.getOptions().isEmpty()) {
+            String opts = rd.getOptions().stream().map(option -> {
+                if (option.getValue() != null) {
+                    return String.format("%s=%s", option.getName(), option.getValue());
+                }
+                return null;
+            }).filter(Objects::nonNull).collect(Collectors.joining(", "));
+            if (!opts.isEmpty()) {
+                recipeString.append(String.format(": {%s}", opts));
+            }
+        }
+
+        consumeRecipeTree().accept(recipeString.toString());
+
+        for (RecipeDescriptor child : rd.getRecipeList()) {
+            printRecipe(child, prefix + "  ");
+        }
+    }
+
+    /**
+     * @return a set of recipe names to skip when printing the recipe tree.
+     */
+    default Set<String> recipesToSkipChildren() {
+        return Collections.emptySet();
+    }
+
+    /**
+     * @return a consumer that accepts a string to print the recipe tree to. Defaults to printing to stdout.
+     */
+    default Consumer<String> consumeRecipeTree() {
+        return System.out::println;
     }
 }
 
