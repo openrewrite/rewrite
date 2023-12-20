@@ -198,7 +198,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     private boolean hasPluginGroupId(String groupId) {
         Xml.Tag tag = getCursor().getValue();
-        boolean isGroupIdFound = matchesGlob(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()), groupId);
+        boolean isGroupIdFound = matchesGlob(tag.getChildValue("groupId").orElse("org.apache.maven.plugins"), groupId);
         if (!isGroupIdFound && getResolutionResult().getPom().getProperties() != null) {
             if (tag.getChildValue("groupId").isPresent() && tag.getChildValue("groupId").get().trim().startsWith("${")) {
                 String propertyKey = tag.getChildValue("groupId").get().trim();
