@@ -1223,20 +1223,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             return variable;
         }
 
-        private void visitTypeAlias(J.VariableDeclarations typeAlias, PrintOutputCapture<P> p) {
-            beforeSyntax(typeAlias, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
-            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
-            visit(typeAlias.getLeadingAnnotations(), p);
-            for (J.Modifier m : typeAlias.getModifiers()) {
-                visitModifier(m, p);
-            }
-
-            visit(typeAlias.getTypeExpression(), p);
-            visitVariable(typeAlias.getPadding().getVariables().get(0).getElement(), p);
-            visitMarkers(typeAlias.getPadding().getVariables().get(0).getMarkers(), p);
-            afterSyntax(typeAlias, p);
-        }
-
         protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {
             if (paddedStat != null) {
                 Statement element = paddedStat.getElement();
