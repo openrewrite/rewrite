@@ -35,6 +35,7 @@ public class AnnotationService {
         return false;
     }
 
+    @SuppressWarnings("deprecation")
     public List<J.Annotation> getAllAnnotations(J j) {
         if (j instanceof J.VariableDeclarations) {
             return ((J.VariableDeclarations) j).getAllAnnotations();
