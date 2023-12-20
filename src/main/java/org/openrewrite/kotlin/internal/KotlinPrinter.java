@@ -28,10 +28,7 @@ import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.*;
-import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.kotlin.tree.KContainer;
-import org.openrewrite.kotlin.tree.KRightPadded;
-import org.openrewrite.kotlin.tree.KSpace;
+import org.openrewrite.kotlin.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
@@ -448,7 +445,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
         visit(typeAlias.getName(), p);
         delegate.visitContainer("<", typeAlias.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
-        delegate.visitLeftPadded("=", typeAlias.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+        visitLeftPadded("=", typeAlias.getPadding().getInitializer(), KLeftPadded.Location.TYPE_ALIAS_INITIALIZER, p);
         afterSyntax(typeAlias, p);
         return typeAlias;
     }
@@ -1361,6 +1358,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         p.append(before);
         visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), p);
         p.append(after == null ? "" : after);
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    protected void visitLeftPadded(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, KLeftPadded.Location location, PrintOutputCapture<P> p) {
+        if (leftPadded != null) {
+            beforeSyntax(leftPadded.getBefore(), leftPadded.getMarkers(), location.getBeforeLocation(), p);
+            if (prefix != null) {
+                p.append(prefix);
+            }
+            visit(leftPadded.getElement(), p);
+            afterSyntax(leftPadded.getMarkers(), p);
+        }
     }
 
     protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, KRightPadded.Location location, PrintOutputCapture<P> p) {

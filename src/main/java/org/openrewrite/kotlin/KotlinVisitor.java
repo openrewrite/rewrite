@@ -99,7 +99,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             b = (K.Binary) temp;
         }
         b = b.withLeft(visitAndCast(b.getLeft(), p));
-        b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), p));
+        b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), KLeftPadded.Location.BINARY_OPERATOR, p));
         b = b.withRight(visitAndCast(b.getRight(), p));
         b = b.withType(visitType(b.getType(), p));
         return b;
@@ -328,7 +328,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             t = t.getPadding().withTypeParameters(visitContainer(t.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
         if (t.getPadding().getInitializer() != null) {
-            t = t.getPadding().withInitializer(visitLeftPadded(t.getPadding().getInitializer(), p));
+            t = t.getPadding().withInitializer(visitLeftPadded(t.getPadding().getInitializer(), KLeftPadded.Location.TYPE_ALIAS_INITIALIZER, p));
         }
         t = t.withType(visitType(t.getType(), p));
         return t;
@@ -427,6 +427,35 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return js == container.getPadding().getElements() && before == container.getBefore() ?
                 container :
                 JContainer.build(before, js, container.getMarkers());
+    }
+
+    public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, KLeftPadded.Location loc, P p) {
+        if (left == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
+        setCursor(new Cursor(getCursor(), left));
+
+        Space before = visitSpace(left.getBefore(), loc.getBeforeLocation(), p);
+        T t = left.getElement();
+
+        if (t instanceof J) {
+            //noinspection unchecked
+            t = visitAndCast((J) left.getElement(), p);
+        }
+
+        setCursor(getCursor().getParent());
+        if (t == null) {
+            // If nothing changed leave AST node the same
+            if (left.getElement() == null && before == left.getBefore()) {
+                return left;
+            }
+            //noinspection ConstantConditions
+            return null;
+        }
+
+        return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, P p) {
