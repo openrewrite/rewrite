@@ -1776,16 +1776,20 @@ public interface K extends J {
         @With
         Markers markers;
 
-        @With
         @Getter
+        @With
         List<Annotation> leadingAnnotations;
 
         @Getter
         @With
         List<J.Modifier> modifiers;
 
-        @With
         @Getter
+        @With
+        Keyword keyword;
+
+        @Getter
+        @With
         Identifier name;
 
         @Nullable
@@ -1827,6 +1831,25 @@ public interface K extends J {
             return name.getSimpleName();
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static final class Keyword implements J {
+
+            @With
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            Space prefix;
+
+            @With
+            Markers markers;
+
+            @With
+            List<Annotation> annotations;
+        }
+
         @Override
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
@@ -1863,7 +1886,7 @@ public interface K extends J {
             }
 
             public TypeAlias withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new TypeAlias(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.name, typeParameters, t.initializer, t.type);
+                return t.typeParameters == typeParameters ? t : new TypeAlias(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.keyword, t.name, typeParameters, t.initializer, t.type);
             }
 
             @Nullable
@@ -1872,7 +1895,7 @@ public interface K extends J {
             }
 
             public TypeAlias withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                return t.initializer == initializer ? t : new TypeAlias(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.name, t.typeParameters, initializer, t.type);
+                return t.initializer == initializer ? t : new TypeAlias(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.keyword, t.name, t.typeParameters, initializer, t.type);
             }
         }
     }

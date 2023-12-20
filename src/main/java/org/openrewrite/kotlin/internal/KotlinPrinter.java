@@ -443,6 +443,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         for (J.Modifier m : typeAlias.getModifiers()) {
             delegate.visitModifier(m, p);
         }
+        visitSpace(typeAlias.getPrefix(), KSpace.Location.TYPE_ALIAS_KEYWORD_PREFIX, p);
+        visitMarkers(typeAlias.getMarkers(), p);
+        visit(typeAlias.getKeyword().getAnnotations(), p);
         visit(typeAlias.getName(), p);
         delegate.visitContainer("<", typeAlias.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
         visitLeftPadded("=", typeAlias.getPadding().getInitializer(), KLeftPadded.Location.TYPE_ALIAS_INITIALIZER, p);

@@ -323,6 +323,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         t = t.withModifiers(ListUtils.map(t.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
         t = t.withModifiers(ListUtils.map(t.getModifiers(), m -> visitAndCast(m, p)));
+        t = t.withKeyword(t.getKeyword().withPrefix(visitSpace(t.getPrefix(), KSpace.Location.TYPE_ALIAS_PREFIX, p)));
+        t = t.withKeyword(t.getKeyword().withAnnotations(ListUtils.map(t.getKeyword().getAnnotations(), it -> visitAndCast(it, p))));
         t = t.withName(visitAndCast(t.getName(), p));
         if (t.getPadding().getTypeParameters() != null) {
             t = t.getPadding().withTypeParameters(visitContainer(t.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));

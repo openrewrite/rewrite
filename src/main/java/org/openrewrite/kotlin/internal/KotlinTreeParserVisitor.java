@@ -1301,7 +1301,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         Set<PsiElement> consumedSpaces = preConsumedInfix(typeAlias);
 
         List<J.Modifier> modifiers = mapModifiers(typeAlias.getModifierList(), leadingAnnotations, lastAnnotations, data);
-        modifiers.add(new J.Modifier(randomId(), prefix(typeAlias.getTypeAliasKeyword(), consumedSpaces), markers, "typealias", J.Modifier.Type.LanguageExtension, emptyList()));
+        K.TypeAlias.Keyword keyword = new K.TypeAlias.Keyword(
+                randomId(),
+                prefix(typeAlias.getTypeAliasKeyword(), consumedSpaces),
+                Markers.EMPTY,
+                lastAnnotations
+        );
 
         if (typeAlias.getIdentifyingElement() == null) {
             throw new UnsupportedOperationException("TODO");
@@ -1325,6 +1330,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 markers,
                 leadingAnnotations,
                 modifiers,
+                keyword,
                 name,
                 typeParams,
                 padLeft(prefix, expr),
