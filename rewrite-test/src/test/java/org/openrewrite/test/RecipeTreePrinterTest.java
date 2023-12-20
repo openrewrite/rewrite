@@ -1,4 +1,19 @@
-package org.openrewrite.test.internal;
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.test;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -8,27 +23,18 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.java.recipes.SelectRecipeExamples;
-import org.openrewrite.test.RewriteTest;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
-class PrintRecipeTreeTest implements RewriteTest {
+class RecipeTreePrinterTest implements RewriteTest {
 
     private final StringBuilder sb = new StringBuilder();
 
-    @Override
-    public boolean printTree() {
-        return true;
-    }
-
-    @Override
-    public Consumer<String> consumeRecipeTree() {
-        return s -> sb.append(s).append(System.lineSeparator());
-    }
+    private final RecipeTreePrinter recipeTreePrinter = prefix ->
+      s -> sb.append(prefix).append(s).append(System.lineSeparator());
 
     @BeforeEach
     void beforeEach() {
@@ -38,7 +44,9 @@ class PrintRecipeTreeTest implements RewriteTest {
     @Test
     void printRecipeTreeForSimpleRecipe() {
         rewriteRun(
-          spec -> spec.recipe(new SelectRecipeExamples())
+          spec -> spec
+            .recipe(new SelectRecipeExamples())
+            .printRecipe(recipeTreePrinter)
         );
 
         assertThat(sb.toString()).isEqualTo(SelectRecipeExamples.class.getName() + System.lineSeparator());
@@ -52,7 +60,9 @@ class PrintRecipeTreeTest implements RewriteTest {
           new CompositeRecipe(Collections.singletonList(new SelectRecipeExamples()))
         ));
         rewriteRun(
-          spec -> spec.recipe(recipe)
+          spec -> spec
+            .recipe(recipe)
+            .printRecipe(recipeTreePrinter)
         );
 
         String output = sb.toString();
