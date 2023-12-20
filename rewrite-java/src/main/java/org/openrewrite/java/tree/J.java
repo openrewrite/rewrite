@@ -134,6 +134,9 @@ public interface J extends Tree {
             return withTypeExpression(typeExpression.withType(type));
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
         @Deprecated
         public List<Annotation> getAllAnnotations() {
             List<J.Annotation> allAnnotations = annotations;
@@ -1240,6 +1243,9 @@ public interface J extends Tree {
             return v.visitClassDeclaration(this, p);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
         @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
@@ -3639,6 +3645,9 @@ public interface J extends Tree {
             return new CoordinateBuilder.MethodDeclaration(this);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
         @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
@@ -5766,6 +5775,9 @@ public interface J extends Tree {
             return new CoordinateBuilder.VariableDeclarations(this);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
         @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
