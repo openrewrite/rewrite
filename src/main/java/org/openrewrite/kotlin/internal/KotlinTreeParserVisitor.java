@@ -912,7 +912,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             }
 
             if (parameter.getValOrVarKeyword() != null) {
-                modifiers.add(mapModifier(parameter.getValOrVarKeyword(), Collections.emptyList(), consumedSpaces));
+                modifiers.add(mapModifier(parameter.getValOrVarKeyword(), lastAnnotations, consumedSpaces));
             }
         }
 
@@ -1027,9 +1027,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitPropertyAccessor(KtPropertyAccessor accessor, ExecutionContext data) {
         Markers markers = Markers.EMPTY;
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
-        List<J.Modifier> modifiers = mapModifiers(accessor.getModifierList(), leadingAnnotations, emptyList(), data);
-        TypeTree returnTypeExpression = null;
         List<J.Annotation> lastAnnotations = new ArrayList<>();
+        List<J.Modifier> modifiers = mapModifiers(accessor.getModifierList(), leadingAnnotations, lastAnnotations, data);
+        TypeTree returnTypeExpression = null;
         JContainer<Statement> params;
         J.Block body = null;
         Set<PsiElement> consumedSpaces = preConsumedInfix(accessor);
@@ -1164,7 +1164,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
         List<J.Modifier> modifiers = mapModifiers(constructor.getModifierList(), leadingAnnotations, lastAnnotations, data);
-        modifiers.add(mapModifier(constructor.getConstructorKeyword(), emptyList(), preConsumedInfix(constructor)));
+        modifiers.add(mapModifier(constructor.getConstructorKeyword(), lastAnnotations, preConsumedInfix(constructor)));
 
         JavaType.Method type = methodDeclarationType(constructor);
         J.Identifier name = createIdentifier(requireNonNull(constructor.getName()), prefix(constructor.getConstructorKeyword()), type)
@@ -2609,7 +2609,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             modifiers.add(buildFinalModifier().withPrefix(Space.EMPTY));
         }
 
-        modifiers.add(new J.Modifier(randomId(), prefix(function.getFunKeyword(), prefixConsumedSet), Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, emptyList()));
+        modifiers.add(new J.Modifier(randomId(), prefix(function.getFunKeyword(), prefixConsumedSet), Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, lastAnnotations));
         J.Identifier name;
 
         JavaType.Method type = methodDeclarationType(function);

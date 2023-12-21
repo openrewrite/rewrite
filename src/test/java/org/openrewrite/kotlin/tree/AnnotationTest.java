@@ -690,4 +690,61 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/552")
+    @Test
+    void trailingAnnotationOnSecondaryConstructor() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class A1
+              class Test ( val answer : Int ) {
+                  private @A1 constructor  (   )    : this  (   42    )
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/552")
+    @Test
+    void trailingAnnotationOnPropertyAccessor() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+              var s : String = ""
+                  internal @Ann set  (   value    )     {
+                      field  =   value
+                  }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/552")
+    @Test
+    void trailingAnnotationOnTypeReference() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Anno
+              class Example  (   public    @Anno val  quux   :     String )
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/552")
+    @Test
+    void trailingAnnotationNamedFunction() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Anno
+              internal @Anno fun method() {}
+              """
+          )
+        );
+    }
 }
