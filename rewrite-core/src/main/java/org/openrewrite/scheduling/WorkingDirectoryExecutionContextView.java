@@ -52,10 +52,8 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
      *             be created.
      */
     public void setRoot(Path path) {
-        try {
-            getCycleDetails();
-        } catch (NullPointerException t) {
-            throw new IllegalStateException("The root working directory cannot be set once" +
+        if (getMessage(CURRENT_CYCLE) != null) {
+            throw new IllegalStateException("The root working directory cannot be set once " +
                                             "recipe execution has begun.");
         }
         putMessage(WORKING_DIRECTORY_ROOT, path);

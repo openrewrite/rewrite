@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -163,14 +164,9 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
         Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
           .getWorkingDirectory();
         assertThat(workingDirectory).isDirectory();
-        assertThat(workingDirectory).hasParent(WorkingDirectoryExecutionContextView.view(ctx)
-          .getWorkingDirectory());
-        if (ctx.getCycle() == 1) {
-            assertThat(workingDirectory).isEmptyDirectory();
-        } else {
-            assertThat(workingDirectory).isNotEmptyDirectory();
-        }
-        assertThat(workingDirectory.getFileName().toString()).isEqualTo("0");
+        assertThat(workingDirectory).hasParent(ctx.getMessage(WORKING_DIRECTORY_ROOT));
+        assertThat(workingDirectory).isEmptyDirectory();
+        assertThat(workingDirectory.getFileName().toString()).isEqualTo("cycle" + ctx.getCycle() + "_recipe0");
         return new Accumulator(workingDirectory);
     }
 
