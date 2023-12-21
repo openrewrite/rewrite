@@ -54,6 +54,14 @@ public class FindDeprecatedMethods extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        if (methodPattern != null) {
+            return "matching `" + methodPattern + "`";
+        }
+        return super.getInstanceNameSuffix();
+    }
+
+    @Override
     public String getDescription() {
         return "Find uses of deprecated methods in any API.";
     }

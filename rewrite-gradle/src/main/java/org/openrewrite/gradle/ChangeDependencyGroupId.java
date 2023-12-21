@@ -66,6 +66,11 @@ public class ChangeDependencyGroupId extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "Change the group of a specified Gradle dependency.";
     }

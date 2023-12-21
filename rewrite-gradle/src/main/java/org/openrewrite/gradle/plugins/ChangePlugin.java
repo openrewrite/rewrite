@@ -79,6 +79,11 @@ public class ChangePlugin extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", pluginId, newPluginId);
+    }
+
+    @Override
     public String getDescription() {
         return "Changes the selected Gradle plugin to the new plugin.";
     }
@@ -141,8 +146,8 @@ public class ChangePlugin extends Recipe {
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                         if (versionMatcher.matches(m) &&
-                                m.getSelect() instanceof J.MethodInvocation &&
-                                pluginMatcher.matches(m.getSelect())) {
+                            m.getSelect() instanceof J.MethodInvocation &&
+                            pluginMatcher.matches(m.getSelect())) {
                             m = maybeUpdateVersion(m, ctx);
                         } else if (pluginMatcher.matches(m)) {
                             m = maybeUpdatePluginSyntax(m);

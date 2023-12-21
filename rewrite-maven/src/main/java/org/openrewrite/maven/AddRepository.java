@@ -35,55 +35,72 @@ import java.util.Optional;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class AddRepository extends Recipe {
-
     private static final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/repositories");
 
-    @Option(description = "Repository id")
+    @Option(displayName = "Repository ID",
+            description = "A unique name to describe the repository.")
     String id;
 
-    @Option(description = "Repository URL")
+    @Option(displayName = "Repository URL",
+            description = "The URL of the repository.")
     String url;
 
-    @Option(required = false, description = "Repository name")
+    @Option(required = false,
+            displayName = "Repository name",
+            description = "A display name for the repository.")
     @Nullable
     String repoName;
 
-    @Option(required = false, description = "Repository layout")
+    @Option(required = false,
+            displayName = "Repository layout",
+            description = "The Maven layout of the repository.")
     @Nullable
     String layout;
 
-    @Option(required = false, description = "Snapshots from the repository are available")
+    @Option(required = false,
+            displayName = "Enable snapshots",
+            description = "Snapshots from the repository are available.")
     @Nullable
     Boolean snapshotsEnabled;
 
-    @Option(required = false, description = "Snapshots checksum policy")
+    @Option(required = false,
+            displayName = "Snapshots checksum policy",
+            description = "Governs whether snapshots require checksums.")
     @Nullable
     String snapshotsChecksumPolicy;
 
-    @Option(required = false, description = "Snapshots update policy policy")
+    @Option(required = false,
+            displayName = "Snapshots update policy",
+            description = "The policy governing snapshot updating interval.")
     @Nullable
     String snapshotsUpdatePolicy;
 
-    @Option(required = false, description = "Releases from the repository are available")
+    @Option(required = false,
+            displayName = "Releases enabled",
+            description = "Releases from the repository are available")
     @Nullable
     Boolean releasesEnabled;
 
-    @Option(required = false, description = "Releases checksum policy")
+    @Option(required = false,
+            displayName = "Releases checksum policy",
+            description = "Governs whether releases require checksums.")
     @Nullable
     String releasesChecksumPolicy;
 
-    @Option(required = false, description = "Releases update policy")
+    @Option(required = false,
+            displayName = "Releases update policy",
+            description = "The policy governing release updating interval.")
     @Nullable
     String releasesUpdatePolicy;
 
     @Override
     public String getDisplayName() {
-        return "Add Repository";
+        return "Add repository";
     }
 
     @Override
     public String getDescription() {
-        return "Adds a new Maven Repository or Update a matching repository.";
+        return "Adds a new Maven Repository or updates a matching repository.";
     }
 
     @Override
@@ -107,8 +124,8 @@ public class AddRepository extends Recipe {
                     Optional<Xml.Tag> maybeRepo = repositories.getChildren().stream()
                             .filter(repo ->
                                     "repository".equals(repo.getName()) &&
-                                            (id.equals(repo.getChildValue("id").orElse(null)) || (isReleasesEqual(repo) && isSnapshotsEqual(repo))) &&
-                                            url.equals(repo.getChildValue("url").orElse(null))
+                                    (id.equals(repo.getChildValue("id").orElse(null)) || (isReleasesEqual(repo) && isSnapshotsEqual(repo))) &&
+                                    url.equals(repo.getChildValue("url").orElse(null))
                             )
                             .findAny();
 
@@ -229,8 +246,8 @@ public class AddRepository extends Recipe {
             return isNoReleases();
         } else {
             return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null))
-                    && Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null))
-                    && Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
+                   && Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null))
+                   && Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
         }
     }
 
@@ -244,8 +261,8 @@ public class AddRepository extends Recipe {
             return isNoSnapshots();
         } else {
             return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null))
-                    && Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null))
-                    && Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
+                   && Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null))
+                   && Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
         }
     }
 

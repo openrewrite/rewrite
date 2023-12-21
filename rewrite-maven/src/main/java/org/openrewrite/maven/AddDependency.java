@@ -152,6 +152,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, version);
+    }
+
+    @Override
     public String getDescription() {
         return "Add a Maven dependency to a `pom.xml` file in the correct scope based on where it is used.";
     }

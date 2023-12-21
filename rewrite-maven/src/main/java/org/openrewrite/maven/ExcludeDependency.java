@@ -45,7 +45,7 @@ public class ExcludeDependency extends Recipe {
 
     @Option(displayName = "Scope",
             description = "Match dependencies with the specified scope. If you specify `compile`, this will NOT match dependencies in `runtime`. " +
-                    "The purpose of this is to be able to exclude dependencies that should be in a higher scope, e.g. a compile dependency that should be a test dependency.",
+                          "The purpose of this is to be able to exclude dependencies that should be in a higher scope, e.g. a compile dependency that should be a test dependency.",
             valid = {"compile", "test", "runtime", "provided"},
             example = "compile",
             required = false)
@@ -73,6 +73,11 @@ public class ExcludeDependency extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "Exclude specified dependency from any dependency that transitively includes it.";
     }
@@ -91,8 +96,8 @@ public class ExcludeDependency extends Recipe {
             if (isDependencyTag()) {
                 ResolvedDependency dependency = findDependency(tag, scope);
                 if (dependency != null &&
-                        !(matchesGlob(dependency.getGroupId(), groupId) && matchesGlob(dependency.getArtifactId(), artifactId)) &&
-                        dependency.findDependency(groupId, artifactId) != null) {
+                    !(matchesGlob(dependency.getGroupId(), groupId) && matchesGlob(dependency.getArtifactId(), artifactId)) &&
+                    dependency.findDependency(groupId, artifactId) != null) {
                     Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                     if (maybeExclusions.isPresent()) {
                         Xml.Tag exclusions = maybeExclusions.get();
@@ -100,21 +105,21 @@ public class ExcludeDependency extends Recipe {
                         List<Xml.Tag> individualExclusions = exclusions.getChildren("exclusion");
                         if (individualExclusions.stream().noneMatch(exclusion ->
                                 groupId.equals(exclusion.getChildValue("groupId").orElse(null)) &&
-                                        artifactId.equals(exclusion.getChildValue("artifactId").orElse(null)))) {
+                                artifactId.equals(exclusion.getChildValue("artifactId").orElse(null)))) {
                             doAfterVisit(new AddToTagVisitor<>(exclusions, Xml.Tag.build("" +
-                                    "<exclusion>\n" +
-                                    "<groupId>" + groupId + "</groupId>\n" +
-                                    "<artifactId>" + artifactId + "</artifactId>\n" +
-                                    "</exclusion>")));
+                                                                                         "<exclusion>\n" +
+                                                                                         "<groupId>" + groupId + "</groupId>\n" +
+                                                                                         "<artifactId>" + artifactId + "</artifactId>\n" +
+                                                                                         "</exclusion>")));
                         }
                     } else {
                         doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("" +
-                                "<exclusions>\n" +
-                                "<exclusion>\n" +
-                                "<groupId>" + groupId + "</groupId>\n" +
-                                "<artifactId>" + artifactId + "</artifactId>\n" +
-                                "</exclusion>\n" +
-                                "</exclusions>")));
+                                                                              "<exclusions>\n" +
+                                                                              "<exclusion>\n" +
+                                                                              "<groupId>" + groupId + "</groupId>\n" +
+                                                                              "<artifactId>" + artifactId + "</artifactId>\n" +
+                                                                              "</exclusion>\n" +
+                                                                              "</exclusions>")));
                     }
                     maybeUpdateModel();
                 }

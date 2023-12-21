@@ -60,6 +60,14 @@ public class FindDeprecatedFields extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        if (typePattern != null) {
+            return "matching `" + typePattern + "`";
+        }
+        return super.getInstanceNameSuffix();
+    }
+
+    @Override
     public String getDescription() {
         return "Find uses of deprecated fields in any API.";
     }

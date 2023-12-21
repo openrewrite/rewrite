@@ -60,6 +60,11 @@ public class ChangePackage extends Recipe {
     Boolean recursive;
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldPackageName, newPackageName);
+    }
+
+    @Override
     public String getDisplayName() {
         return "Rename package name";
     }

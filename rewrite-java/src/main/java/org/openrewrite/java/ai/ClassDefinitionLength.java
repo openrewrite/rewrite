@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.ai;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.table.TokenCount;
 import org.openrewrite.java.tree.J;
@@ -28,6 +29,8 @@ import org.openrewrite.java.tree.J;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ClassDefinitionLength extends Recipe {
+    transient TokenCount tokens = new TokenCount(this);
+
     @Override
     public String getDisplayName() {
         return "Calculate token length of classes";
@@ -38,18 +41,17 @@ public class ClassDefinitionLength extends Recipe {
         return "Locates class definitions and predicts the number of token in each.";
     }
 
-    transient TokenCount tokens = new TokenCount(this);
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration clazz, ExecutionContext ctx) {
                 J.ClassDeclaration cd = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                if(cd == null) {
+                if (cd == null) {
                     return cd;
                 }
-                int numberOfTokens = (int) ( cd.printTrimmed(getCursor()).length() / 3.5);
-                tokens.insertRow(ctx, new TokenCount.Row( cd.getSimpleName(), numberOfTokens));
+                int numberOfTokens = (int) (cd.printTrimmed(getCursor()).length() / 3.5);
+                tokens.insertRow(ctx, new TokenCount.Row(cd.getSimpleName(), numberOfTokens));
                 return cd;
             }
         };

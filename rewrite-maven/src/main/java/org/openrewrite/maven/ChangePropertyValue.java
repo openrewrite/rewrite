@@ -56,6 +56,11 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s=%s`", key, newValue);
+    }
+
+    @Override
     public String getDescription() {
         return "Changes the specified Maven project property value leaving the key intact.";
     }

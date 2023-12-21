@@ -25,15 +25,7 @@ import org.openrewrite.java.tree.J;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeAnnotationAttributeName extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Change annotation attribute name";
-    }
 
-    @Override
-    public String getDescription() {
-        return "Some annotations accept arguments. This recipe renames an existing attribute.";
-    }
 
     @Option(displayName = "Annotation Type",
             description = "The fully qualified name of the annotation.",
@@ -51,9 +43,28 @@ public class ChangeAnnotationAttributeName extends Recipe {
     String newAttributeName;
 
     @Override
+    public String getDisplayName() {
+        return "Change annotation attribute name";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        String shortType = annotationType.substring(annotationType.lastIndexOf('.') + 1);
+        return String.format("`@%s(%s)` to `@%s(%s)`",
+                shortType, oldAttributeName,
+                shortType, newAttributeName);
+    }
+
+    @Override
+    public String getDescription() {
+        return "Some annotations accept arguments. This recipe renames an existing attribute.";
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
             private final AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationType);
+
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(annotation, ctx);

@@ -25,6 +25,7 @@ import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.config.RecipeExample;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.table.RecipeRunStats;
@@ -107,6 +108,85 @@ public abstract class Recipe implements Cloneable {
      */
     @Language("markdown")
     public abstract String getDisplayName();
+
+    /**
+     * A human-readable display name for this recipe instance, including some descriptive
+     * text about the recipe options that are supplied, if any. The name must be
+     * initial capped with no period. For example, "Find text 'hello world'".
+     * <br/>
+     * For recipes with no options, by default this is equal to {@link #getDisplayName()}. For
+     * recipes with options, the default implementation does its best to summarize those options
+     * in a way that fits in a reasonable amount of characters.
+     * <br/>
+     * For consistency, when surrounding option descriptive text in quotes to visually differentiate
+     * it from the text before it, use single ``.
+     * <br/>
+     * Override to provide meaningful recipe instance names for recipes with complex sets of options.
+     *
+     * @return A name that describes this recipe instance.
+     */
+    @Incubating(since = "8.12.0")
+    @Language("markdown")
+    public String getInstanceName() {
+        @Language("markdown")
+        String suffix = getInstanceNameSuffix();
+        if (!StringUtils.isBlank(suffix)) {
+            if (suffix.length() > 40) {
+                if (suffix.endsWith("\"") || suffix.endsWith("'") || suffix.endsWith("`")) {
+                    suffix = suffix.substring(0, 37).trim() + "..." +
+                             suffix.charAt(suffix.length() - 1);
+                } else {
+                    suffix = suffix.substring(0, 37).trim() + "...";
+                }
+            }
+            return getDisplayName() + " " + suffix;
+        }
+
+        List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors(getClass()));
+        options.removeIf(opt -> !opt.isRequired());
+        if (options.isEmpty()) {
+            return getDisplayName();
+        }
+        if (options.size() == 1) {
+            try {
+                OptionDescriptor option = options.get(0);
+                String name = option.getName();
+                Field optionField = getClass().getDeclaredField(name);
+                optionField.setAccessible(true);
+                Object optionValue = optionField.get(this);
+                if (optionValue != null &&
+                    !Iterable.class.isAssignableFrom(optionValue.getClass()) &&
+                    !optionValue.getClass().isArray()) {
+                    String optionValueStr = optionValue.toString();
+                    return String.format("%s \"%s\"", getDisplayName(),
+                            optionValueStr.length() > 20 ?
+                                    optionValueStr.substring(0, 17).trim() + "..." :
+                                    optionValueStr
+                    );
+                }
+            } catch (NoSuchFieldException | IllegalAccessException ignore) {
+                // we tried...
+            }
+        }
+        return getDisplayName();
+    }
+
+    /**
+     * Since most instance names will be constructed with {@link #getDisplayName()} followed
+     * by some further descriptive text about the recipe's options, this method provides a convenient
+     * way to just specify the option descriptive text. When {@link #getInstanceName()} is overridden,
+     * this method has no effect. Generally either override this method or {@link #getInstanceName()}
+     * if you want to customize the instance name text.
+     * <br/>
+     * The default implementation of {@link #getInstanceName()} will furthermore do some truncation
+     * of this suffix to 40 characters, adding trailing ellipses and preserving ending single or
+     * double quotes while doing this truncation if needed.
+     *
+     * @return A suffix to append to the display name of a recipe.
+     */
+    public String getInstanceNameSuffix() {
+        return "";
+    }
 
     /**
      * A human-readable description for the recipe, consisting of one or more full

@@ -59,6 +59,20 @@ public class ChangeType extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        String oldShort = oldFullyQualifiedTypeName.substring(oldFullyQualifiedTypeName.lastIndexOf('.') + 1);
+        String newShort = newFullyQualifiedTypeName.substring(newFullyQualifiedTypeName.lastIndexOf('.') + 1);
+        if (oldShort.equals(newShort)) {
+            return String.format("`%s` to `%s`",
+                    oldFullyQualifiedTypeName,
+                    newFullyQualifiedTypeName);
+        } else {
+            return String.format("`%s` to `%s`",
+                    oldShort, newShort);
+        }
+    }
+
+    @Override
     public String getDescription() {
         return "Change a given type to another.";
     }

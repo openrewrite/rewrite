@@ -59,6 +59,11 @@ public class ChangePackaging extends Recipe {
         return "Set Maven project packaging";
     }
 
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("for `%s:%s` to `%s`", groupId, artifactId, packaging);
+    }
+
     public String getDescription() {
         return "Sets the packaging type of Maven projects. Either adds the packaging tag if it is missing or changes its context if present.";
     }

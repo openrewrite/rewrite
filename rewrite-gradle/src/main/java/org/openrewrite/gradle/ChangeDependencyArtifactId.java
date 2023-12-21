@@ -66,6 +66,11 @@ public class ChangeDependencyArtifactId extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "Change the artifact of a specified Gradle dependency.";
     }
@@ -92,8 +97,8 @@ public class ChangeDependencyArtifactId extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                        (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                                ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                           (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                            ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
                     m = m.withArguments(ListUtils.map(depArgs, platform -> updateDependency((J.MethodInvocation) platform)));
                 }
 
@@ -107,8 +112,8 @@ public class ChangeDependencyArtifactId extends Recipe {
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
                         if (!newArtifactId.equals(dependency.getArtifactId()) &&
-                                ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
-                                        (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
+                            ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
+                             (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
                             Dependency newDependency = dependency.withArtifactId(newArtifactId);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
                         }
@@ -116,10 +121,10 @@ public class ChangeDependencyArtifactId extends Recipe {
                 } else if (depArgs.get(0) instanceof G.GString) {
                     List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
                     if (strings.size() >= 2 &&
-                            strings.get(0) instanceof J.Literal) {
+                        strings.get(0) instanceof J.Literal) {
                         Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
                         if (!newArtifactId.equals(dependency.getArtifactId())
-                                && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                            && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                             dependency = dependency.withArtifactId(newArtifactId);
                             String replacement = dependency.toStringNotation();
                             m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
@@ -163,8 +168,8 @@ public class ChangeDependencyArtifactId extends Recipe {
                         }
                     }
                     if (groupId == null || artifactId == null
-                            || (version == null && !depMatcher.matches(groupId, artifactId))
-                            || (version != null && !depMatcher.matches(groupId, artifactId, version))) {
+                        || (version == null && !depMatcher.matches(groupId, artifactId))
+                        || (version != null && !depMatcher.matches(groupId, artifactId, version))) {
                         return m;
                     }
                     String delimiter = versionStringDelimiter;
