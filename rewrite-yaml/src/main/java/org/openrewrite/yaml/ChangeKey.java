@@ -42,6 +42,11 @@ public class ChangeKey extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKeyPath, newKey);
+    }
+
+    @Override
     public String getDescription() {
         return "Change a YAML mapping entry key while leaving the value intact.";
     }
@@ -55,7 +60,7 @@ public class ChangeKey extends Recipe {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 if (matcher.matches(getCursor())) {
                     if (e.getKey() instanceof Yaml.Scalar) {
-                        e = e.withKey(((Yaml.Scalar)e.getKey()).withValue(newKey));
+                        e = e.withKey(((Yaml.Scalar) e.getKey()).withValue(newKey));
                     }
                 }
                 return e;

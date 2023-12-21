@@ -24,15 +24,6 @@ import org.openrewrite.xml.tree.Xml;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveXmlTag extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Remove XML Tag";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Removes XML tags matching the provided expression.";
-    }
 
     @Option(displayName = "XPath",
             description = "An XPath expression used to find matching tags.",
@@ -45,6 +36,16 @@ public class RemoveXmlTag extends Recipe {
             example = "'**/application-*.xml'")
     @Nullable
     String fileMatcher;
+
+    @Override
+    public String getDisplayName() {
+        return "Remove XML tag";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Removes XML tags matching the provided expression.";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -60,5 +61,4 @@ public class RemoveXmlTag extends Recipe {
             }
         });
     }
-
 }

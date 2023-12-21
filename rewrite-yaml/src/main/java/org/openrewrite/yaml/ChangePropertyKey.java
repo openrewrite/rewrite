@@ -75,6 +75,11 @@ public class ChangePropertyKey extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldPropertyKey, newPropertyKey);
+    }
+
+    @Override
     public String getDescription() {
         return "Change a YAML property key while leaving the value intact. Expects dot notation for nested YAML mappings, similar to how Spring Boot interprets `application.yml` files.";
     }

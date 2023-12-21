@@ -15,8 +15,8 @@
  */
 package org.openrewrite.xml;
 
-import org.openrewrite.Recipe;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -37,6 +37,7 @@ public class RemoveEmptyXmlTags extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
+                //noinspection ConstantValue
                 if (t != null && (t.getContent() == null || t.getContent().isEmpty()) && t.getAttributes().isEmpty()) {
                     doAfterVisit(new RemoveContentVisitor<>(t, true));
                 }
