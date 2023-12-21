@@ -19,7 +19,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
@@ -34,7 +33,7 @@ import org.openrewrite.table.SourcesFileResults;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
 import static java.util.Objects.requireNonNull;
@@ -60,19 +59,16 @@ public class RecipeRunCycle {
     RecipeRunStats recipeRunStats;
     SourcesFileResults sourcesFileResults;
     SourcesFileErrors errorsTable;
-    Map<Recipe, List<Recipe>> recipeLists = new IdentityHashMap<>();
+    RecipeStack allRecipeStack = new RecipeStack();
     long cycleStartTime = System.nanoTime();
     AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
 
     @Getter
     Set<Recipe> madeChangesInThisCycle = Collections.newSetFromMap(new IdentityHashMap<>());
 
-    /**
-     * The zero-based position of the recipe that is currently doing a scan/generate/edit.
-     */
-    @NonFinal
-    @Getter
-    int recipePosition;
+    public int getRecipePosition() {
+        return allRecipeStack.getRecipePosition();
+    }
 
     public LargeSourceSet scanSources(LargeSourceSet sourceSet, int cycle) {
         return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
@@ -106,25 +102,15 @@ public class RecipeRunCycle {
     public LargeSourceSet generateSources(LargeSourceSet sourceSet, int cycle) {
         List<SourceFile> generatedInThisCycle = new ArrayList<>();
 
-        AtomicInteger recipePosition = new AtomicInteger(0);
-        Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
-        LargeSourceSet acc = sourceSet;
-        while (!allRecipesStack.isEmpty()) {
-            if (ctx.getMessage(PANIC) != null) {
-                break;
-            }
-
-            Stack<Recipe> recipeStack = allRecipesStack.pop();
+        sourceSet = allRecipeStack.apply(recipe, sourceSet, ctx, (acc, recipeStack) -> {
             Recipe recipe = recipeStack.peek();
             if (recipe.maxCycles() < cycle) {
-                continue;
+                return acc;
             }
 
-            this.recipePosition = recipePosition.getAndIncrement();
             if (recipe instanceof ScanningRecipe) {
                 //noinspection unchecked
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                sourceSet.setRecipe(recipeStack);
                 List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), generatedInThisCycle, ctx));
                 generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
                 generatedInThisCycle.addAll(generated);
@@ -132,11 +118,11 @@ public class RecipeRunCycle {
                     madeChangesInThisCycle.add(recipe);
                 }
             }
-            recurseRecipeList(allRecipesStack, recipeStack);
-        }
+            return acc;
+        });
 
-        acc = acc.generate(generatedInThisCycle);
-        return acc;
+        sourceSet = sourceSet.generate(generatedInThisCycle);
+        return sourceSet;
     }
 
     public LargeSourceSet editSources(LargeSourceSet sourceSet, int cycle) {
@@ -268,42 +254,15 @@ public class RecipeRunCycle {
 
     private LargeSourceSet mapForRecipeRecursively(LargeSourceSet sourceSet,
                                                    BiFunction<Stack<Recipe>, @Nullable SourceFile, @Nullable SourceFile> mapFn) {
-        AtomicInteger recipePosition = new AtomicInteger(0);
         return sourceSet.edit(sourceFile -> {
-            Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
-            SourceFile acc = sourceFile;
-            while (!allRecipesStack.isEmpty()) {
-                Stack<Recipe> recipeStack = allRecipesStack.pop();
-                sourceSet.setRecipe(recipeStack);
-                this.recipePosition = recipePosition.getAndIncrement();
-                acc = mapFn.apply(recipeStack, acc);
-                if (ctx.getMessage(PANIC) != null) {
-                    break;
-                }
-                recurseRecipeList(allRecipesStack, recipeStack);
-            }
+            AtomicReference<SourceFile> acc = new AtomicReference<>(sourceFile);
+            allRecipeStack.apply(recipe, sourceSet, ctx, (lss, recipeStack) -> {
+                acc.set(mapFn.apply(recipeStack, acc.get()));
+                return lss;
+            });
 
-            return acc;
+            return acc.get();
         });
-    }
-
-    private Stack<Stack<Recipe>> initRecipeStack() {
-        Stack<Stack<Recipe>> allRecipesStack = new Stack<>();
-        Stack<Recipe> rootRecipeStack = new Stack<>();
-        rootRecipeStack.push(recipe);
-        allRecipesStack.push(rootRecipeStack);
-        return allRecipesStack;
-    }
-
-    private void recurseRecipeList(Stack<Stack<Recipe>> allRecipesStack, Stack<Recipe> recipeStack) {
-        List<Recipe> recipeList = recipeLists.computeIfAbsent(recipeStack.peek(), Recipe::getRecipeList);
-        for (int i = recipeList.size() - 1; i >= 0; i--) {
-            Recipe r = recipeList.get(i);
-            Stack<Recipe> nextStack = new Stack<>();
-            nextStack.addAll(recipeStack);
-            nextStack.push(r);
-            allRecipesStack.push(nextStack);
-        }
     }
 
     private static <S extends SourceFile> S addRecipesThatMadeChanges(List<Recipe> recipeStack, S afterFile) {
