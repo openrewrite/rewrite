@@ -15,10 +15,8 @@
  */
 package org.openrewrite.maven.utilities;
 
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryConfig;
-import io.github.resilience4j.retry.RetryRegistry;
-import io.vavr.CheckedFunction1;
+import dev.failsafe.Failsafe;
+import dev.failsafe.RetryPolicy;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
@@ -35,6 +33,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
@@ -46,18 +45,18 @@ import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.internal.StreamUtils.readAllBytes;
 
 public class MavenArtifactDownloader {
-    private static final RetryConfig retryConfig = RetryConfig.custom()
-            .retryExceptions(SocketTimeoutException.class, TimeoutException.class)
+    private static final RetryPolicy<Object> retryPolicy = RetryPolicy.builder()
+            .handle(SocketTimeoutException.class, TimeoutException.class)
+            .withDelay(Duration.ofMillis(500))
+            .withJitter(0.1)
+            .withMaxRetries(5)
             .build();
-
-    private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
-    private static final Retry mavenDownloaderRetry = retryRegistry.retry("MavenDownloader");
 
     private final MavenArtifactCache mavenArtifactCache;
     private final Map<String, MavenSettings.Server> serverIdToServer;
     private final Consumer<Throwable> onError;
     private final HttpSender httpSender;
-    private final CheckedFunction1<HttpSender.Request, HttpSender.Response> sendRequest;
+
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
@@ -70,7 +69,6 @@ public class MavenArtifactDownloader {
                                    HttpSender httpSender,
                                    Consumer<Throwable> onError) {
         this.httpSender = httpSender;
-        this.sendRequest = Retry.decorateCheckedFunction(mavenDownloaderRetry, httpSender::send);
         this.mavenArtifactCache = mavenArtifactCache;
         this.onError = onError;
         this.serverIdToServer = settings == null || settings.getServers() == null ?
@@ -93,12 +91,12 @@ public class MavenArtifactDownloader {
         return mavenArtifactCache.computeArtifact(dependency, () -> {
             String uri = requireNonNull(dependency.getRepository(),
                     String.format("Repository for dependency '%s' was null.", dependency)).getUri() + "/" +
-                    dependency.getGroupId().replace('.', '/') + '/' +
-                    dependency.getArtifactId() + '/' +
-                    dependency.getVersion() + '/' +
-                    dependency.getArtifactId() + '-' +
-                    (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                    ".jar";
+                         dependency.getGroupId().replace('.', '/') + '/' +
+                         dependency.getArtifactId() + '/' +
+                         dependency.getVersion() + '/' +
+                         dependency.getArtifactId() + '-' +
+                         (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                         ".jar";
 
             InputStream bodyStream;
 
@@ -108,7 +106,7 @@ public class MavenArtifactDownloader {
                 bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
             } else {
                 HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
-                try (HttpSender.Response response = sendRequest.apply(request.build());
+                try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                      InputStream body = response.getBody()) {
                     if (!response.isSuccessful() || body == null) {
                         onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s. Response was %d",
@@ -129,7 +127,7 @@ public class MavenArtifactDownloader {
     private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
-            if(authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
+            if (authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
                 for (MavenSettings.HttpHeader header : authInfo.getConfiguration().getHttpHeaders()) {
                     request.withHeader(header.getName(), header.getValue());
                 }
