@@ -70,7 +70,7 @@ public class RecipeScheduler {
             // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
             Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
             try {
-                RecipeRunCycle cycle = new RecipeRunCycle(recipe, i, rootCursor, ctxWithWatch,
+                RecipeRunCycle<LargeSourceSet> cycle = new RecipeRunCycle<>(recipe, i, rootCursor, ctxWithWatch,
                         recipeRunStats, sourceFileResults, errorsTable);
                 ctxWithWatch.putCycle(cycle);
                 after.beforeCycle();

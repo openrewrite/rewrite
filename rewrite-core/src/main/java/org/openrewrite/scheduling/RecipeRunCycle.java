@@ -33,6 +33,7 @@ import org.openrewrite.table.SourcesFileResults;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
@@ -40,7 +41,7 @@ import static org.openrewrite.Recipe.PANIC;
 
 @RequiredArgsConstructor
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-public class RecipeRunCycle {
+public class RecipeRunCycle<LSS extends LargeSourceSet> {
     /**
      * The root recipe that is running, which may contain a recipe list which will
      * also be iterated as part of this cycle.
@@ -69,8 +70,8 @@ public class RecipeRunCycle {
         return allRecipeStack.getRecipePosition();
     }
 
-    public LargeSourceSet scanSources(LargeSourceSet sourceSet) {
-        return sourceSet.edit(sourceFile ->
+    public LSS scanSources(LSS sourceSet) {
+        return applyToSourceSet(sourceSet, sourceFile ->
                 allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
                     Recipe recipe = recipeStack.peek();
                     if (source == null) {
@@ -100,7 +101,7 @@ public class RecipeRunCycle {
         );
     }
 
-    public LargeSourceSet generateSources(LargeSourceSet sourceSet) {
+    public LSS generateSources(LSS sourceSet) {
         List<SourceFile> generatedInThisCycle = allRecipeStack.reduce(sourceSet, recipe, ctx, (acc, recipeStack) -> {
             Recipe recipe = recipeStack.peek();
             if (recipe instanceof ScanningRecipe) {
@@ -116,17 +117,17 @@ public class RecipeRunCycle {
             return acc;
         }, new ArrayList<>());
 
-        sourceSet = sourceSet.generate(generatedInThisCycle);
-        return sourceSet;
+        // noinspection unchecked
+        return (LSS) sourceSet.generate(generatedInThisCycle);
     }
 
-    public LargeSourceSet editSources(LargeSourceSet sourceSet) {
+    public LSS editSources(LSS sourceSet) {
         // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
         // propagate shared root cursor
         // skip edits made to generated source files so that they don't show up in a diff
         // that later fails to apply on a freshly cloned repository
         // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-        return sourceSet.edit(sourceFile ->
+        return applyToSourceSet(sourceSet, sourceFile ->
                 allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
                     Recipe recipe = recipeStack.peek();
                     if (source == null) {
@@ -185,6 +186,11 @@ public class RecipeRunCycle {
                     return after;
                 }, sourceFile)
         );
+    }
+
+    protected LSS applyToSourceSet(LSS sourceSet, UnaryOperator<SourceFile> op) {
+        //noinspection unchecked
+        return (LSS) sourceSet.edit(op);
     }
 
     private void recordSourceFileResult(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
