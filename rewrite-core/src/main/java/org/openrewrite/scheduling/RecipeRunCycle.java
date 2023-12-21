@@ -126,64 +126,64 @@ public class RecipeRunCycle {
         // skip edits made to generated source files so that they don't show up in a diff
         // that later fails to apply on a freshly cloned repository
         // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-        return sourceSet.edit(sourceFile1 ->
-                allRecipeStack.reduce(sourceSet, recipe, ctx, (sourceFile, recipeStack) -> {
-                    Recipe recipe1 = recipeStack.peek();
-                    if (sourceFile == null) {
+        return sourceSet.edit(sourceFile ->
+                allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
+                    Recipe recipe = recipeStack.peek();
+                    if (source == null) {
                         return null;
                     }
 
-                    SourceFile after = sourceFile;
+                    SourceFile after = source;
 
                     try {
                         Duration duration = Duration.ofNanos(System.nanoTime() - cycleStartTime);
                         if (duration.compareTo(ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4))) > 0) {
                             if (thrownErrorOnTimeout.compareAndSet(false, true)) {
-                                RecipeTimeoutException t = new RecipeTimeoutException(recipe1);
+                                RecipeTimeoutException t = new RecipeTimeoutException(recipe);
                                 ctx.getOnError().accept(t);
                                 ctx.getOnTimeout().accept(t, ctx);
                             }
-                            return sourceFile;
+                            return source;
                         }
 
                         if (ctx.getMessage(PANIC) != null) {
-                            return sourceFile;
+                            return source;
                         }
 
-                        TreeVisitor<?, ExecutionContext> visitor = recipe1.getVisitor();
+                        TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
                         // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
                         visitor.setCursor(rootCursor);
 
-                        after = recipeRunStats.recordEdit(recipe1, () -> {
-                            if (visitor.isAcceptable(sourceFile, ctx)) {
+                        after = recipeRunStats.recordEdit(recipe, () -> {
+                            if (visitor.isAcceptable(source, ctx)) {
                                 // propagate shared root cursor
-                                return (SourceFile) visitor.visit(sourceFile, ctx, rootCursor);
+                                return (SourceFile) visitor.visit(source, ctx, rootCursor);
                             }
-                            return sourceFile;
+                            return source;
                         });
 
-                        if (after != sourceFile) {
-                            madeChangesInThisCycle.add(recipe1);
-                            recordSourceFileResult(sourceFile, after, recipeStack, ctx);
-                            if (sourceFile.getMarkers().findFirst(Generated.class).isPresent()) {
+                        if (after != source) {
+                            madeChangesInThisCycle.add(recipe);
+                            recordSourceFileResult(source, after, recipeStack, ctx);
+                            if (source.getMarkers().findFirst(Generated.class).isPresent()) {
                                 // skip edits made to generated source files so that they don't show up in a diff
                                 // that later fails to apply on a freshly cloned repository
-                                return sourceFile;
+                                return source;
                             }
-                            recipeRunStats.recordSourceFileChanged(sourceFile, after);
+                            recipeRunStats.recordSourceFileChanged(source, after);
                         } else if (ctx.hasNewMessages()) {
                             // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-                            madeChangesInThisCycle.add(recipe1);
+                            madeChangesInThisCycle.add(recipe);
                             ctx.resetHasNewMessages();
                         }
                     } catch (Throwable t) {
-                        after = handleError(recipe1, sourceFile, after, t);
+                        after = handleError(recipe, source, after, t);
                     }
-                    if (after != null && after != sourceFile) {
+                    if (after != null && after != source) {
                         after = addRecipesThatMadeChanges(recipeStack, after);
                     }
                     return after;
-                }, sourceFile1)
+                }, sourceFile)
         );
     }
 
