@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -30,6 +31,9 @@ import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveImplements extends Recipe {
+
+    private static final AnnotationMatcher OVERRIDE_MATCHER = new AnnotationMatcher("java.lang.Override");
+
     @Override
     public String getDisplayName() {
         return "Remove interface implementations";
@@ -69,8 +73,14 @@ public class RemoveImplements extends Recipe {
                 return super.visitClassDeclaration(classDeclaration, ctx);
             }
         }, new JavaIsoVisitor<ExecutionContext>() {
+            @Nullable
+            AnnotationService annotationService;
+
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration cd, ExecutionContext ctx) {
+                if (annotationService == null) {
+                     annotationService = service(AnnotationService.class);
+                }
                 if (!(cd.getType() instanceof JavaType.Class) || cd.getImplements() == null) {
                     return super.visitClassDeclaration(cd, ctx);
                 }
@@ -104,7 +114,8 @@ public class RemoveImplements extends Recipe {
                 if (md.getName().getType() != null) {
                     md = md.withName(md.getName().withType(mt));
                 }
-                if (md.getAllAnnotations().stream().noneMatch(ann -> isOfClassType(ann.getType(), "java.lang.Override")) || TypeUtils.isOverride(md.getMethodType())) {
+                assert annotationService != null;
+                if (!annotationService.matches(md, OVERRIDE_MATCHER) || TypeUtils.isOverride(md.getMethodType())) {
                     return super.visitMethodDeclaration(md, ctx);
                 }
                 md = (J.MethodDeclaration) new RemoveAnnotation("@java.lang.Override").getVisitor().visitNonNull(md, ctx, getCursor().getParentOrThrow());

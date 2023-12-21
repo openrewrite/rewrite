@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -267,8 +268,9 @@ class AnnotationTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
-                    assertThat(method.getAllAnnotations()).hasSize(1);
-                    assertThat(method.getAllAnnotations().get(0).getSimpleName()).isEqualTo("Deprecated");
+                    AnnotationService service = cu.service(AnnotationService.class);
+                    assertThat(service.getAllAnnotations(method)).hasSize(1);
+                    assertThat(service.getAllAnnotations(method).get(0).getSimpleName()).isEqualTo("Deprecated");
                     return method;
                 }
             }.visit(cu, 0))
@@ -308,26 +310,27 @@ class AnnotationTest implements RewriteTest {
               public @interface Multi2 {}
               """,
             spec -> spec.afterRecipe(cu -> {
+                AnnotationService service = cu.service(AnnotationService.class);
                 J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
-                assertThat(field.getAllAnnotations()).satisfiesExactly(
+                assertThat(service.getAllAnnotations(field)).satisfiesExactly(
                   leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
                 );
                 J.ParameterizedType fieldType = (J.ParameterizedType) field.getTypeExpression();
                 assertThat(fieldType).isNotNull();
                 J.AnnotatedType annotatedType = (J.AnnotatedType) fieldType.getClazz();
-                assertThat(annotatedType.getAllAnnotations()).satisfiesExactly(
+                assertThat(service.getAllAnnotations(annotatedType)).satisfiesExactly(
                   multi1 -> assertThat(multi1.getSimpleName()).isEqualTo("Multi1"),
                   multi2 -> assertThat(multi2.getSimpleName()).isEqualTo("Multi2")
                 );
 
                 J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
-                assertThat(method.getAllAnnotations()).satisfiesExactly(
+                assertThat(service.getAllAnnotations(method)).satisfiesExactly(
                   leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
                 );
                 J.ParameterizedType returnType = (J.ParameterizedType) method.getReturnTypeExpression();
                 assertThat(returnType).isNotNull();
                 annotatedType = (J.AnnotatedType) returnType.getClazz();
-                assertThat(annotatedType.getAllAnnotations()).satisfiesExactly(
+                assertThat(service.getAllAnnotations(annotatedType)).satisfiesExactly(
                   multi1 -> assertThat(multi1.getSimpleName()).isEqualTo("Multi1"),
                   multi2 -> assertThat(multi2.getSimpleName()).isEqualTo("Multi2")
                 );
