@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.declarations.FirResolvedImport;
+import org.jetbrains.kotlin.fir.expressions.FirCallableReferenceAccess;
 import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference;
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol;
@@ -269,37 +270,36 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitCallableReferenceExpression(KtCallableReferenceExpression expression, ExecutionContext data) {
         FirElement firElement = psiElementAssociations.primary(expression.getCallableReference());
-        FirResolvedCallableReference reference;
-        if (!(firElement instanceof FirResolvedCallableReference)) {
-            throw new UnsupportedOperationException(String.format("Unsupported callable reference: fir: %s, psi : %s with code: %s | sub-psi : %s | sub-fir : %s",
+        if (!(firElement instanceof FirResolvedCallableReference || firElement instanceof FirCallableReferenceAccess)) {
+            throw new UnsupportedOperationException(String.format("Unsupported callable reference: fir class: %s, fir: %s, psi class: %s.",
                     firElement == null ? "null" : firElement.getClass().getName(),
-                    expression.getClass().getName(),
-                    expression.getText(),
-                    PsiTreePrinter.print(expression),
-                    PsiTreePrinter.print(psiElementAssociations.primary(expression))));
-        } else {
-            reference = (FirResolvedCallableReference) psiElementAssociations.primary(expression.getCallableReference());
+                    PsiTreePrinter.print(psiElementAssociations.primary(expression)),
+                    expression.getClass().getName()));
         }
         JavaType.Method methodReferenceType = null;
-        if (reference != null && reference.getResolvedSymbol() instanceof FirNamedFunctionSymbol) {
-            methodReferenceType = psiElementAssociations.getTypeMapping().methodDeclarationType(
-                    ((FirNamedFunctionSymbol) reference.getResolvedSymbol()).getFir(),
-                    expression.getReceiverExpression()
-            );
-        }
-        if (reference != null && reference.getResolvedSymbol() instanceof FirConstructorSymbol) {
-            methodReferenceType = psiElementAssociations.getTypeMapping().methodDeclarationType(
-                    ((FirConstructorSymbol) reference.getResolvedSymbol()).getFir(),
-                    expression.getReceiverExpression()
-            );
-        }
         JavaType.Variable fieldReferenceType = null;
-        if (reference != null && reference.getResolvedSymbol() instanceof FirPropertySymbol) {
-            fieldReferenceType = psiElementAssociations.getTypeMapping().variableType(
-                    ((FirPropertySymbol) reference.getResolvedSymbol()).getFir(),
-                    expression.getReceiverExpression()
-            );
+        if (firElement instanceof FirResolvedCallableReference) {
+            FirResolvedCallableReference reference = (FirResolvedCallableReference) psiElementAssociations.primary(expression.getCallableReference());
+            if (reference != null && reference.getResolvedSymbol() instanceof FirNamedFunctionSymbol) {
+                methodReferenceType = psiElementAssociations.getTypeMapping().methodDeclarationType(
+                        ((FirNamedFunctionSymbol) reference.getResolvedSymbol()).getFir(),
+                        expression.getReceiverExpression()
+                );
+            }
+            if (reference != null && reference.getResolvedSymbol() instanceof FirConstructorSymbol) {
+                methodReferenceType = psiElementAssociations.getTypeMapping().methodDeclarationType(
+                        ((FirConstructorSymbol) reference.getResolvedSymbol()).getFir(),
+                        expression.getReceiverExpression()
+                );
+            }
+            if (reference != null && reference.getResolvedSymbol() instanceof FirPropertySymbol) {
+                fieldReferenceType = psiElementAssociations.getTypeMapping().variableType(
+                        ((FirPropertySymbol) reference.getResolvedSymbol()).getFir(),
+                        expression.getReceiverExpression()
+                );
+            }
         }
+
         JRightPadded<Expression> receiver;
         if (expression.getReceiverExpression() == null) {
             receiver = padRight(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY),

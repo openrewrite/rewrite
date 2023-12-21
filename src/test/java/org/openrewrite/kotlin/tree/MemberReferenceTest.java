@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
@@ -134,6 +135,28 @@ class MemberReferenceTest implements RewriteTest {
             """
               fun method ( s: List<String   ? > ) {
                   s.none( CharSequence  ?   :: isNullOrBlank)
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/386")
+    @Test
+    void firCallableReferenceAccess() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          kotlin(
+            """
+              open class Foo<out A, out B> {
+                  data class Bar<out B>(val value: B) : Foo<Nothing, B>()
+                  @Suppress("UNUSED_PARAMETER")
+                  inline fun method(action: (right: B) -> Unit): Foo<A, B>? {
+                      return null
+                  }
+              }
+              fun test() {
+                Foo.Bar(1).method(::unresolved)
               }
               """
           )
