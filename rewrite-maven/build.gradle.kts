@@ -15,7 +15,7 @@ dependencies {
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
 
-    implementation("org.antlr:antlr4:4.11.1")
+    implementation("org.antlr:antlr4-runtime:4.11.1")
     implementation("dev.failsafe:failsafe:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
