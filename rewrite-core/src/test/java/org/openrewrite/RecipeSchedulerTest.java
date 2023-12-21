@@ -16,11 +16,11 @@
 package org.openrewrite;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -69,7 +69,7 @@ class RecipeSchedulerTest implements RewriteTest {
     @Test
     void suppliedWorkingDirectoryRoot(@TempDir Path path) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        ctx.putMessage(ExecutionContext.WORKING_DIRECTORY_ROOT, path);
+        WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
         AtomicInteger cycle = new AtomicInteger(0);
         rewriteRun(
           spec -> spec.executionContext(ctx).recipe(toRecipe(() -> new TreeVisitor<>() {
@@ -77,7 +77,8 @@ class RecipeSchedulerTest implements RewriteTest {
               public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                   assert tree != null;
                   PlainText plainText = (PlainText) tree;
-                  Path workingDirectory = ctx.getWorkingDirectory();
+                  Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
+                    .getWorkingDirectory();
                   assertThat(workingDirectory).hasParent(path);
                   if (cycle.incrementAndGet() == 2) {
                       assertThat(workingDirectory.resolve("foo.txt")).hasContent("foo");
@@ -94,9 +95,9 @@ class RecipeSchedulerTest implements RewriteTest {
     }
 
     @Test
-    void managedWorkingDirectoryWithScanningRecipe(@TempDir Path path) {
+    void managedWorkingDirectoryWithRecipe(@TempDir Path path) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        ctx.putMessage(ExecutionContext.WORKING_DIRECTORY_ROOT, path);
+        WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
         rewriteRun(
           spec -> spec.executionContext(ctx).recipe(new RecipeWritingToFile()),
           text("foo", "bar")
@@ -159,9 +160,11 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
-        Path workingDirectory = ctx.getWorkingDirectory();
+        Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
+          .getWorkingDirectory();
         assertThat(workingDirectory).isDirectory();
-        assertThat(workingDirectory).hasParent(ctx.getMessage(ExecutionContext.WORKING_DIRECTORY_ROOT));
+        assertThat(workingDirectory).hasParent(WorkingDirectoryExecutionContextView.view(ctx)
+          .getWorkingDirectory());
         if (ctx.getCycle() == 1) {
             assertThat(workingDirectory).isEmptyDirectory();
         } else {
@@ -177,9 +180,10 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 assert tree != null;
-                Path workingDirectory = ctx.getWorkingDirectory();
+                Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
+                  .getWorkingDirectory();
                 assertThat(workingDirectory).isDirectory();
-                assertThat(acc.getWorkingDirectory()).isEqualTo(workingDirectory);
+                assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
                 assertDoesNotThrow(() -> {
                     Files.writeString(workingDirectory.resolve("manifest.txt"), ((SourceFile) tree).getSourcePath().toString(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
                 });
@@ -198,19 +202,19 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
         return new TreeVisitor<>() {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                Path workingDirectory = ctx.getWorkingDirectory();
+                Path workingDirectory = WorkingDirectoryExecutionContextView
+                  .view(ctx).getWorkingDirectory();
                 assertThat(workingDirectory).isDirectory();
-                assertThat(acc.getWorkingDirectory()).isEqualTo(workingDirectory);
+                assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
                 assertDoesNotThrow(() -> {
                     assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
                 });
+                assert tree instanceof PlainText;
                 return ((PlainText) tree).withText("bar");
             }
         };
     }
 
-    @Data
-    public class Accumulator {
-        final Path workingDirectory;
+    public record Accumulator(Path workingDirectory) {
     }
 }
