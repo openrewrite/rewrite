@@ -18,6 +18,7 @@ package org.openrewrite;
 import lombok.AllArgsConstructor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
@@ -25,13 +26,18 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
@@ -100,7 +106,31 @@ class RecipeSchedulerTest implements RewriteTest {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
         rewriteRun(
-          spec -> spec.executionContext(ctx).recipe(new RecipeWritingToFile()),
+          spec -> spec.executionContext(ctx).recipe(new RecipeWritingToFile(0)),
+          text("foo", "bar")
+        );
+        assertThat(path).doesNotExist();
+    }
+
+    @Test
+    void managedWorkingDirectoryWithMultipleRecipes(@TempDir Path path) {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
+        DeclarativeRecipe recipe = new DeclarativeRecipe(
+          "root",
+          "Root recipe",
+          "Root recipe.",
+          emptySet(),
+          null,
+          URI.create("dummy:recipe.yml"),
+          false,
+          emptyList()
+        );
+        recipe.addUninitialized(new RecipeWritingToFile(1));
+        recipe.addUninitialized(new RecipeWritingToFile(2));
+        recipe.initialize(List.of(), Map.of());
+        rewriteRun(
+          spec -> spec.executionContext(ctx).recipe(recipe),
           text("foo", "bar")
         );
         assertThat(path).doesNotExist();
@@ -149,6 +179,8 @@ class BoomException extends RuntimeException {
 @AllArgsConstructor
 class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator> {
 
+    final int position;
+
     @Override
     public String getDisplayName() {
         return "Write text to a file";
@@ -161,13 +193,19 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
+        Path workingDirectory = validateExecutionContext(ctx);
+        return new Accumulator(workingDirectory);
+    }
+
+    private Path validateExecutionContext(ExecutionContext ctx) {
         Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
           .getWorkingDirectory();
         assertThat(workingDirectory).isDirectory();
         assertThat(workingDirectory).hasParent(ctx.getMessage(WORKING_DIRECTORY_ROOT));
-        assertThat(workingDirectory).isEmptyDirectory();
-        assertThat(workingDirectory.getFileName().toString()).isEqualTo("cycle" + ctx.getCycle() + "_recipe0");
-        return new Accumulator(workingDirectory);
+        assertThat(ctx.getCycleDetails().getRecipePosition()).isEqualTo(position);
+        assertThat(workingDirectory.getFileName().toString())
+          .isEqualTo("cycle" + ctx.getCycle() + "_recipe" + position);
+        return workingDirectory;
     }
 
     @Override
@@ -176,10 +214,9 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 assert tree != null;
-                Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
-                  .getWorkingDirectory();
-                assertThat(workingDirectory).isDirectory();
+                Path workingDirectory = validateExecutionContext(ctx);
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
+                assertThat(workingDirectory).isEmptyDirectory();
                 assertDoesNotThrow(() -> {
                     Files.writeString(workingDirectory.resolve("manifest.txt"), ((SourceFile) tree).getSourcePath().toString(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
                 });
@@ -190,7 +227,13 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
 
     @Override
     public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
-        return super.generate(acc, ctx);
+        Path workingDirectory = validateExecutionContext(ctx);
+        assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
+        assertThat(workingDirectory).isDirectoryContaining(path -> path.getFileName().toString().equals("manifest.txt"));
+        assertDoesNotThrow(() -> {
+            assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
+        });
+        return List.of();
     }
 
     @Override
@@ -202,6 +245,7 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
                   .view(ctx).getWorkingDirectory();
                 assertThat(workingDirectory).isDirectory();
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
+                assertThat(workingDirectory).isDirectoryContaining(path -> path.getFileName().toString().equals("manifest.txt"));
                 assertDoesNotThrow(() -> {
                     assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
                 });

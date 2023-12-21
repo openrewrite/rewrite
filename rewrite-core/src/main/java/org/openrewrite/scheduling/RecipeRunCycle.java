@@ -106,6 +106,7 @@ public class RecipeRunCycle {
     public LargeSourceSet generateSources(LargeSourceSet sourceSet, int cycle) {
         List<SourceFile> generatedInThisCycle = new ArrayList<>();
 
+        AtomicInteger recipePosition = new AtomicInteger(0);
         Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
         LargeSourceSet acc = sourceSet;
         while (!allRecipesStack.isEmpty()) {
@@ -119,6 +120,7 @@ public class RecipeRunCycle {
                 continue;
             }
 
+            this.recipePosition = recipePosition.getAndIncrement();
             if (recipe instanceof ScanningRecipe) {
                 //noinspection unchecked
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
@@ -267,7 +269,6 @@ public class RecipeRunCycle {
     private LargeSourceSet mapForRecipeRecursively(LargeSourceSet sourceSet,
                                                    BiFunction<Stack<Recipe>, @Nullable SourceFile, @Nullable SourceFile> mapFn) {
         AtomicInteger recipePosition = new AtomicInteger(0);
-        this.recipePosition = 0;
         return sourceSet.edit(sourceFile -> {
             Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
             SourceFile acc = sourceFile;
