@@ -41,21 +41,24 @@ class RecipeStack {
     @Getter
     int recipePosition;
 
-    public LargeSourceSet apply(Recipe recipe, LargeSourceSet largeSourceSet, ExecutionContext ctx,
-                                BiFunction<LargeSourceSet, Stack<Recipe>, LargeSourceSet> consumer) {
+    public <T> T reduce(LargeSourceSet sourceSet, Recipe recipe, ExecutionContext ctx,
+                        BiFunction<T, Stack<Recipe>, T> consumer, T acc) {
         init(recipe);
         AtomicInteger recipePosition = new AtomicInteger(0);
         while (!allRecipesStack.isEmpty()) {
             if (ctx.getMessage(PANIC) != null) {
                 break;
+            } else if (recipe.maxCycles() < ctx.getCycle()) {
+                continue;
             }
+
             this.recipePosition = recipePosition.getAndIncrement();
             Stack<Recipe> recipeStack = allRecipesStack.pop();
-            largeSourceSet.setRecipe(recipeStack);
-            largeSourceSet = consumer.apply(largeSourceSet, recipeStack);
+            sourceSet.setRecipe(recipeStack);
+            acc = consumer.apply(acc, recipeStack);
             recurseRecipeList(recipeStack);
         }
-        return largeSourceSet;
+        return acc;
     }
 
     private void init(Recipe recipe) {

@@ -78,12 +78,12 @@ public class RecipeScheduler {
                 // pre-transformation scanning phase where there can only be modifications to capture exceptions
                 // occurring during the scanning phase
                 if (hasScanningRecipe(recipe)) {
-                    after = cycle.scanSources(after, i);
+                    after = cycle.scanSources(after);
                 }
 
                 // transformation phases
-                after = cycle.generateSources(after, i);
-                after = cycle.editSources(after, i);
+                after = cycle.generateSources(after);
+                after = cycle.editSources(after);
 
                 boolean anyRecipeCausingAnotherCycle = false;
                 for (Recipe madeChanges : cycle.getMadeChangesInThisCycle()) {
