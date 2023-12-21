@@ -84,8 +84,7 @@ class ImportTest implements RewriteTest {
             """
               import a.b.method
               
-              class A {
-              }
+              class A
               """
           )
         );
@@ -118,20 +117,20 @@ class ImportTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              import java.lang.Integer as Number
+              import kotlin.Int as Number
               var max = Number.MAX_VALUE
               """
           )
         );
     }
 
+    @SuppressWarnings("RedundantSemicolon")
     @Test
     void importWithTrailingSemiColon() {
         rewriteRun(
           kotlin(
             """
-              import java.util.List;
-              import java .  util   . Map;
+              import kotlin . collections . List ;
               
               class T
               """
@@ -153,4 +152,14 @@ class ImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/570")
+    @Test
+    void escapedImport() {
+        rewriteRun(
+          kotlin(
+            """
+              import org.`should be equal to`
+              """)
+        );
+    }
 }
