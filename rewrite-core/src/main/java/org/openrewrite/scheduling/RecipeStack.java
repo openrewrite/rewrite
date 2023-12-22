@@ -48,14 +48,14 @@ class RecipeStack {
         while (!allRecipesStack.isEmpty()) {
             if (ctx.getMessage(PANIC) != null) {
                 break;
-            } else if (recipe.maxCycles() < ctx.getCycle()) {
-                continue;
             }
 
             this.recipePosition = recipePosition.getAndIncrement();
             Stack<Recipe> recipeStack = allRecipesStack.pop();
-            sourceSet.setRecipe(recipeStack);
-            acc = consumer.apply(acc, recipeStack);
+            if (recipeStack.peek().maxCycles() >= ctx.getCycle()) {
+                sourceSet.setRecipe(recipeStack);
+                acc = consumer.apply(acc, recipeStack);
+            }
             recurseRecipeList(recipeStack);
         }
         return acc;
