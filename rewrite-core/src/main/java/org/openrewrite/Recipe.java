@@ -281,6 +281,7 @@ public abstract class Recipe implements Cloneable {
         return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
+    @SuppressWarnings("unused")
     public Validated<Object> validate(ExecutionContext ctx) {
         Validated<Object> validated = validate();
 
