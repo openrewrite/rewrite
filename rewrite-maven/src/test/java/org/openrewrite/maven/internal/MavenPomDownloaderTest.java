@@ -68,7 +68,7 @@ class MavenPomDownloaderTest {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest recordedRequest) {
-                    return new MockResponse().setResponseCode(responseCode).setBody("body");
+                    return new MockResponse().setResponseCode(responseCode).setBody("");
                 }
             });
             mockRepo.start();
