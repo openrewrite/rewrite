@@ -16,6 +16,7 @@
 package org.openrewrite.maven.internal;
 
 import dev.failsafe.Failsafe;
+import dev.failsafe.FailsafeException;
 import dev.failsafe.RetryPolicy;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Metrics;
@@ -134,7 +135,7 @@ public class MavenPomDownloader {
         this.mavenCache = this.ctx.getPomCache();
     }
 
-    byte[] sendRequest(HttpSender.Request request) throws HttpSenderResponseException {
+    byte[] sendRequest(HttpSender.Request request) throws Throwable {
         long start = System.nanoTime();
         try {
             return Failsafe.with(retryPolicy).get(() -> {
@@ -145,14 +146,11 @@ public class MavenPomDownloader {
                     return response.getBodyAsBytes();
                 }
             });
-        } catch (Throwable t) {
-            if (t.getCause() != null) {
-                if (t.getCause() instanceof HttpSenderResponseException) {
-                    throw (HttpSenderResponseException) t.getCause();
-                }
-                throw new HttpSenderResponseException(t.getCause(), null);
+        } catch (FailsafeException failsafeException) {
+            if (failsafeException.getCause() != null) {
+                throw failsafeException.getCause();
             }
-            throw t;
+            throw failsafeException;
         } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }

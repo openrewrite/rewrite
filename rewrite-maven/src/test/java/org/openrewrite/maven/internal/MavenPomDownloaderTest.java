@@ -121,7 +121,7 @@ class MavenPomDownloaderTest {
     }
 
     @Test
-    void retryConnectException() throws IOException, MavenPomDownloader.HttpSenderResponseException {
+    void retryConnectException() throws Throwable {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         try (MockWebServer server = new MockWebServer()) {
             server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
