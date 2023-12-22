@@ -41,7 +41,7 @@ public class WatchableExecutionContext implements ExecutionContext {
         delegate.putMessage(key, value);
     }
 
-    public void putCycle(RecipeRunCycle cycle) {
+    public void putCycle(RecipeRunCycle<?> cycle) {
         delegate.putMessage(CURRENT_CYCLE, cycle);
     }
 

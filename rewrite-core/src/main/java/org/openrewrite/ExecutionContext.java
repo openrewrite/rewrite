@@ -101,7 +101,7 @@ public interface ExecutionContext {
         return getCycleDetails().getCycle();
     }
 
-    default RecipeRunCycle getCycleDetails() {
+    default RecipeRunCycle<?> getCycleDetails() {
         return requireNonNull(getMessage(CURRENT_CYCLE));
     }
 }
