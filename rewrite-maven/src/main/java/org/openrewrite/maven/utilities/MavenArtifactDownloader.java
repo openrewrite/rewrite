@@ -16,6 +16,7 @@
 package org.openrewrite.maven.utilities;
 
 import dev.failsafe.Failsafe;
+import dev.failsafe.FailsafeException;
 import dev.failsafe.RetryPolicy;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
@@ -118,7 +119,8 @@ public class MavenArtifactDownloader {
                     }
                     bodyStream = new ByteArrayInputStream(readAllBytes(body));
                 } catch (Throwable t) {
-                    throw new MavenDownloadingException("Unable to download dependency", t,
+                    Throwable cause = t instanceof FailsafeException && t.getCause() != null ? t.getCause() : t;
+                    throw new MavenDownloadingException("Unable to download dependency", cause,
                             dependency.getRequested().getGav());
                 }
             }
