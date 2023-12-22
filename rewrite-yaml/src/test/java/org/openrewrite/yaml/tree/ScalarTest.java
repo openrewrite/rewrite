@@ -16,8 +16,11 @@
 package org.openrewrite.yaml.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.yaml.YamlIsoVisitor;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 public class ScalarTest implements RewriteTest {
@@ -30,6 +33,29 @@ public class ScalarTest implements RewriteTest {
               key: value that spans
                 multiple lines
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3531")
+    @Test
+    void multilineString() {
+        rewriteRun(
+          yaml("""
+            foo:
+              bar: >
+                A multiline string.
+              baz:
+                quz: Another string.
+            """, spec -> spec.afterRecipe(doc -> new YamlIsoVisitor<>() {
+                @Override
+                public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Object o) {
+                    if ("baz".equals(entry.getKey().getValue())) {
+                        assertThat(entry.getPrefix()).isEqualTo("\n  ");
+                    }
+                    return super.visitMappingEntry(entry, o);
+                }
+            }.visit(doc, 0))
           )
         );
     }

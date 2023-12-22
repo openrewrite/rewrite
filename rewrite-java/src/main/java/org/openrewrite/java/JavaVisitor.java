@@ -23,9 +23,7 @@ import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.Iterator;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 @SuppressWarnings("unused")
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
@@ -137,7 +135,24 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Incubating(since = "8.2.0")
     public <S> S service(Class<S> service) {
-        return getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(service);
+        for (Cursor c = getCursor(); c.getParent() != null; c = c.getParent()) {
+            Map<Class<?>, Object> services = c.getMessage("__services");
+            if (services != null && services.containsKey(service)) {
+                //noinspection unchecked
+                return (S) services.get(service);
+            }
+            if (c.getValue() instanceof JavaSourceFile) {
+                S found = ((JavaSourceFile) c.getValue()).service(service);
+                services = getCursor().getMessage("__services");
+                if (services == null) {
+                    c.putMessage("__services", services = new HashMap<>());
+                }
+                services.put(service, found);
+                return found;
+            }
+        }
+
+        throw new IllegalArgumentException("No JavaSourceFile parent found");
     }
 
     public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
@@ -660,7 +675,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             return temp;
         } else {
             //noinspection unchecked
-            t = t.withParenthesizedType((J.Parentheses<TypeTree>)temp);
+            t = t.withParenthesizedType((J.Parentheses<TypeTree>) temp);
         }
         return t;
     }
@@ -995,6 +1010,24 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         n = n.withBody(visitAndCast(n.getBody(), p));
         n = n.withConstructorType((JavaType.Method) visitType(n.getConstructorType(), p));
         return n;
+    }
+
+    public J visitNullableType(J.NullableType nullableType, P p) {
+        J.NullableType nt = nullableType;
+        nt = nt.withPrefix(visitSpace(nt.getPrefix(), Space.Location.NULLABLE_TYPE_PREFIX, p));
+        nt = nt.withMarkers(visitMarkers(nt.getMarkers(), p));
+        nt = nt.withAnnotations(ListUtils.map(nt.getAnnotations(), a -> visitAndCast(a, p)));
+
+        Expression temp = (Expression) visitExpression(nt, p);
+        if (!(temp instanceof J.NullableType)) {
+            return temp;
+        } else {
+            nt = (J.NullableType) temp;
+        }
+
+        nt = nt.getPadding().withTypeTree(visitRightPadded(nt.getPadding().getTypeTree(), JRightPadded.Location.NULLABLE, p));
+        nt = nt.withType(visitType(nt.getType(), p));
+        return nt;
     }
 
     public J visitPackage(J.Package pkg, P p) {

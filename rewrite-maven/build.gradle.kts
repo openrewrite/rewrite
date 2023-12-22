@@ -15,9 +15,8 @@ dependencies {
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
 
-    implementation("org.antlr:antlr4:4.11.1")
-    // Use 1.7.0 due https://github.com/resilience4j/resilience4j/issues/1472, it has been resolved in Resilience4j 2.x, but that requires Java 17
-    implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
+    implementation("org.antlr:antlr4-runtime:4.11.1")
+    implementation("dev.failsafe:failsafe:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
     implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations")

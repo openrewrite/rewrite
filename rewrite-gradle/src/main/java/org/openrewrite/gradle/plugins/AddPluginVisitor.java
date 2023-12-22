@@ -36,6 +36,7 @@ import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.*;
+import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -118,7 +119,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
     private static boolean isLicenseHeader(Comment comment) {
         return comment instanceof TextComment && comment.isMultiline() &&
-                ((TextComment) comment).getText().contains("License");
+               ((TextComment) comment).getText().contains("License");
     }
 
     private static G.CompilationUnit removeLicenseHeader(G.CompilationUnit cu) {
@@ -177,17 +178,20 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
             Statement statement = GradleParser.builder().build()
                     .parseInputs(singletonList(Parser.Input.fromString(source)), null, ctx)
                     .findFirst()
-                    .filter(G.CompilationUnit.class::isInstance)
-                    .map(G.CompilationUnit.class::cast)
-                    .orElseThrow(() -> new IllegalArgumentException("Could not parse: " + source))
-                    .getStatements()
-                    .get(0);
+                    .map(parsed -> {
+                        if (parsed instanceof ParseError) {
+                            throw ((ParseError) parsed).toException();
+                        }
+                        return ((G.CompilationUnit) parsed);
+                    })
+                    .map(parsed -> parsed.getStatements().get(0))
+                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 
             if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
                 if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))
-                        && !cu.getStatements().isEmpty()
-                        && cu.getStatements().get(0) instanceof J.MethodInvocation
-                        && ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
+                    && !cu.getStatements().isEmpty()
+                    && cu.getStatements().get(0) instanceof J.MethodInvocation
+                    && ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
                     return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), 1));
                 } else {
                     int insertAtIdx = 0;
