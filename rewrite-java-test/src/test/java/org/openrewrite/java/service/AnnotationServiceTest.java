@@ -16,6 +16,8 @@
 package org.openrewrite.java.service;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,18 +31,28 @@ public class AnnotationServiceTest implements RewriteTest {
           java(
             """
               import javax.annotation.processing.Generated;
-              
+                            
               @SuppressWarnings("all")
               public @Generated("foo") class T {}
               """,
-            spec -> spec.afterRecipe(cu -> {
-                AnnotationService service = cu.service(AnnotationService.class);
-                assertThat(service.getAllAnnotations(cu)).isEmpty();
-                assertThat(service.getAllAnnotations(cu.getClasses().get(0))).satisfiesExactly(
-                  ann0 -> assertThat(ann0.getSimpleName()).isEqualTo("SuppressWarnings"),
-                  ann1 -> assertThat(ann1.getSimpleName()).isEqualTo("Generated")
-                );
-            })
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Integer p) {
+                    AnnotationService service = service(AnnotationService.class);
+                    assertThat(service.getAllAnnotations(getCursor())).isEmpty();
+                    return super.visitCompilationUnit(cu, p);
+                }
+
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                    AnnotationService service = service(AnnotationService.class);
+                    assertThat(service.getAllAnnotations(getCursor())).satisfiesExactly(
+                      ann0 -> assertThat(ann0.getSimpleName()).isEqualTo("SuppressWarnings"),
+                      ann1 -> assertThat(ann1.getSimpleName()).isEqualTo("Generated")
+                    );
+                    return classDecl;
+                }
+            }.visit(cu, 0))
           )
         );
     }

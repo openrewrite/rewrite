@@ -95,13 +95,13 @@ public class FindDeprecatedClasses extends Recipe {
                         for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
                                 if (Boolean.TRUE.equals(ignoreDeprecatedScopes)) {
-                                    Iterator<Object> cursorPath = getCursor().getPath();
+                                    Iterator<Cursor> cursorPath = getCursor().getPathAsCursors();
                                     while (cursorPath.hasNext()) {
-                                        Object ancestor = cursorPath.next();
-                                        if (ancestor instanceof J.MethodDeclaration && isDeprecated((J) ancestor)) {
+                                        Cursor ancestor = cursorPath.next();
+                                        if (ancestor.getValue() instanceof J.MethodDeclaration && isDeprecated(ancestor)) {
                                             return nameTree;
                                         }
-                                        if (ancestor instanceof J.ClassDeclaration && isDeprecated((J) ancestor)) {
+                                        if (ancestor.getValue() instanceof J.ClassDeclaration && isDeprecated(ancestor)) {
                                             return nameTree;
                                         }
                                     }
@@ -116,8 +116,8 @@ public class FindDeprecatedClasses extends Recipe {
                 return nameTree;
             }
 
-            private boolean isDeprecated(J j) {
-                return service(AnnotationService.class).matches(j, DEPRECATED_MATCHER);
+            private boolean isDeprecated(Cursor cursor) {
+                return service(AnnotationService.class).matches(cursor, DEPRECATED_MATCHER);
             }
         });
     }
