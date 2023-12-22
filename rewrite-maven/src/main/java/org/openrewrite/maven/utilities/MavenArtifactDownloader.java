@@ -28,6 +28,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -47,6 +48,7 @@ import static org.openrewrite.internal.StreamUtils.readAllBytes;
 public class MavenArtifactDownloader {
     private static final RetryPolicy<Object> retryPolicy = RetryPolicy.builder()
             .handle(SocketTimeoutException.class, TimeoutException.class)
+            .handleIf(throwable -> throwable instanceof UncheckedIOException && throwable.getCause() instanceof SocketTimeoutException)
             .withDelay(Duration.ofMillis(500))
             .withJitter(0.1)
             .withMaxRetries(5)

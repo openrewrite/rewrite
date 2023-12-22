@@ -33,10 +33,7 @@ import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.file.DirectoryStream;
@@ -59,6 +56,7 @@ import static java.util.stream.Collectors.toList;
 public class MavenPomDownloader {
     private static final RetryPolicy<Object> retryPolicy = RetryPolicy.builder()
             .handle(SocketTimeoutException.class, TimeoutException.class)
+            .handleIf(throwable -> throwable instanceof UncheckedIOException && throwable.getCause() instanceof SocketTimeoutException)
             .withDelay(Duration.ofMillis(500))
             .withJitter(0.1)
             .withMaxRetries(5)
@@ -136,28 +134,27 @@ public class MavenPomDownloader {
         this.mavenCache = this.ctx.getPomCache();
     }
 
-    private byte[] sendRequest(HttpSender.Request request) throws HttpSenderResponseException {
+    byte[] sendRequest(HttpSender.Request request) throws HttpSenderResponseException {
+        long start = System.nanoTime();
         try {
             return Failsafe.with(retryPolicy).get(() -> {
-                int responseCode;
-                long start = System.nanoTime();
                 try (HttpSender.Response response = httpSender.send(request)) {
-                    if (response.isSuccessful()) {
-                        return response.getBodyAsBytes();
+                    if (!response.isSuccessful()) {
+                        throw new HttpSenderResponseException(null, response.getCode());
                     }
-                    responseCode = response.getCode();
-                } catch (Throwable t) {
-                    throw new HttpSenderResponseException(t, null);
-                } finally {
-                    this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
+                    return response.getBodyAsBytes();
                 }
-                throw new HttpSenderResponseException(null, responseCode);
             });
         } catch (Throwable t) {
-            if (t.getCause() != null && t.getCause() instanceof HttpSenderResponseException) {
-                throw (HttpSenderResponseException) t.getCause();
+            if (t.getCause() != null) {
+                if (t.getCause() instanceof HttpSenderResponseException) {
+                    throw (HttpSenderResponseException) t.getCause();
+                }
+                throw new HttpSenderResponseException(t.getCause(), null);
             }
             throw t;
+        } finally {
+            this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }
     }
 
