@@ -64,22 +64,11 @@ class MavenPomDownloaderTest {
       .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(100), Duration.ofMillis(100)));
 
     private void mockServer(Integer responseCode, Consumer<MockWebServer> block) {
-        mockServer(List.of(responseCode), block);
-    }
-
-    private void mockServer(List<Integer> responseCodes, Consumer<MockWebServer> block) {
-        List<Integer> responseCodeList = new ArrayList<>(responseCodes);
         try (MockWebServer mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest recordedRequest) {
-                    int code;
-                    if (responseCodeList.size() == 1) {
-                        code = responseCodeList.get(0);
-                    } else {
-                        code = responseCodeList.remove(0);
-                    }
-                    return new MockResponse().setResponseCode(code).setBody("body");
+                    return new MockResponse().setResponseCode(responseCode).setBody("body");
                 }
             });
             mockRepo.start();
