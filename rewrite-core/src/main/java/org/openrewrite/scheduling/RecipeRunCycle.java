@@ -33,6 +33,7 @@ import org.openrewrite.table.SourcesFileResults;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.unmodifiableList;
@@ -59,6 +60,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     RecipeRunStats recipeRunStats;
     SourcesFileResults sourcesFileResults;
     SourcesFileErrors errorsTable;
+    BiFunction<LSS, UnaryOperator<SourceFile>, LSS> sourceSetEditor;
+
     RecipeStack allRecipeStack = new RecipeStack();
     long cycleStartTime = System.nanoTime();
     AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
@@ -71,7 +74,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     public LSS scanSources(LSS sourceSet) {
-        return applyToSourceSet(sourceSet, sourceFile ->
+        return sourceSetEditor.apply(sourceSet, sourceFile ->
                 allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
                     Recipe recipe = recipeStack.peek();
                     if (source == null) {
@@ -127,7 +130,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         // skip edits made to generated source files so that they don't show up in a diff
         // that later fails to apply on a freshly cloned repository
         // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-        return applyToSourceSet(sourceSet, sourceFile ->
+        return sourceSetEditor.apply(sourceSet, sourceFile ->
                 allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
                     Recipe recipe = recipeStack.peek();
                     if (source == null) {
@@ -186,11 +189,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     return after;
                 }, sourceFile)
         );
-    }
-
-    protected LSS applyToSourceSet(LSS sourceSet, UnaryOperator<SourceFile> op) {
-        //noinspection unchecked
-        return (LSS) sourceSet.edit(op);
     }
 
     private void recordSourceFileResult(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {

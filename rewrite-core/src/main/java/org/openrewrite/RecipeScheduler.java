@@ -71,7 +71,7 @@ public class RecipeScheduler {
             Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
             try {
                 RecipeRunCycle<LargeSourceSet> cycle = new RecipeRunCycle<>(recipe, i, rootCursor, ctxWithWatch,
-                        recipeRunStats, sourceFileResults, errorsTable);
+                        recipeRunStats, sourceFileResults, errorsTable, LargeSourceSet::edit);
                 ctxWithWatch.putCycle(cycle);
                 after.beforeCycle();
 
