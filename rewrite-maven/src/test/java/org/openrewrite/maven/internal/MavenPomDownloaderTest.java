@@ -15,10 +15,9 @@
  */
 package org.openrewrite.maven.internal;
 
-import okhttp3.mockwebserver.Dispatcher;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import okhttp3.mockwebserver.RecordedRequest;
+import dev.failsafe.Failsafe;
+import dev.failsafe.RetryPolicy;
+import okhttp3.mockwebserver.*;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +29,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -40,22 +40,25 @@ import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import static java.util.Collections.emptyMap;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@SuppressWarnings({"NullableProblems", "HttpUrlsUsage"})
+@SuppressWarnings({"HttpUrlsUsage"})
 class MavenPomDownloaderTest {
     private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
       .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(100), Duration.ofMillis(100)));
@@ -73,6 +76,7 @@ class MavenPomDownloaderTest {
             assertThat(mockRepo.getRequestCount())
               .as("The mock repository received no requests. The test is not using it.")
               .isGreaterThan(0);
+            mockRepo.shutdown();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -114,6 +118,19 @@ class MavenPomDownloaderTest {
             var normalizedRepo = downloader.normalizeRepository(originalRepo, null);
             assertThat(normalizedRepo).isEqualTo(originalRepo);
         });
+    }
+
+    @Test
+    void retryConnectException() throws Throwable {
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
+            server.enqueue(new MockResponse().setResponseCode(200).setBody("body"));
+            String body = new String(downloader.sendRequest(new HttpSender.Request(server.url("/test").url(), "request".getBytes(), HttpSender.Method.GET, Map.of())));
+            assertThat(body).isEqualTo("body");
+            assertThat(server.getRequestCount()).isEqualTo(2);
+            server.shutdown();
+        }
     }
 
     @Test

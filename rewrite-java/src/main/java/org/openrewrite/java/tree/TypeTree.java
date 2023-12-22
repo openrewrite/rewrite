@@ -47,9 +47,14 @@ public interface TypeTree extends NameTree {
             StringBuilder whitespaceBeforeNext = new StringBuilder();
 
             String segment = scanner.next();
+            boolean inEscape = false;
             for (int j = 0; j < segment.length(); j++) {
                 char c = segment.charAt(j);
-                if (!Character.isWhitespace(c)) {
+                if (escape != null && c == escape) {
+                    inEscape = !inEscape;
+                }
+
+                if (!Character.isWhitespace(c) || inEscape) {
                     if (partBuilder == null) {
                         partBuilder = new StringBuilder();
                     }
