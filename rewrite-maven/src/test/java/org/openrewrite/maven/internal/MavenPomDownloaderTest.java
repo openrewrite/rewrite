@@ -129,6 +129,7 @@ class MavenPomDownloaderTest {
             String body = new String(downloader.sendRequest(new HttpSender.Request(server.url("/test").url(), "request".getBytes(), HttpSender.Method.GET, Map.of())));
             assertThat(body).isEqualTo("body");
             assertThat(server.getRequestCount()).isEqualTo(2);
+            server.shutdown();
         }
     }
 
