@@ -20,6 +20,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.tree.J;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -41,8 +42,6 @@ public class AnnotationService {
         J j = cursor.getValue();
         if (j instanceof J.VariableDeclarations) {
             return ((J.VariableDeclarations) j).getAllAnnotations();
-        } else if (j instanceof J.AnnotatedType) {
-            return ((J.AnnotatedType) j).getAllAnnotations();
         } else if (j instanceof J.MethodDeclaration) {
             return ((J.MethodDeclaration) j).getAllAnnotations();
         } else if (j instanceof J.ClassDeclaration) {
@@ -53,7 +52,51 @@ public class AnnotationService {
             return ((J.TypeParameters) j).getAnnotations();
         } else if (j instanceof J.Package) {
             return ((J.Package) j).getAnnotations();
+        } else if (j instanceof J.AnnotatedType) {
+            return getAllAnnotations((J.AnnotatedType) j);
+        } else if (j instanceof J.ArrayType) {
+            return getAllAnnotations((J.ArrayType) j);
+        } else if (j instanceof J.FieldAccess) {
+            return getAllAnnotations((J.FieldAccess) j);
+        } else if (j instanceof J.Identifier) {
+            return getAllAnnotations((J.Identifier) j);
         }
         return emptyList();
+    }
+
+    private List<J.Annotation> getAllAnnotations(J j) {
+        if (j instanceof J.AnnotatedType) {
+            return getAllAnnotations((J.AnnotatedType) j);
+        } else if (j instanceof J.ArrayType) {
+            return getAllAnnotations((J.ArrayType) j);
+        } else if (j instanceof J.Identifier) {
+            return getAllAnnotations((J.Identifier) j);
+        } else if (j instanceof J.FieldAccess) {
+            return getAllAnnotations((J.FieldAccess) j);
+        }
+        return emptyList();
+    }
+
+    private List<J.Annotation> getAllAnnotations(J.AnnotatedType annotatedType) {
+        List<J.Annotation> annotations = new ArrayList<>(annotatedType.getAnnotations().size());
+        annotations.addAll(annotatedType.getAnnotations());
+        annotations.addAll(getAllAnnotations(annotatedType.getTypeExpression()));
+        return annotations;
+    }
+
+    private List<J.Annotation> getAllAnnotations(J.ArrayType arrayType) {
+        List<J.Annotation> annotations = new ArrayList<>(arrayType.getAnnotations() == null ? 0 : arrayType.getAnnotations().size());
+        if (arrayType.getAnnotations() != null) {
+            annotations.addAll(arrayType.getAnnotations());
+        }
+        return annotations;
+    }
+
+    private List<J.Annotation> getAllAnnotations(J.FieldAccess fieldAccess) {
+        return getAllAnnotations(fieldAccess.getName());
+    }
+
+    private List<J.Annotation> getAllAnnotations(J.Identifier identifier) {
+        return identifier.getAnnotations() == null ? emptyList() : identifier.getAnnotations();
     }
 }

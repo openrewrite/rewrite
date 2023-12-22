@@ -66,9 +66,10 @@ public class FindTypes extends Recipe {
             @Override
             public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                 if (ident.getType() != null &&
-                    getCursor().firstEnclosing(J.Import.class) == null &&
-                    getCursor().firstEnclosing(J.FieldAccess.class) == null &&
-                    !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType)) {
+                        getCursor().firstEnclosing(J.Import.class) == null &&
+                        getCursor().firstEnclosing(J.FieldAccess.class) == null &&
+                        !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType) &&
+                        !(getCursor().getParentOrThrow().getValue() instanceof J.ArrayType)) {
                     JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                     if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         ident.getSimpleName().equals(type.getClassName())) {
@@ -83,7 +84,7 @@ public class FindTypes extends Recipe {
                 N n = super.visitTypeName(name, ctx);
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(n.getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
-                    getCursor().firstEnclosing(J.Import.class) == null) {
+                        getCursor().firstEnclosing(J.Import.class) == null) {
                     return SearchResult.found(n);
                 }
                 return n;
