@@ -754,12 +754,16 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     @Override
     public Tree visitReturn(ReturnTree node, List<Javadoc> body) {
-        List<Javadoc> before = sourceBefore("{@return");
-        boolean hasLeadingBrace = !before.isEmpty();
+        List<Javadoc> before;
+        Markers markers = Markers.EMPTY;
+        if (source.startsWith("{", cursor)) {
+            markers = markers.addIfAbsent(Markers.build(Collections.singletonList(new LeadingBraceMarker())));
+            before = sourceBefore("{@return");
+        } else {
+            before = sourceBefore("@return");
+        }
         body.addAll(before);
-
-        return new Javadoc.Return(randomId(), Markers.EMPTY, convertMultiline(node.getDescription()))
-                .withMarkers(Markers.build(hasLeadingBrace ? Collections.singletonList(new LeadingBraceMarker()) : Collections.emptyList()));
+        return new Javadoc.Return(randomId(), markers, convertMultiline(node.getDescription()));
     }
 
     @Override
@@ -981,8 +985,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
         int endIndex = source.indexOf(delim, cursor);
         if (endIndex < 0) {
-            // Handle the case where the delimiter is not found
-            return emptyList();
+            throw new IllegalStateException("Expected to be able to find " + delim);
         }
 
         List<Javadoc> before = whitespaceBefore();
@@ -1206,9 +1209,11 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     private static class LeadingBraceMarker implements Marker {
+        private UUID uuid;
+        
         @Override
         public UUID getId() {
-            return null;
+            return uuid;
         }
 
         @Override
