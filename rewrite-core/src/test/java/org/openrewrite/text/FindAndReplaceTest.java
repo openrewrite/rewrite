@@ -28,7 +28,6 @@ import java.util.List;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class FindAndReplaceTest implements RewriteTest {
-
     @DocumentExample
     @Test
     void nonTxtExtension() {
@@ -42,6 +41,25 @@ class FindAndReplaceTest implements RewriteTest {
               This is textG
               """,
             spec -> spec.path("test.yml")
+          )
+        );
+    }
+
+    @Test
+    void removeWhenNullOrEmpty() {
+        rewriteRun(
+          spec -> spec.recipe(new FindAndReplace("Bar", null, null, null, null, null, null)),
+          text(
+            """
+              Foo
+              Bar
+              Quz
+              """,
+            """
+              Foo
+              
+              Quz
+              """
           )
         );
     }
@@ -99,6 +117,16 @@ class FindAndReplaceTest implements RewriteTest {
         );
     }
 
+    @Test
+    void dollarsignsTolerated() {
+        String find = "This is text ${dynamic}.";
+        String replace = "This is text ${dynamic}. Stuff";
+        rewriteRun(
+          spec -> spec.recipe(new FindAndReplace(find, replace, null, null, null, null, null)).cycles(1),
+          text(find, replace)
+        );
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = true)
     static class MultiFindAndReplace extends Recipe {
@@ -121,6 +149,7 @@ class FindAndReplaceTest implements RewriteTest {
               new FindAndReplace("three", "four", null, null, null, null, null));
         }
     }
+
     @Test
     void successiveReplacement() {
         rewriteRun(

@@ -17,19 +17,15 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.table.ParentPomsInUse;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.UUID;
-
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @EqualsAndHashCode(callSuper = true)
@@ -47,7 +43,14 @@ public class ParentPomInsight extends Recipe {
             example = "spring-boot-starter-*")
     String artifactIdPattern;
 
-    UUID searchId = randomId();
+    @Option(displayName = "Version",
+            description = "Match only dependencies with the specified version. " +
+                          "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
+                          "All versions are searched by default.",
+            example = "1.x",
+            required = false)
+    @Nullable
+    String version;
 
     @Override
     public String getDisplayName() {
@@ -55,8 +58,22 @@ public class ParentPomInsight extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("for `%s:%s`", groupIdPattern, artifactIdPattern);
+    }
+
+    @Override
     public String getDescription() {
         return "Find Maven parents matching a `groupId` and `artifactId`.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> v = super.validate();
+        if (version != null) {
+            v = v.and(Semver.validate(version, null));
+        }
+        return v;
     }
 
     @Override
@@ -70,10 +87,17 @@ public class ParentPomInsight extends Recipe {
                     String groupId = resolvedPom.getValue(tag.getChildValue("groupId").orElse(null));
                     String artifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null));
                     if (matchesGlob(groupId, groupIdPattern) && matchesGlob(artifactId, artifactIdPattern)) {
-                        String version = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
+                        String parentVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
+                        if (version != null) {
+                            if (!Semver.validate(version, null).getValue()
+                                    .isValid(null, parentVersion)) {
+                                return t;
+                            }
+                        }
+                        // Found a parent pom that matches the criteria
                         String relativePath = tag.getChildValue("relativePath").orElse(null);
                         inUse.insertRow(ctx, new ParentPomsInUse.Row(
-                                resolvedPom.getArtifactId(), groupId, artifactId, version, relativePath));
+                                resolvedPom.getArtifactId(), groupId, artifactId, parentVersion, relativePath));
                         return SearchResult.found(t);
                     }
                 }

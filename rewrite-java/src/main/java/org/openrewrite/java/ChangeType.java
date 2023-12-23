@@ -59,6 +59,20 @@ public class ChangeType extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        String oldShort = oldFullyQualifiedTypeName.substring(oldFullyQualifiedTypeName.lastIndexOf('.') + 1);
+        String newShort = newFullyQualifiedTypeName.substring(newFullyQualifiedTypeName.lastIndexOf('.') + 1);
+        if (oldShort.equals(newShort)) {
+            return String.format("`%s` to `%s`",
+                    oldFullyQualifiedTypeName,
+                    newFullyQualifiedTypeName);
+        } else {
+            return String.format("`%s` to `%s`",
+                    oldShort, newShort);
+        }
+    }
+
+    @Override
     public String getDescription() {
         return "Change a given type to another.";
     }
@@ -160,10 +174,14 @@ public class ChangeType extends Recipe {
             J j = super.postVisit(tree, ctx);
             if (j instanceof J.MethodDeclaration) {
                 J.MethodDeclaration method = (J.MethodDeclaration) j;
-                j = method.withMethodType(updateType(method.getMethodType()));
+                JavaType.Method mt = updateType(method.getMethodType());
+                j = method.withMethodType(mt)
+                        .withName(method.getName().withType(mt));
             } else if (j instanceof J.MethodInvocation) {
                 J.MethodInvocation method = (J.MethodInvocation) j;
-                j = method.withMethodType(updateType(method.getMethodType()));
+                JavaType.Method mt = updateType(method.getMethodType());
+                j = method.withMethodType(mt)
+                        .withName(method.getName().withType(mt));
             } else if (j instanceof J.NewClass) {
                 J.NewClass n = (J.NewClass) j;
                 j = n.withConstructorType(updateType(n.getConstructorType()));
@@ -181,9 +199,9 @@ public class ChangeType extends Recipe {
                         if (maybeType instanceof JavaType.FullyQualified) {
                             JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
                             if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(sf, ctx, getCursor());
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(sf, ctx, getCursor().getParentOrThrow());
                             } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(sf, ctx, getCursor());
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(sf, ctx, getCursor().getParentOrThrow());
                             }
                         }
                     }
@@ -507,7 +525,7 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J.Package visitPackage(J.Package pkg, ExecutionContext ctxext) {
+        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
             String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
             if (original.equals(originalType.getPackageName())) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);

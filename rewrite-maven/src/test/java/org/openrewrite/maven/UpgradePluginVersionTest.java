@@ -244,12 +244,12 @@ class UpgradePluginVersionTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                      
+
                 <packaging>pom</packaging>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app-bom</artifactId>
                 <version>1</version>
-                      
+
                 <build>
                   <pluginManagement>
                     <plugins>
@@ -660,6 +660,52 @@ class UpgradePluginVersionTest implements RewriteTest {
                         <source>1.8</source>
                         <target>1.8</target>
                       </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void defaultPluginGroupId() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins",
+            "maven-compiler-plugin",
+            "3.11.0",
+            null,
+            null,
+            false
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.10.0</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.11.0</version>
                     </plugin>
                   </plugins>
                 </build>

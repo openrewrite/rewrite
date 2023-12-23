@@ -189,7 +189,12 @@ public class TypeUtils {
             } else if (to instanceof JavaType.Parameterized) {
                 JavaType.Parameterized toParameterized = (JavaType.Parameterized) to;
                 if (!(from instanceof JavaType.Parameterized)) {
-                    return toParameterized.getTypeParameters().stream().allMatch(p -> isAssignableTo(p, TYPE_OBJECT));
+                    return from instanceof JavaType.FullyQualified &&
+                           isAssignableTo(toParameterized.getType(), from) &&
+                           toParameterized.getTypeParameters().stream()
+                                   .allMatch(p -> (p instanceof JavaType.GenericTypeVariable &&
+                                                   ((JavaType.GenericTypeVariable) p).getName().equals("?")) ||
+                                                  isAssignableTo(p, TYPE_OBJECT));
                 }
                 JavaType.Parameterized fromParameterized = (JavaType.Parameterized) from;
                 List<JavaType> toParameters = toParameterized.getTypeParameters();
@@ -200,11 +205,41 @@ public class TypeUtils {
                        IntStream.range(0, parameterCount).allMatch(i -> isAssignableTo(toParameters.get(i), fromParameters.get(i)));
             } else if (to instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
-                return isAssignableTo(toFq.getFullyQualifiedName(), from);
+                if (from instanceof JavaType.Primitive) {
+                    JavaType.Primitive toPrimitive = JavaType.Primitive.fromClassName(toFq.getFullyQualifiedName());
+                    if (toPrimitive != null) {
+                        return isAssignableTo(toPrimitive, from);
+                    } else if (toFq.getFullyQualifiedName().equals("java.lang.Object")) {
+                        return true;
+                    }
+                } else if (from instanceof JavaType.Intersection) {
+                    for (JavaType intersectionType : ((JavaType.Intersection) from).getBounds()) {
+                        if (isAssignableTo(to, intersectionType)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                return !(from instanceof JavaType.GenericTypeVariable) && isAssignableTo(toFq.getFullyQualifiedName(), from);
             } else if (to instanceof JavaType.GenericTypeVariable) {
-                JavaType.GenericTypeVariable genericTo = (JavaType.GenericTypeVariable) to;
-                if (genericTo.getBounds().isEmpty()) {
-                    return genericTo.getName().equals("?");
+                JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
+                List<JavaType> toBounds = toGeneric.getBounds();
+                if (!toGeneric.getName().equals("?")) {
+                    return false;
+                } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT) {
+                    for (JavaType toBound : toBounds) {
+                        if (!isAssignableTo(toBound, from)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) {
+                    for (JavaType toBound : toBounds) {
+                        if (!isAssignableTo(from, toBound)) {
+                            return false;
+                        }
+                    }
+                    return true;
                 }
                 return false;
             } else if (to instanceof JavaType.Variable) {
@@ -212,10 +247,53 @@ public class TypeUtils {
             } else if (to instanceof JavaType.Method) {
                 return isAssignableTo(((JavaType.Method) to).getReturnType(), from);
             } else if (to instanceof JavaType.Primitive) {
+                JavaType.Primitive toPrimitive = (JavaType.Primitive) to;
                 if (from instanceof JavaType.FullyQualified) {
                     // Account for auto-unboxing
-                    JavaType.FullyQualified boxed = JavaType.ShallowClass.build(((JavaType.Primitive) to).getClassName());
+                    JavaType.FullyQualified boxed = JavaType.ShallowClass.build(toPrimitive.getClassName());
                     return isAssignableTo(boxed, from);
+                } else if (from instanceof JavaType.Primitive) {
+                    JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
+                    if (fromPrimitive == JavaType.Primitive.Boolean || fromPrimitive == JavaType.Primitive.Void) {
+                        return false;
+                    } else {
+                        switch (toPrimitive) {
+                            case Char:
+                                return fromPrimitive == JavaType.Primitive.Byte;
+                            case Short:
+                                switch (fromPrimitive) {
+                                    case Byte:
+                                    case Char:
+                                        return true;
+                                }
+                                return false;
+                            case Int:
+                                switch (fromPrimitive) {
+                                    case Byte:
+                                    case Char:
+                                    case Short:
+                                        return true;
+                                }
+                                return false;
+                            case Long:
+                                switch (fromPrimitive) {
+                                    case Byte:
+                                    case Char:
+                                    case Short:
+                                    case Int:
+                                        return true;
+                                }
+                                return false;
+                            case Float:
+                                return fromPrimitive != JavaType.Primitive.Double;
+                            case Double:
+                                return true;
+                            case String:
+                                return fromPrimitive == JavaType.Primitive.Null;
+                            default:
+                                return false;
+                        }
+                    }
                 }
             } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
                 return isAssignableTo(((JavaType.Array) to).getElemType(), ((JavaType.Array) from).getElemType());
@@ -236,7 +314,7 @@ public class TypeUtils {
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
                 if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
-                        isAssignableTo(to, classFrom.getSupertype())) {
+                    isAssignableTo(to, classFrom.getSupertype())) {
                     return true;
                 }
                 for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
@@ -253,54 +331,22 @@ public class TypeUtils {
                     }
                 }
             } else if (from instanceof JavaType.Primitive) {
-                JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
                 JavaType.Primitive toPrimitive = JavaType.Primitive.fromKeyword(to);
-                if (fromPrimitive == toPrimitive) {
-                    return true;
-                } else if (fromPrimitive == JavaType.Primitive.Boolean || fromPrimitive == JavaType.Primitive.Void) {
-                    return false;
-                } else if (toPrimitive != null) {
-                    switch (toPrimitive) {
-                        case Char:
-                            return fromPrimitive == JavaType.Primitive.Byte;
-                        case Short:
-                            switch (fromPrimitive) {
-                                case Byte:
-                                case Char:
-                                    return true;
-                            }
-                            return false;
-                        case Int:
-                            switch (fromPrimitive) {
-                                case Byte:
-                                case Char:
-                                case Short:
-                                    return true;
-                            }
-                            return false;
-                        case Long:
-                            switch (fromPrimitive) {
-                                case Byte:
-                                case Char:
-                                case Short:
-                                case Int:
-                                    return true;
-                            }
-                            return false;
-                        case Float:
-                            return fromPrimitive != JavaType.Primitive.Double;
-                        case Double:
-                            return true;
-                        default:
-                            return false;
-                    }
+                if (toPrimitive != null) {
+                    return isAssignableTo(toPrimitive, from);
                 } else if ("java.lang.String".equals(to)) {
-                    return fromPrimitive == JavaType.Primitive.String;
+                    return isAssignableTo(JavaType.Primitive.String, from);
                 }
             } else if (from instanceof JavaType.Variable) {
                 return isAssignableTo(to, ((JavaType.Variable) from).getType());
             } else if (from instanceof JavaType.Method) {
                 return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+            } else if (from instanceof JavaType.Intersection) {
+                for (JavaType bound : ((JavaType.Intersection) from).getBounds()) {
+                    if (isAssignableTo(to, bound)) {
+                        return true;
+                    }
+                }
             }
         } catch (Exception e) {
             return false;

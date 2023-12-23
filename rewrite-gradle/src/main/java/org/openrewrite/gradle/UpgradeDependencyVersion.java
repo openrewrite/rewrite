@@ -45,7 +45,6 @@ import org.openrewrite.semver.*;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -89,6 +88,11 @@ public class UpgradeDependencyVersion extends Recipe {
     @Override
     public String getDisplayName() {
         return "Upgrade Gradle dependency versions";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
     }
 
     @Override
@@ -437,7 +441,7 @@ public class UpgradeDependencyVersion extends Recipe {
                 return gp;
             }
 
-            MavenPomDownloader mpd = new MavenPomDownloader(emptyMap(), ctx, null, null);
+            MavenPomDownloader mpd = new MavenPomDownloader(ctx);
             Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
             ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
             ResolvedGroupArtifactVersion resolvedGav = resolvedPom.getGav();

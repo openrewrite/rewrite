@@ -56,8 +56,8 @@ public class MigrateMarkersSearchResult extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
-                                                            ExecutionContext executionContext) {
-                method = super.visitMethodInvocation(method, executionContext);
+                                                            ExecutionContext ctx) {
+                method = super.visitMethodInvocation(method, ctx);
                 if (method.getSimpleName().equals("withMarkers") &&
                     method.getSelect() != null &&
                     TypeUtils.isOfClassType(method.getSelect().getType(), "org.openrewrite.yaml.tree.Yaml.Mapping.Entry")) {

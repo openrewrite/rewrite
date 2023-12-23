@@ -132,6 +132,11 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, version);
+    }
+
+    @Override
     public String getDescription() {
         return "Add a managed Maven dependency to a `pom.xml` file.";
     }

@@ -33,6 +33,13 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 public class AddOwaspDateBoundSuppressions extends Recipe {
 
+    @Option(displayName = "Until date",
+            required = false,
+            description = "Optional. The date to add to the suppression. Default will be 30 days from today.",
+            example = "2023-01-01")
+    @Nullable
+    String untilDate;
+
     @Override
     public String getDisplayName() {
         return "Add date bounds to OWASP suppressions";
@@ -44,13 +51,6 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
                "For use with the OWASP `dependency-check` tool. " +
                "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
     }
-
-    @Option(displayName = "Until date",
-            required = false,
-            description = "Optional. The date to add to the suppression. Default will be 30 days from today.",
-            example = "2023-01-01")
-    @Nullable
-    String untilDate;
 
     @Override
     public Validated<Object> validate() {

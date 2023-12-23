@@ -134,6 +134,25 @@ public interface J extends Tree {
             return withTypeExpression(typeExpression.withType(type));
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
+        public List<Annotation> getAllAnnotations() {
+            List<J.Annotation> allAnnotations = annotations;
+            List<J.Annotation> moreAnnotations;
+            if (typeExpression instanceof FieldAccess &&
+                !(moreAnnotations = ((FieldAccess) typeExpression).getName().getAnnotations()).isEmpty()) {
+                if (allAnnotations.isEmpty()) {
+                    allAnnotations = moreAnnotations;
+                } else {
+                    allAnnotations = new ArrayList<>(annotations);
+                    allAnnotations.addAll(moreAnnotations);
+                }
+            }
+            return allAnnotations;
+        }
+
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotatedType(this, p);
@@ -178,9 +197,14 @@ public interface J extends Tree {
         NameTree annotationType;
 
         public String getSimpleName() {
-            return annotationType instanceof Identifier ?
-                    ((Identifier) annotationType).getSimpleName() :
-                    ((J.FieldAccess) annotationType).getSimpleName();
+            if (annotationType instanceof Identifier) {
+                return ((Identifier) annotationType).getSimpleName();
+            } else if (annotationType instanceof J.FieldAccess ) {
+                return ((J.FieldAccess) annotationType).getSimpleName();
+            } else {
+                // allow for extending languages like Kotlin to supply a different representation
+                return annotationType.printTrimmed();
+            }
         }
 
         @Nullable
@@ -851,6 +875,8 @@ public interface J extends Tree {
                 } else if (next instanceof J.NewClass) {
                     J.NewClass newClass = (J.NewClass) next;
                     return newClass.getBody() == parentBlock;
+                } else if (next instanceof J.Lambda) {
+                    return false;
                 }
             }
             return false;
@@ -1217,6 +1243,10 @@ public interface J extends Tree {
             return v.visitClassDeclaration(this, p);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
@@ -1243,24 +1273,19 @@ public interface J extends Tree {
         public static final class Kind implements J {
 
             @With
-            @Getter
             @EqualsAndHashCode.Include
             UUID id;
 
             @With
-            @Getter
             Space prefix;
 
             @With
-            @Getter
             Markers markers;
 
             @With
-            @Getter
             List<Annotation> annotations;
 
             @With
-            @Getter
             Type type;
 
             public enum Type {
@@ -2347,6 +2372,51 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Java does not allow for parenthesis around TypeTree in places like a type cast where a J.ControlParenthesis is
+     * used. But other languages, like Kotlin, do.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @With
+    class ParenthesizedTypeTree implements J, TypeTree, Expression {
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Space prefix;
+
+        @Getter
+        Markers markers;
+
+        List<J.Annotation> annotations;
+
+        J.Parentheses<TypeTree> parenthesizedType;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return parenthesizedType.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ParenthesizedTypeTree withType(@Nullable JavaType type) {
+            return withParenthesizedType(parenthesizedType.withType(type));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitParenthesizedTypeTree(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
@@ -2626,6 +2696,7 @@ public interface J extends Tree {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
 
                 // the compiler doesn't type attribute static imports of classes
+                Expression target = qualid.getTarget();
                 if (fq == null) {
                     String possibleInnerClassFqn = getTypeName(qualid);
                     String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.lastIndexOf('$') + 1);
@@ -2636,8 +2707,8 @@ public interface J extends Tree {
                         possibleInnerClassName = possibleInnerClassName.substring(possibleInnerClassName.indexOf('$') + 1);
                     }
 
-                    JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
-                    if (owner != null && !(qualid.getTarget().getType() instanceof JavaType.ShallowClass)) {
+                    JavaType.Class owner = TypeUtils.asClass(target.getType());
+                    if (owner != null && !(target.getType() instanceof JavaType.ShallowClass)) {
                         Iterator<JavaType.Method> visibleMethods = owner.getVisibleMethods();
                         while (visibleMethods.hasNext()) {
                             JavaType.Method method = visibleMethods.next();
@@ -2658,7 +2729,7 @@ public interface J extends Tree {
                     }
                 }
 
-                return getTypeName((FieldAccess) qualid.getTarget());
+                return target instanceof Identifier ? ((Identifier) target).getSimpleName() : getTypeName((FieldAccess) target);
             }
 
             return getTypeName(qualid);
@@ -2877,6 +2948,93 @@ public interface J extends Tree {
 
             public InstanceOf withExpr(JRightPadded<Expression> expression) {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class IntersectionType implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JContainer<TypeTree> bounds;
+
+        public List<TypeTree> getBounds() {
+            return bounds.getElements();
+        }
+
+        public IntersectionType withBounds(List<TypeTree> bounds) {
+            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitIntersectionType(this, p);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public IntersectionType withType(@Nullable JavaType type) {
+            // cannot overwrite type directly, perform this operation on each bound separately
+            return this;
+        }
+
+        @Override
+        public JavaType getType() {
+            return new JavaType.Intersection(bounds.getPadding().getElements().stream()
+                    .filter(Objects::nonNull)
+                    .map(b -> b.getElement().getType())
+                    .collect(toList()));
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final IntersectionType t;
+
+            @Nullable
+            public JContainer<TypeTree> getBounds() {
+                return t.bounds;
+            }
+
+            public IntersectionType withBounds(@Nullable JContainer<TypeTree> bounds) {
+                return t.bounds == bounds ? t : new IntersectionType(t.id, t.prefix, t.markers, bounds);
             }
         }
     }
@@ -3487,6 +3645,10 @@ public interface J extends Tree {
             return new CoordinateBuilder.MethodDeclaration(this);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
@@ -3514,11 +3676,9 @@ public interface J extends Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static final class IdentifierWithAnnotations {
-            @Getter
             @With
             Identifier identifier;
 
-            @Getter
             @With
             List<Annotation> annotations;
         }
@@ -4291,6 +4451,94 @@ public interface J extends Tree {
 
             public NewClass withArguments(JContainer<Expression> arguments) {
                 return t.arguments == arguments ? t : new NewClass(t.id, t.prefix, t.markers, t.enclosing, t.nooh, t.clazz, arguments, t.body, t.constructorType);
+            }
+        }
+    }
+
+    @Incubating(since = "8.12.0")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
+    class NullableType implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<J.NullableType.Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Space prefix;
+
+        @Getter
+        Markers markers;
+
+        @Getter
+        List<J.Annotation> annotations;
+
+        JRightPadded<TypeTree> typeTree;
+
+        public TypeTree getTypeTree() {
+            return typeTree.getElement();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            // TODO also support `nullable` in type attribution
+            return typeTree.getElement().getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public NullableType withType(@Nullable JavaType type) {
+            JRightPadded<TypeTree> rp = getPadding().getTypeTree();
+            TypeTree tt = rp.getElement();
+            tt = tt.withType(type);
+            return getPadding().withTypeTree(rp.withElement(tt));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitNullableType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public J.NullableType.Padding getPadding() {
+            J.NullableType.Padding p;
+            if (this.padding == null) {
+                p = new J.NullableType.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new J.NullableType.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final J.NullableType t;
+
+            public JRightPadded<TypeTree> getTypeTree() {
+                return t.typeTree;
+            }
+
+            public J.NullableType withTypeTree(JRightPadded<TypeTree> typeTree) {
+                return t.typeTree == typeTree ? t : new J.NullableType(t.id,
+                        t.prefix,
+                        t.markers,
+                        t.annotations,
+                        typeTree);
             }
         }
     }
@@ -5218,6 +5466,10 @@ public interface J extends Tree {
         @Getter
         List<Annotation> annotations;
 
+        @With
+        @Getter
+        List<J.Modifier> modifiers;
+
         /**
          * Will be either a {@link TypeTree} or {@link Wildcard}. Wildcards aren't possible in
          * every context where type parameters may be defined (e.g. not possible on new statements).
@@ -5268,7 +5520,7 @@ public interface J extends Tree {
             }
 
             public TypeParameter withBounds(@Nullable JContainer<TypeTree> bounds) {
-                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.name, bounds);
+                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.name, bounds);
             }
         }
     }
@@ -5523,6 +5775,10 @@ public interface J extends Tree {
             return new CoordinateBuilder.VariableDeclarations(this);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);

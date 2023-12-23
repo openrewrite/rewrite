@@ -22,29 +22,38 @@ import org.openrewrite.marker.Marker;
 import java.util.function.UnaryOperator;
 
 public interface BuildEnvironment extends Marker {
-
     @Nullable
     static BuildEnvironment build(UnaryOperator<String> environment) {
+        if (environment.apply("BITBUCKET_COMMIT") != null) {
+            return BitbucketBuildEnvironment.build(environment);
+        }
         if (environment.apply("CUSTOM_CI") != null) {
             return CustomBuildEnvironment.build(environment);
-        } else if (environment.apply("BUILD_NUMBER") != null && environment.apply("JOB_NAME") != null) {
+        }
+        if (environment.apply("BUILD_NUMBER") != null && environment.apply("JOB_NAME") != null) {
             return JenkinsBuildEnvironment.build(environment);
-        } else if (environment.apply("GITLAB_CI") != null) {
+        }
+        if (environment.apply("GITLAB_CI") != null) {
             return GitlabBuildEnvironment.build(environment);
-        } else if (environment.apply("CI") != null && environment.apply("GITHUB_ACTION") != null
+        }
+        if (environment.apply("CI") != null && environment.apply("GITHUB_ACTION") != null
                 && environment.apply("GITHUB_RUN_ID") != null) {
             return GithubActionsBuildEnvironment.build(environment);
-        } else if (environment.apply("DRONE") != null) {
+        }
+        if (environment.apply("DRONE") != null) {
             return DroneBuildEnvironment.build(environment);
-        } else if (environment.apply("CIRCLECI") != null) {
+        }
+        if (environment.apply("CIRCLECI") != null) {
             return CircleCiBuildEnvironment.build(environment);
-        } else if (environment.apply("TRAVIS") != null) {
+        }
+        if (environment.apply("TEAMCITY_VERSION") != null) {
+            return TeamcityBuildEnvironment.build(environment);
+        }
+        if (environment.apply("TRAVIS") != null) {
             return TravisBuildEnvironment.build(environment);
         }
         return null;
     }
 
     GitProvenance buildGitProvenance() throws IncompleteGitConfigException;
-
-
 }

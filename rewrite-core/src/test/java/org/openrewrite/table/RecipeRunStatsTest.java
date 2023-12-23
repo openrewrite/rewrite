@@ -46,7 +46,7 @@ public class RecipeRunStatsTest implements RewriteTest {
             return Preconditions.check(
               new PlainTextVisitor<>() {
                   @Override
-                  public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
                       if (!"sam".equals(text.getText())) {
                           return SearchResult.found(text);
                       }

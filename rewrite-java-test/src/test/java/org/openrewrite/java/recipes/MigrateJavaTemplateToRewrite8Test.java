@@ -138,7 +138,7 @@ public class MigrateJavaTemplateToRewrite8Test implements RewriteTest {
 
     @SuppressWarnings("all")
     @Test
-    void templaveVariable() {
+    void templateVariable() {
         rewriteRun(
           java(
             """

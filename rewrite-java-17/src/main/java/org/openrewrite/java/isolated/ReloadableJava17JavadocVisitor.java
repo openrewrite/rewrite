@@ -534,6 +534,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     Space.EMPTY,
                     Markers.EMPTY,
                     emptyList(),
+                    emptyList(),
                     visitIdentifier(node.getName(), whitespaceBefore()).withPrefix(namePrefix),
                     null
             );
@@ -601,7 +602,6 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             } else {
                 qualifier = null;
             }
-
         }
 
         if (ref.memberName != null) {
@@ -795,6 +795,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitSerialField(SerialFieldTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("@serialField"));
+
         return new Javadoc.SerialField(randomId(), Markers.EMPTY,
                 visitIdentifier(node.getName(), whitespaceBefore()),
                 visitReference(node.getType(), whitespaceBefore()),
@@ -1148,7 +1149,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 typeIdent = ((ArrayTypeTree) typeIdent).getType();
             }
 
-            TypeTree elemType = (TypeTree) scan(typeIdent, fmt);
+            TypeTree elemType = (TypeTree) scan(typeIdent, Space.EMPTY);
 
             List<JRightPadded<Space>> dimensions = emptyList();
             if (dimCount > 0) {
@@ -1164,7 +1165,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
             return new J.ArrayType(
                     randomId(),
-                    Space.EMPTY,
+                    fmt,
                     Markers.EMPTY,
                     elemType,
                     dimensions

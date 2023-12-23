@@ -27,7 +27,7 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void found() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("java.lang.Runnable", null)),
+          spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
           java(
             """
               class Test implements Runnable {
@@ -50,7 +50,7 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void notFound() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("java.lang.Runnable", null)),
+          spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
           java(
             """
               class Test  {
@@ -66,7 +66,7 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void genericType() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("java.lang.Comparable<java.lang.String>", null)),
+          spec -> spec.recipe(new FindImplementations("java.lang.Comparable<java.lang.String>")),
           java(
             """
               class Test implements Comparable<String> {
@@ -92,7 +92,7 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void genericType2() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("java.lang.Comparable", null)),
+          spec -> spec.recipe(new FindImplementations("java.lang.Comparable")),
           java(
             """
               class Test implements Comparable<String> {
@@ -118,7 +118,7 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void unmatchedGenericType() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("java.lang.Comparable<java.lang.Runnable>", null)),
+          spec -> spec.recipe(new FindImplementations("java.lang.Comparable<java.lang.Runnable>")),
           java(
             """
               class Test implements Comparable<String> {
@@ -135,7 +135,7 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void transitiveImplementsExtends() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("org.x.A", null)),
+          spec -> spec.recipe(new FindImplementations("org.x.A")),
           java(
             """
               package org.x;
@@ -192,7 +192,7 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void transitiveExtendsImplements() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("org.x.A", null)),
+          spec -> spec.recipe(new FindImplementations("org.x.A")),
           java(
             """
               package org.x;

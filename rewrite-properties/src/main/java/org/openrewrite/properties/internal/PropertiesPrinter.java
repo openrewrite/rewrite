@@ -38,13 +38,13 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
     @Override
     public Properties visitEntry(Properties.Entry entry, PrintOutputCapture<P> p) {
         beforeSyntax(entry, p);
-        p.append(entry.getKey())
+        p.append(entry.getKeySource())
                 .append(entry.getBeforeEquals());
         if (entry.getDelimiter() != Properties.Entry.Delimiter.NONE) {
             p.append(entry.getDelimiter().getCharacter());
         }
         beforeSyntax(entry.getValue().getPrefix(), entry.getValue().getMarkers(), p);
-        p.append(entry.getValue().getText());
+        p.append(entry.getValue().getSource());
         afterSyntax(entry.getValue().getMarkers(), p);
         afterSyntax(entry, p);
         return entry;

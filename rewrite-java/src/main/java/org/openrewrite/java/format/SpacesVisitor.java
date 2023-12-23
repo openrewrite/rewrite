@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -52,6 +53,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         this.emptyForInitializerPadStyle = emptyForInitializerPadStyle;
         this.emptyForIteratorPadStyle = emptyForIteratorPadStyle;
         this.stopAfter = stopAfter;
+    }
+
+    @Override
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
+        return sourceFile instanceof J.CompilationUnit;
     }
 
     <T extends J> T spaceBefore(T j, boolean spaceBefore) {
@@ -1076,7 +1082,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().getRoot().putMessage("stop", true);
+            getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
