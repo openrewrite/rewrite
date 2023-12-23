@@ -65,7 +65,7 @@ public class RemovePluginDependency extends Recipe {
     public String getInstanceNameSuffix() {
         return String.format("from `%s:%s`", pluginGroupId, pluginArtifactId);
     }
-¬
+
     @Override
     public String getDescription() {
         return "Removes a dependency from the <dependencies> section of a plugin in the pom.xml.";

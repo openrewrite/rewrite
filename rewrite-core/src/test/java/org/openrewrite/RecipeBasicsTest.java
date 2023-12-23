@@ -18,6 +18,7 @@ package org.openrewrite;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.render.TruncatingRecipeNameRenderer;
 import org.openrewrite.text.ChangeText;
 
 import java.util.HashMap;
@@ -43,11 +44,6 @@ class RecipeBasicsTest {
     @Test
     void instanceName() {
         ChangeText ct = new ChangeText("hi");
-        assertThat(ct.getInstanceName()).isEqualTo(
-          "Change text to `hi`");
-
-        ChangeText ct2 = new ChangeText("hi this is some really long text that will get truncated");
-        assertThat(ct2.getInstanceName()).isEqualTo(
-          "Change text to `hi this is some really long text...`");
+        assertThat(ct.getInstanceName()).isEqualTo("Change text to `hi`");
     }
 }

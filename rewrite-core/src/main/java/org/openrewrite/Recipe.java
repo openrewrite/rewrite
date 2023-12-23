@@ -131,14 +131,6 @@ public abstract class Recipe implements Cloneable {
         @Language("markdown")
         String suffix = getInstanceNameSuffix();
         if (!StringUtils.isBlank(suffix)) {
-            if (suffix.length() > 40) {
-                if (suffix.endsWith("\"") || suffix.endsWith("'") || suffix.endsWith("`")) {
-                    suffix = suffix.substring(0, 37).trim() + "..." +
-                             suffix.charAt(suffix.length() - 1);
-                } else {
-                    suffix = suffix.substring(0, 37).trim() + "...";
-                }
-            }
             return getDisplayName() + " " + suffix;
         }
 
@@ -157,12 +149,7 @@ public abstract class Recipe implements Cloneable {
                 if (optionValue != null &&
                     !Iterable.class.isAssignableFrom(optionValue.getClass()) &&
                     !optionValue.getClass().isArray()) {
-                    String optionValueStr = optionValue.toString();
-                    return String.format("%s \"%s\"", getDisplayName(),
-                            optionValueStr.length() > 20 ?
-                                    optionValueStr.substring(0, 17).trim() + "..." :
-                                    optionValueStr
-                    );
+                    return String.format("%s `%s`", getDisplayName(), optionValue);
                 }
             } catch (NoSuchFieldException | IllegalAccessException ignore) {
                 // we tried...
@@ -177,10 +164,6 @@ public abstract class Recipe implements Cloneable {
      * way to just specify the option descriptive text. When {@link #getInstanceName()} is overridden,
      * this method has no effect. Generally either override this method or {@link #getInstanceName()}
      * if you want to customize the instance name text.
-     * <br/>
-     * The default implementation of {@link #getInstanceName()} will furthermore do some truncation
-     * of this suffix to 40 characters, adding trailing ellipses and preserving ending single or
-     * double quotes while doing this truncation if needed.
      *
      * @return A suffix to append to the display name of a recipe.
      */
