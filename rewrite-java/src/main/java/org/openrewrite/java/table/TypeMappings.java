@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
+import org.openrewrite.java.tree.J;
 
 @JsonIgnoreType
 public class TypeMappings extends DataTable<TypeMappings.Row> {
@@ -27,25 +28,30 @@ public class TypeMappings extends DataTable<TypeMappings.Row> {
     public TypeMappings(Recipe recipe) {
         super(recipe,
                 "Type mapping",
-                "The types mapped to J trees.");
+                "The types mapped to `J` trees.");
     }
 
     @Value
     public static class Row {
-        @Column(displayName = "Source file",
-                description = "The source file that the method call occurred in.")
-        String sourceFile;
-
         @Column(displayName = "Tree class name",
-                description = "The class name of the tree.")
+                description = "The simple class name of the `J` element.")
         String treeName;
 
         @Column(displayName = "Java type class name",
-                description = "The class name of the java type.")
+                description = "The simple class name of the `JavaType`.")
         String typeName;
 
-        @Column(displayName = "Java type class name",
-                description = "The class name of the java type.")
+        @Column(displayName = "Count",
+                description = "The number of times this tree and type pair occurred in a repository.")
         Integer count;
+
+        /**
+         * When {@link #typeName} is null, this is the nearest non-null {@link J} type
+         * in the cursor stack.
+         */
+        @Column(displayName = "Nearest non-null tree class name",
+                description = "The simple class name of the nearest non-null `J` element when " +
+                              "`typeName` is null.")
+        String nearestNonNullTreeName;
     }
 }
