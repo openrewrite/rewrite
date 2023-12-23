@@ -759,7 +759,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         List<Javadoc> before;
         Markers markers = Markers.EMPTY;
         if (source.startsWith("{", cursor)) {
-            markers = markers.addIfAbsent(Markers.build(Collections.singletonList(new LeadingBraceMarker())));
+            markers = markers.addIfAbsent(Markers.build(Collections.singletonList(new LeadingBraceMarker(UUID.randomUUID()))));
             before = sourceBefore("{@return");
         } else {
             before = sourceBefore("@return");
