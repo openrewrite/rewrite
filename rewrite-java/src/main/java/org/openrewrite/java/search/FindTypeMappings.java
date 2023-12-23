@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.table.TypeMappings;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypedTree;
 
@@ -58,6 +59,7 @@ public class FindTypeMappings extends ScanningRecipe<Map<FindTypeMappings.TypeAs
             public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
                 Cursor cursor = getCursor();
                 acc.compute(new TypeAssociation(
+                                cursor.firstEnclosingOrThrow(JavaSourceFile.class).getClass(),
                                 cursor.getValue().getClass(),
                                 javaType == null ? null : javaType.getClass(),
                                 javaType == null ?
@@ -80,6 +82,7 @@ public class FindTypeMappings extends ScanningRecipe<Map<FindTypeMappings.TypeAs
             String j = assoc.getJ().getName();
             Class<?> nearJ = assoc.getNearestNonNullJ();
             typeMappingsPerSource.insertRow(ctx, new TypeMappings.Row(
+                    assoc.getCompilationUnit().getEnclosingClass().getSimpleName(),
                     j.substring(j.lastIndexOf('.') + 1),
                     assoc.getJavaType() == null ? "null" : assoc.getJavaType().getSimpleName(),
                     count,
@@ -91,6 +94,8 @@ public class FindTypeMappings extends ScanningRecipe<Map<FindTypeMappings.TypeAs
 
     @Value
     public static class TypeAssociation {
+        Class<? extends JavaSourceFile> compilationUnit;
+
         Class<?> j;
 
         @Nullable

@@ -36,23 +36,23 @@ class FindTypeMappingsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTable(Row.class, table -> {
               assertThat(table.stream()
-                .map(row -> "%-38s%-15s%d%s".formatted(row.getTreeName(), row.getTypeName(), row.getCount(),
+                .map(row -> "%-3s%-38s%-15s%d%s".formatted(row.getCompilationUnitName(), row.getTreeName(), row.getTypeName(), row.getCount(),
                   row.getNearestNonNullTreeName() == null ? "" : "  " + row.getNearestNonNullTreeName()))
                 .sorted()
                 .collect(Collectors.joining("\n", "", "\n")))
                 .isEqualTo(
                   """
-                    J$ClassDeclaration                    Class          1
-                    J$FieldAccess                         Class          2
-                    J$FieldAccess                         Unknown        2
-                    J$Identifier                          Class          6
-                    J$Identifier                          Parameterized  1
-                    J$Identifier                          Unknown        4
-                    J$Identifier                          Variable       1
-                    J$Identifier                          null           10  J$Identifier
-                    J$NewClass                            Method         1
-                    J$ParameterizedType                   Parameterized  2
-                    J$VariableDeclarations$NamedVariable  Variable       1
+                    J  J$ClassDeclaration                    Class          1
+                    J  J$FieldAccess                         Class          2
+                    J  J$FieldAccess                         Unknown        2
+                    J  J$Identifier                          Class          6
+                    J  J$Identifier                          Parameterized  1
+                    J  J$Identifier                          Unknown        4
+                    J  J$Identifier                          Variable       1
+                    J  J$Identifier                          null           10  J$Identifier
+                    J  J$NewClass                            Method         1
+                    J  J$ParameterizedType                   Parameterized  2
+                    J  J$VariableDeclarations$NamedVariable  Variable       1
                     """
                 );
           }),

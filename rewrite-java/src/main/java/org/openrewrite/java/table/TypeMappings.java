@@ -33,6 +33,10 @@ public class TypeMappings extends DataTable<TypeMappings.Row> {
 
     @Value
     public static class Row {
+        @Column(displayName = "Compilation unit class name",
+                description = "The root compilation unit class name containing the mapping.")
+        String compilationUnitName;
+
         @Column(displayName = "Tree class name",
                 description = "The simple class name of the `J` element.")
         String treeName;
