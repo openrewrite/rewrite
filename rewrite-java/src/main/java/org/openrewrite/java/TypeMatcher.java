@@ -61,12 +61,12 @@ public class TypeMatcher {
                        "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
     }
 
-    public TypeMatcher(String fieldType) {
+    public TypeMatcher(@Nullable String fieldType) {
         this(fieldType, false);
     }
 
-    public TypeMatcher(String fieldType, boolean matchInherited) {
-        this.signature = fieldType;
+    public TypeMatcher(@Nullable String fieldType, boolean matchInherited) {
+        this.signature = fieldType == null ? ".*" : fieldType;
         this.matchInherited = matchInherited;
 
         if (StringUtils.isBlank(fieldType)) {

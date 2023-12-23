@@ -62,6 +62,14 @@ public class FindDeprecatedClasses extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        if (typePattern != null) {
+            return "matching `" + typePattern + "`";
+        }
+        return super.getInstanceNameSuffix();
+    }
+
+    @Override
     public String getDescription() {
         return "Find uses of deprecated classes, optionally ignoring those classes that are inside deprecated scopes.";
     }

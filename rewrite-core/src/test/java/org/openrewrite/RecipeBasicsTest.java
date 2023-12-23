@@ -18,6 +18,7 @@ package org.openrewrite;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.render.TruncatingRecipeNameRenderer;
 import org.openrewrite.text.ChangeText;
 
 import java.util.HashMap;
@@ -25,15 +26,24 @@ import java.util.HashMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeBasicsTest {
+
     @Test
     void cloneRecipe() throws JsonMappingException {
         ChangeText ct = new ChangeText("hi");
         ChangeText ct2 = (ChangeText) ct.clone();
         ObjectMapper mapper = new ObjectMapper();
-        mapper.updateValue(ct2, new HashMap<String, String>() {{ put("toText", "hello"); }});
+        mapper.updateValue(ct2, new HashMap<String, String>() {{
+            put("toText", "hello");
+        }});
 
         assertThat(ct2).isNotSameAs(ct);
         assertThat(ct.getToText()).isEqualTo("hi");
         assertThat(ct2.getToText()).isEqualTo("hello");
+    }
+
+    @Test
+    void instanceName() {
+        ChangeText ct = new ChangeText("hi");
+        assertThat(ct.getInstanceName()).isEqualTo("Change text to `hi`");
     }
 }

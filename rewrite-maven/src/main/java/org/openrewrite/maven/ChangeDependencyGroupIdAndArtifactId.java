@@ -35,10 +35,9 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.*;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
-    @EqualsAndHashCode.Exclude
-    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Old groupId",
             description = "The old groupId to replace. The groupId is the first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob expressions.",
@@ -73,7 +72,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -133,6 +132,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
             @Nullable
             private Collection<String> availableVersions;
+
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
 
@@ -173,7 +173,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                     t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                                 }
                             }
-                        } catch(MavenDownloadingException e) {
+                        } catch (MavenDownloadingException e) {
                             return e.warn(tag);
                         }
                     }

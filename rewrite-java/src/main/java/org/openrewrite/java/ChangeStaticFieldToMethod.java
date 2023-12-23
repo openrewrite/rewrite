@@ -59,6 +59,13 @@ public class ChangeStaticFieldToMethod extends Recipe {
     String newMethodName;
 
     @Override
+    public String getInstanceNameSuffix() {
+        String shortType = oldClassName.substring(oldClassName.lastIndexOf('.') + 1);
+        return String.format("`%s#%s` to `%s`",
+                shortType, oldFieldName, newMethodName);
+    }
+
+    @Override
     public String getDisplayName() {
         return "Change static field access to static method access";
     }

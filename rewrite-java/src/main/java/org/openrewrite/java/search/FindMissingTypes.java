@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 public class FindMissingTypes extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Find missing type information on Java ASTs";

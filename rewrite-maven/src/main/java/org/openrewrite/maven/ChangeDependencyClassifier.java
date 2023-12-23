@@ -60,6 +60,11 @@ public class ChangeDependencyClassifier extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("for `%s:%s` to `%s`", groupId, artifactId, newClassifier);
+    }
+
+    @Override
     public String getDescription() {
         return "Add or alter the classifier of the specified dependency.";
     }

@@ -13,20 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.ai;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
-import org.openrewrite.java.search.DeclaresMethod;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.table.TokenCount;
-
-import static java.util.Objects.requireNonNull;
+import org.openrewrite.java.tree.J;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class MethodDefinitionLength extends Recipe {
+    transient TokenCount tokens = new TokenCount(this);
+
     @Override
     public String getDisplayName() {
         return "Calculate token length of method definitions";
@@ -37,7 +39,6 @@ public class MethodDefinitionLength extends Recipe {
         return "Locates method definitions and predicts the number of token in each.";
     }
 
-    transient TokenCount tokens = new TokenCount(this);
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
@@ -46,11 +47,11 @@ public class MethodDefinitionLength extends Recipe {
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
                 J.ClassDeclaration cd = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                if(cd == null) {
+                if (cd == null) {
                     return md;
                 }
-                int numberOfTokens = (int) ( md.printTrimmed(getCursor()).length() / 3.5);
-                tokens.insertRow(ctx, new TokenCount.Row( md.getSimpleName(), numberOfTokens));
+                int numberOfTokens = (int) (md.printTrimmed(getCursor()).length() / 3.5);
+                tokens.insertRow(ctx, new TokenCount.Row(md.getSimpleName(), numberOfTokens));
                 return md;
             }
         };

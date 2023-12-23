@@ -56,8 +56,8 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
     @Nullable
     String artifactPattern;
 
-    @Option(displayName = "Add to the root pom",
-            description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
+    @Option(displayName = "Add to the root POM",
+            description = "Add to the root POM where root is the eldest parent of the pom within the source set.",
             required = false)
     @Nullable
     Boolean addToRootPom;
@@ -74,6 +74,11 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
     @Override
     public String getDisplayName() {
         return "Manage dependencies";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupPattern, artifactPattern);
     }
 
     @Override

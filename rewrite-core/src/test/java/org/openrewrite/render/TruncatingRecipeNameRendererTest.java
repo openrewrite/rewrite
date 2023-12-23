@@ -13,27 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.render;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.java.ai.ClassDefinitionLength;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.ChangeText;
 
-import static org.openrewrite.java.Assertions.java;
+import static org.assertj.core.api.Assertions.assertThat;
 
-class ClassDefinitionLengthTest implements RewriteTest {
+public class TruncatingRecipeNameRendererTest {
+
     @Test
-    void declares() {
-        rewriteRun( spec -> spec.recipe(new ClassDefinitionLength()),
-          java("""
-                public class Foo {
-                    public void hello(){
-                        System.out.println("hello");
-                    }
-                }
-                """)
-        );
+    void shorterThanTruncation() {
+        ChangeText ct2 = new ChangeText("hi");
+        assertThat(new TruncatingRecipeNameRenderer(40).getInstanceName(ct2)).isEqualTo(
+          "Change text to `hi`");
     }
 
-
+    @Test
+    void endsInQuoteDelimiter() {
+        ChangeText ct2 = new ChangeText("hi this is some really long text that will get truncated");
+        assertThat(new TruncatingRecipeNameRenderer(40).getInstanceName(ct2)).isEqualTo(
+          "Change text to `hi this is some real...`");
+    }
 }

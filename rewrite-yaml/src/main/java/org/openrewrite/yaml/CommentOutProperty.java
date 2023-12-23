@@ -33,18 +33,23 @@ import static java.util.stream.StreamSupport.stream;
 @EqualsAndHashCode(callSuper = true)
 public class CommentOutProperty extends Recipe {
     @Option(displayName = "Property key",
-        description = "The key to be commented out.",
-        example = "applicability.singleSource")
+            description = "The key to be commented out.",
+            example = "applicability.singleSource")
     String propertyKey;
 
     @Option(displayName = "comment text",
-        description = "The comment text to be added before the specified key.",
-        example = "The `foo` property is deprecated, please migrate")
+            description = "The comment text to be added before the specified key.",
+            example = "The `foo` property is deprecated, please migrate")
     String commentText;
 
     @Override
     public String getDisplayName() {
         return "Comment out property";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s`", propertyKey);
     }
 
     @Override
@@ -83,13 +88,13 @@ public class CommentOutProperty extends Recipe {
                 }
 
                 Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
-                    .filter(Yaml.Mapping.Entry.class::isInstance)
-                    .map(Yaml.Mapping.Entry.class::cast)
-                    .collect(Collectors.toCollection(ArrayDeque::new));
+                        .filter(Yaml.Mapping.Entry.class::isInstance)
+                        .map(Yaml.Mapping.Entry.class::cast)
+                        .collect(Collectors.toCollection(ArrayDeque::new));
 
                 String prop = stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
-                    .map(e2 -> e2.getKey().getValue())
-                    .collect(Collectors.joining("."));
+                        .map(e2 -> e2.getKey().getValue())
+                        .collect(Collectors.joining("."));
 
                 if (prop.equals(propertyKey)) {
                     String prefix = entry.getPrefix();
