@@ -18,7 +18,6 @@ package org.openrewrite;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.render.TruncatingRecipeNameRenderer;
 import org.openrewrite.text.ChangeText;
 
 import java.util.HashMap;
