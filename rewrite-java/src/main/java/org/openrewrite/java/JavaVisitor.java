@@ -23,9 +23,7 @@ import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.Iterator;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 @SuppressWarnings("unused")
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
@@ -137,7 +135,24 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Incubating(since = "8.2.0")
     public <S> S service(Class<S> service) {
-        return getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(service);
+        for (Cursor c = getCursor(); c.getParent() != null; c = c.getParent()) {
+            Map<Class<?>, Object> services = c.getMessage("__services");
+            if (services != null && services.containsKey(service)) {
+                //noinspection unchecked
+                return (S) services.get(service);
+            }
+            if (c.getValue() instanceof JavaSourceFile) {
+                S found = ((JavaSourceFile) c.getValue()).service(service);
+                services = getCursor().getMessage("__services");
+                if (services == null) {
+                    c.putMessage("__services", services = new HashMap<>());
+                }
+                services.put(service, found);
+                return found;
+            }
+        }
+
+        throw new IllegalArgumentException("No JavaSourceFile parent found");
     }
 
     public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
@@ -660,7 +675,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             return temp;
         } else {
             //noinspection unchecked
-            t = t.withParenthesizedType((J.Parentheses<TypeTree>)temp);
+            t = t.withParenthesizedType((J.Parentheses<TypeTree>) temp);
         }
         return t;
     }

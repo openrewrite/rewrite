@@ -44,7 +44,7 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
     @Language("properties")
     @Option(displayName = "File contents",
             description = "Multiline text content for the file.",
-            example = "a.property=value\nanother.property=value",
+            example = "a.property=value",
             required = false)
     @Nullable
     String fileContents;
