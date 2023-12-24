@@ -104,6 +104,11 @@ public class UpgradePluginVersion extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
+    }
+
+    @Override
     public String getDescription() {
         return "Upgrade the version of a plugin using Node Semver advanced range selectors, " +
                "allowing more precise control over version updates to patch or minor releases.";
@@ -136,7 +141,7 @@ public class UpgradePluginVersion extends Recipe {
                             assert tagGroupId != null;
                             assert tagArtifactId != null;
                             findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer ->
-                                doAfterVisit(new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer, Boolean.TRUE.equals(addVersionIfMissing)))
+                                    doAfterVisit(new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer, Boolean.TRUE.equals(addVersionIfMissing)))
                             );
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);

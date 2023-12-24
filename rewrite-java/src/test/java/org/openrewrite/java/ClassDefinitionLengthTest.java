@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.ai.ClassDefinitionLength;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;

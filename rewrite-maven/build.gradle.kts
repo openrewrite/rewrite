@@ -10,6 +10,7 @@ dependencies {
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 
+    implementation(project(":rewrite-core"))
     compileOnly(project(":rewrite-test"))
 
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.

@@ -45,38 +45,27 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeParentPom extends Recipe {
-    @EqualsAndHashCode.Exclude
-    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven parent pom";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Change the parent pom of a Maven pom.xml. Identifies the parent pom to be changed by its groupId and artifactId.";
-    }
-
-    @Option(displayName = "Old GroupId",
-            description = "The groupId of the maven parent pom to be changed away from.",
+    @Option(displayName = "Old group ID",
+            description = "The group ID of the Maven parent pom to be changed away from.",
             example = "org.springframework.boot")
     String oldGroupId;
 
-    @Option(displayName = "New GroupId",
-            description = "The groupId of the new maven parent pom to be adopted. If this argument is omitted it defaults to the value of `oldGroupId`.",
+    @Option(displayName = "New group ID",
+            description = "The group ID of the new maven parent pom to be adopted. If this argument is omitted it defaults to the value of `oldGroupId`.",
             example = "org.springframework.boot",
             required = false)
     @Nullable
     String newGroupId;
 
-    @Option(displayName = "Old ArtifactId",
-            description = "The artifactId of the maven parent pom to be changed away from.",
+    @Option(displayName = "Old artifact ID",
+            description = "The artifact ID of the maven parent pom to be changed away from.",
             example = "spring-boot-starter-parent")
     String oldArtifactId;
 
-    @Option(displayName = "New ArtifactId",
-            description = "The artifactId of the new maven parent pom to be adopted. If this argument is omitted it defaults to the value of `oldArtifactId`.",
+    @Option(displayName = "New artifact ID",
+            description = "The artifact ID of the new maven parent pom to be adopted. If this argument is omitted it defaults to the value of `oldArtifactId`.",
             example = "spring-boot-starter-parent",
             required = false)
     @Nullable
@@ -124,6 +113,21 @@ public class ChangeParentPom extends Recipe {
             required = false)
     @Nullable
     List<String> retainVersions;
+
+    @Override
+    public String getDisplayName() {
+        return "Change Maven parent";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", newGroupId, newArtifactId, newVersion);
+    }
+
+    @Override
+    public String getDescription() {
+        return "Change the parent pom of a Maven pom.xml. Identifies the parent pom to be changed by its groupId and artifactId.";
+    }
 
     @Override
     public Validated<Object> validate() {
@@ -203,13 +207,11 @@ public class ChangeParentPom extends Recipe {
                                 // Update or add relativePath
                                 if (oldRelativePath != null && !oldRelativePath.equals(targetRelativePath)) {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("relativePath").get(), targetRelativePath));
-                                }
-                                else if (tag.getChildValue("relativePath").orElse(null) == null && targetRelativePath != null) {
+                                } else if (tag.getChildValue("relativePath").orElse(null) == null && targetRelativePath != null) {
                                     final Xml.Tag relativePathTag;
                                     if (StringUtils.isBlank(targetRelativePath)) {
                                         relativePathTag = Xml.Tag.build("<relativePath />");
-                                    }
-                                    else {
+                                    } else {
                                         relativePathTag = Xml.Tag.build("<relativePath>" + targetRelativePath + "</relativePath>");
                                     }
                                     doAfterVisit(new AddToTagVisitor<>(t, relativePathTag, new MavenTagInsertionComparator(t.getChildren())));

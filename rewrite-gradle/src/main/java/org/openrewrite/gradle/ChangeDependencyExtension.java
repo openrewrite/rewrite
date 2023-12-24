@@ -66,6 +66,11 @@ public class ChangeDependencyExtension extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s` to `%s`", groupId, artifactId, newExtension);
+    }
+
+    @Override
     public String getDescription() {
         return "Finds dependencies declared in `build.gradle` files.";
     }
@@ -94,8 +99,8 @@ public class ChangeDependencyExtension extends Recipe {
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
                         if (!newExtension.equals(dependency.getExt()) &&
-                                ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
-                                        (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
+                            ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
+                             (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
                             Dependency newDependency = dependency.withExt(newExtension);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
                         }
@@ -138,9 +143,9 @@ public class ChangeDependencyExtension extends Recipe {
                         }
                     }
                     if (groupId == null || artifactId == null
-                            || (version == null && !depMatcher.matches(groupId, artifactId))
-                            || (version != null && !depMatcher.matches(groupId, artifactId, version))
-                            || extension == null) {
+                        || (version == null && !depMatcher.matches(groupId, artifactId))
+                        || (version != null && !depMatcher.matches(groupId, artifactId, version))
+                        || extension == null) {
                         return m;
                     }
                     String delimiter = extensionStringDelimiter;

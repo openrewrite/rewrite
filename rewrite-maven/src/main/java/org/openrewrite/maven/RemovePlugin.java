@@ -45,8 +45,13 @@ public class RemovePlugin extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
-        return "Remove the specified Maven plugin from the pom.xml.";
+        return "Remove the specified Maven plugin from the POM.";
     }
 
     @Override

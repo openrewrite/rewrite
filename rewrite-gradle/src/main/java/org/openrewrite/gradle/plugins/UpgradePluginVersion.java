@@ -39,10 +39,9 @@ import java.util.List;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpgradePluginVersion extends Recipe {
-    @EqualsAndHashCode.Exclude
-    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`, as a glob expression.",
@@ -62,7 +61,7 @@ public class UpgradePluginVersion extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -112,8 +111,8 @@ public class UpgradePluginVersion extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (!(versionMatcher.matches(m) &&
-                        m.getSelect() instanceof J.MethodInvocation &&
-                        pluginMatcher.matches(m.getSelect()))) {
+                      m.getSelect() instanceof J.MethodInvocation &&
+                      pluginMatcher.matches(m.getSelect()))) {
                     return m;
                 }
                 List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
@@ -121,7 +120,7 @@ public class UpgradePluginVersion extends Recipe {
                     return m;
                 }
                 String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
-                if(pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
+                if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
                     return m;
                 }
 
@@ -130,7 +129,7 @@ public class UpgradePluginVersion extends Recipe {
                     return m;
                 }
                 String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
-                if(currentVersion == null) {
+                if (currentVersion == null) {
                     return m;
                 }
                 Optional<String> version;
