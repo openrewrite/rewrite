@@ -1,3 +1,18 @@
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.ruby;
 
 import org.jruby.RubySymbol;
@@ -540,9 +555,33 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     @Override
     public J visitIfNode(IfNode node) {
-        Markers markers = Markers.EMPTY;
-        Space prefix = sourceBefore("if");
+        Space prefix = whitespace();
+        return (source.startsWith("if", cursor) ?
+                ifStatement(node) :
+                ifModifier(node)).withPrefix(prefix);
+    }
 
+    private J.If ifModifier(IfNode node) {
+        Statement thenElem = convert(node.getThenBody());
+        JRightPadded<Statement> then = padRight(thenElem, sourceBefore("if"));
+        Expression ifConditionExpr = convert(node.getCondition());
+        J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(
+                randomId(),
+                ifConditionExpr.getPrefix(),
+                Markers.EMPTY,
+                padRight(ifConditionExpr, EMPTY)
+        );
+        return new J.If(
+                randomId(),
+                EMPTY,
+                Markers.build(singletonList(new IfModifier(randomId()))),
+                ifCondition,
+                then,
+                null
+        );
+    }
+
+    private J.If ifStatement(IfNode node) {
         Space ifConditionPrefix = whitespace();
         Expression ifConditionExpr = convert(node.getCondition());
         boolean explicitThen = Pattern.compile("\\s+then").matcher(source).find(cursor);
@@ -575,8 +614,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
         return new J.If(
                 randomId(),
-                prefix,
-                markers,
+                EMPTY,
+                Markers.EMPTY,
                 ifCondition,
                 then,
                 anElse

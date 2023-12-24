@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.ruby.tree;
+package org.openrewrite.ruby.marker;
 
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.marker.Marker;
 
-import static org.openrewrite.ruby.Assertions.ruby;
+import java.util.UUID;
 
-public class ParenthesesTest implements RewriteTest {
-
-    @Disabled
-    @Test
-    void parentheses() {
-        rewriteRun(
-          ruby(
-            """
-              (42)
-              """
-          )
-        );
-    }
+/**
+ * In Ruby, `if` statements can be used as expressions, which they
+ * call "modifiers" in this context.
+ */
+@Value
+@With
+public class IfModifier implements Marker {
+    UUID id;
 }
