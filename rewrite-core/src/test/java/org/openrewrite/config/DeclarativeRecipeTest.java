@@ -83,4 +83,22 @@ public class DeclarativeRecipeTest implements RewriteTest {
           text("2")
         );
     }
+
+    @Test
+    void maxCycles() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.MaxCyclesTest
+            maxCycles: 1
+            recipeList:
+              - org.openrewrite.text.FindAndReplace:
+                 find: .*
+                 replace: $0+1
+                 regex: true
+            """, "org.openrewrite.MaxCyclesTest"),
+          text("1","1+1")
+        );
+    }
 }

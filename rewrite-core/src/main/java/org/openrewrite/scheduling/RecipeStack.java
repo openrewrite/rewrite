@@ -56,6 +56,7 @@ class RecipeStack {
                 sourceSet.setRecipe(recipeStack);
                 acc = consumer.apply(acc, recipeStack);
             }
+            // FIXME no recursion when `maxCycles` exceeded but update `recipePosition`
             recurseRecipeList(recipeStack);
         }
         return acc;
