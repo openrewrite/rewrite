@@ -49,6 +49,10 @@
             "type": "string",
             "format": "duration"
           },
+          "maxCycles": {
+            "type": "integer",
+            "default": 2147483647
+          },
           "causesAnotherCycle": {
             "type": "boolean",
             "default": false
