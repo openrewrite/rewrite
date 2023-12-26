@@ -55,9 +55,10 @@ class RecipeStack {
             if (recipeStack.peek().maxCycles() >= ctx.getCycle()) {
                 sourceSet.setRecipe(recipeStack);
                 acc = consumer.apply(acc, recipeStack);
+                recurseRecipeList(recipeStack);
+            } else {
+                this.recipePosition = recipePosition.getAndAdd(countRecipes(recipeStack.peek()));
             }
-            // FIXME no recursion when `maxCycles` exceeded but update `recipePosition`
-            recurseRecipeList(recipeStack);
         }
         return acc;
     }
@@ -70,7 +71,7 @@ class RecipeStack {
     }
 
     private void recurseRecipeList(Stack<Recipe> recipeStack) {
-        List<Recipe> recipeList = getRecipeList(recipeStack);
+        List<Recipe> recipeList = getRecipeList(recipeStack.peek());
         for (int i = recipeList.size() - 1; i >= 0; i--) {
             Recipe r = recipeList.get(i);
             Stack<Recipe> nextStack = new Stack<>();
@@ -80,7 +81,17 @@ class RecipeStack {
         }
     }
 
-    private List<Recipe> getRecipeList(Stack<Recipe> recipeStack) {
-        return recipeLists.computeIfAbsent(recipeStack.peek(), Recipe::getRecipeList);
+    private int countRecipes(Recipe recipe) {
+        int count = 0;
+        List<Recipe> recipeList = getRecipeList(recipe);
+        for (Recipe subRecipe : recipeList) {
+            count++;
+            count += countRecipes(subRecipe);
+        }
+        return count;
+    }
+
+    private List<Recipe> getRecipeList(Recipe recipe) {
+        return recipeLists.computeIfAbsent(recipe, Recipe::getRecipeList);
     }
 }
