@@ -236,8 +236,7 @@ public class YamlResourceLoader implements ResourceLoader {
                 }
             }
             DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags,
-                    estimatedEffortPerOccurrence, source, (int) r.getOrDefault("maxCycles", Integer.MAX_VALUE),
-                    (boolean) r.getOrDefault("causesAnotherCycle", false), maintainers);
+                    estimatedEffortPerOccurrence, source, (boolean) r.getOrDefault("causesAnotherCycle", false), maintainers);
 
             List<Object> recipeList = (List<Object>) r.get("recipeList");
             if (recipeList == null) {

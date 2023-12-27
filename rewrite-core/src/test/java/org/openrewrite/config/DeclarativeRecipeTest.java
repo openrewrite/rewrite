@@ -18,7 +18,10 @@ package org.openrewrite.config;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
@@ -27,13 +30,10 @@ import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -43,32 +43,32 @@ public class DeclarativeRecipeTest implements RewriteTest {
     @Test
     void precondition() {
         rewriteRun(
-            spec -> {
-                spec.validateRecipeSerialization(false);
-                DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
-                  null, null, 2, true, null);
-                dr.addPrecondition(
-                  toRecipe(() -> new PlainTextVisitor<>() {
-                      @Override
-                      public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                          if("1".equals(text.getText())) {
-                              return SearchResult.found(text);
-                          }
-                          return text;
-                      }
-                  })
-                );
-                dr.addUninitialized(
-                  new ChangeText("2")
-                );
-                dr.addUninitialized(
-                  new ChangeText("3")
-                );
-                dr.initialize(List.of(), Map.of());
-                spec.recipe(dr);
-            },
-            text("1","3"),
-            text("2")
+          spec -> {
+              spec.validateRecipeSerialization(false);
+              DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
+                null, null, true, null);
+              dr.addPrecondition(
+                toRecipe(() -> new PlainTextVisitor<>() {
+                    @Override
+                    public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                        if ("1".equals(text.getText())) {
+                            return SearchResult.found(text);
+                        }
+                        return text;
+                    }
+                })
+              );
+              dr.addUninitialized(
+                new ChangeText("2")
+              );
+              dr.addUninitialized(
+                new ChangeText("3")
+              );
+              dr.initialize(List.of(), Map.of());
+              spec.recipe(dr);
+          },
+          text("1", "3"),
+          text("2")
         );
     }
 
@@ -88,7 +88,7 @@ public class DeclarativeRecipeTest implements RewriteTest {
               - org.openrewrite.text.ChangeText:
                  toText: 3
             """, "org.openrewrite.PreconditionTest"),
-          text("1","3"),
+          text("1", "3"),
           text("2")
         );
     }
@@ -108,39 +108,21 @@ public class DeclarativeRecipeTest implements RewriteTest {
     @Test
     void maxCyclesNested() {
         AtomicInteger cycleCount = new AtomicInteger();
-        DeclarativeRecipe root = new DeclarativeRecipe(
-          "root",
-          "Root recipe",
-          "Root recipe.",
-          emptySet(),
-          null,
-          URI.create("dummy:recipe.yml"),
+        Recipe root = new MaxCycles(
           100,
-          false,
-          emptyList()
+          List.of(new MaxCycles(
+              2,
+              List.of(new RepeatedFindAndReplace(".+", "$0+1", 100))
+            ),
+            toRecipe(() -> new TreeVisitor<>() {
+                @Override
+                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    cycleCount.incrementAndGet();
+                    return tree;
+                }
+            })
+          )
         );
-        DeclarativeRecipe nested = new DeclarativeRecipe(
-          "root",
-          "Nested recipe",
-          "Nested recipe.",
-          emptySet(),
-          null,
-          URI.create("dummy:recipe.yml"),
-          2,
-          false,
-          emptyList()
-        );
-        nested.addUninitialized(new RepeatedFindAndReplace(".+", "$0+1", 100));
-        nested.initialize(List.of(), Map.of());
-        root.addUninitialized(nested);
-        root.addUninitialized(toRecipe(() -> new TreeVisitor<>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                cycleCount.incrementAndGet();
-                return tree;
-            }
-        }));
-        root.initialize(List.of(), Map.of());
         rewriteRun(
           spec -> spec.recipe(root).cycles(10).expectedCyclesThatMakeChanges(2),
           text("1", "1+1+1")
@@ -150,7 +132,29 @@ public class DeclarativeRecipeTest implements RewriteTest {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    public static class RepeatedFindAndReplace extends Recipe {
+    static class MaxCycles extends Recipe {
+        int maxCycles;
+        List<Recipe> recipeList;
+
+        @Override
+        public int maxCycles() {
+            return maxCycles;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "Executes recipes multiple times";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Executes recipes multiple times.";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    static class RepeatedFindAndReplace extends Recipe {
         String find;
         String replace;
         int maxCycles;

@@ -123,7 +123,6 @@ class RecipeSchedulerTest implements RewriteTest {
           emptySet(),
           null,
           URI.create("dummy:recipe.yml"),
-          2,
           false,
           emptyList()
         );

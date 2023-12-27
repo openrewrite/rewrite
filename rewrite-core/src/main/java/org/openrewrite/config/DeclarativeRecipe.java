@@ -50,13 +50,6 @@ public class DeclarativeRecipe extends Recipe {
 
     private final URI source;
 
-    private final int maxCycles;
-
-    @Override
-    public int maxCycles() {
-        return maxCycles;
-    }
-
     private final boolean causesAnotherCycle;
 
     @Override
