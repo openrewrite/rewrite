@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -206,6 +207,9 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     @Override
     public Javadoc visitReturn(Javadoc.Return aReturn, PrintOutputCapture<P> p) {
         beforeSyntax(aReturn, p);
+        if (aReturn.getMarkers().findFirst(LeadingBrace.class).isPresent()) {
+            p.append("{");
+        }
         p.append("@return");
         visit(aReturn.getDescription(), p);
         afterSyntax(aReturn, p);

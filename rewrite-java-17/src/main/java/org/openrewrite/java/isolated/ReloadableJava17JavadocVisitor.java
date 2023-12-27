@@ -32,13 +32,11 @@ import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
-import lombok.Value;
-import lombok.With;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -759,7 +757,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         List<Javadoc> before;
         Markers markers = Markers.EMPTY;
         if (source.startsWith("{", cursor)) {
-markers = markers.addIfAbsent(new LeadingBrace(Tree.randomId()));
+            markers = markers.addIfAbsent(new LeadingBrace(Tree.randomId()));
             before = sourceBefore("{@return");
         } else {
             before = sourceBefore("@return");
@@ -1208,11 +1206,5 @@ markers = markers.addIfAbsent(new LeadingBrace(Tree.randomId()));
             }
             return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions), typeMapping.type(node));
         }
-    }
-
-    @Value
-    @With
-    private static class LeadingBrace implements Marker {
-        UUID id;
     }
 }

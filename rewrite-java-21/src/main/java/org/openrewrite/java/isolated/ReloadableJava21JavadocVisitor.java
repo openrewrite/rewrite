@@ -35,6 +35,7 @@ import com.sun.tools.javac.util.Context;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -753,8 +754,16 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     @Override
     public Tree visitReturn(ReturnTree node, List<Javadoc> body) {
-        body.addAll(sourceBefore("@return"));
-        return new Javadoc.Return(randomId(), Markers.EMPTY, convertMultiline(node.getDescription()));
+        List<Javadoc> before;
+        Markers markers = Markers.EMPTY;
+        if (source.startsWith("{", cursor)) {
+            markers = markers.addIfAbsent(new LeadingBrace(Tree.randomId()));
+            before = sourceBefore("{@return");
+        } else {
+            before = sourceBefore("@return");
+        }
+        body.addAll(before);
+        return new Javadoc.Return(randomId(), markers, convertMultiline(node.getDescription()));
     }
 
     @Override
