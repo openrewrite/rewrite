@@ -1213,6 +1213,6 @@ markers = markers.addIfAbsent(new LeadingBrace(Tree.randomId()));
     @Value
     @With
     private static class LeadingBrace implements Marker {
-        private UUID uuid;
+        UUID id;
     }
 }
