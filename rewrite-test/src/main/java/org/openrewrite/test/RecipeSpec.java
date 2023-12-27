@@ -286,7 +286,7 @@ public class RecipeSpec {
         return executionContext;
     }
 
-    @Incubating(since = "8.11.3")
+    @Incubating(since = "8.12.1")
     public RecipeSpec printRecipe(RecipePrinter recipePrinter) {
         this.recipePrinter = recipePrinter;
         return this;
