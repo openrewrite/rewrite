@@ -1214,16 +1214,5 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @With
     private static class LeadingBraceMarker implements Marker {
         private UUID uuid;
-        
-        @Override
-        public UUID getId() {
-            return uuid;
-        }
-
-        @Override
-        public <M extends Marker> M withId(UUID id) {
-            return null;
-        }
-        // You can add any additional fields or methods if needed
     }
 }
