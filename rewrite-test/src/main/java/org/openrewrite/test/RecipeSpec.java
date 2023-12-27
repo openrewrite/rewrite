@@ -99,7 +99,7 @@ public class RecipeSpec {
     Function<List<SourceFile>, LargeSourceSet> sourceSet;
 
     @Nullable
-    RecipeTreePrinter recipeTreePrinter;
+    RecipePrinter recipePrinter;
 
     /**
      * Configuration that applies to all source file inputs.
@@ -287,8 +287,8 @@ public class RecipeSpec {
     }
 
     @Incubating(since = "8.11.3")
-    public RecipeSpec printRecipe(RecipeTreePrinter recipeTreePrinter) {
-        this.recipeTreePrinter = recipeTreePrinter;
+    public RecipeSpec printRecipe(RecipePrinter recipePrinter) {
+        this.recipePrinter = recipePrinter;
         return this;
     }
 }

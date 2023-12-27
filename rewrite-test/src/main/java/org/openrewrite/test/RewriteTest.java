@@ -182,15 +182,10 @@ public interface RewriteTest extends SourceSpecs {
             validateRecipeOptions(recipe);
         }
 
-        RecipeTreePrinter recipeTreePrinter = null;
-        if (testMethodSpec.getRecipeTreePrinter() != null) {
-            recipeTreePrinter = testMethodSpec.getRecipeTreePrinter();
-        } else if (testClassSpec.getRecipeTreePrinter() != null) {
-            recipeTreePrinter = testClassSpec.getRecipeTreePrinter();
-        }
-
-        if (recipeTreePrinter != null) {
-            recipeTreePrinter.printTree(recipe);
+        if (testMethodSpec.getRecipePrinter() != null) {
+            testMethodSpec.getRecipePrinter().printTree(recipe);
+        } else if (testClassSpec.getRecipePrinter() != null) {
+            testClassSpec.getRecipePrinter().printTree(recipe);
         }
 
         int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();

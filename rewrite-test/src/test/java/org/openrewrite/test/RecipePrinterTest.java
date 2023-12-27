@@ -29,16 +29,13 @@ import java.util.Collections;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
-class RecipeTreePrinterTest implements RewriteTest {
+class RecipePrinterTest implements RewriteTest {
 
-    private final StringBuilder sb = new StringBuilder();
-
-    private final RecipeTreePrinter recipeTreePrinter = prefix ->
-      s -> sb.append(prefix).append(s).append(System.lineSeparator());
+    private StringBuilder sb;
 
     @BeforeEach
     void beforeEach() {
-        sb.setLength(0);
+        sb = new StringBuilder();
     }
 
     @Test
@@ -46,7 +43,7 @@ class RecipeTreePrinterTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new SelectRecipeExamples())
-            .printRecipe(recipeTreePrinter)
+            .printRecipe(() -> sb::append)
         );
 
         assertThat(sb.toString()).isEqualTo(SelectRecipeExamples.class.getName() + System.lineSeparator());
@@ -62,7 +59,7 @@ class RecipeTreePrinterTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(recipe)
-            .printRecipe(recipeTreePrinter)
+            .printRecipe(() -> sb::append)
         );
 
         String output = sb.toString();
@@ -78,24 +75,24 @@ class RecipeTreePrinterTest implements RewriteTest {
 
         assertThat(output).isEqualTo(expected);
     }
-}
 
-@Value
-@EqualsAndHashCode(callSuper = true)
-class TestRecipe extends Recipe {
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    private static class TestRecipe extends Recipe {
 
-    @Option(displayName = "An option",
-      description = "A sample option.",
-      example = "Some text.")
-    String theOption;
+        @Option(displayName = "An option",
+          description = "A sample option.",
+          example = "Some text.")
+        String theOption;
 
-    @Override
-    public String getDisplayName() {
-        return "Test recipe";
-    }
+        @Override
+        public String getDisplayName() {
+            return "Test recipe";
+        }
 
-    @Override
-    public String getDescription() {
-        return "Test recipe.";
+        @Override
+        public String getDescription() {
+            return "Test recipe.";
+        }
     }
 }

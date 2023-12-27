@@ -19,17 +19,13 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Contributor;
-import org.openrewrite.Incubating;
 import org.openrewrite.Maintainer;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -62,23 +58,4 @@ public class RecipeDescriptor {
     List<RecipeExample> examples;
 
     URI source;
-
-    @Incubating(since = "8.11.3")
-    public void print(Consumer<String> consumer) {
-        StringBuilder recipeString = new StringBuilder(name);
-
-        if (options != null && !options.isEmpty()) {
-            String opts = options.stream().map(option -> {
-                if (option.getValue() != null) {
-                    return String.format("%s=%s", option.getName(), option.getValue());
-                }
-                return null;
-            }).filter(Objects::nonNull).collect(Collectors.joining(", "));
-            if (!opts.isEmpty()) {
-                recipeString.append(String.format(": {%s}", opts));
-            }
-        }
-
-        consumer.accept(recipeString.toString());
-    }
 }
