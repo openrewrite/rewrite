@@ -41,7 +41,7 @@ public class DeclarativeRecipeTest implements RewriteTest {
                 dr.addPrecondition(
                   toRecipe(() -> new PlainTextVisitor<>() {
                       @Override
-                      public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                      public PlainText visitText(PlainText text, ExecutionContext ctx) {
                           if("1".equals(text.getText())) {
                               return SearchResult.found(text);
                           }

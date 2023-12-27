@@ -44,6 +44,11 @@ public class ChangeMethodAccessLevel extends Recipe {
     Boolean matchOverrides;
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", methodPattern, newAccessLevel);
+    }
+
+    @Override
     public String getDisplayName() {
         return "Change method access level";
     }

@@ -58,21 +58,21 @@ public class ReplaceConstant extends Recipe {
             J.Literal literal;
 
             @Override
-            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
+            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 if (isConstant(fieldAccess.getName().getFieldType())) {
                     maybeRemoveImport(owningType);
                     return buildLiteral().withPrefix(fieldAccess.getPrefix());
                 }
-                return super.visitFieldAccess(fieldAccess, executionContext);
+                return super.visitFieldAccess(fieldAccess, ctx);
             }
 
             @Override
-            public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
+            public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                 if (isConstant(ident.getFieldType()) && !isVariableDeclaration()) {
                     maybeRemoveImport(owningType);
                     return buildLiteral().withPrefix(ident.getPrefix());
                 }
-                return super.visitIdentifier(ident, executionContext);
+                return super.visitIdentifier(ident, ctx);
             }
 
             private boolean isConstant(@Nullable JavaType.Variable varType) {

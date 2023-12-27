@@ -114,6 +114,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
+    }
+
+    @Override
     public String getDescription() {
         return "Upgrade the version of a dependency by specifying a group and (optionally) an artifact using Node Semver " +
                "advanced range selectors, allowing more precise control over version updates to patch or minor releases.";
@@ -128,7 +133,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
     public TreeVisitor<?, ExecutionContext> getScanner(Set<GroupArtifact> projectArtifacts) {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 ResolvedPom pom = getResolutionResult().getPom();
                 projectArtifacts.add(new GroupArtifact(pom.getGroupId(), pom.getArtifactId()));
                 return document;

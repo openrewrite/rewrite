@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.scheduling.RecipeRunCycle;
 
 import java.util.*;
 import java.util.function.BiConsumer;
@@ -97,6 +98,10 @@ public interface ExecutionContext {
     BiConsumer<Throwable, ExecutionContext> getOnTimeout();
 
     default int getCycle() {
+        return getCycleDetails().getCycle();
+    }
+
+    default RecipeRunCycle<?> getCycleDetails() {
         return requireNonNull(getMessage(CURRENT_CYCLE));
     }
 }

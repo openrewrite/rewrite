@@ -149,7 +149,8 @@ public class ChangeMethodTargetToStatic extends Recipe {
                             )
                     );
                 }
-                m = m.withMethodType(transformedType);
+                m = m.withMethodType(transformedType)
+                        .withName(m.getName().withType(transformedType));
             }
             return m;
         }

@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -79,6 +80,14 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier ident, P p) {
+            if (getCursor().dropParentUntil(it -> it instanceof Javadoc.Parameter ||
+                    it instanceof Comment ||
+                    it instanceof J.ClassDeclaration ||
+                    it instanceof J.MethodDeclaration ||
+                    it instanceof J.VariableDeclarations ||
+                    it instanceof SourceFile).getValue() instanceof Javadoc.Parameter) {
+                return ident;
+            }
             Cursor parent = getCursor().getParentTreeCursor();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
                 if (parent.getValue() instanceof J.FieldAccess) {
@@ -112,6 +121,15 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 }
             }
             return super.visitIdentifier(ident, p);
+        }
+
+        @Override
+        public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
+            J.MemberReference m = super.visitMemberReference(memberRef, p);
+            if (m != memberRef && m.getVariableType() != null && m.getVariableType().getName().equals(renameVariable.getSimpleName())) {
+                m = m.withVariableType(m.getVariableType().withName(newName));
+            }
+            return m;
         }
 
         private boolean isVariableName(Object value, J.Identifier ident) {

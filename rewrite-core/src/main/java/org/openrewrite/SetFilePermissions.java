@@ -57,7 +57,7 @@ public class SetFilePermissions extends Recipe {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Nullable
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     Path sourcePath = sourceFile.getSourcePath();
@@ -72,7 +72,7 @@ public class SetFilePermissions extends Recipe {
                         return sourceFile;
                     }
                 }
-                return super.visit(tree, executionContext);
+                return super.visit(tree, ctx);
             }
         };
     }

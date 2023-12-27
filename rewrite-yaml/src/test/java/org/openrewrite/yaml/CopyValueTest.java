@@ -91,7 +91,7 @@ class CopyValueTest implements RewriteTest {
           spec -> spec.recipe(
             toRecipe(() -> Preconditions.check(new FindSourceFiles("**/a.yml"), new YamlIsoVisitor<>() {
                 @Override
-                public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
+                public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
                     doAfterVisit(new CopyValue(".source", ".destination").getVisitor());
                     return documents;
                 }

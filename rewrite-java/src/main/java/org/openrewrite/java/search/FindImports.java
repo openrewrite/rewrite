@@ -34,6 +34,7 @@ public class FindImports extends Recipe {
             description = "A type pattern that is used to find matching field uses.",
             example = "org.springframework..*",
             required = false)
+    @Nullable
     String typePattern;
 
     @Option(displayName = "Match inherited",
@@ -48,6 +49,14 @@ public class FindImports extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        if (typePattern != null) {
+            return "matching `" + typePattern + "`";
+        }
+        return super.getInstanceNameSuffix();
+    }
+
+    @Override
     public String getDescription() {
         return "Locates source files that have imports matching the given type pattern, regardless of whether " +
                "that import is used in the code.";
@@ -58,11 +67,11 @@ public class FindImports extends Recipe {
         TypeMatcher typeMatcher = new TypeMatcher(typePattern, Boolean.TRUE.equals(matchInherited));
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Import visitImport(J.Import anImport, ExecutionContext executionContext) {
+            public J.Import visitImport(J.Import anImport, ExecutionContext ctx) {
                 if (typeMatcher.matchesPackage(anImport.getTypeName())) {
                     return SearchResult.found(anImport);
                 }
-                return super.visitImport(anImport, executionContext);
+                return super.visitImport(anImport, ctx);
             }
         };
     }

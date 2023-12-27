@@ -46,12 +46,12 @@ public class DeleteKey extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
-            public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext executionContext) {
+            public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
                 if (matcher.matches(getCursor()) || matcher.matches(new Cursor(getCursor(), entry.getBlock()))) {
                     //noinspection ConstantConditions
                     return null;
                 }
-                return super.visitSequenceEntry(entry, executionContext);
+                return super.visitSequenceEntry(entry, ctx);
             }
 
             @Override

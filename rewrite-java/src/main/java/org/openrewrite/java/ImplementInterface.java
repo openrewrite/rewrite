@@ -84,7 +84,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
-                        impl,
+                        interfaceType instanceof JavaType.Parameterized ? impl.withType(((JavaType.Parameterized) interfaceType).getType()) : impl,
                         JContainer.build(Space.EMPTY, elements, Markers.EMPTY),
                         interfaceType
                 );

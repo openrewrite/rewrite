@@ -51,7 +51,7 @@ class ExtractInterfaceTest implements RewriteTest {
         public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<J.CompilationUnit> acc) {
             return new JavaIsoVisitor<>() {
                 @Override
-                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                     acc.set(cu.withId(randomId()));
                     return cu;
                 }

@@ -30,7 +30,7 @@ class NormalizeFormatTest implements RewriteTest {
 
     Recipe removeAnnotation = toRecipe(() -> new JavaIsoVisitor<>() {
         @Override
-        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
+        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
             //noinspection ConstantConditions
             return null;
         }

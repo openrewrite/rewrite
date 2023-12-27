@@ -48,14 +48,14 @@ public class IsInRepository extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree == null) {
                     return null;
                 }
                 Optional<GitProvenance> maybeGp = tree.getMarkers().findFirst(GitProvenance.class);
                 if (maybeGp.isPresent()) {
                     GitProvenance gp = maybeGp.get();
-                    if (!allowedRepositories.contains(gp.getRepositoryName())) {
+                    if (allowedRepositories.contains(gp.getRepositoryName())) {
                         return SearchResult.found(tree);
                     }
                 }

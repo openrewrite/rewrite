@@ -171,14 +171,14 @@ public class FindMethods extends Recipe {
                             final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
 
                             @Override
-                            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                                 J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
                                 if (enclosingClass != null && methodMatcher.matches(method, getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class))) {
                                     return SearchResult.found(method);
                                 } else if (methodMatcher.matches(method.getMethodType())) {
                                     return SearchResult.found(method);
                                 }
-                                return super.visitMethodDeclaration(method, p);
+                                return super.visitMethodDeclaration(method, ctx);
                             }
                         },
                         j,

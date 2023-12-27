@@ -65,6 +65,11 @@ public class RemoveDependency extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "Removes a single dependency from the dependencies section of the `build.gradle`.";
     }

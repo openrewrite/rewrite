@@ -405,6 +405,56 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         );
     }
 
+    @Test
+    void differentFieldAccesses() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  Object f = null;
+                  class B extends A {
+                      boolean m(Object o) {
+                          B other = (B) o;
+                          if (this.f == null || other.f == null) {
+                              return true;
+                          }
+                          return false;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveComments() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m(boolean a) {
+                      if (/*a*/!!a) {
+                          return true;
+                      }
+                      return /*a*/!true || !true;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m(boolean a) {
+                      if (/*a*/a) {
+                          return true;
+                      }
+                      return /*a*/false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @Issue("https://github.com/openrewrite/rewrite-templating/issues/28")
     // Mimic what would be inserted by a Refaster template using two nullable parameters, with the second one a literal

@@ -31,16 +31,16 @@ public class ChangeTagAttribute extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change XML Attribute";
+        return "Change XML attribute";
     }
 
     @Override
     public String getDescription() {
-        return "Alters XML Attribute value within specified element.";
+        return "Alters XML attribute value on a specified element.";
     }
 
     @Option(displayName = "Element name",
-            description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath Expression.",
+            description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath expression.",
             example = "property")
     String elementName;
 

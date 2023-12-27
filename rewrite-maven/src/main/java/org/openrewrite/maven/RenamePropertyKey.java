@@ -44,6 +44,11 @@ public class RenamePropertyKey extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKey, newKey);
+    }
+
+    @Override
     public String getDescription() {
         return "Rename the specified Maven project property key leaving the value unchanged.";
     }

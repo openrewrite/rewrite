@@ -17,9 +17,11 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -267,14 +269,75 @@ class AnnotationTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
-                    assertThat(method.getAllAnnotations()).hasSize(1);
-                    assertThat(method.getAllAnnotations().get(0).getSimpleName()).isEqualTo("Deprecated");
+                    AnnotationService service = service(AnnotationService.class);
+                    assertThat(service.getAllAnnotations(getCursor())).hasSize(1);
+                    assertThat(service.getAllAnnotations(getCursor()).get(0).getSimpleName()).isEqualTo("Deprecated");
                     return method;
                 }
             }.visit(cu, 0))
           )
         );
+    }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3683")
+    @Test
+    void annotationAfterVariableTypePackageName() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              import java.util.List;
+              
+              import static java.lang.annotation.ElementType.*;
+              
+              public class A {
+                @Leading java. util. @Multi1 @Multi2 List<String> l;
+                @Leading java. util. @Multi1 @Multi2 List<String> m() { return null; }
+              }
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value={FIELD, METHOD})
+              public @interface Leading {}
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value=TYPE_USE)
+              public @interface Multi1 {}
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value=TYPE_USE)
+              public @interface Multi2 {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AnnotationService service = cu.service(AnnotationService.class);
+                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                assertThat(service.getAllAnnotations(new Cursor(null, field))).satisfiesExactly(
+                  leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
+                );
+                J.ParameterizedType fieldType = (J.ParameterizedType) field.getTypeExpression();
+                assertThat(fieldType).isNotNull();
+                J.AnnotatedType annotatedType = (J.AnnotatedType) fieldType.getClazz();
+                assertThat(service.getAllAnnotations(new Cursor(null, annotatedType))).satisfiesExactly(
+                  multi1 -> assertThat(multi1.getSimpleName()).isEqualTo("Multi1"),
+                  multi2 -> assertThat(multi2.getSimpleName()).isEqualTo("Multi2")
+                );
+
+                J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
+                assertThat(service.getAllAnnotations(new Cursor(null, method))).satisfiesExactly(
+                  leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
+                );
+                J.ParameterizedType returnType = (J.ParameterizedType) method.getReturnTypeExpression();
+                assertThat(returnType).isNotNull();
+                annotatedType = (J.AnnotatedType) returnType.getClazz();
+                assertThat(service.getAllAnnotations(new Cursor(null, annotatedType))).satisfiesExactly(
+                  multi1 -> assertThat(multi1.getSimpleName()).isEqualTo("Multi1"),
+                  multi2 -> assertThat(multi2.getSimpleName()).isEqualTo("Multi2")
+                );
+            })
+          )
+        );
     }
 
 }

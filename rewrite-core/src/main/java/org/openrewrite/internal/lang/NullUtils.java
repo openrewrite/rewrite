@@ -68,7 +68,6 @@ public class NullUtils {
      * <li>org.springframework.lang.Nullable</li>
      * <li>javax.annotations.Nullable</li>
      * <li>org.checkerframework.checker.nullness.qual.Nullable</li>
-     * <li>javax.validation.constraints.NotNull</li>
      */
     private static final List<String> FIELD_LEVEL_NULLABLE_ANNOTATIONS = Collections.singletonList(
             "Nullable"

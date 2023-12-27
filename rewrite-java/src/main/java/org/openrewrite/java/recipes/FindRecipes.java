@@ -79,11 +79,11 @@ public class FindRecipes extends Recipe {
             }
 
             @Override
-            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                 if (multiVariable.getLeadingAnnotations().stream().anyMatch(optionAnnotation::matches)) {
                     options.add(multiVariable);
                 }
-                return super.visitVariableDeclarations(multiVariable, executionContext);
+                return super.visitVariableDeclarations(multiVariable, ctx);
             }
 
             @Override
