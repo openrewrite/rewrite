@@ -2411,14 +2411,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (j instanceof J.Annotation) {
                 J.Annotation a = (J.Annotation) j;
                 a = a.withAnnotationType(a.getAnnotationType().withPrefix(callExpressionPrefix));
-                J.FieldAccess newName = new J.FieldAccess(
+                J.FieldAccess newName = mapType(new J.FieldAccess(
                         randomId(),
                         receiver.getPrefix(),
                         Markers.EMPTY,
                         receiver.withPrefix(Space.EMPTY),
                         padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) a.getAnnotationType()),
                         a.getType()
-                );
+                ));
                 return a.withAnnotationType(newName).withPrefix(prefix);
             } else if (j instanceof J.ParameterizedType) {
                 J.ParameterizedType pt = (J.ParameterizedType) j;
@@ -2445,14 +2445,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         J.ParameterizedType pt = (J.ParameterizedType) n.getClazz();
                         if (pt != null) {
                             pt = pt.withClazz(pt.getClazz().withPrefix(callExpressionPrefix));
-                            J.FieldAccess newName = new J.FieldAccess(
+                            J.FieldAccess newName = mapType(new J.FieldAccess(
                                     randomId(),
                                     receiver.getPrefix(),
                                     Markers.EMPTY,
                                     receiver.withPrefix(Space.EMPTY),
                                     padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) pt.getClazz()),
                                     pt.getType()
-                            );
+                            ));
                             pt = pt.withClazz(newName);
                             pt = mapType(pt);
                             n = n.withClazz(pt);
@@ -2461,14 +2461,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         J.Identifier id = (J.Identifier) n.getClazz();
                         if (id != null) {
                             id = id.withPrefix(callExpressionPrefix);
-                            J.FieldAccess newName = new J.FieldAccess(
+                            J.FieldAccess newName = mapType(new J.FieldAccess(
                                     randomId(),
                                     receiver.getPrefix(),
                                     Markers.EMPTY,
                                     receiver.withPrefix(Space.EMPTY),
                                     padLeft(suffix(expression.getReceiverExpression()), id),
                                     id.getType()
-                            );
+                            ));
                             n = n.withClazz(newName).withPrefix(prefix);
                         }
                     }
@@ -3453,8 +3453,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             updated = (J2) mapType((J.Unary) tree);
         } else if (tree instanceof K.Binary) {
             updated = (J2) mapType((K.Binary) tree);
-        } else if (tree instanceof K.Unary) {
-            updated = (J2) mapType((K.Unary) tree);
         }
         return updated;
     }
@@ -3465,9 +3463,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (a.getAnnotationType().getType() instanceof JavaType.Method) {
                 a = a.withAnnotationType(a.getAnnotationType().withType(((JavaType.Method) a.getAnnotationType().getType()).getReturnType()));
             }
-//            else {
-                // Type association error, add marker for use in data table.
-//            }
         }
         return a;
     }
@@ -3480,9 +3475,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             } else if (a.getType() instanceof JavaType.Variable) {
                 a = a.withType(((JavaType.Variable) a.getType()).getType());
             }
-//            else {
-                // Type association error, add marker for use in data table.
-//            }
         }
         return a;
     }
@@ -3495,9 +3487,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             } else if (a.getType() instanceof JavaType.Variable) {
                 a = a.withType(((JavaType.Variable) a.getType()).getType());
             }
-//            else {
-                // Type association error, add marker for use in data table.
-//            }
         }
         return a;
     }
@@ -3508,9 +3497,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (b.getType() instanceof JavaType.Method) {
                 b = b.withType(((JavaType.Method) b.getType()).getReturnType());
             }
-//            else {
-                // Type association error, add marker for use in data table.
-//            }
         }
         return b;
     }
@@ -3523,13 +3509,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             } else if (f.getType() instanceof JavaType.Variable) {
                 f = f.withType(((JavaType.Variable) f.getType()).getType());
             }
-//            else {
-                // Type association error, add marker for use in data table.
-//            }
             return f;
-        }
-        if (f.getTarget() instanceof J.Identifier && isNotFullyQualified(f.getTarget().getType())) {
-            // Type association error, add marker for use in data table.
         }
         return f;
     }
@@ -3549,9 +3529,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 J.Identifier clazz = (J.Identifier) n.getClazz();
                 n = n.withClazz(clazz.withType(((JavaType.Parameterized) clazz.getType()).getType()));
             }
-//            else if (n.getClazz().getType() != null && isNotFullyQualified(n.getClazz().getType())) {
-                // Type association error, add marker for use in data table.
-//            }
         }
         return n;
     }
@@ -3563,13 +3540,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 if (((JavaType.Method) p.getType()).getReturnType() instanceof JavaType.Parameterized) {
                     p = p.withType(((JavaType.Method) p.getType()).getReturnType());
                 }
-//                else {
-                    // Type association error, add marker for use in data table.
-//                }
             }
-//            else {
-                // Type association error, add marker for use in data table.
-//            }
         }
         if (p.getClazz() != null && p.getClazz().getType() instanceof JavaType.Parameterized) {
             p = p.withClazz(p.getClazz().withType(((JavaType.Parameterized) p.getClazz().getType()).getType()));
@@ -3583,9 +3554,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (u.getType() instanceof JavaType.Method) {
                 u = u.withType(((JavaType.Method) u.getType()).getReturnType());
             }
-//            else {
-                // Type association error, add marker for use in data table.
-//            }
         }
         return u;
     }
@@ -3596,19 +3564,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (b.getType() instanceof JavaType.Method) {
                 b = b.withType(((JavaType.Method) b.getType()).getReturnType());
             }
-//            else {
-                // Type association error, add marker for use in data table.
-//            }
         }
         return b;
-    }
-
-    private K.Unary mapType(K.Unary tree) {
-        K.Unary u = tree;
-//        if (isNotFullyQualified(tree.getType())) {
-            // Type association error, add marker for use in data table.
-//        }
-        return u;
     }
 
     private boolean isNotFullyQualified(@Nullable JavaType type) {
