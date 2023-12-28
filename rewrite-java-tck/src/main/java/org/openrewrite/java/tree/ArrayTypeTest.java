@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Arrays;
@@ -78,23 +79,26 @@ class ArrayTypeTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext executionContext) {
-                  if (arrayType.getElementType() instanceof J.ArrayType) {
+              public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
+                  if (arrayType.getElementType() instanceof J.ArrayType && arrayType.getMarkers().findFirst(SearchResult.class).isEmpty()) {
                       assert arrayType.getType() != null && "java.lang.Integer[][]".equals(arrayType.getType().toString());
                       // Construct a new J.ArrayType from an old LST model.
                       //noinspection deprecation
                       return new J.ArrayType(
-                          Tree.randomId(),
-                          Space.EMPTY,
-                          Markers.EMPTY,
-                          ((J.ArrayType) arrayType.getElementType()).getElementType().withType(arrayType.getType()),
-                          Arrays.asList(JRightPadded.build(Space.EMPTY).withAfter(Space.build("", emptyList())), JRightPadded.build(Space.EMPTY).withAfter(Space.build(" ", emptyList()))),
-                          null,
-                          null,
-                          null
+                        Tree.randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY.addIfAbsent(new SearchResult(Tree.randomId(), "")),
+                        ((J.ArrayType) arrayType.getElementType()).getElementType(),
+                        Arrays.asList(
+                          JRightPadded.build(Space.EMPTY).withAfter(Space.build("", emptyList())),
+                          JRightPadded.build(Space.EMPTY).withAfter(Space.build(" ", emptyList()))
+                        ),
+                        null,
+                        null,
+                        null
                       );
                   }
-                  return super.visitArrayType(arrayType, executionContext);
+                  return super.visitArrayType(arrayType, ctx);
               }
           })),
           java(
@@ -105,7 +109,7 @@ class ArrayTypeTest implements RewriteTest {
               """,
             """
               class Test {
-                  Integer[][ ] n = new Integer[0][0];
+                  /*~~()~~>*/Integer[][ ] n = new Integer[0][0];
               }
               """,
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
