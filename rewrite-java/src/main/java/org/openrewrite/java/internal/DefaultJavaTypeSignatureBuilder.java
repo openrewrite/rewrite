@@ -60,6 +60,14 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         return signature(((JavaType.Array) type).getElemType()) + "[]";
     }
 
+    private String mapAnnotations(List<JavaType.FullyQualified> annotations) {
+        StringJoiner annos = new StringJoiner(",", "{annotations=[", "]}");
+        for (JavaType.FullyQualified annotation : annotations) {
+            annos.add(signature(annotation));
+        }
+        return annos.toString();
+    }
+
     @Override
     public String classSignature(Object type) {
         return ((JavaType.Class) type).getFullyQualifiedName();

@@ -2126,15 +2126,11 @@ public class GroovyParserVisitor {
     }
 
     private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode) {
-        Space prefix = whitespace();
         if (classNode != null && classNode.isArray()) {
             //noinspection unchecked
-            return (T) new J.ArrayType(randomId(), prefix, Markers.EMPTY,
-                    typeTree(classNode.getComponentType()),
-                    null,
-                    padLeft(sourceBefore("["), sourceBefore("]")),
-                    typeMapping.type(classNode));
+            return (T) arrayType(classNode);
         }
+        Space prefix = whitespace();
         String maybeFullyQualified = name();
         String[] parts = maybeFullyQualified.split("\\.");
 
@@ -2176,6 +2172,40 @@ public class GroovyParserVisitor {
             }
         }
         return expr.withPrefix(prefix);
+    }
+
+    private TypeTree arrayType(ClassNode classNode) {
+        ClassNode typeTree = classNode.getComponentType();
+        int count = 1;
+        while (typeTree.isArray()) {
+            count++;
+            typeTree = typeTree.getComponentType();
+        }
+        Space prefix = whitespace();
+        TypeTree elemType = typeTree(typeTree);
+        JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+        return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
+                count == 1 ? elemType : mapDimensions(elemType, classNode.getComponentType()),
+                null,
+                dimension,
+                typeMapping.type(classNode));
+    }
+
+    private TypeTree mapDimensions(TypeTree baseType, ClassNode classNode) {
+        if (classNode.isArray()) {
+            Space prefix = whitespace();
+            JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+            return new J.ArrayType(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    mapDimensions(baseType, classNode.getComponentType()),
+                    null,
+                    dimension,
+                    typeMapping.type(classNode)
+            );
+        }
+        return baseType;
     }
 
     private Space sourceBefore(String untilDelim) {
