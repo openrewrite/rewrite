@@ -78,18 +78,21 @@ public class AnnotationService {
     }
 
     private List<J.Annotation> getAllAnnotations(J.AnnotatedType annotatedType) {
-        List<J.Annotation> annotations = new ArrayList<>(annotatedType.getAnnotations().size());
+        List<J.Annotation> targetAnnotations = getAllAnnotations(annotatedType.getTypeExpression());
+        if (targetAnnotations.isEmpty()) {
+            return annotatedType.getAnnotations();
+        }
+        List<J.Annotation> annotations = new ArrayList<>(annotatedType.getAnnotations().size() + targetAnnotations.size());
         annotations.addAll(annotatedType.getAnnotations());
-        annotations.addAll(getAllAnnotations(annotatedType.getTypeExpression()));
+        annotations.addAll(targetAnnotations);
         return annotations;
     }
 
     private List<J.Annotation> getAllAnnotations(J.ArrayType arrayType) {
-        List<J.Annotation> annotations = new ArrayList<>(arrayType.getAnnotations() == null ? 0 : arrayType.getAnnotations().size());
         if (arrayType.getAnnotations() != null) {
-            annotations.addAll(arrayType.getAnnotations());
+            return arrayType.getAnnotations();
         }
-        return annotations;
+        return emptyList();
     }
 
     private List<J.Annotation> getAllAnnotations(J.FieldAccess fieldAccess) {
