@@ -36,6 +36,7 @@ class PropertyTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("RedundantGetter")
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/325")
     void interfaceWithEmptyGetter() {
@@ -82,6 +83,20 @@ class PropertyTest implements RewriteTest {
             """
               val <T> T.plus2: Int where  T   : CharSequence  ,   T : Comparable<T>
                   get() = length + 2
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings({"TrailingWhitespacesInTextBlock", "RedundantSemicolon"})
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/568")
+    void propertyAccessorWithTrailingSemiColon() {
+        rewriteRun(
+          kotlin(
+            """
+              val <T : Any> Collection<T>.nullable: Collection<T?>
+                  /*c1*/ get() = this ;   
               """
           )
         );
