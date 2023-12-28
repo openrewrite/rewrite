@@ -1,3 +1,18 @@
+/*
+ * Copyright 2020 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
@@ -27,43 +42,17 @@ public class ReplaceUUIDRandomId extends Recipe {
      */
     @Option(displayName = "LST Constructor pattern",
             description = "A method pattern that is used to find matching LST constructor invocations.",
-            example = "com.example.LST *.*(..)")
+            example = "org.openrewrite.java.tree.J.Literal <constructor>(..)")
     String constructorPattern;
 
     @Override
     public String getDisplayName() {
-        return "Replace UUID.randomUUID() with Tree.randomId() in LST constructor call";
+        return "Replace `UUID.randomUUID()` with `Tree.randomId()` in LST constructor call";
     }
 
     @Override
     public String getDescription() {
-        return "This recipe replaces occurrences of UUID.randomUUID() with Tree.randomId() when passed as an argument inside a constructor call for an LST class.";
-    }
-
-    @JsonCreator
-    public ReplaceUUIDRandomId(@NonNull @JsonProperty("fullyQualifiedClassName") String constructorPattern) {
-        this.constructorPattern = constructorPattern;
-    }
-
-    @Override
-    public Set<String> getTags() {
-        return Collections.singleton("uuid-replacement");
-    }
-
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(2);
-    }
-
-    @Override
-    public RecipeDescriptor createRecipeDescriptor() {
-        // Customize if needed
-        return super.createRecipeDescriptor();
-    }
-
-    @Override
-    public @NotNull List<Recipe> getRecipeList() {
-        return Collections.emptyList();
+        return "Replaces occurrences of `UUID.randomUUID()` with `Tree.randomId()` when passed as an argument inside a constructor call for an LST class.";
     }
 
     @Override
