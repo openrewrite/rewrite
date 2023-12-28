@@ -2127,6 +2127,14 @@ public class GroovyParserVisitor {
 
     private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode) {
         Space prefix = whitespace();
+        if (classNode != null && classNode.isArray()) {
+            //noinspection unchecked
+            return (T) new J.ArrayType(randomId(), prefix, Markers.EMPTY,
+                    typeTree(classNode.getComponentType()),
+                    null,
+                    padLeft(sourceBefore("["), sourceBefore("]")),
+                    typeMapping.type(classNode));
+        }
         String maybeFullyQualified = name();
         String[] parts = maybeFullyQualified.split("\\.");
 
@@ -2165,20 +2173,9 @@ public class GroovyParserVisitor {
         if (classNode != null) {
             if (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
                 expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
-            } else if (classNode.isArray()) {
-                expr = new J.ArrayType(randomId(), EMPTY, Markers.EMPTY, (TypeTree) expr, arrayDimensionsFrom(classNode));
             }
         }
         return expr.withPrefix(prefix);
-    }
-
-    private List<JRightPadded<Space>> arrayDimensionsFrom(ClassNode classNode) {
-        List<JRightPadded<Space>> result = new ArrayList<>();
-        while (classNode != null && classNode.isArray()) {
-            classNode = classNode.getComponentType();
-            result.add(JRightPadded.build(sourceBefore("[")).withAfter(sourceBefore("]")));
-        }
-        return result;
     }
 
     private Space sourceBefore(String untilDelim) {

@@ -297,13 +297,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         a = a.withElementType(visitAndCast(a.getElementType(), p));
         a = a.withElementType(visitTypeName(a.getElementType(), p));
-        a = a.withDimensions(
-                ListUtils.map(a.getDimensions(), dim ->
-                        visitRightPadded(dim.withElement(
-                                visitSpace(dim.getElement(), Space.Location.DIMENSION, p)
-                        ), JRightPadded.Location.DIMENSION, p)
-                )
-        );
+        a = a.withAnnotations(ListUtils.map(a.getAnnotations(), ann -> visitAndCast(ann, p)));
+        a = a.withDimension(a.getDimension()
+                .withBefore(visitSpace(a.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p))
+                .withElement(visitSpace(a.getDimension().getElement(), Space.Location.DIMENSION, p)));
+        a = a.withType(visitType(a.getType(), p));
         return a;
     }
 
@@ -954,6 +952,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.withVarargs(m.getVarargs() == null ?
                 null :
                 visitSpace(m.getVarargs(), Space.Location.VARARGS, p));
+        // For backwards compatibility.
+        //noinspection deprecation
         m = m.withDimensionsBeforeName(ListUtils.map(m.getDimensionsBeforeName(), dim ->
                 dim.withBefore(visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p))
                         .withElement(visitSpace(dim.getElement(), Space.Location.DIMENSION, p))

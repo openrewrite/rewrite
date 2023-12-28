@@ -16,9 +16,12 @@
 package org.openrewrite.java.service;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -51,6 +54,137 @@ public class AnnotationServiceTest implements RewriteTest {
                       ann1 -> assertThat(ann1.getSimpleName()).isEqualTo("Generated")
                     );
                     return classDecl;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void annotatedType() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.*;
+              
+              import static java.lang.annotation.ElementType.*;
+                            
+              class T {
+                  public @A1 Integer @A2 [] arg;
+              }
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value=TYPE_USE)
+              @interface A1 {}
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value=TYPE_USE)
+              @interface A2 {}
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Integer p) {
+                    AnnotationService service = service(AnnotationService.class);
+                    assertThat(service.getAllAnnotations(getCursor())).isEmpty();
+                    return super.visitCompilationUnit(cu, p);
+                }
+
+                @Override
+                public J.AnnotatedType visitAnnotatedType(J.AnnotatedType annotatedType, Integer integer) {
+                    if (annotatedType.getTypeExpression() instanceof J.AnnotatedType) {
+                        AnnotationService service = service(AnnotationService.class);
+                        List<J.Annotation> annotations = service.getAllAnnotations(getCursor());
+                        assertThat(annotations.size()).isEqualTo(2);
+                    }
+                    return super.visitAnnotatedType(annotatedType, integer);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void arrayTypeAnnotations() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.*;
+              
+              import static java.lang.annotation.ElementType.*;
+              
+              class T {
+                  Integer @A1 [] @A2 [] foo;
+              }
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value=TYPE_USE)
+              @interface A1 {}
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value=TYPE_USE)
+              @interface A2 {}
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Integer p) {
+                    AnnotationService service = service(AnnotationService.class);
+                    assertThat(service.getAllAnnotations(getCursor())).isEmpty();
+                    return super.visitCompilationUnit(cu, p);
+                }
+
+                @Override
+                public J.ArrayType visitArrayType(J.ArrayType arrayType, Integer integer) {
+                    AnnotationService service = service(AnnotationService.class);
+                    if (arrayType.getElementType() instanceof J.Identifier) {
+                        assertThat(service.getAllAnnotations(new Cursor(null, arrayType))).satisfiesExactly(
+                          ann -> assertThat(ann.getSimpleName()).isEqualTo("A1")
+                        );
+                    } else if (arrayType.getElementType() instanceof J.ArrayType) {
+                        assertThat(service.getAllAnnotations(new Cursor(null, arrayType))).satisfiesExactly(
+                          ann -> assertThat(ann.getSimpleName()).isEqualTo("A2")
+                        );
+                    }
+                    return super.visitArrayType(arrayType, integer);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void fieldAccessAnnotations() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.*;
+              
+              import static java.lang.annotation.ElementType.*;
+                            
+              class T {
+                  java. lang. @Ann Map arg;
+              }
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value=TYPE_USE)
+              @interface Ann {}
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Integer p) {
+                    AnnotationService service = service(AnnotationService.class);
+                    assertThat(service.getAllAnnotations(getCursor())).isEmpty();
+                    return super.visitCompilationUnit(cu, p);
+                }
+
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
+                    if (fieldAccess.getSimpleName().equals("Integer")) {
+                        AnnotationService service = service(AnnotationService.class);
+                        assertThat(service.getAllAnnotations(new Cursor(null, fieldAccess))).satisfiesExactly(
+                          ann -> assertThat(ann.getSimpleName()).isEqualTo("Ann")
+                        );
+                    }
+                    return super.visitFieldAccess(fieldAccess, integer);
                 }
             }.visit(cu, 0))
           )

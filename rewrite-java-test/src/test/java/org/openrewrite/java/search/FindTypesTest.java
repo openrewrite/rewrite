@@ -125,6 +125,27 @@ class FindTypesTest implements RewriteTest {
     }
 
     @Test
+    void multiDimensionalArray() {
+        rewriteRun(
+          java(
+            """
+              import a.A1;
+              public class B {
+                 A1[][] a = new A1[0][0];
+              }
+              """,
+            """
+              import a.A1;
+              public class B {
+                 /*~~>*/A1[][] a = new /*~~>*/A1[0][0];
+              }
+              """
+          ),
+          java(a1)
+        );
+    }
+
+    @Test
     void classDecl() {
         rewriteRun(
           spec -> spec.recipes(
