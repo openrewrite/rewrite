@@ -81,7 +81,8 @@ class ArrayTypeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
-                  if (arrayType.getElementType() instanceof J.ArrayType && arrayType.getMarkers().findFirst(SearchResult.class).isEmpty()) {
+                  //noinspection SimplifyOptionalCallChains
+                  if (arrayType.getElementType() instanceof J.ArrayType && !arrayType.getMarkers().findFirst(SearchResult.class).isPresent()) {
                       assert arrayType.getType() != null && "java.lang.Integer[][]".equals(arrayType.getType().toString());
                       // Construct a new J.ArrayType from an old LST model.
                       //noinspection deprecation
@@ -138,7 +139,8 @@ class ArrayTypeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
-                  if (arrayType.getMarkers().findFirst(SearchResult.class).isEmpty()) {
+                  //noinspection SimplifyOptionalCallChains
+                  if (!arrayType.getMarkers().findFirst(SearchResult.class).isPresent()) {
                       assert arrayType.getType() == null || "java.lang.Integer[]".equals(arrayType.getType().toString());
                       // Construct a new J.ArrayType from an old LST model.
                       //noinspection deprecation
