@@ -70,4 +70,21 @@ public class ChangeExtraPropertyTest implements RewriteTest {
               """)
         );
     }
+
+    @Test
+    void maintainQuoteStyle() {
+        rewriteRun(
+          buildGradle(
+            """
+              ext {
+                foo = 'bar'
+              }
+              """,
+            """
+              ext {
+                foo = 'baz'
+              }
+              """)
+        );
+    }
 }

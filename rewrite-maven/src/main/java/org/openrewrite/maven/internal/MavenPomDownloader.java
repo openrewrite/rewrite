@@ -15,13 +15,12 @@
  */
 package org.openrewrite.maven.internal;
 
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryConfig;
-import io.github.resilience4j.retry.RetryRegistry;
+import dev.failsafe.Failsafe;
+import dev.failsafe.FailsafeException;
+import dev.failsafe.RetryPolicy;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
-import io.vavr.CheckedFunction1;
 import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
@@ -35,10 +34,7 @@ import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.file.DirectoryStream;
@@ -59,15 +55,13 @@ import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("OptionalAssignedToNull")
 public class MavenPomDownloader {
-    private static final RetryConfig retryConfig = RetryConfig.custom()
-            .retryOnException(throwable -> throwable instanceof SocketTimeoutException ||
-                                           throwable instanceof TimeoutException)
-            .maxAttempts(5)
+    private static final RetryPolicy<Object> retryPolicy = RetryPolicy.builder()
+            .handle(SocketTimeoutException.class, TimeoutException.class)
+            .handleIf(throwable -> throwable instanceof UncheckedIOException && throwable.getCause() instanceof SocketTimeoutException)
+            .withDelay(Duration.ofMillis(500))
+            .withJitter(0.1)
+            .withMaxRetries(5)
             .build();
-
-    private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
-
-    private static final Retry mavenDownloaderRetry = retryRegistry.retry("MavenDownloader");
 
     private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
 
@@ -85,8 +79,6 @@ public class MavenPomDownloader {
 
     @Nullable
     private List<String> activeProfiles;
-
-    private final CheckedFunction1<HttpSender.Request, byte[]> sendRequest;
 
     private boolean addDefaultRepositories = true;
 
@@ -140,24 +132,25 @@ public class MavenPomDownloader {
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
         this.ctx = MavenExecutionContextView.view(ctx);
-        this.sendRequest = Retry.decorateCheckedFunction(
-                mavenDownloaderRetry,
-                request -> {
-                    int responseCode;
-                    long start = System.nanoTime();
-                    try (HttpSender.Response response = httpSender.send(request)) {
-                        if (response.isSuccessful()) {
-                            return response.getBodyAsBytes();
-                        }
-                        responseCode = response.getCode();
-                    } catch (Throwable t) {
-                        throw new HttpSenderResponseException(t, null);
-                    } finally {
-                        this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
-                    }
-                    throw new HttpSenderResponseException(null, responseCode);
-                });
         this.mavenCache = this.ctx.getPomCache();
+    }
+
+    byte[] sendRequest(HttpSender.Request request) throws Throwable {
+        long start = System.nanoTime();
+        try {
+            return Failsafe.with(retryPolicy).get(() -> {
+                try (HttpSender.Response response = httpSender.send(request)) {
+                    if (!response.isSuccessful()) {
+                        throw new HttpSenderResponseException(null, response.getCode());
+                    }
+                    return response.getBodyAsBytes();
+                }
+            });
+        } catch (FailsafeException failsafeException) {
+            throw failsafeException.getCause() == null ? failsafeException : failsafeException.getCause();
+        } finally {
+            this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
+        }
     }
 
     private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
@@ -731,7 +724,7 @@ public class MavenPomDownloader {
                 HttpSender.Request.Builder request = applyAuthenticationToRequest(repository, httpSender.get(httpsUri));
                 MavenRepository normalized = null;
                 try {
-                    sendRequest.apply(request.build());
+                    sendRequest(request.build());
                     normalized = repository.withUri(httpsUri).withKnownToExist(true);
                 } catch (Throwable t) {
                     if (t instanceof HttpSenderResponseException) {
@@ -744,7 +737,7 @@ public class MavenPomDownloader {
                     if (normalized == null) {
                         if (!httpsUri.equals(originalUrl)) {
                             try {
-                                sendRequest.apply(request.url(originalUrl).build());
+                                sendRequest(request.url(originalUrl).build());
                                 normalized = new MavenRepository(
                                         repository.getId(),
                                         originalUrl,
@@ -798,7 +791,7 @@ public class MavenPomDownloader {
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException {
         try {
-            return sendRequest.apply(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
+            return sendRequest(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
         } catch (HttpSenderResponseException e) {
             if (hasCredentials(repo) && e.isClientSideException()) {
                 return retryRequestAnonymously(uriString, e);
@@ -812,7 +805,7 @@ public class MavenPomDownloader {
 
     private byte[] retryRequestAnonymously(String uriString, HttpSenderResponseException originalException) throws HttpSenderResponseException {
         try {
-            return sendRequest.apply(httpSender.get(uriString).build());
+            return sendRequest(httpSender.get(uriString).build());
         } catch (HttpSenderResponseException retryException) {
             if (retryException.isAccessDenied()) {
                 throw originalException;
@@ -835,9 +828,9 @@ public class MavenPomDownloader {
      * Returns a request builder with Authorization header set if the provided repository specifies credentials
      */
     private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
-        if(ctx.getSettings() != null && ctx.getSettings().getServers() != null) {
+        if (ctx.getSettings() != null && ctx.getSettings().getServers() != null) {
             for (MavenSettings.Server server : ctx.getSettings().getServers().getServers()) {
-                if(server.getId().equals(repository.getId()) && server.getConfiguration() != null && server.getConfiguration().getHttpHeaders() != null) {
+                if (server.getId().equals(repository.getId()) && server.getConfiguration() != null && server.getConfiguration().getHttpHeaders() != null) {
                     for (MavenSettings.HttpHeader header : server.getConfiguration().getHttpHeaders()) {
                         request.withHeader(header.getName(), header.getValue());
                     }

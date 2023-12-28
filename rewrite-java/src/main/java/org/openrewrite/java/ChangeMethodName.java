@@ -58,6 +58,11 @@ public class ChangeMethodName extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", methodPattern, newMethodName);
+    }
+
+    @Override
     public String getDescription() {
         return "Rename a method.";
     }

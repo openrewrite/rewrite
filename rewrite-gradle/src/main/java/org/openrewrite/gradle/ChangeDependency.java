@@ -95,7 +95,6 @@ public class ChangeDependency extends Recipe {
     @Nullable
     Boolean overrideManagedVersion;
 
-
     /**
      * Keeping this constructor just for compatibility purposes
      * @deprecated Use {@link ChangeDependency#ChangeDependency(String, String, String, String, String, String, Boolean)}
@@ -119,6 +118,11 @@ public class ChangeDependency extends Recipe {
     @Override
     public String getDisplayName() {
         return "Change Gradle dependency";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", oldGroupId, oldArtifactId);
     }
 
     @Override

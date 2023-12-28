@@ -177,6 +177,34 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    void arrayIsFullyQualifiedOfType() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  Integer[][] integer1;
+                  Integer[] integer2;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
+                    assertThat(multiVariable.getTypeExpression().getType()).isInstanceOf(JavaType.Array.class);
+                    assertThat(TypeUtils.isOfClassType(multiVariable.getTypeExpression().getType(), "java.lang.Integer")).isTrue();
+                    return super.visitVariableDeclarations(multiVariable, o);
+                }
+
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                    assertThat(variable.getVariableType().getType()).isInstanceOf(JavaType.Array.class);
+                    return super.visitVariable(variable, o);
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
     void isFullyQualifiedOfType() {
         rewriteRun(
           java(

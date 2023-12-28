@@ -15,26 +15,22 @@
  */
 package org.openrewrite.xml;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeNamespaceValue extends Recipe {
-
     private static final String XMLNS_PREFIX = "xmlns";
     private static final String VERSION_PREFIX = "version";
 
     @Override
     public String getDisplayName() {
-        return "Change XML Attribute of a specific resource version";
+        return "Change XML attribute of a specific resource version";
     }
 
     @Override
@@ -75,26 +71,10 @@ public class ChangeNamespaceValue extends Recipe {
             required = false)
     Boolean searchAllNamespaces;
 
-
-    @JsonCreator
-    public ChangeNamespaceValue(@Nullable @JsonProperty("elementName") String elementName, @Nullable @JsonProperty("oldValue") String oldValue,
-                                @NonNull @JsonProperty("newValue") String newValue, @Nullable @JsonProperty("versionMatcher") String versionMatcher,
-                                @Nullable @JsonProperty("searchAllNamespaces") Boolean searchAllNamespaces) {
-        this.elementName = elementName;
-        this.oldValue = oldValue;
-        this.newValue = newValue;
-        this.versionMatcher = versionMatcher;
-        this.searchAllNamespaces = searchAllNamespaces;
-    }
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-
+        XPathMatcher elementNameMatcher = elementName != null ? new XPathMatcher(elementName) : null;
         return new XmlIsoVisitor<ExecutionContext>() {
-
-            @Nullable
-            private final XPathMatcher elementNameMatcher = elementName != null ? new XPathMatcher(elementName) : null;
-
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
@@ -171,5 +151,4 @@ public class ChangeNamespaceValue extends Recipe {
             }
         };
     }
-
 }

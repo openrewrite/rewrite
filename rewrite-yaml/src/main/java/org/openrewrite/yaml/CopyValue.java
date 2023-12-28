@@ -42,11 +42,16 @@ public class CopyValue extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKeyPath, newKey);
+    }
+
+    @Override
     public String getDescription() {
         return "Copies a YAML value from one key to another. " +
-                "The existing key/value pair remains unaffected by this change. " +
-                "If either the source or destination key path does not exist, no value will be copied. " +
-                "Furthermore, copies are limited to scalar values, not whole YAML blocks.";
+               "The existing key/value pair remains unaffected by this change. " +
+               "If either the source or destination key path does not exist, no value will be copied. " +
+               "Furthermore, copies are limited to scalar values, not whole YAML blocks.";
     }
 
     @Override

@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collections;
 import java.util.Set;
@@ -43,6 +44,11 @@ public class ChangeText extends Recipe {
     @Override
     public String getDisplayName() {
         return "Change text";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return "to `" + toText + "`";
     }
 
     @Override

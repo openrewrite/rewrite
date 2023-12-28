@@ -250,6 +250,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.NullableType visitNullableType(J.NullableType nullableType, P p) {
+        return (J.NullableType) super.visitNullableType(nullableType, p);
+    }
+
+    @Override
     public J.Package visitPackage(J.Package pkg, P p) {
         return (J.Package) super.visitPackage(pkg, p);
     }

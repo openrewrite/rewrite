@@ -67,6 +67,11 @@ public class MergeYaml extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("at `%s`", key);
+    }
+
+    @Override
     public String getDescription() {
         return "Merge a YAML snippet with an existing YAML document.";
     }

@@ -15,13 +15,15 @@
  */
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpec;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -195,36 +197,6 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("rawtypes")
-    @Disabled
-    @Issue("https://github.com/openrewrite/rewrite/issues/881")
-    @Test
-    void annotationsInFullyQualified() {
-        rewriteRun(
-          java(
-            """
-              package annotation.fun;
-              import java.lang.annotation.*;
-                      
-              @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE_USE})
-              @Retention(RetentionPolicy.RUNTIME)
-              public @interface Nullable {
-              }
-              """,
-            SourceSpec::skip
-          ),
-          java(
-            """
-              import annotation.fun.Nullable;
-              public class AnnotationFun {
-                  public void justBecauseYouCanDoesntMeanYouShould(java.util.@Nullable List myList) {
-                  }
-              }
-              """
-          )
-        );
-    }
-
     @Issue("https://github.com/openrewrite/rewrite/issues/726")
     @Test
     void annotationOnConstructorName() {
@@ -267,8 +239,9 @@ class AnnotationTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
-                    assertThat(method.getAllAnnotations()).hasSize(1);
-                    assertThat(method.getAllAnnotations().get(0).getSimpleName()).isEqualTo("Deprecated");
+                    AnnotationService service = service(AnnotationService.class);
+                    assertThat(service.getAllAnnotations(getCursor())).hasSize(1);
+                    assertThat(service.getAllAnnotations(getCursor()).get(0).getSimpleName()).isEqualTo("Deprecated");
                     return method;
                 }
             }.visit(cu, 0))
@@ -308,26 +281,27 @@ class AnnotationTest implements RewriteTest {
               public @interface Multi2 {}
               """,
             spec -> spec.afterRecipe(cu -> {
+                AnnotationService service = cu.service(AnnotationService.class);
                 J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
-                assertThat(field.getAllAnnotations()).satisfiesExactly(
+                assertThat(service.getAllAnnotations(new Cursor(null, field))).satisfiesExactly(
                   leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
                 );
                 J.ParameterizedType fieldType = (J.ParameterizedType) field.getTypeExpression();
                 assertThat(fieldType).isNotNull();
                 J.AnnotatedType annotatedType = (J.AnnotatedType) fieldType.getClazz();
-                assertThat(annotatedType.getAllAnnotations()).satisfiesExactly(
+                assertThat(service.getAllAnnotations(new Cursor(null, annotatedType))).satisfiesExactly(
                   multi1 -> assertThat(multi1.getSimpleName()).isEqualTo("Multi1"),
                   multi2 -> assertThat(multi2.getSimpleName()).isEqualTo("Multi2")
                 );
 
                 J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
-                assertThat(method.getAllAnnotations()).satisfiesExactly(
+                assertThat(service.getAllAnnotations(new Cursor(null, method))).satisfiesExactly(
                   leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
                 );
                 J.ParameterizedType returnType = (J.ParameterizedType) method.getReturnTypeExpression();
                 assertThat(returnType).isNotNull();
                 annotatedType = (J.AnnotatedType) returnType.getClazz();
-                assertThat(annotatedType.getAllAnnotations()).satisfiesExactly(
+                assertThat(service.getAllAnnotations(new Cursor(null, annotatedType))).satisfiesExactly(
                   multi1 -> assertThat(multi1.getSimpleName()).isEqualTo("Multi1"),
                   multi2 -> assertThat(multi2.getSimpleName()).isEqualTo("Multi2")
                 );
@@ -336,4 +310,94 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3453")
+    @Test
+    void annotatedArrayType() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              
+              class TypeAnnotationTest {
+                  Integer @A1 [] @A2 [ ] integers;
+              
+                  @Target(ElementType.TYPE_USE)
+                  private @interface A1 {
+                  }
+              
+                  @Target(ElementType.TYPE_USE)
+                  private @interface A2 {
+                  }
+              }
+              """, spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean firstDimension = new AtomicBoolean(false);
+                AtomicBoolean secondDimension = new AtomicBoolean(false);
+                new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                        if (arrayType.getElementType() instanceof J.ArrayType) {
+                            if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
+                                assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A2");
+                            }
+                            assertThat(arrayType.toString()).isEqualTo("Integer @A1 [] @A2 [ ]");
+                            secondDimension.set(true);
+                        } else {
+                            if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
+                                assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A1");
+                            }
+                            assertThat(arrayType.toString()).isEqualTo("Integer @A1 []");
+                            firstDimension.set(true);
+                        }
+                        return super.visitArrayType(arrayType, o);
+                    }
+                }.visit(cu, 0);
+                assertThat(firstDimension.get()).isTrue();
+                assertThat(secondDimension.get()).isTrue();
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3453")
+    @Test
+    void annotationOnSecondDimension() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              
+              class TypeAnnotationTest {
+                  Integer [] @A1 [ ] integers;
+              
+                  @Target(ElementType.TYPE_USE)
+                  private @interface A1 {
+                  }
+              }
+              """, spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean firstDimension = new AtomicBoolean(false);
+                AtomicBoolean secondDimension = new AtomicBoolean(false);
+                new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                        if (arrayType.getElementType() instanceof J.ArrayType) {
+                            if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
+                                assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A1");
+                            }
+                            assertThat(arrayType.toString()).isEqualTo("Integer [] @A1 [ ]");
+                            secondDimension.set(true);
+                        } else {
+                            assertThat(arrayType.toString()).isEqualTo("Integer []");
+                            firstDimension.set(true);
+                        }
+                        return super.visitArrayType(arrayType, o);
+                    }
+                }.visit(cu, 0);
+                assertThat(firstDimension.get()).isTrue();
+                assertThat(secondDimension.get()).isTrue();
+            })
+          )
+        );
+    }
 }

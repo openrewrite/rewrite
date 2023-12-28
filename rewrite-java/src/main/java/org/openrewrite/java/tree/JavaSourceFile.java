@@ -19,6 +19,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 
@@ -62,6 +63,8 @@ public interface JavaSourceFile extends J {
             if (ImportService.class.getName().equals(service.getName())) {
                 return service.getConstructor().newInstance();
             } else if (AutoFormatService.class.getName().equals(service.getName())) {
+                return service.getConstructor().newInstance();
+            } else if (AnnotationService.class.getName().equals(service.getName())) {
                 return service.getConstructor().newInstance();
             } else {
                 throw new UnsupportedOperationException("Service " + service + " not supported");

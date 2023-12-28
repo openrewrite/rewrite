@@ -59,6 +59,11 @@ public class FindDependency extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "Finds first-order dependency uses, i.e. dependencies that are defined directly in a project.";
     }

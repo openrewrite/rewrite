@@ -54,6 +54,11 @@ public class DeleteMethodArgument extends Recipe {
     int argumentIndex;
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("%d in methods `%s`", argumentIndex, methodPattern);
+    }
+
+    @Override
     public String getDisplayName() {
         return "Delete method argument";
     }
@@ -91,8 +96,8 @@ public class DeleteMethodArgument extends Recipe {
             MethodCall m = methodCall;
             List<Expression> originalArgs = m.getArguments();
             if (methodMatcher.matches(m) && originalArgs.stream()
-                    .filter(a -> !(a instanceof J.Empty))
-                    .count() >= argumentIndex + 1) {
+                                                    .filter(a -> !(a instanceof J.Empty))
+                                                    .count() >= argumentIndex + 1) {
                 List<Expression> args = new ArrayList<>(originalArgs);
 
                 args.remove(argumentIndex);

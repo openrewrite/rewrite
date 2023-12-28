@@ -34,6 +34,7 @@ public class FindImports extends Recipe {
             description = "A type pattern that is used to find matching field uses.",
             example = "org.springframework..*",
             required = false)
+    @Nullable
     String typePattern;
 
     @Option(displayName = "Match inherited",
@@ -45,6 +46,14 @@ public class FindImports extends Recipe {
     @Override
     public String getDisplayName() {
         return "Find source files with imports";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        if (typePattern != null) {
+            return "matching `" + typePattern + "`";
+        }
+        return super.getInstanceNameSuffix();
     }
 
     @Override

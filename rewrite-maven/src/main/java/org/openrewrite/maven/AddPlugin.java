@@ -93,6 +93,11 @@ public class AddPlugin extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, version);
+    }
+
+    @Override
     public String getDescription() {
         return "Add the specified Maven plugin to the pom.xml.";
     }

@@ -176,12 +176,11 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     public J visitArrayType(ArrayType arrayType, PrintOutputCapture<P> p) {
         beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
         visit(arrayType.getElementType(), p);
-        for (JRightPadded<Space> d : arrayType.getDimensions()) {
-            visitSpace(d.getElement(), Space.Location.DIMENSION, p);
-            p.append('[');
-            visitSpace(d.getAfter(), Space.Location.DIMENSION_SUFFIX, p);
-            p.append(']');
-        }
+        visit(arrayType.getAnnotations(), p);
+        visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
+        p.append('[');
+        visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
+        p.append(']');
         afterSyntax(arrayType, p);
         return arrayType;
     }
@@ -800,6 +799,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             visitModifier(m, p);
         }
         visit(multiVariable.getTypeExpression(), p);
+        // For backwards compatibility.
         for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
             visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
             p.append('[');
@@ -841,6 +841,16 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(newClass.getBody(), p);
         afterSyntax(newClass, p);
         return newClass;
+    }
+
+    @Override
+    public J visitNullableType(J.NullableType nt, PrintOutputCapture<P> p) {
+        beforeSyntax(nt, Space.Location.NULLABLE_TYPE_PREFIX, p);
+        visit(nt.getTypeTree(), p);
+        visitSpace(nt.getPadding().getTypeTree().getAfter(), Space.Location.NULLABLE_TYPE_SUFFIX, p);
+        p.append("?");
+        afterSyntax(nt, p);
+        return nt;
     }
 
     @Override
