@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -88,7 +89,7 @@ class ArrayTypeTest implements RewriteTest {
                         Tree.randomId(),
                         Space.EMPTY,
                         Markers.EMPTY.addIfAbsent(new SearchResult(Tree.randomId(), "")),
-                        ((J.ArrayType) arrayType.getElementType()).getElementType(),
+                        ((J.ArrayType) arrayType.getElementType()).getElementType().withType(arrayType.getType()),
                         Arrays.asList(
                           JRightPadded.build(Space.EMPTY).withAfter(Space.build("", emptyList())),
                           JRightPadded.build(Space.EMPTY).withAfter(Space.build(" ", emptyList()))
@@ -124,6 +125,55 @@ class ArrayTypeTest implements RewriteTest {
                         assert arrayType.getElementType().getType() != null;
                         assertThat(arrayType.getElementType().getType().toString()).isEqualTo("java.lang.Integer");
                     }
+                    return super.visitArrayType(arrayType, o);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void singleDimensionalArrayFromJsonCreatorConstructor() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
+                  if (arrayType.getMarkers().findFirst(SearchResult.class).isEmpty()) {
+                      assert arrayType.getType() == null || "java.lang.Integer[]".equals(arrayType.getType().toString());
+                      // Construct a new J.ArrayType from an old LST model.
+                      //noinspection deprecation
+                      return new J.ArrayType(
+                        Tree.randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY.addIfAbsent(new SearchResult(Tree.randomId(), "")),
+                        arrayType.getElementType(),
+                        singletonList(
+                          JRightPadded.build(Space.EMPTY).withAfter(Space.build("", emptyList()))
+                        ),
+                        null,
+                        null,
+                        null
+                      );
+                  }
+                  return super.visitArrayType(arrayType, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  Integer[] n = new Integer[0];
+              }
+              """,
+            """
+              class Test {
+                  /*~~()~~>*/Integer[] n = new Integer[0];
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                    assert arrayType.getType() != null;
+                    assertThat(arrayType.getType().toString()).isEqualTo("java.lang.Integer");
                     return super.visitArrayType(arrayType, o);
                 }
             }.visit(cu, 0))
