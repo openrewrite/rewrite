@@ -353,12 +353,8 @@ public interface J extends Tree {
             this.prefix = prefix;
             this.markers = markers;
             if (dimensions != null) {
-                JavaType javaType = elementType.getType();
-                for (int i = 0; i < dimensions.size(); i++) {
-                    javaType = new JavaType.Array(null, javaType);
-                }
-                this.elementType = mapElement(elementType, mapType(javaType), dimensions, dimensions.size() - 1);
-                this.type = javaType;
+                this.elementType = dimensions.size() == 1 ? elementType : mapElement(elementType, mapType(elementType.getType()), dimensions, dimensions.size() - 2);
+                this.type = elementType.getType();
             } else {
                 this.elementType = elementType;
                 this.type = type == null ? JavaType.Unknown.getInstance() : type;
@@ -376,15 +372,15 @@ public interface J extends Tree {
             }
         }
 
-        private TypeTree mapElement(TypeTree elementType, @Nullable JavaType javaType, List<JRightPadded<Space>> dimensions, int count) {
+        private TypeTree mapElement(TypeTree elementType, @Nullable JavaType javaType, List<JRightPadded<Space>> dimensions, Integer count) {
             JavaType nextType = mapType(javaType);
             return new ArrayType(
                     Tree.randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
-                    count <= 1 ? elementType.withType(nextType) : mapElement(elementType, nextType, dimensions, count - 1),
+                    count == 0 ? elementType.withType(nextType) : mapElement(elementType, nextType, dimensions, count - 1),
                     null,
-                    JLeftPadded.build(dimensions.get(count - 1).getAfter()).withBefore(dimensions.get(count - 1).getElement()),
+                    JLeftPadded.build(dimensions.get(count).getAfter()).withBefore(dimensions.get(count).getElement()),
                     javaType
             );
         }
