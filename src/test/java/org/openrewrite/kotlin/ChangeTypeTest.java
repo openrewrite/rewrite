@@ -483,4 +483,36 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/576")
+    @Test
+    void changeAnnotationWithUseSiteTargetImport() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              annotation class Original
+              """,
+            SourceSpec::skip
+          ),
+          kotlin(
+            """
+              import a.b.Original
+              
+              class A (
+                @get:Original
+                val field: String
+              )
+              """,
+            """
+              import x.y.Target
+              
+              class A (
+                @get:Target
+                val field: String
+              )
+              """
+          )
+        );
+    }
 }

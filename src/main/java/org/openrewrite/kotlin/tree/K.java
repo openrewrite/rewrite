@@ -2307,13 +2307,13 @@ public interface K extends J {
 
         @Override
         public @Nullable JavaType getType() {
-            // use site has no type
-            return null;
+            return callee.getType();
         }
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            return (T) this;
+            //noinspection unchecked
+            return (T) withCallee(callee.withType(type));
         }
 
         @Override
