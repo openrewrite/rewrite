@@ -113,7 +113,7 @@ public class NoWhitespaceAfter extends Recipe {
         public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
             J.ArrayType a = super.visitArrayType(arrayType, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getArrayDeclarator())) {
-                if (a.getDimension().getBefore().getWhitespace().contains(" ")) {
+                if (a.getDimension() != null && a.getDimension().getBefore().getWhitespace().contains(" ")) {
                     a = a.withDimension(a.getDimension().withBefore(a.getDimension().getBefore().withWhitespace("")));
                 }
             }
