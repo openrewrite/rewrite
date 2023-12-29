@@ -352,6 +352,14 @@ public interface J extends Tree {
                 @Nullable JLeftPadded<Space> dimension,
                 @Nullable JavaType type) {
             if (dimensions != null) {
+                // To create a consistent JavaType$Array from old Groovy and Java LSTs, we need to map the element type.
+                // The JavaType from GroovyTypeMapping was a JavaType$Array, while the JavaType from JavaTypeMapping was a JavaType$Class.
+                JavaType updated = elementType.getType();
+                while (updated instanceof JavaType.Array) {
+                    updated = ((JavaType.Array) updated).getElemType();
+                }
+                elementType = elementType.withType(updated);
+
                 if (dimensions.isEmpty()) {
                     // varargs in Javadoc
                     type = new JavaType.Array(null, elementType.getType());
