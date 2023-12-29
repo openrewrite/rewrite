@@ -199,7 +199,7 @@ public interface J extends Tree {
         public String getSimpleName() {
             if (annotationType instanceof Identifier) {
                 return ((Identifier) annotationType).getSimpleName();
-            } else if (annotationType instanceof J.FieldAccess ) {
+            } else if (annotationType instanceof J.FieldAccess) {
                 return ((J.FieldAccess) annotationType).getSimpleName();
             } else {
                 // allow for extending languages like Kotlin to supply a different representation
@@ -353,8 +353,13 @@ public interface J extends Tree {
             this.prefix = prefix;
             this.markers = markers;
             if (dimensions != null) {
-                this.elementType = dimensions.size() == 1 ? elementType : mapElement(elementType, mapType(elementType.getType()), dimensions, dimensions.size() - 2);
-                this.type = elementType.getType();
+                if (dimensions.isEmpty()) {
+                    this.elementType = elementType;
+                    this.type = new JavaType.Array(null, this.elementType.getType());
+                } else {
+                    this.elementType = mapOldFormat(elementType, dimensions.subList(0, dimensions.size() - 1));
+                    this.type = new JavaType.Array(null, this.elementType.getType());
+                }
             } else {
                 this.elementType = elementType;
                 this.type = type == null ? JavaType.Unknown.getInstance() : type;
@@ -372,21 +377,23 @@ public interface J extends Tree {
             }
         }
 
-        private TypeTree mapElement(TypeTree elementType, @Nullable JavaType javaType, List<JRightPadded<Space>> dimensions, Integer count) {
-            JavaType nextType = mapType(javaType);
-            return new ArrayType(
-                    Tree.randomId(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    count == 0 ? elementType.withType(nextType) : mapElement(elementType, nextType, dimensions, count - 1),
-                    null,
-                    JLeftPadded.build(dimensions.get(count).getAfter()).withBefore(dimensions.get(count).getElement()),
-                    javaType
+        private TypeTree mapOldFormat(TypeTree elementType, List<JRightPadded<Space>> dimensions) {
+            int count = dimensions.size();
+            if (count == 0) {
+                return elementType;
+            }
+            return mapOldFormat(
+                    new ArrayType(
+                            Tree.randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            elementType,
+                            null,
+                            JLeftPadded.build(dimensions.get(0).getAfter()).withBefore(dimensions.get(0).getElement()),
+                            new JavaType.Array(null, elementType.getType())
+                    ),
+                    dimensions.subList(1, count)
             );
-        }
-
-        private @Nullable JavaType mapType(@Nullable JavaType javaType) {
-            return javaType instanceof JavaType.Array ? ((JavaType.Array) javaType).getElemType() : javaType;
         }
 
         @Override
@@ -2421,7 +2428,7 @@ public interface J extends Tree {
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @With
     class ParenthesizedTypeTree implements J, TypeTree, Expression {
         @Getter
@@ -2462,7 +2469,7 @@ public interface J extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @With
     class Identifier implements J, TypeTree, Expression {
         @Getter
@@ -2705,22 +2712,22 @@ public interface J extends Tree {
 
         @Nullable
         public J.Identifier getAlias() {
-            if(alias == null) {
+            if (alias == null) {
                 return null;
             }
             return alias.getElement();
         }
 
         public J.Import withAlias(@Nullable J.Identifier alias) {
-            if(this.alias == null) {
-                if(alias == null) {
+            if (this.alias == null) {
+                if (alias == null) {
                     return this;
                 }
                 return new J.Import(null, id, prefix, markers, statik, qualid, JLeftPadded
                         .build(alias)
                         .withBefore(Space.format(" ")));
             }
-            if(alias == null) {
+            if (alias == null) {
                 return new J.Import(null, id, prefix, markers, statik, qualid, null);
             }
             return getPadding().withAlias(this.alias.withElement(alias));
@@ -4002,7 +4009,7 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @Data
     final class Modifier implements J {
         public static boolean hasModifier(Collection<Modifier> modifiers, Modifier.Type modifier) {
@@ -5943,7 +5950,7 @@ public interface J extends Tree {
             public boolean isField(Cursor cursor) {
                 Cursor declaringScope = getDeclaringScope(cursor);
                 return declaringScope.getValue() instanceof J.Block
-                        && declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
+                       && declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
             }
 
             public Padding getPadding() {
