@@ -668,6 +668,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             t = t.withAnnotations(ListUtils.map(t.getAnnotations(), a -> visitAndCast(a, p)));
         }
 
+        if (t.getModifiers() != null && !t.getModifiers().isEmpty()) {
+            t = t.withModifiers(ListUtils.map(t.getModifiers(), m -> visitAndCast(m, p)));
+        }
+
         J temp = visitParentheses(t.getParenthesizedType(), p);
         if (!(temp instanceof J.Parentheses)) {
             return temp;

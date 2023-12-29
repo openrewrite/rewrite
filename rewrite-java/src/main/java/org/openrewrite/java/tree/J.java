@@ -2436,6 +2436,8 @@ public interface J extends Tree {
 
         List<J.Annotation> annotations;
 
+        List<J.Modifier> modifiers;
+
         J.Parentheses<TypeTree> parenthesizedType;
 
         @Override
