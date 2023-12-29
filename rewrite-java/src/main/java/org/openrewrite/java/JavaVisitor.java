@@ -1150,13 +1150,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.Ternary t = ternary;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.TERNARY_PREFIX, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
-        Expression temp = (Expression) visitExpression(t, p);
+        J temp = visitExpression(t, p);
         if (!(temp instanceof J.Ternary)) {
             return temp;
         } else {
             t = (J.Ternary) temp;
         }
-        Statement tempStat = (Statement) visitStatement(t, p);
+        J tempStat = visitStatement(t, p);
         if (!(tempStat instanceof J.Ternary)) {
             return tempStat;
         } else {
