@@ -38,6 +38,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
+    static final XPathMatcher PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("/project/*/plugins/plugin/dependencies/dependency");
     static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
@@ -120,6 +121,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return false;
     }
 
+    public boolean isPluginDependencyTag(String groupId, String artifactId) {
+        if (!PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
+            return false;
+        }
+        Xml.Tag tag = getCursor().getValue();
+        return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+    }
+
     public boolean isManagedDependencyTag() {
         return MANAGED_DEPENDENCY_MATCHER.matches(getCursor());
     }
@@ -188,7 +198,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     private boolean hasPluginGroupId(String groupId) {
         Xml.Tag tag = getCursor().getValue();
-        boolean isGroupIdFound = matchesGlob(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()), groupId);
+        boolean isGroupIdFound = matchesGlob(tag.getChildValue("groupId").orElse("org.apache.maven.plugins"), groupId);
         if (!isGroupIdFound && getResolutionResult().getPom().getProperties() != null) {
             if (tag.getChildValue("groupId").isPresent() && tag.getChildValue("groupId").get().trim().startsWith("${")) {
                 String propertyKey = tag.getChildValue("groupId").get().trim();

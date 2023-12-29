@@ -62,6 +62,7 @@ class FindImplementationsTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("NullableProblems")
     @Test
     void genericType() {
         rewriteRun(
@@ -87,6 +88,7 @@ class FindImplementationsTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("NullableProblems")
     @Test
     void genericType2() {
         rewriteRun(
@@ -112,6 +114,7 @@ class FindImplementationsTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("NullableProblems")
     @Test
     void unmatchedGenericType() {
         rewriteRun(

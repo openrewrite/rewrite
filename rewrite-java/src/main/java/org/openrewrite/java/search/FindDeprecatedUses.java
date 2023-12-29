@@ -51,13 +51,21 @@ public class FindDeprecatedUses extends Recipe {
         return Arrays.asList(
                 new FindDeprecatedMethods((typePattern == null || typePattern.isEmpty() ? null : typePattern + " *(..)"), ignoreDeprecatedScopes),
                 new FindDeprecatedClasses(typePattern, matchInherited, ignoreDeprecatedScopes),
-                new FindDeprecatedFields(typePattern, ignoreDeprecatedScopes)
+                new FindDeprecatedFields(typePattern, matchInherited, ignoreDeprecatedScopes)
         );
     }
 
     @Override
     public String getDisplayName() {
         return "Find uses of deprecated classes, methods, and fields";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        if (typePattern != null) {
+            return "matching `" + typePattern + "`";
+        }
+        return super.getInstanceNameSuffix();
     }
 
     @Override

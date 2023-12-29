@@ -26,6 +26,7 @@ import org.openrewrite.style.Style;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.Collection;
 import java.util.function.Consumer;
@@ -327,13 +328,33 @@ class MethodParamPadTest implements RewriteTest {
     }
 
     @Test
+    void javadocNotFormatted() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              class A {
+                  /**
+                   * @see java.sql.Connection#createArrayOf(String, Object[])
+                   */
+                  void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void recordWithCompactConstructor() {
         rewriteRun(
           version(java(
             """
+              import java.util.Objects;
+
               public record HttpClientTrafficLogData(
-                  Request request,
-                  Response response
+                  String request,
+                  String response
               )
               {
                   public HttpClientTrafficLogData

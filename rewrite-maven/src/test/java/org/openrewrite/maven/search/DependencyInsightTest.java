@@ -28,7 +28,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void doesNotMatchTestScope() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null)),
+          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null, null)),
           pomXml(
             """
               <project>
@@ -53,7 +53,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findDependency() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null)),
+          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null, null)),
           pomXml(
             """
               <project>
@@ -90,7 +90,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findDependencyTransitively() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile", null)),
+          spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile", null, null)),
           pomXml(
             """
               <project>
@@ -127,7 +127,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void onlyDirect() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile", true)),
+          spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile", null, true)),
           pomXml(
             """
               <project>
@@ -139,6 +139,54 @@ class DependencyInsightTest implements RewriteTest {
                       <groupId>io.micrometer</groupId>
                       <artifactId>micrometer-registry-prometheus</artifactId>
                       <version>1.6.3</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void versionSelector() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("org.openrewrite", "*", "compile", "8.0.0", true)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-java</artifactId>
+                      <version>8.0.0</version>
+                  </dependency>
+                  <dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-yaml</artifactId>
+                      <version>7.0.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!--~~>--><dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-java</artifactId>
+                      <version>8.0.0</version>
+                  </dependency>
+                  <dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-yaml</artifactId>
+                      <version>7.0.0</version>
                   </dependency>
                 </dependencies>
               </project>

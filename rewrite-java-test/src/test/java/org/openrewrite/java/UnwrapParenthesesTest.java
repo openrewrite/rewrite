@@ -188,7 +188,9 @@ class UnwrapParenthesesTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.util.HashSet;
               public class A {
+                  static HashSet<String> set = new HashSet<>();
                   static boolean notEmpty = !(set == null || set.isEmpty());
               }
               """

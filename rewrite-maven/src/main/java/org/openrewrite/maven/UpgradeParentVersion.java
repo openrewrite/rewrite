@@ -24,26 +24,24 @@ import org.openrewrite.semver.Semver;
 
 import java.util.List;
 
+@Getter
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpgradeParentVersion extends Recipe {
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.springframework.boot:spring-boot-parent:VERSION'.",
             example = "org.springframework.boot")
-    @Getter
     String groupId;
 
     @Option(displayName = "Artifact",
             description = "The second part of a dependency coordinate 'org.springframework.boot:spring-boot-parent:VERSION'.",
             example = "spring-boot-parent")
-    @Getter
     String artifactId;
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number.",
             example = "29.X")
-    @Getter
     String newVersion;
 
     @Option(displayName = "Version pattern",
@@ -51,7 +49,6 @@ public class UpgradeParentVersion extends Recipe {
                           "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
-    @Getter
     @Nullable
     String versionPattern;
 
@@ -61,13 +58,17 @@ public class UpgradeParentVersion extends Recipe {
                           "The version can be omitted from the GAV to use the old value from dependency management",
             example = "com.jcraft:jsch",
             required = false)
-    @Getter
     @Nullable
     List<String> retainVersions;
 
     @Override
     public String getDisplayName() {
         return "Upgrade Maven parent project version";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("to `%s:%s:%s`", groupId, artifactId, newVersion);
     }
 
     @Override
@@ -91,7 +92,7 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     private ChangeParentPom changeParentPom() {
-        return new ChangeParentPom(groupId, null, artifactId, null, newVersion,
+        return new ChangeParentPom(groupId, null, artifactId, null, newVersion, null, null,
                 versionPattern, false, retainVersions);
     }
 }

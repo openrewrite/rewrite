@@ -24,11 +24,12 @@ import org.openrewrite.marker.GitProvenance;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class CustomBuildEnvironment implements BuildEnvironment{
+public class CustomBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
     String cloneURL;
@@ -46,11 +47,12 @@ public class CustomBuildEnvironment implements BuildEnvironment{
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
         if (StringUtils.isBlank(cloneURL)
-                || StringUtils.isBlank(ref)
-                || StringUtils.isBlank(sha)) {
+            || StringUtils.isBlank(ref)
+            || StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException();
         } else {
-            return new GitProvenance(UUID.randomUUID(), cloneURL, ref, sha, null, null);
+            return new GitProvenance(UUID.randomUUID(), cloneURL, ref, sha,
+                    null, null, emptyList());
         }
     }
 

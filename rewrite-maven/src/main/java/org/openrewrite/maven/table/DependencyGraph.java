@@ -25,7 +25,8 @@ public class DependencyGraph extends DataTable<DependencyGraph.Row> {
     public DependencyGraph(Recipe recipe) {
         super(recipe, DependencyGraph.Row.class,
                 DependenciesInUse.class.getName(),
-                "Dependency graph", "Relationships between dependencies.");
+                "Dependency graph",
+                "Relationships between dependencies.");
     }
 
     @Value
@@ -39,11 +40,11 @@ public class DependencyGraph extends DataTable<DependencyGraph.Row> {
         String sourceSet;
 
         @Column(displayName = "From dependency",
-                description = "A dependency that depends on the 'to' dependency.")
+                description = "What depends on the 'to' dependency.")
         String from;
 
         @Column(displayName = "From dependency",
-                description = "A dependency that depends on the 'to' dependency.")
+                description = "A dependency.")
         String to;
     }
 }

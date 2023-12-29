@@ -15,21 +15,29 @@
  */
 package org.openrewrite;
 
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.FindAndReplace;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.io.ByteArrayInputStream;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.Recipe.noop;
@@ -46,7 +54,7 @@ class RecipeLifecycleTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
               @Override
-              public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+              public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                   fail("Should never have reached a visit method");
                   return tree;
               }
@@ -72,20 +80,33 @@ class RecipeLifecycleTest implements RewriteTest {
         );
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    static class DeleteFirst extends Recipe {
+
+        @Override
+        public String getDisplayName() {
+            return "Delete a file";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Deletes a file early on in the recipe pipeline. " +
+                   "Subsequent recipes should not be passed a null source file.";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return Arrays.asList(
+              new DeleteSourceFiles("test.txt"),
+              new FindAndReplace("test", "", null, null, null, null, null));
+        }
+    }
+
     @Test
-    void deleteFile() {
+    void deletionWithSubsequentRecipes() {
         rewriteRun(
-          spec -> spec
-            .recipe(toRecipe(() -> new TreeVisitor<>() {
-                  @Override
-                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                      return null;
-                  }
-              }).withName("test.DeletingRecipe")
-            )
-            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
-              .map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
-              .containsOnly("test.DeletingRecipe")),
+          spec -> spec.recipe(new DeleteFirst()),
           text("test", null, spec -> spec.path("test.txt"))
         );
     }
@@ -95,7 +116,7 @@ class RecipeLifecycleTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
               @Override
-              public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext executionContext) {
+              public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext ctx) {
                   return null;
               }
           })),
@@ -241,12 +262,198 @@ class RecipeLifecycleTest implements RewriteTest {
     private Recipe testRecipe(@Language("markdown") String name) {
         return toRecipe(() -> new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 if (!text.getText().contains(name)) {
                     return text.withText(name + text.getText());
                 }
-                return super.visitText(text, executionContext);
+                return super.visitText(text, ctx);
             }
         }).withName(name);
+    }
+
+    @Test
+    void canCallImperativeRecipeWithoutArgsFromDeclarative() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe
+            displayName: Test Recipe
+            recipeList:
+              - org.openrewrite.NoArgRecipe
+            """,
+          "test.recipe"
+          ),
+          text("Hi", "NoArgRecipeHi"));
+    }
+
+    @Test
+    void canCallImperativeRecipeWithUnnecessaryArgsFromDeclarative() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe
+            displayName: Test Recipe
+            recipeList:
+              - org.openrewrite.NoArgRecipe:
+                  foo: bar
+            """,
+            "test.recipe"
+          ),
+          text("Hi", "NoArgRecipeHi"));
+    }
+
+    @Test
+    void canCallRecipeWithNoExplicitConstructor() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe
+            displayName: Test Recipe
+            recipeList:
+              - org.openrewrite.DefaultConstructorRecipe
+            """,
+            "test.recipe"
+          ),
+          text("Hi", "DefaultConstructorRecipeHi"));
+    }
+
+    @Test
+    void declarativeRecipeChain() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe.a
+            displayName: Test Recipe
+            recipeList:
+              - test.recipe.b
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe.b
+            displayName: Test Recipe
+            recipeList:
+              - test.recipe.c
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe.c
+            displayName: Test Recipe
+            recipeList:
+              - org.openrewrite.NoArgRecipe
+            """,
+            "test.recipe.a"
+          ),
+          text("Hi", "NoArgRecipeHi"));
+    }
+
+    @Test
+    void declarativeRecipeChainAcrossFiles() {
+        rewriteRun(spec -> spec.recipe(Environment.builder()
+            .load(new YamlResourceLoader(new ByteArrayInputStream("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe.c
+                displayName: Test Recipe
+                recipeList:
+                  - org.openrewrite.NoArgRecipe
+                """.getBytes()),
+              URI.create("rewrite.yml"), new Properties()))
+            .load(new YamlResourceLoader(new ByteArrayInputStream("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe.b
+                displayName: Test Recipe
+                recipeList:
+                  - test.recipe.c
+                """.getBytes()),
+              URI.create("rewrite.yml"), new Properties()))
+            .load(new YamlResourceLoader(new ByteArrayInputStream("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe.a
+                displayName: Test Recipe
+                recipeList:
+                  - test.recipe.b
+                """.getBytes()),
+              URI.create("rewrite.yml"), new Properties()))
+            .build()
+            .activateRecipes("test.recipe.a")),
+          text("Hi", "NoArgRecipeHi"));
+    }
+
+    @Test
+    void declarativeRecipeChainFromResources() {
+        rewriteRun(spec -> spec.recipeFromResources("test.declarative.sample.a"),
+          text("Hi", "after"));
+    }
+
+    @Test
+    void declarativeRecipeChainFromResourcesIncludesImperativeRecipesInDescriptors() {
+        rewriteRun(spec -> spec.recipeFromResources("test.declarative.sample.a")
+            .afterRecipe(recipeRun -> assertThat(recipeRun.getChangeset().getAllResults().get(0)
+              .getRecipeDescriptorsThatMadeChanges().get(0).getRecipeList().get(0).getRecipeList().get(0)
+              .getDisplayName()).isEqualTo("Change text")),
+          text("Hi", "after"));
+    }
+
+    @Test
+    void declarativeRecipeChainFromResourcesLongList() {
+        rewriteRun(spec -> spec.recipe(Environment.builder()
+            .load(new YamlResourceLoader(requireNonNull(RecipeLifecycleTest.class.getResourceAsStream("/META-INF/rewrite/test-sample-a.yml")), URI.create("rewrite.yml"), new Properties()))
+            .load(new YamlResourceLoader(requireNonNull(RecipeLifecycleTest.class.getResourceAsStream("/META-INF/rewrite/test-sample-b.yml")), URI.create("rewrite.yml"), new Properties()))
+            .build()
+            .activateRecipes("test.declarative.sample.a")),
+          text("Hi", "after"));
+    }
+}
+
+@SuppressWarnings("unused") // referenced in yaml
+class DefaultConstructorRecipe extends Recipe {
+    @Override
+    public String getDisplayName() {
+        return "DefaultConstructorRecipe";
+    }
+
+    @Override
+    public String getDescription() {
+        return "DefaultConstructorRecipe.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if (!text.getText().contains(getDisplayName())) {
+                    return text.withText(getDisplayName() + text.getText());
+                }
+                return super.visitText(text, ctx);
+            }
+        };
+    }
+}
+
+@SuppressWarnings("unused") // referenced in yaml
+@NoArgsConstructor
+class NoArgRecipe extends Recipe {
+    @Override
+    public String getDisplayName() {
+        return "NoArgRecipe";
+    }
+
+    @Override
+    public String getDescription() {
+        return "NoArgRecipe.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if (!text.getText().contains(getDisplayName())) {
+                    return text.withText(getDisplayName() + text.getText());
+                }
+                return super.visitText(text, ctx);
+            }
+        };
     }
 }

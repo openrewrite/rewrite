@@ -125,9 +125,9 @@ class AssertionsTest implements RewriteTest {
                 }
 
                 @Override
-                public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
+                public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                     assertThat(filename).isEqualTo("pom.xml");
-                    return super.visitTag(tag, executionContext);
+                    return super.visitTag(tag, ctx);
                 }
             };
         }

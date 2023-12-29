@@ -24,6 +24,7 @@ import org.openrewrite.marker.GitProvenance;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -66,16 +67,15 @@ public class GithubActionsBuildEnvironment implements BuildEnvironment {
             gitRef = gitRef.replaceFirst("refs/heads/", "");
         }
         if (StringUtils.isBlank(ghRef)
-                || StringUtils.isBlank(host)
-                || StringUtils.isBlank(repository)
-                || StringUtils.isBlank(sha)) {
+            || StringUtils.isBlank(host)
+            || StringUtils.isBlank(repository)
+            || StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException(
                     String.format("Invalid GitHub environment with host: %s, branch: %s, " +
-                    "repository: %s, sha: %s", host, ghRef, repository, sha));
+                                  "repository: %s, sha: %s", host, ghRef, repository, sha));
         }
 
         return new GitProvenance(UUID.randomUUID(), host + "/" + getRepository()
-                + ".git", gitRef, getSha(), null, null);
+                                                    + ".git", gitRef, getSha(), null, null, emptyList());
     }
-
 }

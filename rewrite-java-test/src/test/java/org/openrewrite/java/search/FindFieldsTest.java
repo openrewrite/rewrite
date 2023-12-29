@@ -26,7 +26,26 @@ class FindFieldsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindFields("java.nio.charset.StandardCharsets", "UTF_8"));
+        spec.recipe(new FindFields("java.nio.charset.StandardCharsets", null,"UTF_8"));
+    }
+
+    @Test
+    void fieldMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new FindFields("java.nio..*", true, "*")),
+          java(
+            """
+              class Test {
+                  Object o = java.nio.charset.StandardCharsets.UTF_8;
+              }
+              """,
+            """
+              class Test {
+                  Object o = /*~~>*/java.nio.charset.StandardCharsets.UTF_8;
+              }
+              """
+          )
+        );
     }
 
     @DocumentExample

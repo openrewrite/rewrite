@@ -20,7 +20,9 @@ import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
+import org.openrewrite.PathUtils;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -48,7 +50,9 @@ public class AddPlugin extends Recipe {
 
     @Option(displayName = "Version",
             description = "A fixed version of the plugin to add.",
-            example = "1.0.0")
+            example = "1.0.0",
+            required = false)
+    @Nullable
     String version;
 
     @Language("xml")
@@ -73,9 +77,24 @@ public class AddPlugin extends Recipe {
     @Nullable
     String executions;
 
+    @Option(displayName = "File pattern",
+            description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
+                    "Multiple patterns may be specified, separated by a semicolon `;`. " +
+                    "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
+                    "When not set, all source files are searched. ",
+            required = false,
+            example = "**/*-parent/grpc-*/pom.xml")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Add Maven plugin";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
     @Override
@@ -89,6 +108,14 @@ public class AddPlugin extends Recipe {
     }
 
     private class AddPluginVisitor extends MavenIsoVisitor<ExecutionContext> {
+
+        @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            if (filePattern != null) {
+                return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, ctx);
+            }
+            return super.isAcceptable(sourceFile, ctx);
+        }
 
         @Override
         public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
@@ -125,15 +152,16 @@ public class AddPlugin extends Recipe {
 
                 if (maybePlugin.isPresent()) {
                     Xml.Tag plugin = maybePlugin.get();
-                    if (!version.equals(plugin.getChildValue("version").orElse(null))) {
-                        //noinspection OptionalGetWithoutIsPresent
-                        t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                    if (version != null && !version.equals(plugin.getChildValue("version").orElse(null))) {
+                        if (plugin.getChild("version").isPresent()) {
+                            t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                        }
                     }
                 } else {
                     Xml.Tag pluginTag = Xml.Tag.build("<plugin>\n" +
                             "<groupId>" + groupId + "</groupId>\n" +
                             "<artifactId>" + artifactId + "</artifactId>\n" +
-                            "<version>" + version + "</version>\n" +
+                            (version != null ? "<version>" + version + "</version>\n" : "") +
                             (executions != null ? executions.trim() + "\n" : "") +
                             (configuration != null ? configuration.trim() + "\n" : "") +
                             (dependencies != null ? dependencies.trim() + "\n" : "") +

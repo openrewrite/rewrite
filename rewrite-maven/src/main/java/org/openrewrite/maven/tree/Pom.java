@@ -105,7 +105,7 @@ public class Pom {
     }
 
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, List<MavenRepository> initialRepositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList()).resolve(ctx, downloader);
+        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList()).resolve(ctx, downloader);
     }
 
     @Nullable

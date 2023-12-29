@@ -85,7 +85,7 @@ public abstract class ScanningRecipe<T> extends Recipe {
         return TreeVisitor.noop();
     }
 
-    T getAccumulator(Cursor cursor, ExecutionContext ctx) {
+    public T getAccumulator(Cursor cursor, ExecutionContext ctx) {
         return cursor.getRoot().computeMessageIfAbsent(recipeAccMessage, m -> getInitialValue(ctx));
     }
 

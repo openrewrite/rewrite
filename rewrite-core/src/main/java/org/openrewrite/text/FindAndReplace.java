@@ -17,16 +17,16 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.With;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
 import java.util.Arrays;
-import java.util.UUID;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,8 +43,10 @@ public class FindAndReplace extends Recipe {
     String find;
 
     @Option(displayName = "Replace",
-            description = "The replacement text for `find`.",
-            example = "denylist")
+            description = "The replacement text for `find`. This supports multiline strings.",
+            example = "denylist",
+            required = false)
+    @Nullable
     String replace;
 
     @Option(displayName = "Regex",
@@ -79,6 +81,7 @@ public class FindAndReplace extends Recipe {
                           "Multiple patterns may be specified, separated by a semicolon `;`. " +
                           "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
                           "When not set, all source files are searched. ",
+            required = false,
             example = "**/*.java")
     @Nullable
     String filePattern;
@@ -95,17 +98,6 @@ public class FindAndReplace extends Recipe {
                "will not be able to operate on language-specific type.";
     }
 
-
-    /**
-     * Ensure that a file is not find-and-replaced twice in the same recipe run.
-     * Used to avoid the situation where replacing "a" with "ab" results in something like "abb".
-     */
-    @Value
-    @With
-    static class AlreadyReplaced implements Marker {
-        UUID id;
-    }
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
@@ -115,21 +107,26 @@ public class FindAndReplace extends Recipe {
                 if (sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
                     return sourceFile;
                 }
-                if(sourceFile.getMarkers().findFirst(AlreadyReplaced.class).isPresent()) {
-                    return sourceFile;
+                for (Marker marker : sourceFile.getMarkers().getMarkers()) {
+                    if (marker instanceof AlreadyReplaced) {
+                        AlreadyReplaced alreadyReplaced = (AlreadyReplaced) marker;
+                        if (Objects.equals(find, alreadyReplaced.getFind()) && Objects.equals(replace, alreadyReplaced.getReplace())) {
+                            return sourceFile;
+                        }
+                    }
                 }
                 String searchStr = find;
                 if (!Boolean.TRUE.equals(regex)) {
                     searchStr = Pattern.quote(searchStr);
                 }
                 int patternOptions = 0;
-                if(!Boolean.TRUE.equals(caseSensitive)) {
+                if (!Boolean.TRUE.equals(caseSensitive)) {
                     patternOptions |= Pattern.CASE_INSENSITIVE;
                 }
-                if(Boolean.TRUE.equals(multiline)) {
+                if (Boolean.TRUE.equals(multiline)) {
                     patternOptions |= Pattern.MULTILINE;
                 }
-                if(Boolean.TRUE.equals(dotAll)) {
+                if (Boolean.TRUE.equals(dotAll)) {
                     patternOptions |= Pattern.DOTALL;
                 }
                 PlainText plainText = PlainTextParser.convert(sourceFile);
@@ -139,20 +136,26 @@ public class FindAndReplace extends Recipe {
                 if (!matcher.find()) {
                     return sourceFile;
                 }
-                String newText = matcher.replaceAll(replace);
+                String replacement = replace == null ? "" : replace;
+                if (!Boolean.TRUE.equals(regex)) {
+                    replacement = replacement.replace("$", "\\$");
+                }
+                String newText = matcher.replaceAll(replacement);
                 return plainText.withText(newText)
-                        .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId())));
+                        .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
             }
         };
         //noinspection DuplicatedCode
-        if(filePattern != null) {
+        if (filePattern != null) {
             //noinspection unchecked
             TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                    .map(HasSourcePath<ExecutionContext>::new)
+                    .map(FindSourceFiles::new)
+                    .map(Recipe::getVisitor)
                     .toArray(TreeVisitor[]::new));
 
             visitor = Preconditions.check(check, visitor);
         }
         return visitor;
     }
+
 }

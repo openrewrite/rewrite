@@ -68,6 +68,7 @@ public class PropertiesParser implements Parser {
         for (char c : s.toCharArray()) {
             if (isEscapedNewLine) {
                 if (Character.isWhitespace(c)) {
+                    buff.append(c);
                     continue;
                 } else {
                     isEscapedNewLine = false;
@@ -77,7 +78,7 @@ public class PropertiesParser implements Parser {
             if (c == '\n') {
                 if (prev == '\\') {
                     isEscapedNewLine = true;
-                    buff.deleteCharAt(buff.length() - 1);
+                    buff.append(c);
                 } else {
                     Properties.Content content = extractContent(buff.toString(), prefix);
                     if (content != null) {
@@ -188,7 +189,8 @@ public class PropertiesParser implements Parser {
         Properties.Entry.Delimiter delimiter = Properties.Entry.Delimiter.NONE;
         char prev = '$';
         int state = 0;
-        for (char c : line.toCharArray()) {
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
             switch (state) {
                 case 0:
                     if (Character.isWhitespace(c)) {
@@ -203,15 +205,34 @@ public class PropertiesParser implements Parser {
                             break;
                         } else {
                             delimiter = Properties.Entry.Delimiter.getDelimiter(String.valueOf(c));
-                            state += 2;
+                            state += 3;
+                            break;
                         }
+                    } else if (c == '\\') {
+                        key.append(c);
+                        state++;
+                        break;
                     } else if (!Character.isWhitespace(c)) {
                         key.append(c);
                         break;
                     } else {
-                        state++;
+                        equalsPrefix.append(c);
+                        state += 2;
+                        break;
                     }
                 case 2:
+                    if (Character.isWhitespace(c)) {
+                        trailingWhitespaceBuffer.append(c);
+                        break;
+                    } else {
+                        // multi-word or continuation line value
+                        key.append(trailingWhitespaceBuffer);
+                        trailingWhitespaceBuffer.setLength(0);
+                        key.append(c);
+                        state--;
+                        break;
+                    }
+                case 3:
                     if (Character.isWhitespace(c)) {
                         equalsPrefix.append(c);
                         break;
@@ -219,7 +240,7 @@ public class PropertiesParser implements Parser {
                         delimiter = Properties.Entry.Delimiter.getDelimiter(String.valueOf(c));
                     }
                     state++;
-                case 3:
+                case 4:
                     if (c == '=' || c == ':') {
                         continue;
                     } else if (Character.isWhitespace(c)) {
@@ -227,22 +248,22 @@ public class PropertiesParser implements Parser {
                         break;
                     }
                     state++;
-                case 4:
+                case 5:
                     if (!Character.isWhitespace(c)) {
                         value.append(c);
                         break;
                     }
                     state++;
-                case 5:
-                    if (!Character.isWhitespace(c)) {
-                        // multi-word value
+                case 6:
+                    if (Character.isWhitespace(c)) {
+                        trailingWhitespaceBuffer.append(c);
+                    } else {
+                        // multi-word or continuation line value
                         value.append(trailingWhitespaceBuffer);
-                        trailingWhitespaceBuffer.delete(0, trailingWhitespaceBuffer.length());
+                        trailingWhitespaceBuffer.setLength(0);
                         value.append(c);
                         state--;
                         break;
-                    } else {
-                        trailingWhitespaceBuffer.append(c);
                     }
             }
             prev = c;

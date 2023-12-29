@@ -30,10 +30,13 @@ public class TreeVisitorTest {
 
     @Test
     void scheduleAfterOnVisitWithCursor() {
+        Quark quark = new Quark(Tree.randomId(), Paths.get("quark"), Markers.EMPTY, null, null);
         AtomicInteger visited = new AtomicInteger(0);
         TreeVisitor<Tree, Integer> scheduled = new TreeVisitor<>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, Integer i) {
+                assertThat(tree).isSameAs(quark);
+                assertThat(getCursor()).isSameAs(getCursor().getRoot());
                 visited.incrementAndGet();
                 return tree;
             }
@@ -46,12 +49,11 @@ public class TreeVisitorTest {
                 return tree;
             }
         };
-        Quark quark = new Quark(Tree.randomId(), Paths.get("quark"), Markers.EMPTY, null, null);
 
-        visitor.visit(quark, 0, new Cursor(new Cursor(null, Cursor.ROOT_VALUE), "foo"));
+        visitor.visit(quark, 0);
         assertThat(visited).hasValue(1);
 
-        visitor.visit(quark, 0, new Cursor(new Cursor(null, Cursor.ROOT_VALUE), "foo"));
+        visitor.visit(quark, 0);
         assertThat(visited).hasValue(2);
     }
 }

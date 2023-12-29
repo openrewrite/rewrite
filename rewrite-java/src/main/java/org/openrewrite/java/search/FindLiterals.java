@@ -67,7 +67,7 @@ public class FindLiterals extends Recipe {
             public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
                 if (literal.getValueSource() != null) {
                     if (literal.getType() == JavaType.Primitive.String) {
-                        if (compiledPattern.matcher(literal.getValueSource().substring(1, literal.getValueSource().length() - 1)).matches()) {
+                        if (!literal.getValueSource().isEmpty() && compiledPattern.matcher(literal.getValueSource().substring(1, literal.getValueSource().length() - 1)).matches()) {
                             return SearchResult.found(literal);
                         }
                     }

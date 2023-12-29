@@ -11,6 +11,7 @@ classDiagram
 `rewrite-java-tck` ..> `rewrite-java`: implementation
 `rewrite-java-tck` ..> `rewrite-java-test`: implementation
 `rewrite-java-17` ..> `rewrite-java-tck` : compatibilityTest classpath
+`rewrite-java-17` ..> `rewrite-java-tck` : compatibilityTest classpath
 `rewrite-java-11` ..> `rewrite-java-tck` : compatibilityTest classpath
 `rewrite-java-8` ..> `rewrite-java-tck` : compatibilityTest classpath
 `rewrite-groovy` ..> `rewrite-java-test` : testImplementation

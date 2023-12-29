@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
@@ -40,9 +41,20 @@ public class FindFieldsOfType extends Recipe {
             example = "org.slf4j.api.Logger")
     String fullyQualifiedTypeName;
 
+    @Option(displayName = "Match inherited",
+            description = "When enabled, find types that inherit from a deprecated type.",
+            required = false)
+    @Nullable
+    Boolean matchInherited;
+
     @Override
     public String getDisplayName() {
         return "Find fields of type";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return "on types `" + fullyQualifiedTypeName + "`";
     }
 
     @Override
@@ -59,8 +71,9 @@ public class FindFieldsOfType extends Recipe {
                     return multiVariable;
                 }
                 if (multiVariable.getTypeExpression() != null &&
-                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName) &&
-                        isField(getCursor())) {
+                    hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName,
+                                Boolean.TRUE.equals(matchInherited)) &&
+                    isField(getCursor())) {
                     return SearchResult.found(multiVariable);
                 }
                 return multiVariable;
@@ -76,7 +89,7 @@ public class FindFieldsOfType extends Recipe {
                     return multiVariable;
                 }
                 if (multiVariable.getTypeExpression() != null &&
-                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName)  &&
+                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName, true)  &&
                         isField(getCursor())) {
                     vs.add(multiVariable);
                 }
@@ -103,20 +116,20 @@ public class FindFieldsOfType extends Recipe {
         return true;
     }
 
-    private static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName) {
+    private static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName,
+                                          boolean matchOverrides) {
         if (type instanceof JavaType.Array) {
-            return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName);
+            return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName, matchOverrides);
         } else if (type instanceof JavaType.FullyQualified) {
-            return fullyQualifiedName.equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
+            return new TypeMatcher(fullyQualifiedName, matchOverrides).matches(type);
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
             for (JavaType bound : generic.getBounds()) {
-                if (hasElementType(bound, fullyQualifiedName)) {
+                if (hasElementType(bound, fullyQualifiedName, matchOverrides)) {
                     return true;
                 }
             }
         }
         return false;
     }
-
 }

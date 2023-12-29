@@ -28,8 +28,10 @@ import java.util.stream.Collectors;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
 public class MavenRepositoryMirror {
+    @Nullable
     String id;
 
+    @Nullable
     String url;
 
     /**
@@ -40,8 +42,9 @@ public class MavenRepositoryMirror {
      * repo,repo1 = repo or repo1
      * !repo1 = everything except repo1
      * <p>
-     * See: https://maven.apache.org/guides/mini/guide-mirror-settings.html#advanced-mirror-specification
+     * See: <a href="https://maven.apache.org/guides/mini/guide-mirror-settings.html#advanced-mirror-specification">Maven's Mirrors documentation</a>
      */
+    @Nullable
     String mirrorOf;
 
     @Nullable
@@ -50,26 +53,67 @@ public class MavenRepositoryMirror {
     @Nullable
     Boolean snapshots;
 
+    private final boolean externalOnly;
+    private final List<String> mirrorsOf;
+    private final Set<String> excludedRepos;
+    private final Set<String> includedRepos;
+
+    public MavenRepositoryMirror(@Nullable String id, @Nullable String url, @Nullable String mirrorOf, @Nullable Boolean releases, @Nullable Boolean snapshots) {
+        this.id = id;
+        this.url = url;
+        this.mirrorOf = mirrorOf;
+        this.releases = releases;
+        this.snapshots = snapshots;
+
+        if (mirrorOf != null) {
+            int colonIndex = mirrorOf.indexOf(':');
+            String mirrorOfWithoutExternal;
+            if (colonIndex == -1) {
+                mirrorOfWithoutExternal = mirrorOf;
+                externalOnly = false;
+            } else {
+                externalOnly = true;
+                mirrorOfWithoutExternal = mirrorOf.substring(colonIndex + 1);
+            }
+            mirrorsOf = Arrays.stream(mirrorOfWithoutExternal.split(",")).collect(Collectors.toList());
+            excludedRepos = new HashSet<>();
+            includedRepos = new HashSet<>();
+            for (String mirror : mirrorsOf) {
+                if (mirror.startsWith("!")) {
+                    excludedRepos.add(mirror.substring(1));
+                } else {
+                    includedRepos.add(mirror);
+                }
+            }
+        } else {
+            externalOnly = false;
+            mirrorsOf = null;
+            includedRepos = null;
+            excludedRepos = null;
+        }
+    }
+
     public static MavenRepository apply(Collection<MavenRepositoryMirror> mirrors, MavenRepository repo) {
-        MavenRepository mapped = repo;
-        MavenRepository next = null;
-        while (next != mapped) {
-            next = mapped;
-            for (MavenRepositoryMirror mirror : mirrors) {
-                mapped = mirror.apply(mapped);
+        for (MavenRepositoryMirror mirror : mirrors) {
+            MavenRepository mapped = mirror.apply(repo);
+            if (mapped != repo) {
+                return  mapped;
             }
         }
-        return mapped;
+        return repo;
     }
 
     public MavenRepository apply(MavenRepository repo) {
-        if (matches(repo) && !(repo.getUri().equals(url) && id.equals(repo.getId()))) {
-            return repo.withUri(url)
+        if (Objects.equals(id, repo.getId()) && (repo.getUri().equals(url) || repo.isKnownToExist()) || !matches(repo)) {
+            return repo;
+        } else {
+            MavenRepository repoWithMirror = repo.withUri(url)
                     .withId(id)
                     .withReleases(!Boolean.FALSE.equals(releases) ? "true" : "false")
                     .withSnapshots(!Boolean.FALSE.equals(snapshots) ? "true" : "false");
-        } else {
-            return repo;
+            // Since the URL has likely changed we cannot assume that the new repository is known to exist
+            repoWithMirror.setKnownToExist(false);
+            return repoWithMirror;
         }
     }
 
@@ -81,40 +125,21 @@ public class MavenRepositoryMirror {
             return true;
         }
 
-        int colonIndex = mirrorOf.indexOf(':');
-        String mirrorOfWithoutExternal = mirrorOf;
-        boolean externalOnly = false;
-        if (colonIndex != -1) {
-            externalOnly = true;
-            mirrorOfWithoutExternal = mirrorOf.substring(colonIndex + 1);
-        }
-
-        List<String> mirrorsOf = Arrays.stream(mirrorOfWithoutExternal.split(",")).collect(Collectors.toList());
-        Set<String> excludedRepos = new HashSet<>();
-        Set<String> includedRepos = new HashSet<>();
-        for (String mirror : mirrorsOf) {
-            if (mirror.startsWith("!")) {
-                excludedRepos.add(mirror.substring(1));
-            } else {
-                includedRepos.add(mirror);
-            }
-        }
-
         if (externalOnly && isInternal(repository)) {
             return false;
         }
         // Named inclusion/exclusion beats wildcard inclusion/exclusion
-        if (excludedRepos.stream().anyMatch(it -> "*".equals(it))) {
+        if (excludedRepos.contains("*")) {
             return includedRepos.contains(repository.getId());
         }
-        if (includedRepos.stream().anyMatch(it -> "*".equals(it))) {
+        if (includedRepos.contains("*")) {
             return !excludedRepos.contains(repository.getId());
         }
         return !excludedRepos.contains(repository.getId()) && includedRepos.contains(repository.getId());
     }
 
     private boolean isInternal(MavenRepository repo) {
-        if (repo.getUri().toLowerCase().startsWith("file:")) {
+        if (repo.getUri().regionMatches(true, 0,"file:", 0, 5)) {
             return true;
         }
         try {

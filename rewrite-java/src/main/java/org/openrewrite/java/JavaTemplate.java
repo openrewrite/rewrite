@@ -96,10 +96,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             throw new IllegalArgumentException("`scope` must point to a J instance.");
         }
 
-        if (parameters.length != parameterCount) {
-            throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
-        }
-
         Substitutions substitutions = substitutions(parameters);
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
@@ -178,6 +174,20 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             this.code = code.trim();
         }
 
+        /**
+         * A template snippet is context-sensitive when it refers to the class, variables, methods, or other symbols
+         * visible from its insertion scope. When a template is completely self-contained, it is not context-sensitive.
+         * Context-free template snippets can be cached, since it does not matter where the resulting LST elements will
+         * be inserted. Since the LST elements in a context-sensitive snippet vary depending on where they are inserted
+         * the resulting LST elements cannot be reused between different insertion points and are not cached.
+         * <p>
+         * An example of a context-free snippet might be something like this, to be used as a local variable declaration:
+         * <code>int i = 1</code>;
+         * <p>
+         * An example of a context-sensitive snippet is:
+         * <code>int i = a</code>;
+         * This cannot be made sense of without the surrounding scope which includes the declaration of "a".
+         */
         public Builder contextSensitive() {
             this.contextSensitive = true;
             return this;
@@ -228,199 +238,5 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             return new JavaTemplate(contextSensitive, parser.clone(), code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P0 p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P1<?> p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P2<?, ?> p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P3<?, ?, ?> p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P4<?, ?, ?, ?> p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P5<?, ?, ?, ?, ?> p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P6<?, ?, ?, ?, ?, ?> p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P7<?, ?, ?, ?, ?, ?, ?> p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P8<?, ?, ?, ?, ?, ?, ?, ?> p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P9<?, ?, ?, ?, ?, ?, ?, ?, ?> p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P10<?, ?, ?, ?, ?, ?, ?, ?, ?, ?> p) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F0<?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F1<?, ?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F2<?, ?, ?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F3<?, ?, ?, ?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F4<?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F5<?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F6<?, ?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F7<?, ?, ?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F8<?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F9<?, ?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F10<?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name).build(owner);
-    }
-
-    @Value
-    @SuppressWarnings("unused")
-    static class PatternBuilder {
-        String name;
-
-        public JavaTemplate.Builder build(JavaVisitor<?> owner) {
-            try {
-                Class<?> templateClass = Class.forName(owner.getClass().getName() + "_" + name, true,
-                        owner.getClass().getClassLoader());
-                Method getTemplate = templateClass.getDeclaredMethod("getTemplate", JavaVisitor.class);
-                return (JavaTemplate.Builder) getTemplate.invoke(null, owner);
-            } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException |
-                     IllegalAccessException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    public interface P0 {
-        void accept() throws Exception;
-    }
-
-    public interface P1<P1> {
-        void accept(P1 p1) throws Exception;
-    }
-
-    public interface P2<P1, P2> {
-        void accept(P1 p1, P2 p2) throws Exception;
-    }
-
-    public interface P3<P1, P2, P3> {
-        void accept(P1 p1, P2 p2, P3 p3) throws Exception;
-    }
-
-    public interface P4<P1, P2, P3, P4> {
-        void accept(P1 p1, P2 p2, P3 p3, P4 p4) throws Exception;
-    }
-
-    public interface P5<P1, P2, P3, P4, P5> {
-        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5) throws Exception;
-    }
-
-    public interface P6<P1, P2, P3, P4, P5, P6> {
-        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6) throws Exception;
-    }
-
-    public interface P7<P1, P2, P3, P4, P5, P6, P7> {
-        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7) throws Exception;
-    }
-
-    public interface P8<P1, P2, P3, P4, P5, P6, P7, P8> {
-        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8) throws Exception;
-    }
-
-    public interface P9<P1, P2, P3, P4, P5, P6, P7, P8, P9> {
-        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9) throws Exception;
-    }
-
-    public interface P10<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10> {
-        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9, P10 p10) throws Exception;
-    }
-
-    public interface F0<R> {
-        R accept() throws Exception;
-    }
-
-    public interface F1<R, P1> {
-        R accept(P1 p1) throws Exception;
-    }
-
-    public interface F2<R, P1, P2> {
-        R accept(P1 p1, P2 p2) throws Exception;
-    }
-
-    public interface F3<R, P1, P2, P3> {
-        R accept(P1 p1, P2 p2, P3 p3) throws Exception;
-    }
-
-    public interface F4<R, P1, P2, P3, P4> {
-        R accept(P1 p1, P2 p2, P3 p3, P4 p4) throws Exception;
-    }
-
-    public interface F5<R, P1, P2, P3, P4, P5> {
-        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5) throws Exception;
-    }
-
-    public interface F6<R, P1, P2, P3, P4, P5, P6> {
-        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6) throws Exception;
-    }
-
-    public interface F7<R, P1, P2, P3, P4, P5, P6, P7> {
-        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7) throws Exception;
-    }
-
-    public interface F8<R, P1, P2, P3, P4, P5, P6, P7, P8> {
-        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8) throws Exception;
-    }
-
-    public interface F9<R, P1, P2, P3, P4, P5, P6, P7, P8, P9> {
-        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9) throws Exception;
-    }
-
-    public interface F10<R, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10> {
-        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9, P10 p10) throws Exception;
     }
 }

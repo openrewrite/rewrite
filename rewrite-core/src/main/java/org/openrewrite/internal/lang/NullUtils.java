@@ -15,6 +15,9 @@
  */
 package org.openrewrite.internal.lang;
 
+import org.openrewrite.Option;
+
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.*;
 
@@ -48,7 +51,7 @@ public class NullUtils {
      * <li>org.checkerframework.checker.nullness.qual.NonNull</li>
      * <li>javax.validation.constraints.NotNull</li>
      */
-    private static List<String> FIELD_LEVEL_NON_NULL_ANNOTATIONS = Arrays.asList(
+    private static final List<String> FIELD_LEVEL_NON_NULL_ANNOTATIONS = Arrays.asList(
             "NonNull",
             "Nonnull",
             "NotNull"
@@ -65,16 +68,18 @@ public class NullUtils {
      * <li>org.springframework.lang.Nullable</li>
      * <li>javax.annotations.Nullable</li>
      * <li>org.checkerframework.checker.nullness.qual.Nullable</li>
-     * <li>javax.validation.constraints.NotNull</li>
      */
-    private static List<String> FIELD_LEVEL_NULLABLE_ANNOTATIONS = Collections.singletonList(
+    private static final List<String> FIELD_LEVEL_NULLABLE_ANNOTATIONS = Collections.singletonList(
             "Nullable"
     );
 
     /**
      * The method uses reflection to find all declared fields of a class that have been marked (via commonly used
-     * annotations) as being Non-Null. This method will also look at the class's package level to see if the API
-     * for that package is defaulted as Non-Null. ANY annotation that has runtime retention and matches on of the simple
+     * annotations) as being Non-Null, or a required {@link Option}.
+     * This method will also look at the class's package level to see if the API
+     * for that package is defaulted as Non-Null.
+     * Fields with explicit Nullable annotations will be excluded.
+     * Any other annotation that has runtime retention and matches one of the simple
      * annotation names (minus any package) will be considered a match.
      *
      * @param _class The class to reflect over
@@ -94,8 +99,10 @@ public class NullUtils {
         List<Field> nonNullFields = new ArrayList<>(fields.length);
         for (Field field : fields) {
             field.setAccessible(true);
-            if(fieldHasNonNullableAnnotation(field) ||
-                    (defaultNonNull && !fieldHasNullableAnnotation(field))) {
+            if (fieldHasNullableAnnotation(field)) {
+                continue;
+            }
+            if (defaultNonNull || fieldHasNonNullableAnnotation(field) || fieldIsRequiredOption(field)) {
                 nonNullFields.add(field);
             }
         }
@@ -103,14 +110,29 @@ public class NullUtils {
         return nonNullFields;
     }
 
+    private static boolean fieldIsRequiredOption(Field field) {
+        Option annotation = field.getAnnotation(Option.class);
+        if (annotation != null)
+            return annotation.required();
+        return false;
+    }
+
     private static boolean fieldHasNonNullableAnnotation(Field field) {
-        return Arrays.stream(field.getDeclaredAnnotations())
-                .map(a -> a.annotationType().getSimpleName())
-                .anyMatch(FIELD_LEVEL_NON_NULL_ANNOTATIONS::contains);
+        for (Annotation a : field.getDeclaredAnnotations()) {
+            String simpleName = a.annotationType().getSimpleName();
+            if (FIELD_LEVEL_NON_NULL_ANNOTATIONS.contains(simpleName)) {
+                return true;
+            }
+        }
+        return false;
     }
     private static boolean fieldHasNullableAnnotation(Field field) {
-        return Arrays.stream(field.getDeclaredAnnotations())
-                .map(a -> a.annotationType().getSimpleName())
-                .anyMatch(FIELD_LEVEL_NULLABLE_ANNOTATIONS::contains);
+        for (Annotation a : field.getDeclaredAnnotations()) {
+            String simpleName = a.annotationType().getSimpleName();
+            if (FIELD_LEVEL_NULLABLE_ANNOTATIONS.contains(simpleName)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

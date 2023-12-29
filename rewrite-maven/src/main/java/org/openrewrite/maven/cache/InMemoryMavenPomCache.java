@@ -59,19 +59,23 @@ public class InMemoryMavenPomCache implements MavenPomCache {
         );
     }
 
+    public InMemoryMavenPomCache(String cacheNickname,
+                                 Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache,
+                                 Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
+                                 Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
+                                 Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
+
+        this.pomCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, pomCache, "Maven POMs - " + cacheNickname);
+        this.mavenMetadataCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, mavenMetadataCache, "Maven metadata - " + cacheNickname);
+        this.repositoryCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, repositoryCache, "Maven repositories - " + cacheNickname);
+        this.dependencyCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, dependencyCache, "Resolved dependency POMs - " + cacheNickname);
+    }
+
     public InMemoryMavenPomCache(Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache,
                                  Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
                                  Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
                                  Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
-        this.pomCache = pomCache;
-        this.mavenMetadataCache = mavenMetadataCache;
-        this.repositoryCache = repositoryCache;
-        this.dependencyCache = dependencyCache;
-
-        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, pomCache, "Maven POMs");
-        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, mavenMetadataCache, "Maven metadata");
-        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, repositoryCache, "Maven repositories");
-        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, dependencyCache, "Resolved dependency POMs");
+        this("default", pomCache, mavenMetadataCache, repositoryCache, dependencyCache);
     }
 
     @Nullable

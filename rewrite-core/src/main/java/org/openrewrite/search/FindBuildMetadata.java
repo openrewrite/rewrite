@@ -50,7 +50,7 @@ public class FindBuildMetadata extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     for (BuildMetadata buildMetadata : tree.getMarkers().findAll(BuildMetadata.class)) {
                         if (buildMetadata.getMetadata().containsKey(key)) {

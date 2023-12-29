@@ -22,6 +22,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -31,7 +32,7 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final String fullyQualifiedType;
     @Nullable
-    private final Pattern typePattern;
+    private final Predicate<JavaType> typePattern;
 
     @Nullable
     private final Boolean includeImplicit;
@@ -39,7 +40,18 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     public UsesType(String fullyQualifiedType, @Nullable Boolean includeImplicit) {
         if (fullyQualifiedType.contains("*")) {
             this.fullyQualifiedType = null;
-            this.typePattern = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType));
+            if (fullyQualifiedType.indexOf('*') == fullyQualifiedType.length() - 1) {
+                int dotdot = fullyQualifiedType.indexOf("..");
+                if (dotdot == -1 && fullyQualifiedType.charAt(fullyQualifiedType.length() - 2) == '.') {
+                    this.typePattern = packagePattern(fullyQualifiedType.substring(0, fullyQualifiedType.length() - 2));
+                } else if (dotdot == fullyQualifiedType.length() - 3) {
+                    this.typePattern = packagePrefixPattern(fullyQualifiedType.substring(0, dotdot));
+                } else {
+                    this.typePattern = genericPattern(Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType)));
+                }
+            } else {
+                this.typePattern = genericPattern(Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType)));
+            }
         } else {
             this.fullyQualifiedType = fullyQualifiedType;
             this.typePattern = null;
@@ -98,10 +110,40 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
         }
 
         if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type)
-            || fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
+                || fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
             return SearchResult.found(c);
         }
 
         return c;
     }
+
+    private static Predicate<JavaType> genericPattern(Pattern pattern) {
+        return type -> {
+            if (type instanceof JavaType.FullyQualified) {
+                return pattern.matcher(((JavaType.FullyQualified) type).getFullyQualifiedName()).matches();
+            } else if (type instanceof JavaType.Primitive) {
+                return pattern.matcher(((JavaType.Primitive) type).getKeyword()).matches();
+            }
+            return false;
+        };
+    }
+
+    private static Predicate<JavaType> packagePattern(String name) {
+        return type -> type instanceof JavaType.FullyQualified &&
+                       // optimization to avoid unnecessary memory allocations
+                       ((JavaType.FullyQualified) type).getFullyQualifiedName().startsWith(name) &&
+                       ((JavaType.FullyQualified) type).getPackageName().equals(name);
+    }
+
+    private static Predicate<JavaType> packagePrefixPattern(String prefix) {
+        String subPackagePrefix = prefix + ".";
+        return type -> {
+            if (type instanceof JavaType.FullyQualified) {
+                String packageName = ((JavaType.FullyQualified) type).getPackageName();
+                return packageName.equals(prefix) || packageName.startsWith(subPackagePrefix);
+            }
+            return false;
+        };
+    }
+
 }

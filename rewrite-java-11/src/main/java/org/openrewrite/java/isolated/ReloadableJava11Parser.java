@@ -152,7 +152,6 @@ public class ReloadableJava11Parser implements JavaParser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
-        parsingListener.intermediateMessage("Compiling Java source files");
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
             parsingListener.startedParsing(input);
@@ -332,7 +331,7 @@ public class ReloadableJava11Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<ReloadableJava11Parser, Builder> {
         @Override
         public ReloadableJava11Parser build() {
-            return new ReloadableJava11Parser(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+            return new ReloadableJava11Parser(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
         }
     }
 

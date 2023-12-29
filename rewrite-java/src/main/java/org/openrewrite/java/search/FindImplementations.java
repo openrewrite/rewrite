@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -23,21 +26,24 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class FindImplementations extends Recipe {
-    private final String interfaceFullyQualifiedName;
-
-    public FindImplementations(String interfaceFullyQualifiedName) {
-        this.interfaceFullyQualifiedName = interfaceFullyQualifiedName;
-    }
+    @Option(displayName = "Type name",
+            description = "The fully qualified name to search for.",
+            example = "org.openrewrite.Recipe")
+    String typeName;
 
     @Override
     public String getDisplayName() {
-        return "Find class declarations implementing an interface";
+        return "Find implementing classes";
     }
 
     @Override
     public String getDescription() {
-        return "Find source files that contain a class declaration implementing a specific interface.";
+        return "Find class declarations which implement the specified type. " +
+               "If the specified type is a class, its subclasses will be matched. " +
+               "If the specified type is an interface, classes which implement it will be matched.";
     }
 
     @Override
@@ -46,13 +52,11 @@ public class FindImplementations extends Recipe {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
                                                             ExecutionContext ctx) {
-                classDecl = super.visitClassDeclaration(classDecl, ctx);
-
-                if (!TypeUtils.isOfClassType(classDecl.getType(), interfaceFullyQualifiedName) &&
-                    TypeUtils.isAssignableTo(interfaceFullyQualifiedName, classDecl.getType())) {
-                    return SearchResult.found(classDecl);
+                J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+                if (TypeUtils.isAssignableTo(typeName, cd.getType()) && !TypeUtils.isOfClassType(cd.getType(), typeName)) {
+                    cd = SearchResult.found(cd);
                 }
-                return classDecl;
+                return cd;
             }
         };
     }

@@ -369,7 +369,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
                   if (mi.getSimpleName().equals("acceptInteger")) {
-                      return JavaTemplate.builder("acceptString(#{any()}.toString())").contextSensitive()
+                      mi = JavaTemplate.builder("acceptString(#{any()}.toString())").contextSensitive()
                         .javaParser(JavaParser.fromJavaVersion()
                           .dependsOn(
                             """
@@ -384,6 +384,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                         )
                         .build()
                         .apply(updateCursor(mi), mi.getCoordinates().replaceMethod(), mi.getArguments().get(0));
+                      mi = mi.withName(mi.getName().withType(mi.getMethodType()));
                   }
                   return mi;
               }

@@ -38,7 +38,7 @@ public class FindProperties extends Recipe {
 
     @Option(displayName = "Property pattern",
             description = "Regular expression pattern used to match property tag names.",
-            example = "guava*")
+            example = "guava.*")
     String propertyPattern;
 
     UUID searchId = randomId();
@@ -55,18 +55,18 @@ public class FindProperties extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        Pattern propertyMatcher = Pattern.compile(propertyPattern.replace(".", "\\.")
-                .replace("*", ".*"));
+        Pattern propertyMatcher = Pattern.compile(propertyPattern);
+        Pattern propertyUsageMatcher = Pattern.compile(".*\\$\\{" + propertyMatcher.pattern() + "}.*");
         return new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
-                if (isPropertyTag() && propertyMatcher.matcher(tag.getName()).matches()) {
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+                if (isPropertyTag() && propertyMatcher.matcher(t.getName()).matches()) {
                     t = SearchResult.found(t);
                 }
 
-                Optional<String> value = tag.getValue();
-                if (t.getContent() != null && value.isPresent() && value.get().contains("${")) {
+                Optional<String> value = t.getValue();
+                if (value.isPresent() && propertyUsageMatcher.matcher(value.get()).matches()) {
                     //noinspection unchecked
                     t = t.withContent(ListUtils.mapFirst((List<Content>) t.getContent(), v ->
                             SearchResult.found(v, getResolutionResult().getPom().getValue(value.get()))));
@@ -76,11 +76,16 @@ public class FindProperties extends Recipe {
         };
     }
 
+    /**
+     *
+     * @param xml The xml document of the pom.xml
+     * @param propertyPattern Regular expression pattern used to match property tag names
+     * @return Set of Maven project property tags that matches the {@code propertyPattern} within a pom.xml
+     */
     public static Set<Xml.Tag> find(Xml.Document xml, String propertyPattern) {
-        Pattern propertyMatcher = Pattern.compile(propertyPattern.replace(".", "\\.")
-                .replace("*", ".*"));
+        Pattern propertyMatcher = Pattern.compile(propertyPattern);
         Set<Xml.Tag> found = new HashSet<>();
-        new MavenVisitor<Set<Xml.Tag>>(){
+        new MavenVisitor<Set<Xml.Tag>>() {
             @Override
             public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> tags) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, tags);

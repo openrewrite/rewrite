@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
@@ -27,6 +28,7 @@ import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.maven.utilities.RetainVersions;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -43,38 +45,27 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeParentPom extends Recipe {
-    @EqualsAndHashCode.Exclude
-    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven Parent Pom";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Change the parent pom of a Maven pom.xml. Identifies the parent pom to be changed by its groupId and artifactId.";
-    }
-
-    @Option(displayName = "Old GroupId",
-            description = "The groupId of the maven parent pom to be changed away from.",
+    @Option(displayName = "Old group ID",
+            description = "The group ID of the Maven parent pom to be changed away from.",
             example = "org.springframework.boot")
     String oldGroupId;
 
-    @Option(displayName = "New GroupId",
-            description = "The groupId of the new maven parent pom to be adopted. If this argument is omitted it defaults to the value of `oldGroupId`.",
+    @Option(displayName = "New group ID",
+            description = "The group ID of the new maven parent pom to be adopted. If this argument is omitted it defaults to the value of `oldGroupId`.",
             example = "org.springframework.boot",
             required = false)
     @Nullable
     String newGroupId;
 
-    @Option(displayName = "Old ArtifactId",
-            description = "The artifactId of the maven parent pom to be changed away from.",
+    @Option(displayName = "Old artifact ID",
+            description = "The artifact ID of the maven parent pom to be changed away from.",
             example = "spring-boot-starter-parent")
     String oldArtifactId;
 
-    @Option(displayName = "New ArtifactId",
-            description = "The artifactId of the new maven parent pom to be adopted. If this argument is omitted it defaults to the value of `oldArtifactId`.",
+    @Option(displayName = "New artifact ID",
+            description = "The artifact ID of the new maven parent pom to be adopted. If this argument is omitted it defaults to the value of `oldArtifactId`.",
             example = "spring-boot-starter-parent",
             required = false)
     @Nullable
@@ -84,6 +75,20 @@ public class ChangeParentPom extends Recipe {
             description = "An exact version number or node-style semver selector used to select the version number.",
             example = "29.X")
     String newVersion;
+
+    @Option(displayName = "Old relative path",
+            description = "The relativePath of the maven parent pom to be changed away from.",
+            example = "../../pom.xml",
+            required = false)
+    @Nullable
+    String oldRelativePath;
+
+    @Option(displayName = "New relative path",
+            description = "New relative path attribute for parent lookup.",
+            example = "../pom.xml",
+            required = false)
+    @Nullable
+    String newRelativePath;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
@@ -108,6 +113,21 @@ public class ChangeParentPom extends Recipe {
             required = false)
     @Nullable
     List<String> retainVersions;
+
+    @Override
+    public String getDisplayName() {
+        return "Change Maven parent";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", newGroupId, newArtifactId, newVersion);
+    }
+
+    @Override
+    public String getDescription() {
+        return "Change the parent pom of a Maven pom.xml. Identifies the parent pom to be changed by its groupId and artifactId.";
+    }
 
     @Override
     public Validated<Object> validate() {
@@ -139,7 +159,7 @@ public class ChangeParentPom extends Recipe {
 
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Parent parent = getResolutionResult().getPom().getRequested().getParent();
                 if (parent != null &&
                     matchesGlob(parent.getArtifactId(), oldArtifactId) &&
@@ -161,11 +181,13 @@ public class ChangeParentPom extends Recipe {
                     ResolvedPom resolvedPom = getResolutionResult().getPom();
 
                     if (matchesGlob(resolvedPom.getValue(tag.getChildValue("groupId").orElse(null)), oldGroupId) &&
-                        matchesGlob(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)), oldArtifactId)) {
+                        matchesGlob(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)), oldArtifactId) &&
+                        (oldRelativePath == null || matchesGlob(resolvedPom.getValue(tag.getChildValue("relativePath").orElse(null)), oldRelativePath))) {
                         String oldVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
                         assert oldVersion != null;
                         String targetGroupId = newGroupId == null ? tag.getChildValue("groupId").orElse(oldGroupId) : newGroupId;
                         String targetArtifactId = newArtifactId == null ? tag.getChildValue("artifactId").orElse(oldArtifactId) : newArtifactId;
+                        String targetRelativePath = newRelativePath == null ? tag.getChildValue("relativePath").orElse(oldRelativePath) : newRelativePath;
                         try {
                             Optional<String> targetVersion = findNewerDependencyVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
                             if (targetVersion.isPresent()) {
@@ -180,6 +202,20 @@ public class ChangeParentPom extends Recipe {
 
                                 if (!oldVersion.equals(targetVersion.get())) {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()));
+                                }
+
+                                // Update or add relativePath
+                                if (oldRelativePath != null && !oldRelativePath.equals(targetRelativePath)) {
+                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("relativePath").get(), targetRelativePath));
+                                } else if (tag.getChildValue("relativePath").orElse(null) == null && targetRelativePath != null) {
+                                    final Xml.Tag relativePathTag;
+                                    if (StringUtils.isBlank(targetRelativePath)) {
+                                        relativePathTag = Xml.Tag.build("<relativePath />");
+                                    } else {
+                                        relativePathTag = Xml.Tag.build("<relativePath>" + targetRelativePath + "</relativePath>");
+                                    }
+                                    doAfterVisit(new AddToTagVisitor<>(t, relativePathTag, new MavenTagInsertionComparator(t.getChildren())));
+                                    maybeUpdateModel();
                                 }
 
                                 if (changeParentTagVisitors.size() > 0) {

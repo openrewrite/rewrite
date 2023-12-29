@@ -39,7 +39,8 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  return method.getBody() != null && JavaTemplate.matches("System.out.println(1);", new Cursor(getCursor(), method.getBody())) ?
+                  return method.getBody() != null && JavaTemplate.matches("System.out.println(1);",
+                    new Cursor(new Cursor(getCursor(), method.getBody()), method.getBody().getStatements().get(0))) ?
                     JavaTemplate.apply("System.out.println(2);", getCursor(), method.getCoordinates().replaceBody()) :
                     super.visitMethodDeclaration(method, ctx);
               }

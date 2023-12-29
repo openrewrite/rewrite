@@ -22,6 +22,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 public class FindMissingTypes extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Find missing type information on Java ASTs";
@@ -58,7 +60,10 @@ public class FindMissingTypes extends Recipe {
                 public <M extends Marker> M visitMarker(Marker marker, List<MissingTypeResult> missingTypeResults) {
                     if (marker instanceof SearchResult) {
                         String message = ((SearchResult) marker).getDescription();
-                        String path = getCursor().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
+                        String path = getCursor()
+                                .getPathAsStream(j -> j instanceof J || j instanceof Javadoc)
+                                .map(t -> t.getClass().getSimpleName())
+                                .collect(Collectors.joining("->"));
                         J j = getCursor().firstEnclosing(J.class);
                         String printedTree;
                         if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
@@ -95,6 +100,9 @@ public class FindMissingTypes extends Recipe {
             if (!isWellFormedType(identifier.getType(), seenTypes) && !isAllowedToHaveNullType(identifier)) {
                 identifier = SearchResult.found(identifier, "Identifier type is missing or malformed");
             }
+            if (identifier.getFieldType() != null && !identifier.getSimpleName().equals(identifier.getFieldType().getName())) {
+                identifier = SearchResult.found(identifier, "type information has a different variable name '" + identifier.getFieldType().getName() + "'");
+            }
             return identifier;
         }
 
@@ -103,7 +111,7 @@ public class FindMissingTypes extends Recipe {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
             if (v == variable) {
                 JavaType.Variable variableType = v.getVariableType();
-                if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType(variable)) {
+                if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType()) {
                     v = SearchResult.found(v, "Variable type is missing or malformed");
                 } else if (variableType != null && !variableType.getName().equals(v.getSimpleName())) {
                     v = SearchResult.found(v, "type information has a different variable name '" + variableType.getName() + "'");
@@ -112,7 +120,7 @@ public class FindMissingTypes extends Recipe {
             return v;
         }
 
-        private boolean isAllowedToHaveUnknownType(J.VariableDeclarations.NamedVariable variable) {
+        private boolean isAllowedToHaveUnknownType() {
             Cursor parent = getCursor().getParent();
             while (parent != null && parent.getParent() != null && !(parent.getParentTreeCursor().getValue() instanceof J.ClassDeclaration)) {
                 parent = parent.getParentTreeCursor();
@@ -133,6 +141,11 @@ public class FindMissingTypes extends Recipe {
                 } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
                     mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
                 }
+                if (mi.getName().getType() != null && type != null && type != mi.getName().getType()) {
+                    // The MethodDeclaration#name#type and the methodType field should be the same object.
+                    // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
+                    mi = SearchResult.found(mi, "MethodInvocation#name#type is not the same instance as the MethodType of MethodInvocation.");
+                }
             }
             return mi;
         }
@@ -141,10 +154,19 @@ public class FindMissingTypes extends Recipe {
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
             J.MemberReference mr = super.visitMemberReference(memberRef, ctx);
             JavaType.Method type = mr.getMethodType();
-            if (!isWellFormedType(type, seenTypes)) {
-                mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
-            } else if (!type.getName().equals(mr.getReference().getSimpleName()) && !type.isConstructor()) {
-                mr = SearchResult.found(mr, "type information has a different method name '" + type.getName() + "'");
+            if (type != null) {
+                if (!isWellFormedType(type, seenTypes)) {
+                    mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
+                } else if (!type.getName().equals(mr.getReference().getSimpleName()) && !type.isConstructor()) {
+                    mr = SearchResult.found(mr, "type information has a different method name '" + type.getName() + "'");
+                }
+            } else {
+                JavaType.Variable variableType = mr.getVariableType();
+                if (!isWellFormedType(variableType, seenTypes)) {
+                    mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
+                } else if (!variableType.getName().equals(mr.getReference().getSimpleName())) {
+                    mr = SearchResult.found(mr, "type information has a different variable name '" + variableType.getName() + "'");
+                }
             }
             return mr;
         }
@@ -157,6 +179,11 @@ public class FindMissingTypes extends Recipe {
                 md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
                 md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
+            }
+            if (md.getName().getType() != null && type != null && type != md.getName().getType()) {
+                // The MethodDeclaration#name#type and the methodType field should be the same object.
+                // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
+                md = SearchResult.found(md, "MethodDeclaration#name#type is not the same instance as the MethodType of MethodDeclaration.");
             }
             return md;
         }
@@ -184,18 +211,33 @@ public class FindMissingTypes extends Recipe {
         }
 
         @Override
-        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
-            J.NewClass n = super.visitNewClass(newClass, executionContext);
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            J.NewClass n = super.visitNewClass(newClass, ctx);
             if (n == newClass && !isWellFormedType(n.getType(), seenTypes)) {
                 n = SearchResult.found(n, "NewClass type is missing or malformed");
             }
+            if (n.getClazz() instanceof J.Identifier && n.getClazz().getType() != null &&
+                    !(n.getClazz().getType() instanceof JavaType.Class || n.getClazz().getType() instanceof JavaType.Unknown)) {
+                n = SearchResult.found(n, "NewClass#clazz is J.Identifier and the type is is not JavaType$Class.");
+            }
             return n;
+        }
+
+        @Override
+        public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
+            J.ParameterizedType p = super.visitParameterizedType(type, ctx);
+            if (p.getClazz() instanceof J.Identifier && p.getClazz().getType() != null &&
+                    !(p.getClazz().getType() instanceof JavaType.Class || p.getClazz().getType() instanceof JavaType.Unknown)) {
+                p = SearchResult.found(p, "ParameterizedType#clazz is J.Identifier and the type is is not JavaType$Class.");
+            }
+            return p;
         }
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName()
                     || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
-                    || isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident);
+                    || isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident)
+                    || isInJavaDoc(ident);
         }
 
         private boolean inPackageDeclaration() {
@@ -222,24 +264,24 @@ public class FindMissingTypes extends Recipe {
         }
 
         private boolean isFieldAccess(J.Identifier ident) {
-            J value = getCursor().getParentTreeCursor().getValue();
+            Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.FieldAccess
                     && (ident == ((J.FieldAccess) value).getName() ||
                         ident == ((J.FieldAccess) value).getTarget() && !((J.FieldAccess) value).getSimpleName().equals("class"));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {
-            J value = getCursor().getParentTreeCursor().getValue();
+            Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.VariableDeclarations.NamedVariable && ident == ((J.VariableDeclarations.NamedVariable) value).getName();
         }
 
         private boolean isParameterizedType(J.Identifier ident) {
-            J value = getCursor().getParentTreeCursor().getValue();
+            Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.ParameterizedType && ident == ((J.ParameterizedType) value).getClazz();
         }
 
         private boolean isNewClass(J.Identifier ident) {
-            J value = getCursor().getParentTreeCursor().getValue();
+            Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.NewClass && ident == ((J.NewClass) value).getClazz();
         }
 
@@ -249,9 +291,15 @@ public class FindMissingTypes extends Recipe {
         }
 
         private boolean isMemberReference(J.Identifier ident) {
-            J value = getCursor().getParentTreeCursor().getValue();
+            Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.MemberReference &&
                    ident == ((J.MemberReference) value).getReference();
+        }
+
+        private boolean isInJavaDoc(J.Identifier ident) {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof Javadoc.Reference &&
+                    ident == ((Javadoc.Reference) value).getTree();
         }
 
         private boolean isCaseLabel() {

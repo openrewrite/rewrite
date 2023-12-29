@@ -19,10 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaVersion;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -41,7 +38,8 @@ public class HasJavaVersion extends Recipe {
     @Option(displayName = "Version check against target compatibility",
             description = "The source and target compatibility versions can be different. This option allows you to " +
                           "check against the target compatibility version instead of the source compatibility version.",
-            example = "17.X")
+            example = "17.X",
+            required = false)
     @Nullable
     Boolean checkTargetCompatibility;
 
@@ -69,20 +67,19 @@ public class HasJavaVersion extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                    return cu.getMarkers().findFirst(JavaVersion.class)
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree != null) {
+                    return tree.getMarkers().findFirst(JavaVersion.class)
                             .filter(version -> versionComparator.isValid(null, Integer.toString(
                                     Boolean.TRUE.equals(checkTargetCompatibility) ?
                                             version.getMajorReleaseVersion() :
                                             version.getMajorVersion())))
-                            .map(version -> SearchResult.found(cu))
-                            .orElse(cu);
+                            .map(version -> SearchResult.found(tree))
+                            .orElse(tree);
                 }
-                return (J) tree;
+                return tree;
             }
         };
     }

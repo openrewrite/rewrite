@@ -28,6 +28,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.io.File;
 import java.io.Serializable;
 import java.net.URI;
+import java.nio.file.Paths;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -37,7 +38,7 @@ import java.net.URI;
 public class MavenRepository implements Serializable {
 
     public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), "true", "true", true, null, null, false);
-    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", new File(System.getProperty("user.home") + "/.m2/repository").toURI().toString(), "true", "true", true, null, null, false);
+    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", Paths.get(System.getProperty("user.home"), ".m2", "repository").toUri().toString(), "true", "true", true, null, null, false);
     public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", "true", "false", true, null, null, true);
 
     @EqualsAndHashCode.Include
@@ -62,6 +63,8 @@ public class MavenRepository implements Serializable {
     @Nullable
     String snapshots;
 
+    @EqualsAndHashCode.Include
+    @With
     @NonFinal
     boolean knownToExist;
 

@@ -26,7 +26,6 @@ import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.tree.ParseError;
-import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
@@ -83,19 +82,24 @@ public class MavenParser implements Parser {
                 pom.getProperties().put("project.basedir", baseDir);
                 pom.getProperties().put("basedir", baseDir);
 
-                Xml.Document xml = (Xml.Document) new MavenXmlParser()
+                SourceFile sourceFile = new MavenXmlParser()
                         .parseInputs(singletonList(source), relativeTo, ctx)
                         .iterator().next();
 
-                projectPoms.put(xml, pom);
-                projectPomsByPath.put(pomPath, pom);
+                if (sourceFile instanceof Xml.Document) {
+                    Xml.Document xml = (Xml.Document) sourceFile;
+
+                    projectPoms.put(xml, pom);
+                    projectPomsByPath.put(pomPath, pom);
+                } else {
+                    parsed.add(sourceFile);
+                }
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
                 parsed.add(ParseError.build(this, source, relativeTo, ctx, t));
             }
         }
 
-        ParsingExecutionContextView.view(ctx).getParsingListener().intermediateMessage("Resolving Maven dependencies");
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
 
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
@@ -108,7 +112,16 @@ public class MavenParser implements Parser {
                 MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles())
                         .resolveDependencies(downloader, ctx);
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
-            } catch (MavenDownloadingExceptions | MavenDownloadingException e) {
+            } catch (MavenDownloadingExceptions e) {
+                ParseExceptionResult parseExceptionResult = new ParseExceptionResult(
+                        randomId(),
+                        MavenParser.class.getSimpleName(),
+                        e.getClass().getSimpleName(),
+                        e.warn(docToPom.getKey()).printAll(), // Shows any underlying MavenDownloadingException
+                        null);
+                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(parseExceptionResult)));
+                ctx.getOnError().accept(e);
+            } catch (MavenDownloadingException | UncheckedIOException e) {
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e))));
                 ctx.getOnError().accept(e);
             }
@@ -173,11 +186,12 @@ public class MavenParser implements Parser {
             return this;
         }
 
+        @SuppressWarnings("unused") // Used in `MavenMojoProjectParser.parseMaven(..)`
         public Builder mavenConfig(@Nullable Path mavenConfig) {
             if (mavenConfig != null && mavenConfig.toFile().exists()) {
                 try {
                     String mavenConfigText = new String(Files.readAllBytes(mavenConfig));
-                    Matcher matcher = Pattern.compile("(?:$|\\s)-P\\s+([^\\s]+)").matcher(mavenConfigText);
+                    Matcher matcher = Pattern.compile("(?:$|\\s)-P\\s+(\\S+)").matcher(mavenConfigText);
                     if (matcher.find()) {
                         String[] profiles = matcher.group(1).split(",");
                         return activeProfiles(profiles);

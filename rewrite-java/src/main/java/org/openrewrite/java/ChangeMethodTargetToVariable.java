@@ -114,7 +114,8 @@ public class ChangeMethodTargetToVariable extends Recipe {
                         variableName,
                         this.variableType,
                         null)
-                ).withMethodType(methodType);
+                ).withMethodType(methodType)
+                        .withName(m.getName().withType(methodType));
             }
             return m;
         }

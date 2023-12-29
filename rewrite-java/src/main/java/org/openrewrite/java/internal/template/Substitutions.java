@@ -25,7 +25,9 @@ import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.tree.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -41,14 +43,13 @@ public class Substitutions {
             "#{", "}", null);
 
     public String substitute() {
+        AtomicInteger requiredParameters = new AtomicInteger(0);
         AtomicInteger index = new AtomicInteger(0);
         String substituted = code;
         while (true) {
+            Map<String, String> typedPatternByName = new HashMap<>();
             String previous = substituted;
             substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
-                int i = index.getAndIncrement();
-                Object parameter = parameters[i];
-
                 String s;
                 if (!key.isEmpty()) {
                     TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
@@ -58,22 +59,62 @@ public class Substitutions {
                     parser.addErrorListener(new ThrowingErrorListener());
 
                     TemplateParameterParser.MatcherPatternContext ctx = parser.matcherPattern();
-                    String matcherName = ctx.matcherName().Identifier().getText();
-                    List<TemplateParameterParser.MatcherParameterContext> params = ctx.matcherParameter();
-
-                    if ("anyArray".equals(matcherName)) {
-                        if (!(parameter instanceof TypedTree)) {
-                            throw new IllegalArgumentException("anyArray can only be used on TypedTree parameters");
+                    TemplateParameterParser.TypedPatternContext typedPattern = ctx.typedPattern();
+                    if (typedPattern == null) {
+                        String paramName = ctx.parameterName().Identifier().getText();
+                        s = typedPatternByName.get(paramName);
+                        if (s == null) {
+                            throw new IllegalArgumentException("The parameter " + paramName + " must be defined before it is referenced.");
                         }
-
-                        JavaType type = ((TypedTree) parameter).getType();
-                        JavaType.Array arrayType = TypeUtils.asArray(type);
-                        if (arrayType == null) {
-                            arrayType = TypeUtils.asArray(type);
-                            if (arrayType == null) {
-                                throw new IllegalArgumentException("anyArray can only be used on parameters containing JavaType.Array type attribution");
-                            }
+                    } else {
+                        int i = index.getAndIncrement();
+                        s = substituteTypedPattern(key, i, typedPattern);
+                        if (ctx.typedPattern().parameterName() != null) {
+                            String paramName = ctx.typedPattern().parameterName().Identifier().getText();
+                            typedPatternByName.put(paramName, s);
                         }
+                        requiredParameters.incrementAndGet();
+                    }
+                } else {
+                    int i = index.getAndIncrement();
+                    s = substituteUntyped(parameters[i], i);
+                    requiredParameters.incrementAndGet();
+                }
+
+                return s;
+            });
+
+            if (previous.equals(substituted)) {
+                break;
+            }
+        }
+
+        if (parameters.length != requiredParameters.get()) {
+            throw new IllegalArgumentException("This template requires " + requiredParameters.get() + " parameters.");
+        }
+
+        return substituted;
+    }
+
+    private String substituteTypedPattern(String key, int index, TemplateParameterParser.TypedPatternContext typedPattern) {
+        Object parameter = parameters[index];
+        String s;
+        String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
+        List<TemplateParameterParser.MatcherParameterContext> params = typedPattern.patternType().matcherParameter();
+
+        if ("anyArray".equals(matcherName)) {
+            if (!(parameter instanceof TypedTree)) {
+                throw new IllegalArgumentException("anyArray can only be used on TypedTree parameters");
+            }
+
+            JavaType type = ((TypedTree) parameter).getType();
+            JavaType.Array arrayType = TypeUtils.asArray(type);
+            if (arrayType == null) {
+                arrayType = TypeUtils.asArray(type);
+                if (arrayType == null) {
+                    throw new IllegalArgumentException("anyArray can only be used on parameters containing JavaType.Array type attribution");
+                }
+            }
 
                         int dimensions = 1;
                         for (; arrayType.getElemType() instanceof JavaType.Array; arrayType = (JavaType.Array) arrayType.getElemType()) {
@@ -103,30 +144,18 @@ public class Substitutions {
                             }
                         }
 
-                        fqn = fqn.replace("$", ".");
+            fqn = fqn.replace("$", ".");
 
                         JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
                         s = primitive == null || primitive.equals(JavaType.Primitive.String) ?
                                 newObjectParameter(fqn, i) :
                                 newPrimitiveParameter(fqn, i);
 
-                        parameters[i] = ((J) parameter).withPrefix(Space.EMPTY);
-                    } else {
-                        throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
-                    }
-                } else {
-                    s = substituteUntyped(parameter, i);
-                }
-
-                return s;
-            });
-
-            if (previous.equals(substituted)) {
-                break;
-            }
+            parameters[index] = ((J) parameter).withPrefix(Space.EMPTY);
+        } else {
+            throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
         }
-
-        return substituted;
+        return s;
     }
 
     protected String newObjectParameter(String fqn, int index) {
@@ -158,7 +187,8 @@ public class Substitutions {
             }
             return ((JavaType.Parameterized) type).getFullyQualifiedName() + joiner;
         } else if (type instanceof JavaType.GenericTypeVariable) {
-            return ((JavaType.GenericTypeVariable) type).getName();
+            String name = ((JavaType.GenericTypeVariable) type).getName();
+            return "?".equals(name) ? "Object" : name;
         } else if (type instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Primitive) {

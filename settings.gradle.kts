@@ -19,7 +19,8 @@ val allProjects = listOf(
         "rewrite-java",
         "rewrite-java-tck",
         "rewrite-java-test",
-        "rewrite-java-17",
+        "rewrite-java-17", // remove this when rewrite recipe gradle plugin moves to 21
+        "rewrite-java-21",
         "rewrite-json",
         "rewrite-maven",
         "rewrite-properties",
@@ -42,7 +43,7 @@ val includedProjects = file("IDE.properties").let {
 }.toSet()
 
 if(!file("IDE.properties").exists() || includedProjects.contains("tools")) {
-//    includeBuild("tools")
+    includeBuild("tools")
 }
 
 include(*allProjects.toTypedArray())
@@ -71,7 +72,9 @@ if (System.getProperty("idea.active") == null &&
         System.getProperty("idea.sync.active") == null) {
     include(
             "rewrite-java-8",
-            "rewrite-java-11"
+            "rewrite-java-11",
+            "rewrite-java-17",
+            "rewrite-java-21"
     )
 }
 
@@ -93,8 +96,8 @@ gradleEnterprise {
     buildCache {
         remote(HttpBuildCache::class) {
             url = uri("https://ge.openrewrite.org/cache/")
-            isPush = isCiServer
             if (!gradleCacheRemoteUsername.isNullOrBlank() && !gradleCacheRemotePassword.isNullOrBlank()) {
+                isPush = isCiServer
                 credentials {
                     username = gradleCacheRemoteUsername
                     password = gradleCacheRemotePassword

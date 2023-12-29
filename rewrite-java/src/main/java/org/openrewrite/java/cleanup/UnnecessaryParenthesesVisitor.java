@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import lombok.EqualsAndHashCode;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
@@ -22,9 +23,10 @@ import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.*;
 
-public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext> {
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+    public boolean isAcceptable(SourceFile sourceFile, P executionContext) {
         // Causes problems on other languages like JavaScript
         return sourceFile instanceof J.CompilationUnit;
     }
@@ -35,14 +37,18 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
 
     private UnnecessaryParenthesesStyle getStyle() {
         if (style == null) {
-            JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
-            style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class, Checkstyle.unnecessaryParentheses());
+            JavaSourceFile cu = getCursor().firstEnclosing(JavaSourceFile.class);
+            if(cu == null) {
+                style = Checkstyle.unnecessaryParentheses();
+            } else {
+                style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class, Checkstyle.unnecessaryParentheses());
+            }
         }
         return style;
     }
 
     @Override
-    public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+    public <T extends J> J visitParentheses(J.Parentheses<T> parens, P ctx) {
         J par = super.visitParentheses(parens, ctx);
         Cursor c = getCursor().pollNearestMessage(UNNECESSARY_PARENTHESES_MESSAGE);
         if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier)) {
@@ -59,7 +65,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+    public J visitIdentifier(J.Identifier ident, P ctx) {
         J.Identifier i = (J.Identifier) super.visitIdentifier(ident, ctx);
         if (getStyle().getIdent() && getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
             getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MESSAGE, getCursor());
@@ -68,7 +74,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+    public J visitLiteral(J.Literal literal, P ctx) {
         J.Literal l = (J.Literal) super.visitLiteral(literal, ctx);
         JavaType.Primitive type = l.getType();
         if ((getStyle().getNumInt() && type == JavaType.Primitive.Int) ||
@@ -88,7 +94,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitAssignmentOperation(J.AssignmentOperation assignOp, ExecutionContext ctx) {
+    public J visitAssignmentOperation(J.AssignmentOperation assignOp, P ctx) {
         J.AssignmentOperation a = (J.AssignmentOperation) super.visitAssignmentOperation(assignOp, ctx);
         J.AssignmentOperation.Type op = a.getOperator();
         if (a.getAssignment() instanceof J.Parentheses && ((getStyle().getBitAndAssign() && op == J.AssignmentOperation.Type.BitAnd) ||
@@ -109,7 +115,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+    public J visitAssignment(J.Assignment assignment, P ctx) {
         J.Assignment a = visitAndCast(assignment, ctx, super::visitAssignment);
         if (getStyle().getAssign() && a.getAssignment() instanceof J.Parentheses) {
             a = (J.Assignment) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visitNonNull(a, ctx,
@@ -119,7 +125,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitReturn(J.Return return_, ExecutionContext ctx) {
+    public J visitReturn(J.Return return_, P ctx) {
         J.Return rtn = (J.Return) super.visitReturn(return_, ctx);
         if (getStyle().getExpr() && rtn.getExpression() instanceof J.Parentheses) {
             rtn = (J.Return) new UnwrapParentheses<>((J.Parentheses<?>) rtn.getExpression()).visitNonNull(rtn, ctx,
@@ -129,7 +135,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+    public J visitVariable(J.VariableDeclarations.NamedVariable variable, P ctx) {
         J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable,
             ctx);
         if (getStyle().getAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
@@ -139,7 +145,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+    public J visitLambda(J.Lambda lambda, P ctx) {
         J.Lambda l = (J.Lambda) super.visitLambda(lambda, ctx);
         if (l.getParameters().getParameters().size() == 1 &&
             l.getParameters().isParenthesized() &&
@@ -151,7 +157,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitIf(J.If iff, ExecutionContext ctx) {
+    public J visitIf(J.If iff, P ctx) {
         J.If i = (J.If) super.visitIf(iff, ctx);
         // Unwrap when if condition is a single parenthesized expression
         Expression expression = i.getIfCondition().getTree();
@@ -163,7 +169,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitWhileLoop(J.WhileLoop whileLoop, ExecutionContext ctx) {
+    public J visitWhileLoop(J.WhileLoop whileLoop, P ctx) {
         J.WhileLoop w = (J.WhileLoop) super.visitWhileLoop(whileLoop, ctx);
         // Unwrap when while condition is a single parenthesized expression
         Expression expression = w.getCondition().getTree();
@@ -175,7 +181,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, ExecutionContext ctx) {
+    public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P ctx) {
         J.DoWhileLoop dw = (J.DoWhileLoop) super.visitDoWhileLoop(doWhileLoop, ctx);
         // Unwrap when while condition is a single parenthesized expression
         Expression expression = dw.getWhileCondition().getTree();
@@ -187,7 +193,7 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
     }
 
     @Override
-    public J visitForControl(J.ForLoop.Control control, ExecutionContext ctx) {
+    public J visitForControl(J.ForLoop.Control control, P ctx) {
         J.ForLoop.Control fc = (J.ForLoop.Control) super.visitForControl(control, ctx);
         Expression condition = fc.getCondition();
         if (condition instanceof J.Parentheses) {
@@ -195,5 +201,14 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
                 getCursor().getParentOrThrow());
         }
         return fc;
+    }
+
+    @Override
+    public J visitTernary(J.Ternary ternary, P ctx) {
+        J.Ternary te = (J.Ternary) super.visitTernary(ternary, ctx);
+        if (te.getCondition() instanceof J.Parentheses) {
+            te = (J.Ternary) new UnwrapParentheses<>((J.Parentheses<?>) te.getCondition()).visitNonNull(te, ctx, getCursor().getParentOrThrow());
+        }
+        return te;
     }
 }

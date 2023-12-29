@@ -17,6 +17,7 @@ package org.openrewrite.java.internal.template;
 
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -30,7 +31,9 @@ import org.openrewrite.java.tree.*;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.singletonList;
 
@@ -106,12 +109,13 @@ public class JavaTemplateParser {
     }
 
     public J parseExpression(Cursor cursor, String template, Space.Location location) {
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location, JavaCoordinates.Mode.REPLACEMENT);
-        return cacheIfContextFree(cursor, stub, () -> {
-            onBeforeParseTemplate.accept(stub);
-            JavaSourceFile cu = compileTemplate(stub);
-            return statementTemplateGenerator.listTemplatedTrees(cu, Expression.class);
-        }).get(0);
+        return cacheIfContextFree(cursor, new ContextFreeCacheKey(template, Expression.class, imports),
+                tmpl -> statementTemplateGenerator.template(cursor, tmpl, location, JavaCoordinates.Mode.REPLACEMENT),
+                stub -> {
+                    onBeforeParseTemplate.accept(stub);
+                    JavaSourceFile cu = compileTemplate(stub);
+                    return statementTemplateGenerator.listTemplatedTrees(cu, Expression.class);
+                }).get(0);
     }
 
     public TypeTree parseExtends(Cursor cursor, String template) {
@@ -164,12 +168,14 @@ public class JavaTemplateParser {
                                                         String template,
                                                         Space.Location location,
                                                         JavaCoordinates.Mode mode) {
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location, mode);
-        return cacheIfContextFree(cursor, stub, () -> {
-            onBeforeParseTemplate.accept(stub);
-            JavaSourceFile cu = compileTemplate(stub);
-            return statementTemplateGenerator.listTemplatedTrees(cu, expected);
-        });
+        return cacheIfContextFree(cursor,
+                new ContextFreeCacheKey(template, expected, imports),
+                tmpl -> statementTemplateGenerator.template(cursor, tmpl, location, mode),
+                stub -> {
+                    onBeforeParseTemplate.accept(stub);
+                    JavaSourceFile cu = compileTemplate(stub);
+                    return statementTemplateGenerator.listTemplatedTrees(cu, expected);
+                });
     }
 
     public J.MethodInvocation parseMethod(Cursor cursor, String template, Space.Location location) {
@@ -267,38 +273,40 @@ public class JavaTemplateParser {
      * The statement `i++;` cannot be context free because it cannot be parsed without a preceding declaration of i.
      * The statement `class A{}` is typically not context free because it
      *
-     * @param cursor   indicates whether the stub is context free or not
-     * @param supplier supplies the LST elements produced from the stub
+     * @param cursor     indicates whether the stub is context free or not
+     * @param treeMapper supplies the LST elements produced from the stub
      * @return result of parsing the stub into LST elements
      */
-    private <J2 extends J> List<J2> cacheIfContextFree(Cursor cursor, String stub, Supplier<List<? extends J>> supplier) {
+    private <J2 extends J> List<J2> cacheIfContextFree(Cursor cursor, ContextFreeCacheKey key,
+                                                       UnaryOperator<String> stubMapper,
+                                                       Function<String, List<? extends J>> treeMapper) {
         if (cursor.getParent() == null) {
             throw new IllegalArgumentException("Expecting `cursor` to have a parent element");
         }
         if (!contextSensitive) {
-            return cache(cursor, stub, supplier);
+            return cache(cursor, key, () -> treeMapper.apply(stubMapper.apply(key.getTemplate())));
         }
         //noinspection unchecked
-        return (List<J2>) supplier.get();
+        return (List<J2>) treeMapper.apply(stubMapper.apply(key.getTemplate()));
     }
 
     @SuppressWarnings("unchecked")
-    private <J2 extends J> List<J2> cache(Cursor cursor, String stub, Supplier<List<? extends J>> ifAbsent) {
+    private <J2 extends J> List<J2> cache(Cursor cursor, Object key, Supplier<List<? extends J>> ifAbsent) {
         List<J2> js = null;
 
         Timer.Sample sample = Timer.start();
         Cursor root = cursor.getRoot();
-        Map<String, List<J2>> cache = root.getMessage(TEMPLATE_CACHE_MESSAGE_KEY);
+        Map<Object, List<J2>> cache = root.getMessage(TEMPLATE_CACHE_MESSAGE_KEY);
         if (cache == null) {
             cache = new HashMap<>();
             root.putMessage(TEMPLATE_CACHE_MESSAGE_KEY, cache);
         } else {
-            js = cache.get(stub);
+            js = cache.get(key);
         }
 
         if (js == null) {
             js = (List<J2>) ifAbsent.get();
-            cache.put(stub, js);
+            cache.put(key, js);
             sample.stop(Timer.builder("rewrite.template.cache").tag("result", "miss")
                     .register(Metrics.globalRegistry));
         } else {
@@ -307,5 +315,12 @@ public class JavaTemplateParser {
         }
 
         return ListUtils.map(js, j -> (J2) new RandomizeIdVisitor<Integer>().visit(j, 0));
+    }
+
+    @Value
+    private static class ContextFreeCacheKey {
+        String template;
+        Class<? extends J> expected;
+        Set<String> imports;
     }
 }

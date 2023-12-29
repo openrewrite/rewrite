@@ -15,15 +15,30 @@
  */
 package org.openrewrite.java.service;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.ShortenFullyQualifiedTypeReferences;
+import org.openrewrite.java.tree.J;
 
 @Incubating(since = "8.2.0")
 public class ImportService {
 
-    public <P> JavaVisitor<P> addImportVisitor(@Nullable String packageName, String typeName, @Nullable String member, boolean onlyIfReferenced) {
-        return new AddImport<>(packageName, typeName, member, onlyIfReferenced);
+    public <P> JavaVisitor<P> addImportVisitor(@Nullable String packageName,
+                                               String typeName,
+                                               @Nullable String member,
+                                               @Nullable String alias,
+                                               boolean onlyIfReferenced) {
+        return new AddImport<>(packageName, typeName, member,  alias, onlyIfReferenced);
+    }
+
+    public <J2 extends J> JavaVisitor<ExecutionContext> shortenAllFullyQualifiedTypeReferences() {
+        return new ShortenFullyQualifiedTypeReferences().getVisitor();
+    }
+
+    public <J2 extends J> JavaVisitor<ExecutionContext> shortenFullyQualifiedTypeReferencesIn(J2 subtree) {
+        return ShortenFullyQualifiedTypeReferences.modifyOnly(subtree);
     }
 }

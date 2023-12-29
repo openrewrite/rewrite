@@ -28,12 +28,14 @@ import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.DependenciesInUse;
-import org.openrewrite.maven.table.DependencyGraph;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -45,7 +47,6 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = true)
 public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
-    transient DependencyGraph dependencyGraph = new DependencyGraph(this);
 
     private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
 
@@ -58,6 +59,15 @@ public class DependencyInsight extends Recipe {
             description = "Artifact glob pattern used to match dependencies.",
             example = "jackson-module-*")
     String artifactIdPattern;
+
+    @Option(displayName = "Version",
+            description = "Match only dependencies with the specified version. " +
+                          "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
+                          "All versions are searched by default.",
+            example = "1.x",
+            required = false)
+    @Nullable
+    String version;
 
     @Option(displayName = "Scope",
             description = "Match dependencies with the specified scope. If not specified, all configurations will be searched.",
@@ -75,6 +85,15 @@ public class DependencyInsight extends Recipe {
     public String getDescription() {
         return "Find direct and transitive dependencies matching a group, artifact, and optionally a configuration name. " +
                "Results include dependencies that either directly match or transitively include a matching dependency.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> v = super.validate();
+        if (version != null) {
+            v = v.and(Semver.validate(version, null));
+        }
+        return v;
     }
 
     @Override
@@ -100,38 +119,50 @@ public class DependencyInsight extends Recipe {
                 Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency = new HashMap<>();
                 Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency = new HashMap<>();
                 for (GradleDependencyConfiguration c : gp.getConfigurations()) {
-                    if (configuration == null || configuration.isEmpty() || c.getName().equals(configuration)) {
-                        for (ResolvedDependency resolvedDependency : c.getResolved()) {
-                            ResolvedDependency dep = resolvedDependency.findDependency(groupIdPattern, artifactIdPattern);
-                            if (dep != null) {
-                                GroupArtifactVersion requestedGav = new GroupArtifactVersion(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion());
-                                GroupArtifactVersion targetGav = new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
-                                configurationToDirectDependency.compute(c.getName(), (k, v) -> {
-                                    if (v == null) {
-                                        v = new LinkedHashSet<>();
-                                    }
-                                    v.add(requestedGav);
-                                    return v;
-                                });
-                                directDependencyToTargetDependency.compute(requestedGav, (k, v) -> {
-                                    if (v == null) {
-                                        v = new LinkedHashSet<>();
-                                    }
-                                    v.add(targetGav);
-                                    return v;
-                                });
-                                dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
-                                        projectName,
-                                        sourceSetName,
-                                        dep.getGroupId(),
-                                        dep.getArtifactId(),
-                                        dep.getVersion(),
-                                        dep.getDatedSnapshotVersion(),
-                                        dep.getRequested().getScope(),
-                                        dep.getDepth()
-                                ));
+                    if (!(configuration == null || configuration.isEmpty() || c.getName().equals(configuration))) {
+                        continue;
+                    }
+                    for (ResolvedDependency resolvedDependency : c.getResolved()) {
+                        ResolvedDependency dep = resolvedDependency.findDependency(groupIdPattern, artifactIdPattern);
+                        if(dep ==null) {
+                            continue;
+                        }
+                        if(version != null) {
+                            VersionComparator versionComparator = Semver.validate(version, null).getValue();
+                            if(versionComparator == null) {
+                                sourceFile = Markup.warn(sourceFile, new IllegalArgumentException("Could not construct a valid version comparator from " + version + "."));
+                            } else {
+                                if(!versionComparator.isValid(null, dep.getVersion())) {
+                                    continue;
+                                }
                             }
                         }
+                        GroupArtifactVersion requestedGav = new GroupArtifactVersion(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion());
+                        GroupArtifactVersion targetGav = new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
+                        configurationToDirectDependency.compute(c.getName(), (k, v) -> {
+                            if (v == null) {
+                                v = new LinkedHashSet<>();
+                            }
+                            v.add(requestedGav);
+                            return v;
+                        });
+                        directDependencyToTargetDependency.compute(requestedGav, (k, v) -> {
+                            if (v == null) {
+                                v = new LinkedHashSet<>();
+                            }
+                            v.add(targetGav);
+                            return v;
+                        });
+                        dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
+                                projectName,
+                                sourceSetName,
+                                dep.getGroupId(),
+                                dep.getArtifactId(),
+                                dep.getVersion(),
+                                dep.getDatedSnapshotVersion(),
+                                dep.getRequested().getScope(),
+                                dep.getDepth()
+                        ));
                     }
                 }
                 if (directDependencyToTargetDependency.isEmpty()) {

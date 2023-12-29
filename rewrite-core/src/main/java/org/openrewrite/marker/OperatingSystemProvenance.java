@@ -223,7 +223,7 @@ public abstract class OperatingSystemProvenance implements Marker {
 
     public abstract EOL getEOL();
 
-    protected enum EOL {
+    public enum EOL {
         CRLF,
         LF
     }

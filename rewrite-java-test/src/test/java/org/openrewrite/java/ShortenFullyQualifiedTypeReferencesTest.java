@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RecipeSpec;
@@ -228,7 +229,7 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               @SuppressWarnings("DataFlowIssue")
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   if (method.getSimpleName().equals("m1")) {
-                      return (J.MethodDeclaration) new ShortenFullyQualifiedTypeReferences().getVisitor().visit(method, ctx, getCursor().getParent());
+                      return (J.MethodDeclaration) ShortenFullyQualifiedTypeReferences.modifyOnly(method).visit(method, ctx, getCursor().getParent());
                   }
                   return super.visitMethodDeclaration(method, ctx);
               }
@@ -416,6 +417,122 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   Function<Collection<?>, Integer> m() {
                       return Collection::size;
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void subtree() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("m1")) {
+                      doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(method));
+                  }
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.Collection;
+              import java.util.function.Function;
+
+              class T {
+                  Function<Collection<?>, Integer> m() {
+                      return java.util.Collection::size;
+                  }
+                  Function<Collection<?>, Integer> m1() {
+                      return java.util.Collection::size;
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              import java.util.function.Function;
+
+              class T {
+                  Function<Collection<?>, Integer> m() {
+                      return java.util.Collection::size;
+                  }
+                  Function<Collection<?>, Integer> m1() {
+                      return Collection::size;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedReferenceCollision() {
+        rewriteRun(
+          java("""            
+            class List {
+                class A {
+                }
+            }
+          """),
+          java("""           
+            import java.util.ArrayList;
+            
+            class Test {
+                void test(List.A l1) {
+                    java.util.List<Integer> l2 = new ArrayList<>();
+                }
+            }
+          """)
+        );
+    }
+
+    @Test
+    void deeperNestedReferenceCollision() {
+        rewriteRun(
+          java("""            
+            class List {
+                class A {
+                    class B {
+                    }
+                }
+            }
+          """),
+          java("""           
+            import java.util.ArrayList;
+            
+            class Test {
+                void test(List.A.B l1) {
+                    java.util.List<Integer> l2 = new ArrayList<>();
+                }
+            }
+          """)
+        );
+    }
+
+    @Test
+    void importWithLeadingComment() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+              
+              /* comment */
+              import java.util.List;
+              
+              class Test {
+                  List<String> l = new java.util.ArrayList<>();
+              }
+              """,
+            """
+              package foo;
+              
+              /* comment */
+              import java.util.ArrayList;
+              import java.util.List;
+              
+              class Test {
+                  List<String> l = new ArrayList<>();
               }
               """
           )

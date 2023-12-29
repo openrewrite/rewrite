@@ -302,7 +302,8 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
 
     private static int getNewLineCount(String whitespace) {
         int newLineCount = 0;
-        for (char c : whitespace.toCharArray()) {
+        for (int i = 0; i < whitespace.length(); i++) {
+            char c = whitespace.charAt(i);
             if (c == '\n') {
                 newLineCount++;
             }

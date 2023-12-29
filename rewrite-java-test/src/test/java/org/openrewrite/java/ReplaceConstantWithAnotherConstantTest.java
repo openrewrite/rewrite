@@ -16,40 +16,32 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec
-          .parser(JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true)
-            .classpath("guava"));
-    }
+class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
     @Test
     void replaceConstantInAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "com.constant.B.UTF_8")),
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "com.constant.B.PATH_SEPARATOR")),
           java(
             """
               package com.constant;
               public class B {
-                  public static final String UTF_8 = "UTF_8";
+                  public static final String PATH_SEPARATOR = ":";
               }
               """
           ),
           java(
             """
-              import com.google.common.base.Charsets;
+              import java.io.File;
               
-              @SuppressWarnings(Charsets.UTF_8)
+              @SuppressWarnings(File.pathSeparator)
               class Test {
-                  @SuppressWarnings(value = Charsets.UTF_8)
+                  @SuppressWarnings(value = File.pathSeparator)
                   void foo() {
                       System.out.println("Annotation");
                   }
@@ -57,10 +49,10 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """,
             """
               import com.constant.B;
-    
-              @SuppressWarnings(B.UTF_8)
+              
+              @SuppressWarnings(B.PATH_SEPARATOR)
               class Test {
-                  @SuppressWarnings(value = B.UTF_8)
+                  @SuppressWarnings(value = B.PATH_SEPARATOR)
                   void foo() {
                       System.out.println("Annotation");
                   }
@@ -71,19 +63,47 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     }
 
     @Test
-    void replaceConstant() {
+    @Issue("https://github.com/openrewrite/rewrite/pull/3448")
+    void replaceConstantInCurlyBracesInAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "java.io.File.separator")),
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator"))
+            .parser(JavaParser.fromJavaVersion().classpath("guava")),
           java(
             """
-              import com.google.common.base.Charsets;
+              import java.io.File;
+              
+              class Test {
+                  @SuppressWarnings({File.pathSeparator})
+                  private String bar;
+              }
+              """,
+            """
+              import java.io.File;
+              
+              class Test {
+                  @SuppressWarnings({File.separator})
+                  private String bar;
+              }
+              """
+          )
+        );
+    }
 
-              import static com.google.common.base.Charsets.UTF_8;
+    @Test
+    void replaceConstant() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
+          java(
+            """
+              import java.io.File;
+
+              import static java.io.File.pathSeparator;
 
               class Test {
-                  Object o = Charsets.UTF_8;
+                  Object o = File.pathSeparator;
                   void foo() {
-                      System.out.println(UTF_8);
+                      System.out.println(pathSeparator);
+                      System.out.println(java.io.File.pathSeparator);
                   }
               }
               """,
@@ -96,6 +116,7 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   Object o = File.separator;
                   void foo() {
                       System.out.println(separator);
+                      System.out.println(File.separator);
                   }
               }
               """
@@ -112,8 +133,8 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               package foo;
 
               public class Bar {
-                  public enum Baz {
-                      QUX
+                  public static class Baz {
+                      public static final String QUX = "QUX";
                   }
               }
               """
@@ -131,6 +152,34 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               class Test {
                   static final String FOO = "foo";
                   Object o = Test.FOO;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3555")
+    void replaceConstantForAnnotatedParameter() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
+          java(
+            """
+              import java.io.File;
+              
+              class Test {
+                  void foo(@SuppressWarnings(value = File.pathSeparator) String param) {
+                      System.out.println(param);
+                  }
+              }
+              """,
+            """
+              import java.io.File;
+              
+              class Test {
+                  void foo(@SuppressWarnings(value = File.separator) String param) {
+                      System.out.println(param);
+                  }
               }
               """
           )

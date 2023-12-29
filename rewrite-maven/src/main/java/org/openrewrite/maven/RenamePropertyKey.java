@@ -44,19 +44,18 @@ public class RenamePropertyKey extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKey, newKey);
+    }
+
+    @Override
     public String getDescription() {
         return "Rename the specified Maven project property key leaving the value unchanged.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new MavenVisitor<ExecutionContext>() {
-            @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                // Scanning every tag's value is not an efficient applicable test, so just accept all maven files
-                return SearchResult.found(document);
-            }
-        }, new MavenIsoVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             final String oldKeyAsProperty = "${" + oldKey + "}";
             final String newKeyAsProperty = "${" + newKey + "}";
 
@@ -76,6 +75,6 @@ public class RenamePropertyKey extends Recipe {
                 }
                 return t;
             }
-        });
+        };
     }
 }

@@ -241,8 +241,8 @@ public class Autodetect extends NamedStyles {
             int tabSize = (moreFrequentTabSize == 0) ? 4 : moreFrequentTabSize;
 
             IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
+            int continuationIndent = continuationFrequencies.continuationIndent(useTabs ? 1 : tabSize) * (useTabs ? tabSize : 1);
 
-            int continuationIndent = continuationFrequencies.continuationIndent(tabSize);
             return new TabsAndIndentsStyle(
                     useTabs,
                     tabSize,
@@ -293,12 +293,11 @@ public class Autodetect extends NamedStyles {
         @Override
         public Space visitSpace(Space space, Space.Location loc, GeneralFormatStatistics stats) {
             String prefix = space.getWhitespace();
-            char[] chars = prefix.toCharArray();
 
-            for (int i = 0; i < chars.length; i++) {
-                char c = chars[i];
+            for (int i = 0; i < prefix.length(); i++) {
+                char c = prefix.charAt(i);
                 if (c == '\n') {
-                    if (i == 0 || chars[i - 1] != '\r') {
+                    if (i == 0 || prefix.charAt(i - 1) != '\r') {
                         stats.linesWithLFNewLines++;
                     } else {
                         stats.linesWithCRLFNewLines++;
@@ -343,10 +342,11 @@ public class Autodetect extends NamedStyles {
                 List<Statement> parameters = method.getParameters();
                 for (int i = 1; i < parameters.size(); i++) {
                     if (parameters.get(i).getPrefix().getLastWhitespace().contains("\n")) {
-                        if (alignTo == parameters.get(i).getPrefix().getLastWhitespace().length()) {
+                        if (alignTo == parameters.get(i).getPrefix().getLastWhitespace().length() - 1) {
                             stats.multilineAlignedToFirstArgument++;
                         } else {
                             stats.multilineNotAlignedToFirstArgument++;
+                            countIndents(parameters.get(i).getPrefix().getWhitespace(), true, stats);
                         }
                     }
                 }
@@ -418,7 +418,13 @@ public class Autodetect extends NamedStyles {
             if (statementExpressions.contains(expression)) {
                 return expression;
             }
-            countIndents(expression.getPrefix().getWhitespace(), true, stats);
+            // (newline-separated) annotations on some common target are not continuations
+            boolean isContinuation = !(expression instanceof J.Annotation && !(
+                    // ...but annotations which are *arguments* to other annotations can be continuations
+                    getCursor().getParentTreeCursor().getValue() instanceof J.Annotation
+                    || getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
+            ));
+            countIndents(expression.getPrefix().getWhitespace(), isContinuation, stats);
 
             return expression;
         }
@@ -434,6 +440,7 @@ public class Autodetect extends NamedStyles {
             }
             if (m.getPadding().getSelect() != null) {
                 countIndents(m.getPadding().getSelect().getAfter().getWhitespace(), true, stats);
+                visit(m.getSelect(), stats);
             }
             visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, stats);
 
@@ -460,8 +467,8 @@ public class Autodetect extends NamedStyles {
                 int spaceIndent = 0;
                 int tabIndent = 0;
                 boolean mixed = false;
-                char[] chars = space.substring(ni).toCharArray();
-                for (char c : chars) {
+                for (int i = ni; i < space.length(); i++) {
+                    char c = space.charAt(i);
                     if (c == ' ') {
                         if (tabIndent > 0) {
                             mixed = true;
@@ -842,11 +849,9 @@ public class Autodetect extends NamedStyles {
                 return pkg;
             }
 
-            char[] p1 = pkg.toCharArray();
-            char[] p2 = lcp.toCharArray();
             int i = 0;
-            for (; i < p1.length && i < p2.length; i++) {
-                if (p1[i] != p2[i]) {
+            for (; i < pkg.length() && i < lcp.length(); i++) {
+                if (pkg.charAt(i) != lcp.charAt(i)) {
                     break;
                 }
             }

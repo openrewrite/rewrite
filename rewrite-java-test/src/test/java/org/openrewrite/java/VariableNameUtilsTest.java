@@ -26,6 +26,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.HashSet;
 import java.util.List;
@@ -444,7 +445,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return identifier;
               }
-          })),
+          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
           java(
             """
               @SuppressWarnings("all")
@@ -483,9 +484,11 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return lambda;
               }
-          })),
+          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
           java(
             """
+              import java.util.function.Consumer;
+              
               @SuppressWarnings("all")
               class Test {
                   void m() {
@@ -499,6 +502,8 @@ class VariableNameUtilsTest implements RewriteTest {
               }
               """,
             """
+              import java.util.function.Consumer;
+              
               @SuppressWarnings("all")
               class Test {
                   void m() {
@@ -528,7 +533,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return identifier;
               }
-          })),
+          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
           java(
             """
               @SuppressWarnings("all")

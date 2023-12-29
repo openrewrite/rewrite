@@ -58,6 +58,11 @@ public class DoesNotIncludeDependency extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "An applicability test which returns false if visiting a Maven pom which includes the specified dependency in the classpath of some scope. "
                 + "For compatibility with multimodule projects, this should most often be applied as a single-source applicability test.";
@@ -80,11 +85,9 @@ public class DoesNotIncludeDependency extends Recipe {
     private TreeVisitor<?, ExecutionContext>[] dependencyInsightVisitors() {
         if (scope == null) {
             return new TreeVisitor[] {
-                    // anything in compile/runtime scope will also be in test classpath; no need to check individually
-                    new DependencyInsight(groupId, artifactId, Scope.Test.toString(), onlyDirect).getVisitor(),
-                    new DependencyInsight(groupId, artifactId, Scope.Provided.toString(), onlyDirect).getVisitor()
+                new DependencyInsight(groupId, artifactId, null, null, onlyDirect).getVisitor(),
             };
         }
-        return new TreeVisitor[] { new DependencyInsight(groupId, artifactId, scope, onlyDirect).getVisitor() };
+        return new TreeVisitor[] { new DependencyInsight(groupId, artifactId, scope, null, onlyDirect).getVisitor() };
     }
 }

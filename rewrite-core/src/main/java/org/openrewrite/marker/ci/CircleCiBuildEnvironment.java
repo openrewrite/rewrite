@@ -24,6 +24,7 @@ import org.openrewrite.marker.GitProvenance;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.marker.OperatingSystemProvenance.hostname;
 
@@ -63,10 +64,10 @@ public class CircleCiBuildEnvironment implements BuildEnvironment {
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
         if (StringUtils.isBlank(repositoryURL) || StringUtils.isBlank(sha1) || (
-                StringUtils.isBlank(branch)&& StringUtils.isBlank(tag))) {
+                StringUtils.isBlank(branch) && StringUtils.isBlank(tag))) {
             throw new IncompleteGitConfigException();
         }
-        return new GitProvenance(UUID.randomUUID(), repositoryURL, StringUtils.isBlank(branch)? tag : branch,
-                sha1, null, null);
+        return new GitProvenance(UUID.randomUUID(), repositoryURL, StringUtils.isBlank(branch) ? tag : branch,
+                sha1, null, null, emptyList());
     }
 }
