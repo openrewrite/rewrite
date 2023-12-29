@@ -21,16 +21,16 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -79,21 +79,23 @@ class ArrayTypeTest implements RewriteTest {
     @Test
     void javaTypesFromJsonCreatorConstructor() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
+              public TypeTree visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
                   //noinspection SimplifyOptionalCallChains
                   if (!arrayType.getMarkers().findFirst(SearchResult.class).isPresent()) {
                       // Construct a new J.ArrayType from an old LST model.
                       List<JRightPadded<Space>> dimensions = new ArrayList<>();
+                      assert arrayType.getDimension() != null;
                       dimensions.add(0, JRightPadded.build(arrayType.getDimension().getBefore()).withAfter(arrayType.getDimension().getElement()));
                       TypeTree elementType = arrayType.getElementType();
                       while (elementType instanceof J.ArrayType elementArrayType) {
+                          assert elementArrayType.getDimension() != null;
                           dimensions.add(0, JRightPadded.build(elementArrayType.getDimension().getBefore()).withAfter(elementArrayType.getDimension().getElement()));
                           elementType = elementArrayType.getElementType();
                       }
-                      //noinspection deprecation,UnnecessaryLocalVariable
-                      J.ArrayType migratedArrayType = new J.ArrayType(
+                      //noinspection deprecation
+                      return J.ArrayType.create(
                         Tree.randomId(),
                         Space.EMPTY,
                         Markers.EMPTY.addIfAbsent(new SearchResult(Tree.randomId(), "arr")),
@@ -103,7 +105,6 @@ class ArrayTypeTest implements RewriteTest {
                         null,
                         null
                       );
-                      arrayType = migratedArrayType;
                   }
                   return arrayType;
               }
@@ -137,52 +138,27 @@ class ArrayTypeTest implements RewriteTest {
     }
 
     @Test
-    void singleDimensionalArrayFromJsonCreatorConstructor() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
-                  //noinspection SimplifyOptionalCallChains
-                  if (!arrayType.getMarkers().findFirst(SearchResult.class).isPresent()) {
-                      assert arrayType.getType() == null || "java.lang.Integer[]".equals(arrayType.getType().toString());
-                      // Construct a new J.ArrayType from an old LST model.
-                      //noinspection deprecation
-                      return new J.ArrayType(
-                        Tree.randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY.addIfAbsent(new SearchResult(Tree.randomId(), "")),
-                        arrayType.getElementType(),
-                        singletonList(
-                          JRightPadded.build(Space.EMPTY).withAfter(Space.build("", emptyList()))
-                        ),
-                        null,
-                        null,
-                        null
-                      );
-                  }
-                  return super.visitArrayType(arrayType, ctx);
-              }
-          })),
-          java(
-            """
-              class Test {
-                  Integer[] n = new Integer[0];
-              }
-              """,
-            """
-              class Test {
-                  /*~~()~~>*/Integer[] n = new Integer[0];
-              }
-              """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
-                    assert arrayType.getType() != null;
-                    assertThat(arrayType.getType().toString()).isEqualTo("java.lang.Integer");
-                    return super.visitArrayType(arrayType, o);
-                }
-            }.visit(cu, 0))
-          )
+    void arrayTypeWithoutDimensions() {
+        J.Identifier elementType = new J.Identifier(
+          Tree.randomId(),
+          Space.EMPTY,
+          Markers.EMPTY,
+          Collections.emptyList(),
+          "String",
+          JavaType.ShallowClass.build("java.lang.String"),
+          null
         );
+        //noinspection deprecation
+        J.ArrayType migratedArrayType = J.ArrayType.create(
+          Tree.randomId(),
+          Space.EMPTY,
+          Markers.EMPTY,
+          elementType,
+          Collections.emptyList(),
+          null,
+          null,
+          null
+        );
+        assertThat(migratedArrayType.toString()).isEqualTo("String");
     }
 }

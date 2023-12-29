@@ -298,9 +298,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         a = a.withElementType(visitAndCast(a.getElementType(), p));
         a = a.withElementType(visitTypeName(a.getElementType(), p));
         a = a.withAnnotations(ListUtils.map(a.getAnnotations(), ann -> visitAndCast(ann, p)));
-        a = a.withDimension(a.getDimension()
-                .withBefore(visitSpace(a.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p))
-                .withElement(visitSpace(a.getDimension().getElement(), Space.Location.DIMENSION, p)));
+        if (a.getDimension() != null) {
+            a = a.withDimension(a.getDimension()
+                    .withBefore(visitSpace(a.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p))
+                    .withElement(visitSpace(a.getDimension().getElement(), Space.Location.DIMENSION, p)));
+        }
         a = a.withType(visitType(a.getType(), p));
         return a;
     }
