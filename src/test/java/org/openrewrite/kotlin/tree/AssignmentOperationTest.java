@@ -133,4 +133,19 @@ class AssignmentOperationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/555")
+    @Test
+    void modEqual() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( n1: Int, n2: Int ) {
+                  var copy = n1
+                  copy %= n2
+              }
+              """
+          )
+        );
+    }
 }
