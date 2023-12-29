@@ -331,7 +331,7 @@ public interface J extends Tree {
         @Nullable
         List<J.Annotation> annotations;
 
-        @Nullable
+        @Nullable // nullable for backwards compatibility only
         JLeftPadded<Space> dimension;
 
         JavaType type;
