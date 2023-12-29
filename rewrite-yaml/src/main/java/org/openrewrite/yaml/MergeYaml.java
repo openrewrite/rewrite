@@ -37,6 +37,14 @@ public class MergeYaml extends Recipe {
     @Language("yml")
     String yaml;
 
+    @Incubating(since = "7.11.0")
+    @Option(displayName = "Optional file matcher",
+            description = "Matching files will be modified. This is a glob expression.",
+            required = false,
+            example = "**/application-*.yml")
+    @Nullable
+    String fileMatcher;
+
     @Option(displayName = "Accept theirs",
             description = "When the YAML snippet to insert conflicts with an existing key value pair and an existing key has a different value, prefer the original value.",
             required = false)
@@ -85,6 +93,14 @@ public class MergeYaml extends Recipe {
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"))
                 .getDocuments().get(0).getBlock();
 
+        if(fileMatcher!=null && !fileMatcher.isEmpty()) {
+            return Preconditions.check(new FindSourceFiles(fileMatcher),
+                    getExecutionContextTreeVisitor(matcher, incoming));
+        }
+        return getExecutionContextTreeVisitor(matcher, incoming);
+    }
+
+    private TreeVisitor<?, ExecutionContext> getExecutionContextTreeVisitor(JsonPathMatcher matcher, Yaml incoming) {
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {

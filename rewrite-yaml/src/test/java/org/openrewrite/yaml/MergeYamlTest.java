@@ -36,6 +36,7 @@ class MergeYamlTest implements RewriteTest {
               schedule:
                   - cron: "0 18 * * *"
               """,
+            null,
             true,
             null
           )),
@@ -61,6 +62,7 @@ class MergeYamlTest implements RewriteTest {
                   name: update
                   description: a description
               """,
+            null,
             false,
             null
           )),
@@ -89,6 +91,7 @@ class MergeYamlTest implements RewriteTest {
                   name: update
                   description: a description
               """,
+            null,
             false,
             null
           )),
@@ -122,6 +125,7 @@ class MergeYamlTest implements RewriteTest {
                     condition:
                         age: 7
               """,
+            null,
             false,
             null
           )),
@@ -159,7 +163,7 @@ class MergeYamlTest implements RewriteTest {
                   list:
                     - item 2
                 """,
-              false, null
+              null, false, null
             )),
           yaml(
             """
@@ -190,6 +194,7 @@ class MergeYamlTest implements RewriteTest {
                   list:
                     - item 2
                 """,
+              null,
               true, null
             )
           ),
@@ -212,6 +217,7 @@ class MergeYamlTest implements RewriteTest {
             """
               bucketPolicyOnly: true
               """,
+            null,
             false,
             null
           )),
@@ -248,6 +254,7 @@ class MergeYamlTest implements RewriteTest {
                       condition:
                           age: 7
                 """,
+              null,
               false,
               null
             )),
@@ -280,6 +287,7 @@ class MergeYamlTest implements RewriteTest {
             "$",
             //language=yaml
             "spec: 0",
+            null,
             true,
             null
           )),
@@ -303,6 +311,7 @@ class MergeYamlTest implements RewriteTest {
           spec -> spec.recipe(new MergeYaml(
             "$.spec.containers",
             "imagePullPolicy: Always",
+            null,
             true,
             null
           )),
@@ -332,6 +341,7 @@ class MergeYamlTest implements RewriteTest {
             "$.spec.containers[?(@.name == 'pod-0')]",
             //language=yaml
             "imagePullPolicy: Always",
+            null,
             true,
             null
           )),
@@ -365,6 +375,7 @@ class MergeYamlTest implements RewriteTest {
               securityContext:
                 privileged: false
               """,
+            null,
             true,
             null
           )),
@@ -400,6 +411,7 @@ class MergeYamlTest implements RewriteTest {
               securityContext:
                 privileged: false
               """,
+            null,
             true,
             null
           )),
@@ -432,6 +444,7 @@ class MergeYamlTest implements RewriteTest {
               with:
                 cache: 'gradle'
               """,
+            null,
             false,
             null
           )),
@@ -473,6 +486,7 @@ class MergeYamlTest implements RewriteTest {
                       - Woodpecker
                       - Mangrove
               """,
+            null,
             true,
             null
           )),
@@ -515,6 +529,7 @@ class MergeYamlTest implements RewriteTest {
                       - 1
                       - 2
               """,
+            null,
             true,
             null
           )),
@@ -551,6 +566,7 @@ class MergeYamlTest implements RewriteTest {
                   - nnmap1: v111
                     nnmap2: v222
               """,
+            null,
             true,
             null
           )),
@@ -594,6 +610,7 @@ class MergeYamlTest implements RewriteTest {
                   - name: jdk_version
                     value: 18
                 """,
+              null,
               false,
               "name"
             )),
@@ -630,6 +647,7 @@ class MergeYamlTest implements RewriteTest {
                   - name: jdk_version
                     value: 18
                 """,
+              null,
               false,
               "name"
             )),
@@ -662,6 +680,7 @@ class MergeYamlTest implements RewriteTest {
                   - name: jdk_version
                     value: 18
               """,
+            null,
             false,
             null
           )),
@@ -694,6 +713,7 @@ class MergeYamlTest implements RewriteTest {
                   - name: build_tool
                     row2key2: maven
                 """,
+              null,
               false,
               "name"
             )),
@@ -730,6 +750,7 @@ class MergeYamlTest implements RewriteTest {
                   - name: jdk_version
                     value: 17
                 """,
+              null,
               false,
               "name"
             )),
@@ -767,6 +788,7 @@ class MergeYamlTest implements RewriteTest {
                       kind: Postgres
                       name: customer-profile-database-02
                 """,
+              null,
               false,
               "name"
             )),
@@ -815,6 +837,7 @@ class MergeYamlTest implements RewriteTest {
                       kind: MySQL
                       name: relation-profile-database
                 """,
+              null,
               false,
               "name"
             )),
@@ -841,4 +864,90 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3856")
+    @Test
+    void mergeYamlAppliedWhenFileMatchesGivenPattern() {
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1)
+            .recipe(new MergeYaml(
+              "$",
+              //language=yaml
+              """
+              node: java  
+              """,
+              "**/jules.yml",
+              false,
+              "value"
+            )),
+          yaml(
+            """
+            service: db
+            host: localhost
+            """,
+            """
+            service: db
+            host: localhost
+            node: java
+            """,
+            spec -> spec.path("src/main/resources/jules.yml")
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3856")
+    @Test
+    void mergeYamlNotAppliedWhenFileDoesnotMatchGivenPattern() {
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(0)
+            .recipe(new MergeYaml(
+              "$",
+              //language=yaml
+              """
+              node: java  
+              """,
+              "**/jules.yml",
+              false,
+              "value"
+            )),
+          yaml(
+            """
+            service: db
+            host: localhost
+            """,
+            spec -> spec.path("src/main/resources/application.yml")
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3856")
+    @Test
+    void mergeYamlAppliedOnAllFilesWhenFileMatcherPatternNotProvided() {
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1)
+            .recipe(new MergeYaml(
+              "$",
+              //language=yaml
+              """
+              node: java  
+              """,
+              null,
+              false,
+              "value"
+            )),
+          yaml(
+            """
+            service: db
+            host: localhost
+            """,
+            """
+            service: db
+            host: localhost
+            node: java
+            """
+          )
+        );
+    }
 }

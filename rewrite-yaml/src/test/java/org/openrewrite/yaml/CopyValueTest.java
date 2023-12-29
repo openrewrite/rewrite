@@ -68,7 +68,7 @@ class CopyValueTest implements RewriteTest {
     void insertCopyValueAndRemoveSource() {
         rewriteRun(
           spec -> spec.recipes(
-            new MergeYaml("$", "destination: TEMP", true, null),
+            new MergeYaml("$", "destination: TEMP", null, true, null),
             new CopyValue(".source", ".destination"),
             new DeleteKey(".source")
           ),
