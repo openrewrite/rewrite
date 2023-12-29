@@ -30,8 +30,6 @@ import org.openrewrite.template.SourceTemplate;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
@@ -75,7 +73,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     }
 
     private static JavaParser.Builder<?,?> augmentClasspath(JavaParser.Builder<?,?> parserBuilder) {
-        return parserBuilder.addClasspath(getTemplateClasspathDir());
+        return parserBuilder.classpathEntry(getTemplateClasspathDir());
     }
 
     protected JavaTemplate(String code, int parameterCount, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {

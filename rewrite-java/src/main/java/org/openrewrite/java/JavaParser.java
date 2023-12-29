@@ -367,17 +367,18 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
-        B addClasspath(Path classpath) {
+        B classpathEntry(Path entry) {
             this.artifactNames = Collections.emptyList();
             if (this.classpath.isEmpty()) {
-                this.classpath = Collections.singletonList(classpath);
+                this.classpath = Collections.singletonList(entry);
             } else {
-                this.classpath.add(classpath);
+                this.classpath.add(entry);
             }
             return (B) this;
         }
 
         public B classpath(String... classpath) {
+            this.artifactNames = Collections.emptyList();
             this.classpath = dependenciesFromClasspath(classpath);
             return (B) this;
         }
