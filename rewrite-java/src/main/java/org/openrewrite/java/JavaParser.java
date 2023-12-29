@@ -200,7 +200,6 @@ public interface JavaParser extends Parser {
             }
 
             if (!missingArtifactNames.isEmpty()) {
-                //noinspection ConstantValue
                 throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
                         missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n")) +
                         "The caller is of type " + caller.getName() + ".\n" +

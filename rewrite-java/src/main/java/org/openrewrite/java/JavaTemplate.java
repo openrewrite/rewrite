@@ -63,22 +63,20 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     }
 
     private final String code;
-    private final int parameterCount;
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
     private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, Set<String> imports,
                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
-        this(code, StringUtils.countOccurrences(code, "#{"), onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports));
+        this(code, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports));
     }
 
     private static JavaParser.Builder<?,?> augmentClasspath(JavaParser.Builder<?,?> parserBuilder) {
         return parserBuilder.classpathEntry(getTemplateClasspathDir());
     }
 
-    protected JavaTemplate(String code, int parameterCount, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {
+    protected JavaTemplate(String code, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {
         this.code = code;
-        this.parameterCount = parameterCount;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.templateParser = templateParser;
     }
