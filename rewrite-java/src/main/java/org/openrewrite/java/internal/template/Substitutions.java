@@ -116,40 +116,40 @@ public class Substitutions {
                 }
             }
 
-                        int dimensions = 1;
-                        for (; arrayType.getElemType() instanceof JavaType.Array; arrayType = (JavaType.Array) arrayType.getElemType()) {
-                            dimensions++;
-                        }
+            int dimensions = 1;
+            for (; arrayType.getElemType() instanceof JavaType.Array; arrayType = (JavaType.Array) arrayType.getElemType()) {
+                dimensions++;
+            }
 
-                        s = "(" + newArrayParameter(arrayType.getElemType(), dimensions, i) + ")";
-                    } else if ("any".equals(matcherName)) {
-                        String fqn;
+            s = "(" + newArrayParameter(arrayType.getElemType(), dimensions, index) + ")";
+        } else if ("any".equals(matcherName)) {
+            String fqn;
 
-                        if (params.size() == 1) {
-                            if (params.get(0).Identifier() != null) {
-                                fqn = params.get(0).Identifier().getText();
-                            } else {
-                                fqn = params.get(0).FullyQualifiedName().getText();
-                            }
-                        } else {
-                            if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null
-                                && ((J.NewClass) parameter).getClazz() != null) {
-                                // for anonymous classes get the type from the supertype
-                                fqn = getTypeName(((J.NewClass) parameter).getClazz().getType());
-                            } else if (!(parameter instanceof TypedTree)) {
-                                // any should only be used on TypedTree parameters, but will give it best effort
-                                fqn = "java.lang.Object";
-                            } else {
-                                fqn = getTypeName(((TypedTree) parameter).getType());
-                            }
-                        }
+            if (params.size() == 1) {
+                if (params.get(0).Identifier() != null) {
+                    fqn = params.get(0).Identifier().getText();
+                } else {
+                    fqn = params.get(0).FullyQualifiedName().getText();
+                }
+            } else {
+                if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null
+                    && ((J.NewClass) parameter).getClazz() != null) {
+                    // for anonymous classes get the type from the supertype
+                    fqn = getTypeName(((J.NewClass) parameter).getClazz().getType());
+                } else if (!(parameter instanceof TypedTree)) {
+                    // any should only be used on TypedTree parameters, but will give it best effort
+                    fqn = "java.lang.Object";
+                } else {
+                    fqn = getTypeName(((TypedTree) parameter).getType());
+                }
+            }
 
             fqn = fqn.replace("$", ".");
 
-                        JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
-                        s = primitive == null || primitive.equals(JavaType.Primitive.String) ?
-                                newObjectParameter(fqn, i) :
-                                newPrimitiveParameter(fqn, i);
+            JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
+            s = primitive == null || primitive.equals(JavaType.Primitive.String) ?
+                    newObjectParameter(fqn, index) :
+                    newPrimitiveParameter(fqn, index);
 
             parameters[index] = ((J) parameter).withPrefix(Space.EMPTY);
         } else {
