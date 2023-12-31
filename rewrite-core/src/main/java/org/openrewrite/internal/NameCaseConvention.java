@@ -148,18 +148,19 @@ public enum NameCaseConvention {
      */
     private static String toCamelCase(String str, boolean lowerCaseFirstLetter) {
         boolean allUpperCase = true;
-        for (char c : str.toCharArray()) {
+        final int strLength = str.length();
+        for (int i = 0; i < strLength; i++) {
+            final char c = str.charAt(i);
             if (Character.isLowerCase(c)) {
                 allUpperCase = false;
                 break;
             }
         }
-
         if (allUpperCase) {
             str = str.toLowerCase();
         }
 
-        StringBuilder sb = new StringBuilder(str.length());
+        StringBuilder sb = new StringBuilder(strLength);
         for (String s : CAMEL_CASE_SPLIT.split(str)) {
             String capitalize = StringUtils.capitalize(s);
             sb.append(capitalize);
