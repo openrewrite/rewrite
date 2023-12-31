@@ -149,11 +149,13 @@ public enum NameCaseConvention {
     private static String toCamelCase(String str, boolean lowerCaseFirstLetter) {
         boolean allUpperCase = true;
         for (char c : str.toCharArray()) {
-            if(Character.isLowerCase(c)) {
+            if (Character.isLowerCase(c)) {
                 allUpperCase = false;
+                break;
             }
         }
-        if(allUpperCase) {
+
+        if (allUpperCase) {
             str = str.toLowerCase();
         }
 
