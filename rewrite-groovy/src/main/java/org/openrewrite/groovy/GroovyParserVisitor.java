@@ -640,7 +640,7 @@ public class GroovyParserVisitor {
                                 .collect(Collectors.toList());
             } else if (!unparsedArgs.isEmpty() && unparsedArgs.get(0) instanceof MapExpression) {
                 // The map literal may or may not be wrapped in "[]"
-                // If it is wrapped in "[]" then this isn't a named arguments situation and we should not lift the parameters out of the enclosing MapExpression
+                // If it is wrapped in "[]" then this isn't a named arguments situation, and we should not lift the parameters out of the enclosing MapExpression
                 saveCursor = cursor;
                 whitespace();
                 boolean isOpeningBracketPresent = '[' == source.charAt(cursor);
@@ -1178,7 +1178,8 @@ public class GroovyParserVisitor {
         @Override
         public void visitConstructorCallExpression(ConstructorCallExpression ctor) {
             Space fmt = sourceBefore("new");
-            TypeTree clazz = visitTypeTree(ctor.getType());
+            TypeTree clazz = visitTypeTree(ctor.getType(), ctor.getMetaDataMap().containsKey(StaticTypesMarker.INFERRED_TYPE));
+
             JContainer<Expression> args = visit(ctor.getArguments());
             J.Block body = null;
             if (ctor.isUsingAnonymousInnerClass() && ctor.getType() instanceof InnerClassNode) {
@@ -1914,7 +1915,7 @@ public class GroovyParserVisitor {
                     emptyList(),
                     expression.getOriginType().getUnresolvedName(),
                     type, null);
-            if (type instanceof JavaType.Parameterized) {
+            if (expression.getOriginType().getGenericsTypes() != null) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
                         staticType((org.codehaus.groovy.ast.expr.Expression) expression).getGenericsTypes()), type);
             }
@@ -2125,7 +2126,12 @@ public class GroovyParserVisitor {
         return token;
     }
 
+    @SuppressWarnings("SameParameterValue")
     private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode) {
+        return typeTree(classNode, false);
+    }
+
+    private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode, boolean inferredType) {
         Space prefix = whitespace();
         if (classNode != null && classNode.isArray()) {
             //noinspection unchecked
@@ -2172,7 +2178,9 @@ public class GroovyParserVisitor {
         assert expr != null;
         if (classNode != null) {
             if (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
-                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
+                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, inferredType ?
+                        JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
+                        visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
             }
         }
         return expr.withPrefix(prefix);
@@ -2222,6 +2230,10 @@ public class GroovyParserVisitor {
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
+        return visitTypeTree(classNode, false);
+    }
+
+    private TypeTree visitTypeTree(ClassNode classNode, boolean inferredType) {
         JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(classNode.getUnresolvedName());
         if (primitiveType != null) {
             return new J.Primitive(randomId(), sourceBefore(classNode.getUnresolvedName()), Markers.EMPTY, primitiveType);
@@ -2237,7 +2249,7 @@ public class GroovyParserVisitor {
             cursor = saveCursor;
         }
 
-        return typeTree(classNode);
+        return typeTree(classNode, inferredType);
     }
 
     private List<J.Modifier> visitModifiers(int modifiers) {
