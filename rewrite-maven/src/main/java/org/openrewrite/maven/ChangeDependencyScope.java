@@ -61,6 +61,11 @@ public class ChangeDependencyScope extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("for `%s:%s` to `%s`", groupId, artifactId, newScope);
+    }
+
+    @Override
     public String getDescription() {
         return "Add or alter the scope of the specified dependency.";
     }

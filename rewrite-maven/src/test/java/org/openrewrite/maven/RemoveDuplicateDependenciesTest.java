@@ -18,13 +18,13 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class RemoveDuplicateDependenciesTest implements RewriteTest {
-
     @Override
     public void defaults(RecipeSpec spec) {
         spec.expectedCyclesThatMakeChanges(1).recipe(new RemoveDuplicateDependencies());
@@ -429,4 +429,45 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3832")
+    void retainDuplicateManagedDependenciesWithDifferentClassifier() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(0),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <properties>
+                  <version.chromedriver>94.0.4606.61</version.chromedriver>
+                </properties>
+                
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>selenium-tools</groupId>
+                      <artifactId>chromedriver</artifactId>
+                      <classifier>w64</classifier>
+                      <version>${version.chromedriver}</version>
+                      <type>tar.gz</type>
+                    </dependency>
+                    <dependency>
+                      <groupId>selenium-tools</groupId>
+                      <artifactId>chromedriver</artifactId>
+                      <classifier>x64</classifier>
+                      <version>${version.chromedriver}</version>
+                      <type>tar.gz</type>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
 }

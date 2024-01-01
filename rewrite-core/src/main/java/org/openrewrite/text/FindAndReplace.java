@@ -43,8 +43,10 @@ public class FindAndReplace extends Recipe {
     String find;
 
     @Option(displayName = "Replace",
-            description = "The replacement text for `find`.",
-            example = "denylist")
+            description = "The replacement text for `find`. This supports multiline strings.",
+            example = "denylist",
+            required = false)
+    @Nullable
     String replace;
 
     @Option(displayName = "Regex",
@@ -106,9 +108,9 @@ public class FindAndReplace extends Recipe {
                     return sourceFile;
                 }
                 for (Marker marker : sourceFile.getMarkers().getMarkers()) {
-                    if(marker instanceof AlreadyReplaced) {
+                    if (marker instanceof AlreadyReplaced) {
                         AlreadyReplaced alreadyReplaced = (AlreadyReplaced) marker;
-                        if(Objects.equals(find, alreadyReplaced.getFind()) && Objects.equals(replace, alreadyReplaced.getReplace())) {
+                        if (Objects.equals(find, alreadyReplaced.getFind()) && Objects.equals(replace, alreadyReplaced.getReplace())) {
                             return sourceFile;
                         }
                     }
@@ -118,13 +120,13 @@ public class FindAndReplace extends Recipe {
                     searchStr = Pattern.quote(searchStr);
                 }
                 int patternOptions = 0;
-                if(!Boolean.TRUE.equals(caseSensitive)) {
+                if (!Boolean.TRUE.equals(caseSensitive)) {
                     patternOptions |= Pattern.CASE_INSENSITIVE;
                 }
-                if(Boolean.TRUE.equals(multiline)) {
+                if (Boolean.TRUE.equals(multiline)) {
                     patternOptions |= Pattern.MULTILINE;
                 }
-                if(Boolean.TRUE.equals(dotAll)) {
+                if (Boolean.TRUE.equals(dotAll)) {
                     patternOptions |= Pattern.DOTALL;
                 }
                 PlainText plainText = PlainTextParser.convert(sourceFile);
@@ -134,7 +136,7 @@ public class FindAndReplace extends Recipe {
                 if (!matcher.find()) {
                     return sourceFile;
                 }
-                String replacement = replace;
+                String replacement = replace == null ? "" : replace;
                 if (!Boolean.TRUE.equals(regex)) {
                     replacement = replacement.replace("$", "\\$");
                 }
@@ -144,10 +146,10 @@ public class FindAndReplace extends Recipe {
             }
         };
         //noinspection DuplicatedCode
-        if(filePattern != null) {
+        if (filePattern != null) {
             //noinspection unchecked
             TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                    .map(HasSourcePath::new)
+                    .map(FindSourceFiles::new)
                     .map(Recipe::getVisitor)
                     .toArray(TreeVisitor[]::new));
 

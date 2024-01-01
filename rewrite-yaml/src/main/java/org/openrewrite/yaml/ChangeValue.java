@@ -45,6 +45,11 @@ public class ChangeValue extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKeyPath, value);
+    }
+
+    @Override
     public String getDescription() {
         return "Change a YAML mapping entry value while leaving the key intact.";
     }
@@ -54,8 +59,8 @@ public class ChangeValue extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
-            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
-                Yaml.Mapping.Entry e = super.visitMappingEntry(entry, context);
+            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
+                Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value))) {
                     Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
                     String prefix = e.getValue() instanceof Yaml.Sequence ? ((Yaml.Sequence) e.getValue()).getOpeningBracketPrefix() : e.getValue().getPrefix();
@@ -68,8 +73,8 @@ public class ChangeValue extends Recipe {
             }
 
             @Override
-            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext executionContext) {
-                Yaml.Scalar s = super.visitScalar(scalar, executionContext);
+            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext ctx) {
+                Yaml.Scalar s = super.visitScalar(scalar, ctx);
                 if (matcher.matches(getCursor())) {
                     s = s.withValue(value);
                 }

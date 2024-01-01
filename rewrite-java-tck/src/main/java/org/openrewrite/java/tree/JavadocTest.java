@@ -1748,4 +1748,36 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void returnOpeningAndClosingBrace() {
+        rewriteRun(
+          java(
+            """
+              interface Test {
+              	/**
+              	 * {@return 42}
+              	 */
+              	int foo();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void returnOpeningBraceOnly() {
+        rewriteRun(
+          java(
+            """
+              interface Test {
+              	/**
+              	 * {@return 42
+              	 */
+              	int foo();
+              }
+              """
+          )
+        );
+    }
 }

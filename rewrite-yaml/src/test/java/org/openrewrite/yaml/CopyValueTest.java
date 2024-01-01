@@ -18,7 +18,7 @@ package org.openrewrite.yaml;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.HasSourcePath;
+import org.openrewrite.FindSourceFiles;
 import org.openrewrite.Preconditions;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.yaml.tree.Yaml;
@@ -89,9 +89,9 @@ class CopyValueTest implements RewriteTest {
     void changeOnlyMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(
-            toRecipe(() -> Preconditions.check(new HasSourcePath("**/a.yml"), new YamlIsoVisitor<>() {
+            toRecipe(() -> Preconditions.check(new FindSourceFiles("**/a.yml"), new YamlIsoVisitor<>() {
                 @Override
-                public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
+                public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
                     doAfterVisit(new CopyValue(".source", ".destination").getVisitor());
                     return documents;
                 }

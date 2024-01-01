@@ -16,9 +16,12 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -126,6 +129,25 @@ class MethodDeclarationTest implements RewriteTest {
                   return null
               }
               """
+          )
+        );
+    }
+    @Test
+    void arrayType() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(String[][] s) {}
+              """, spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                    if (arrayType.getElementType() instanceof J.ArrayType) {
+                        assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
+                        assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
+                    }
+                    return super.visitArrayType(arrayType, o);
+                }
+            }.visit(cu, 0))
           )
         );
     }

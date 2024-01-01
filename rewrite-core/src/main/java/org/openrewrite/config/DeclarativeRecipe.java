@@ -148,6 +148,11 @@ public class DeclarativeRecipe extends Recipe {
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
                 @Override
+                public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                    return precondition.isAcceptable(sourceFile, ctx);
+                }
+
+                @Override
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                     Tree t = precondition.visit(tree, ctx);
                     preconditionApplicable = t != tree;

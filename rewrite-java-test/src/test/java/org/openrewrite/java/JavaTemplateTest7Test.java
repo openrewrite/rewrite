@@ -21,6 +21,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -139,6 +140,52 @@ class JavaTemplateTest7Test implements RewriteTest {
                   void foo() {
                       int i;
                       i = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3787")
+    @Test
+    void changeMethodInvocation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final MethodMatcher GET_BYTES = new MethodMatcher("java.lang.String getBytes()");
+              final JavaTemplate WITH_ENCODING = JavaTemplate
+                .builder("getBytes(StandardCharsets.#{})")
+                .contextSensitive()
+                .imports("java.nio.charset.StandardCharsets")
+                .build();
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+                  if (GET_BYTES.matches(method)) {
+                      maybeAddImport("java.nio.charset.StandardCharsets");
+                      m = WITH_ENCODING.apply(updateCursor(m), m.getCoordinates().replaceMethod(), "UTF_8");
+                      assertThat(m.getName().getType()).isEqualTo(m.getMethodType());
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              public class Test {
+                  byte[] test() {
+                      String s = "hello";
+                      return s.getBytes();
+                  }
+              }
+              """,
+            """
+              import java.nio.charset.StandardCharsets;
+              
+              public class Test {
+                  byte[] test() {
+                      String s = "hello";
+                      return s.getBytes(StandardCharsets.UTF_8);
                   }
               }
               """

@@ -42,11 +42,16 @@ public class CopyValue extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKeyPath, newKey);
+    }
+
+    @Override
     public String getDescription() {
         return "Copies a YAML value from one key to another. " +
-                "The existing key/value pair remains unaffected by this change. " +
-                "If either the source or destination key path does not exist, no value will be copied. " +
-                "Furthermore, copies are limited to scalar values, not whole YAML blocks.";
+               "The existing key/value pair remains unaffected by this change. " +
+               "If either the source or destination key path does not exist, no value will be copied. " +
+               "Furthermore, copies are limited to scalar values, not whole YAML blocks.";
     }
 
     @Override
@@ -61,7 +66,7 @@ public class CopyValue extends Recipe {
                 if (oldPathMatcher.matches(getCursor()) && entry.getValue() instanceof Yaml.Scalar) {
                     doAfterVisit(new YamlIsoVisitor<ExecutionContext>() {
                         @Override
-                        public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext executionContext) {
+                        public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                             Yaml.Mapping.Entry dest = super.visitMappingEntry(entry, ctx);
                             if (newPathMatcher.matches(getCursor())) {
                                 dest = dest.withValue(source.getValue());

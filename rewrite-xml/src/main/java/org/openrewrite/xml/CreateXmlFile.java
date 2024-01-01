@@ -18,8 +18,8 @@ package org.openrewrite.xml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.junit.platform.commons.util.StringUtils;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
@@ -88,13 +88,12 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
         return emptyList();
     }
 
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
         Path path = Paths.get(relativeFileName);
         return new XmlVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(document.getSourcePath())) {
                     if (StringUtils.isBlank(fileContents)) {
                         return document.withProlog(null).withRoot(null);

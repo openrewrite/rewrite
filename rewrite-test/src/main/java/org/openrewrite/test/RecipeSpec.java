@@ -98,6 +98,9 @@ public class RecipeSpec {
     @Nullable
     Function<List<SourceFile>, LargeSourceSet> sourceSet;
 
+    @Nullable
+    RecipePrinter recipePrinter;
+
     /**
      * Configuration that applies to all source file inputs.
      */
@@ -162,13 +165,13 @@ public class RecipeSpec {
         return this;
     }
 
-    public RecipeSpec executionContext(ExecutionContext executionContext) {
-        this.executionContext = executionContext;
+    public RecipeSpec executionContext(ExecutionContext ctx) {
+        this.executionContext = ctx;
         return this;
     }
 
-    public RecipeSpec recipeExecutionContext(ExecutionContext executionContext) {
-        this.recipeExecutionContext = executionContext;
+    public RecipeSpec recipeExecutionContext(ExecutionContext ctx) {
+        this.recipeExecutionContext = ctx;
         return this;
     }
 
@@ -281,5 +284,11 @@ public class RecipeSpec {
     @Nullable
     ExecutionContext getExecutionContext() {
         return executionContext;
+    }
+
+    @Incubating(since = "8.12.1")
+    public RecipeSpec printRecipe(RecipePrinter recipePrinter) {
+        this.recipePrinter = recipePrinter;
+        return this;
     }
 }

@@ -38,8 +38,8 @@ public class IsOwaspSuppressionsFile extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new XmlIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                Xml.Document doc = super.visitDocument(document, executionContext);
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml.Document doc = super.visitDocument(document, ctx);
                 if (doc.getRoot() == null) {
                     return doc;
                 }
@@ -59,7 +59,6 @@ public class IsOwaspSuppressionsFile extends Recipe {
                     }
                 }
                 if (isOwaspSuppressionFile) {
-
                     return doc.withRoot(SearchResult.found(doc.getRoot()));
                 }
                 return doc;

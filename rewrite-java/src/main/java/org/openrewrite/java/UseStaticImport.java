@@ -20,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
@@ -73,6 +74,10 @@ public class UseStaticImport extends Recipe {
                     return m;
                 }
                 if (m.getMethodType() != null) {
+                    if (!m.getMethodType().hasFlags(Flag.Static)) {
+                        return m;
+                    }
+
                     JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
                     maybeRemoveImport(receiverType);
 
@@ -97,7 +102,7 @@ public class UseStaticImport extends Recipe {
                  * Otherwise, the Javadoc method reference would eventually be refactored to static import, which is not valid for Javadoc.
                  */
                 @Override
-                public Javadoc visitReference(Javadoc.Reference reference, ExecutionContext p) {
+                public Javadoc visitReference(Javadoc.Reference reference, ExecutionContext ctx) {
                     return reference;
                 }
             };

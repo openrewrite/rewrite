@@ -25,8 +25,7 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class WatchableExecutionContext implements ExecutionContext {
     private final ExecutionContext delegate;
-
-    private boolean hasNewMessages = false;
+    private boolean hasNewMessages;
 
     public boolean hasNewMessages() {
         return hasNewMessages;
@@ -42,7 +41,7 @@ public class WatchableExecutionContext implements ExecutionContext {
         delegate.putMessage(key, value);
     }
 
-    public void putCycle(int cycle) {
+    public void putCycle(RecipeRunCycle<?> cycle) {
         delegate.putMessage(CURRENT_CYCLE, cycle);
     }
 

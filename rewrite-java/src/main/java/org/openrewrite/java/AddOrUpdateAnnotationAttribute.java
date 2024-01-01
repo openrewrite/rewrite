@@ -70,7 +70,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext context) {
+            public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext ctx) {
                 if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
                     return a;
                 }
@@ -149,7 +149,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     ).getArguments().get(0);
                     List<Expression> newArguments = ListUtils.concat(as, a.getArguments());
                     a = a.withArguments(newArguments);
-                    a = autoFormat(a, context);
+                    a = autoFormat(a, ctx);
                 }
 
                 return a;

@@ -54,7 +54,7 @@ class RecipeLifecycleTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
               @Override
-              public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+              public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                   fail("Should never have reached a visit method");
                   return tree;
               }
@@ -116,7 +116,7 @@ class RecipeLifecycleTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
               @Override
-              public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext executionContext) {
+              public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext ctx) {
                   return null;
               }
           })),
@@ -262,11 +262,11 @@ class RecipeLifecycleTest implements RewriteTest {
     private Recipe testRecipe(@Language("markdown") String name) {
         return toRecipe(() -> new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 if (!text.getText().contains(name)) {
                     return text.withText(name + text.getText());
                 }
-                return super.visitText(text, executionContext);
+                return super.visitText(text, ctx);
             }
         }).withName(name);
     }
@@ -421,11 +421,11 @@ class DefaultConstructorRecipe extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 if (!text.getText().contains(getDisplayName())) {
                     return text.withText(getDisplayName() + text.getText());
                 }
-                return super.visitText(text, executionContext);
+                return super.visitText(text, ctx);
             }
         };
     }
@@ -448,11 +448,11 @@ class NoArgRecipe extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 if (!text.getText().contains(getDisplayName())) {
                     return text.withText(getDisplayName() + text.getText());
                 }
-                return super.visitText(text, executionContext);
+                return super.visitText(text, ctx);
             }
         };
     }
