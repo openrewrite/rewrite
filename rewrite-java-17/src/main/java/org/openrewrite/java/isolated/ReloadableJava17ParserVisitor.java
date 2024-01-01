@@ -1507,9 +1507,17 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
-        TypeTree typeExpr;
+        TypeTree typeExpr = null;
         if (vartype == null || vartype instanceof JCErroneous) {
-            typeExpr = null;
+            try {
+                if (source.substring(node.startPos, node.pos).contains("var")) {
+                    // "var x = unknownType" can be translated into "(ERROR) var x = unknownType"
+                    typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.EMPTY, emptyList(), "var", typeMapping.type(vartype), null);
+                    typeExpr = typeExpr.withMarkers(typeExpr.getMarkers().add(JavaVarKeyword.build()));
+                }
+            } catch (StringIndexOutOfBoundsException e) {
+                typeExpr = null;
+            }
         } else if (endPos(vartype) < 0) {
             if ((node.sym.flags() & Flags.PARAMETER) > 0) {
                 // this is a lambda parameter with an inferred type expression
@@ -1555,6 +1563,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = 0; i < nodes.size(); i++) {
             JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
+            // how to capture var ?
             Space namedVarPrefix = sourceBefore(n.getName().toString());
 
             JavaType type = typeMapping.type(n);
