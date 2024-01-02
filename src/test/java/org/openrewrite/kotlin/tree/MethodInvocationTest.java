@@ -923,4 +923,21 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/556")
+    @Test
+    void innerClassInvocation() {
+        rewriteRun(
+          kotlin(
+            """
+              class Pony2 {
+                  inner class Builder
+
+                  companion object {
+                      fun newBuilder() = Pony2().Builder()
+                  }
+              }
+              """
+          )
+        );
+    }
 }

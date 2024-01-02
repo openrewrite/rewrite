@@ -1942,6 +1942,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         );
     }
 
+
     @Override
     public J visitCallExpression(KtCallExpression expression, ExecutionContext data) {
         if (expression.getCalleeExpression() == null) {
@@ -2436,7 +2437,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         .withPrefix(prefix);
             } else if (j instanceof J.NewClass) {
                 J.NewClass n = (J.NewClass) j;
-                if (receiver instanceof J.FieldAccess || receiver instanceof J.Identifier) {
+                if (receiver instanceof J.FieldAccess || receiver instanceof J.Identifier || receiver instanceof J.NewClass) {
                     n = n.withPrefix(prefix);
                     if (n.getClazz() instanceof J.ParameterizedType) {
                         J.ParameterizedType pt = (J.ParameterizedType) n.getClazz();
