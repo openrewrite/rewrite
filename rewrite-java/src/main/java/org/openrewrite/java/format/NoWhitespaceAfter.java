@@ -114,7 +114,9 @@ public class NoWhitespaceAfter extends Recipe {
             J.ArrayType a = super.visitArrayType(arrayType, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getArrayDeclarator())) {
                 if (a.getDimension() != null && a.getDimension().getBefore().getWhitespace().contains(" ")) {
-                    a = a.withDimension(a.getDimension().withBefore(a.getDimension().getBefore().withWhitespace("")));
+                    if (a.getAnnotations() == null || a.getAnnotations().isEmpty()) {
+                        a = a.withDimension(a.getDimension().withBefore(a.getDimension().getBefore().withWhitespace("")));
+                    }
                 }
             }
             return a;
