@@ -1508,14 +1508,16 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
         TypeTree typeExpr = null;
-        if (vartype == null || vartype instanceof JCErroneous) {
+        if (vartype == null) {
+            typeExpr = null;
+        } else if (vartype instanceof JCErroneous) {
             try {
-                if (source.substring(node.startPos, node.pos).contains("var")) {
+                if (source.substring(node.startPos, node.pos).startsWith("var")) {
                     // "var x = unknownType" can be translated into "(ERROR) var x = unknownType"
                     typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.EMPTY, emptyList(), "var", typeMapping.type(vartype), null);
                     typeExpr = typeExpr.withMarkers(typeExpr.getMarkers().add(JavaVarKeyword.build()));
                 }
-            } catch (StringIndexOutOfBoundsException e) {
+            } catch (Exception e) {
                 typeExpr = null;
             }
         } else if (endPos(vartype) < 0) {
