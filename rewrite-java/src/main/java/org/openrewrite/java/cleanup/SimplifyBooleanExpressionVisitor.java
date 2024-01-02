@@ -103,29 +103,35 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J.Unary asUnary = (J.Unary) j;
 
         if (asUnary.getOperator() == J.Unary.Type.Not) {
-            Expression expr = asUnary.getExpression();
-            if (isLiteralTrue(expr)) {
-                j = ((J.Literal) expr).withValue(false).withValueSource("false");
-            } else if (isLiteralFalse(expr)) {
-                j = ((J.Literal) expr).withValue(true).withValueSource("true");
-            } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
-                j = ((J.Unary) expr).getExpression();
-            } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof J.Binary) {
-                J.Binary binary = (J.Binary) ((J.Parentheses<?>) expr).getTree();
-                J.Binary.Type negated = negate(binary.getOperator());
-                if (negated != binary.getOperator()) {
-                    j = binary.withOperator(negated).withPrefix(j.getPrefix());
-                }
-            } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof J.Unary) {
-                J.Unary unary1 = (J.Unary) ((J.Parentheses<?>) expr).getTree();
-                J.Unary.Type operator = unary1.getOperator();
-                if (operator == J.Unary.Type.Not) {
-                    j = unary1.getExpression().withPrefix(j.getPrefix());
-                }
-            }
+            j = unpackExpression(asUnary.getExpression(), j);
         }
         if (asUnary != j) {
             j = j.withPrefix(asUnary.getPrefix());
+        }
+        return j;
+    }
+
+    private J unpackExpression(Expression expr, J j) {
+        if (isLiteralTrue(expr)) {
+            j = ((J.Literal) expr).withValue(false).withValueSource("false");
+        } else if (isLiteralFalse(expr)) {
+            j = ((J.Literal) expr).withValue(true).withValueSource("true");
+        } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
+            j = ((J.Unary) expr).getExpression();
+        } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof J.Binary) {
+            J.Binary binary = (J.Binary) ((J.Parentheses<?>) expr).getTree();
+            J.Binary.Type negated = negate(binary.getOperator());
+            if (negated != binary.getOperator()) {
+                j = binary.withOperator(negated).withPrefix(j.getPrefix());
+            }
+        } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof J.Unary) {
+            J.Unary unary1 = (J.Unary) ((J.Parentheses<?>) expr).getTree();
+            J.Unary.Type operator = unary1.getOperator();
+            if (operator == J.Unary.Type.Not) {
+                j = unary1.getExpression().withPrefix(j.getPrefix());
+            }
+        } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof Expression) {
+            j = unpackExpression((Expression) ((J.Parentheses<?>) expr).getTree(), j);
         }
         return j;
     }

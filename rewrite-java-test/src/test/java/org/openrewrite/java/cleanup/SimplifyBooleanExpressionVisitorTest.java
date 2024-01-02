@@ -108,6 +108,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       boolean a = !false;
                       boolean b = !true;
+                      boolean c = !(false);
+                      boolean d = !(true);
+                      boolean e = !((false));
+                      boolean f = !((true));
                   }
               }
               """,
@@ -116,6 +120,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       boolean a = true;
                       boolean b = false;
+                      boolean c = true;
+                      boolean d = false;
+                      boolean e = true;
+                      boolean f = false;
                   }
               }
               """
