@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -40,14 +41,14 @@ import org.openrewrite.test.TypeValidation;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 
-public class FinalizeLocalVariablesTest implements RewriteTest {
+class FinalizeLocalVariablesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FinalizeLocalVariables());
     }
 
     @ParameterizedTest
-    @CsvSource(value = { "11", "17", "21" })
+    @ValueSource(ints = { 11, 17, 21 })
     @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     void missingTypePlusVarNotMissingSpace(int javaVersion) {
         rewriteRun(
@@ -77,7 +78,7 @@ public class FinalizeLocalVariablesTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource(value = { "11", "17", "21" })
+    @ValueSource(ints = { 11, 17, 21 })
     @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     void explicitTypePlusVarNotMissingSpace(int javaVersion) {
         rewriteRun(
@@ -118,8 +119,7 @@ public class FinalizeLocalVariablesTest implements RewriteTest {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return new JavaIsoVisitor<ExecutionContext>() {
-
+            return new JavaIsoVisitor<>() {
                 @Override
                 public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
                                                                         ExecutionContext ctx) {
