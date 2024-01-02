@@ -666,12 +666,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.ParenthesizedTypeTree t = parTree;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.PARENTHESES_PREFIX, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
-        if (t.getAnnotations() != null && !t.getAnnotations().isEmpty()) {
-            t = t.withAnnotations(ListUtils.map(t.getAnnotations(), a -> visitAndCast(a, p)));
-        }
 
         if (t.getModifiers() != null && !t.getModifiers().isEmpty()) {
             t = t.withModifiers(ListUtils.map(t.getModifiers(), m -> visitAndCast(m, p)));
+        }
+
+        if (t.getAnnotations() != null && !t.getAnnotations().isEmpty()) {
+            t = t.withAnnotations(ListUtils.map(t.getAnnotations(), a -> visitAndCast(a, p)));
         }
 
         J temp = visitParentheses(t.getParenthesizedType(), p);
