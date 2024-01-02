@@ -1505,19 +1505,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
-        TypeTree typeExpr = null;
+        TypeTree typeExpr;
         if (vartype == null) {
             typeExpr = null;
-        } else if (vartype instanceof JCErroneous) {
-            try {
-                if (source.substring(node.startPos, node.pos).startsWith("var")) {
-                    // "var x = unknownType" can be translated into "(ERROR) var x = unknownType"
-                    typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.EMPTY, emptyList(), "var", typeMapping.type(vartype), null);
-                    typeExpr = typeExpr.withMarkers(typeExpr.getMarkers().add(JavaVarKeyword.build()));
-                }
-            } catch (Exception e) {
-                typeExpr = null;
-            }
         } else if (endPos(vartype) < 0) {
             if ((node.sym.flags() & Flags.PARAMETER) > 0) {
                 // this is a lambda parameter with an inferred type expression
