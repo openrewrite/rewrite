@@ -538,4 +538,34 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotatedFieldAccess() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              
+              class Test {
+                  java.util. @Anno List<String> l;
+              }
+              @Target(ElementType.TYPE_USE)
+              @interface Anno {}
+              """,
+            """
+                  import java.lang.annotation.ElementType;
+                  import java.lang.annotation.Target;
+                  import java.util.List;
+                  
+                  class Test {
+                      @Anno List<String> l;
+                  }
+                  @Target(ElementType.TYPE_USE)
+                  @interface Anno {}
+                  """
+          )
+        );
+    }
 }
