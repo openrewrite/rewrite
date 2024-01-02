@@ -1334,11 +1334,6 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                             annotations, fieldAccess.name.toString(), type, typeMapping.variableType(fieldAccess.sym))),
                     type
             );
-        } else if (node instanceof JCAnnotatedType) {
-            JCAnnotatedType annotatedType = (JCAnnotatedType) node;
-            if (annotatedType.getUnderlyingType() instanceof JCArrayTypeTree) {
-                return arrayTypeTree(annotatedType, annotationPosTable);
-            }
         }
         return convert(node);
     }
