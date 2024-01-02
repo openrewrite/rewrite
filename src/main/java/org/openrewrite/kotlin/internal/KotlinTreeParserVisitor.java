@@ -2937,7 +2937,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<KtPropertyAccessor> ktPropertyAccessors = property.getAccessors();
         if (!ktPropertyAccessors.isEmpty() || receiver != null || typeConstraints != null) {
             List<JRightPadded<J.MethodDeclaration>> accessors = new ArrayList<>(ktPropertyAccessors.size());
-            PsiElement lastChild = findLastChild(property, c -> !isSpace(c.getNode()) && !isSemicolon(c));
 
             for (KtPropertyAccessor ktPropertyAccessor : ktPropertyAccessors) {
                 J.MethodDeclaration accessor = (J.MethodDeclaration) ktPropertyAccessor.accept(this, data);
@@ -4303,26 +4302,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         for (PsiElement child = parent.getLastChild(); child != null; child = child.getPrevSibling()) {
             if (condition.test(child)) {
                 return child;
-            }
-        }
-
-        return null;
-    }
-
-    // Search for the last child that satisfies a given condition. If at any point, a child meets a break condition before the condition is satisfied, the function should return null.
-    @Nullable
-    private static PsiElement findLastChild(@Nullable PsiElement parent, Predicate<PsiElement> condition,  Predicate<PsiElement> breakCondition) {
-        if (parent == null) {
-            return null;
-        }
-
-        for (PsiElement child = parent.getLastChild(); child != null; child = child.getPrevSibling()) {
-            if (condition.test(child)) {
-                return child;
-            }
-
-            if (breakCondition.test(child)) {
-                return null;
             }
         }
 
