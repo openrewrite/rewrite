@@ -63,7 +63,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                         var a = b;
                     }
                 }
-                  """,
+                """,
               """
                 import foo.Unknown;
                 class Bar {
@@ -71,7 +71,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                         final var a = b;
                     }
                 }
-                  """
+                """
             ), javaVersion
           )
         );
@@ -92,21 +92,20 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                         var a = b;
                     }
                 }
-                  """,
+                """,
               """
                 class Bar {
                     void test(String b) {
                         final var a = b;
                     }
                 }
-                  """
+                """
             ), javaVersion
           )
         );
     }
 
     public static class FinalizeLocalVariables extends Recipe {
-
         @Override
         public String getDisplayName() {
             return "Finalize local variables";
