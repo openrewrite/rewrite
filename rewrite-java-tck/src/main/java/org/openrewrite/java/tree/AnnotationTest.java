@@ -339,15 +339,15 @@ class AnnotationTest implements RewriteTest {
                         if (arrayType.getElementType() instanceof J.ArrayType) {
                             if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
                                 assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A1");
+                                assertThat(arrayType.toString()).isEqualTo("Integer @A1 [] @A2 [ ]");
+                                firstDimension.set(true);
                             }
-                            assertThat(arrayType.toString()).isEqualTo("Integer @A1 [] @A2 [ ]");
-                            firstDimension.set(true);
                         } else {
                             if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
                                 assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A2");
+                                assertThat(arrayType.toString()).isEqualTo("Integer @A2 [ ]");
+                                secondDimension.set(true);
                             }
-                            assertThat(arrayType.toString()).isEqualTo("Integer @A2 [ ]");
-                            secondDimension.set(true);
                         }
                         return super.visitArrayType(arrayType, o);
                     }
