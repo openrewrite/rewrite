@@ -1565,7 +1565,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = 0; i < nodes.size(); i++) {
             JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
-            // how to capture var ?
             Space namedVarPrefix = sourceBefore(n.getName().toString());
 
             JavaType type = typeMapping.type(n);
