@@ -16,6 +16,9 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -64,6 +67,37 @@ class CompilationUnitTest implements RewriteTest {
               """,
             SourceSpec::noTrim
           )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "class Foo",
+      "val x = 1",
+      """
+        import java.util.Objects
+
+        class A
+        """,
+      """
+        package x.y
+
+        class A
+        """,
+      """
+        package x.y
+        import java.util.Objects
+
+        class A
+        """
+    })
+    void shebang(String fileContent) {
+        rewriteRun(
+          kotlin("""
+            #!/usr/bin/env who
+            
+            %s
+            """.formatted(fileContent))
         );
     }
 }

@@ -98,6 +98,11 @@ public interface K extends J {
 
         @With
         @Getter
+        @Nullable
+        String shebang;
+
+        @With
+        @Getter
         Space prefix;
 
         @With
@@ -287,7 +292,7 @@ public interface K extends J {
             }
 
             public K.CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
-                return t.packageDeclaration == packageDeclaration ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
+                return t.packageDeclaration == packageDeclaration ? t : new K.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
                         t.annotations, packageDeclaration, t.imports, t.statements, t.eof);
             }
 
@@ -310,7 +315,7 @@ public interface K extends J {
                         .map(i -> (JRightPadded<Statement>) (Object) i)
                         .collect(Collectors.toList()));
 
-                return t.getPadding().getClasses() == classes ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.annotations, t.packageDeclaration, t.imports, statements, t.eof);
+                return t.getPadding().getClasses() == classes ? t : new K.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.annotations, t.packageDeclaration, t.imports, statements, t.eof);
             }
 
             @Override
@@ -320,7 +325,7 @@ public interface K extends J {
 
             @Override
             public K.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
-                return t.imports == imports ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
+                return t.imports == imports ? t : new K.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
                         t.annotations, t.packageDeclaration, imports, t.statements, t.eof);
             }
 
@@ -329,7 +334,7 @@ public interface K extends J {
             }
 
             public K.CompilationUnit withStatements(List<JRightPadded<Statement>> statements) {
-                return t.statements == statements ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath,
+                return t.statements == statements ? t : new K.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath,
                         t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.annotations, t.packageDeclaration, t.imports, statements, t.eof);
             }
         }
