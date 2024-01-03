@@ -154,13 +154,13 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     }
 
     private JavaType.Array arrayType(ClassNode array, String signature) {
-        JavaType.Array arr = new JavaType.Array(null, null);
+        JavaType.Array arr = new JavaType.Array(null, null, null);
         typeCache.put(signature, arr);
 
         if (array.getComponentType().isUsingGenerics()) {
-            arr.unsafeSet(type(array.getComponentType().getGenericsTypes()[0]));
+            arr.unsafeSet(type(array.getComponentType().getGenericsTypes()[0]), null);
         } else {
-            arr.unsafeSet(type(array.getComponentType()));
+            arr.unsafeSet(type(array.getComponentType()), null);
         }
 
         return arr;

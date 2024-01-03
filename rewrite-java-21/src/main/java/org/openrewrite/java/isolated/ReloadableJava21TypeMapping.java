@@ -92,10 +92,90 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType array(Type type, String signature) {
-        JavaType.Array arr = new JavaType.Array(null, null);
+        JavaType.Array arr = new JavaType.Array(null, null, null);
         typeCache.put(signature, arr);
-        arr.unsafeSet(type(((Type.ArrayType) type).elemtype));
+        arr.unsafeSet(type(((Type.ArrayType) type).elemtype), null);
         return arr;
+    }
+
+    /**
+     * Maps annotated array types to a JavaType through the JCTree instead of the Type tree.
+     * <p>
+     * The JCTree is necessary to preserve annotations on multidimensional arrays in Java 8.
+     * In Java 11+, annotations are available directly on the `Type` tree through TypeMetadata, but
+     * annotations are accessed differently in Java 11 and 17 compared to Java 21.
+     * Annotated array types are mapped through the JCTree so that the mapping is consistent for each version of the
+     * java compiler.
+     */
+    private JavaType annotatedArray(JCTree.JCAnnotatedType annotatedType) {
+        String signature = signatureBuilder.annotatedArraySignature(annotatedType);
+        JavaType.Array existing = typeCache.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+        JavaType.Array arr = new JavaType.Array(null, null, null);
+        typeCache.put(signature, arr);
+
+        Tree tree = annotatedType;
+        List<Tree> trees = new ArrayList<>();
+        while (tree instanceof JCTree.JCAnnotatedType || tree instanceof JCTree.JCArrayTypeTree) {
+            if (tree instanceof JCTree.JCAnnotatedType) {
+                if (((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
+                    trees.add(0, tree);
+                    tree = ((JCTree.JCArrayTypeTree) ((JCTree.JCAnnotatedType) tree).getUnderlyingType()).getType();
+                } else {
+                    tree = ((JCTree.JCAnnotatedType) tree).getUnderlyingType();
+                }
+            } else {
+                trees.add(0, tree);
+                tree = ((JCTree.JCArrayTypeTree) tree).getType();
+            }
+        }
+        return mapElements(type(tree), trees);
+    }
+
+    private JavaType mapElements(JavaType elementType, List<Tree> trees) {
+        int count = trees.size();
+        if (count == 0) {
+            return elementType;
+        }
+        return mapElements(
+                new JavaType.Array(
+                        null,
+                        elementType,
+                        trees.get(0) instanceof JCTree.JCAnnotatedType ? mapAnnotations(((JCTree.JCAnnotatedType) trees.get(0)).annotations) : null
+                ),
+                trees.subList(1, count)
+        );
+    }
+
+    private @Nullable JavaType.FullyQualified[] mapAnnotations(List<JCTree.JCAnnotation> annotations) {
+        List<JavaType.FullyQualified> types = new ArrayList<>(annotations.size());
+        for (JCTree.JCAnnotation annotation : annotations) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(annotation));
+            if (fq != null) {
+                types.add(fq);
+            }
+        }
+        return types.toArray(new JavaType.FullyQualified[0]);
+    }
+
+    private @Nullable JavaType.FullyQualified[] mapAnnotations(Type type) {
+        if (!type.isAnnotated()) {
+            return null;
+        }
+        List<JavaType.FullyQualified> annotations = new ArrayList<>();
+        for (TypeMetadata metadata : type.getMetadata()) {
+            if (metadata instanceof TypeMetadata.Annotations) {
+                for (Attribute.Compound annotation : ((TypeMetadata.Annotations) metadata).annotationBuffer().toArray(Attribute.Compound[]::new)) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(annotation.type));
+                    if (fq != null) {
+                        annotations.add(fq);
+                    }
+                }
+            }
+        }
+        return annotations.toArray(new JavaType.FullyQualified[0]);
     }
 
     private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature) {
@@ -287,6 +367,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             symbol = ((JCTree.JCMethodDecl) tree).sym;
         } else if (tree instanceof JCTree.JCVariableDecl) {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
+        } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
+            return annotatedArray((JCTree.JCAnnotatedType) tree);
         }
 
         return type(((JCTree) tree).type, symbol);
@@ -627,7 +709,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     continue;
                 }
                 Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if(retention != null && retention.value() == RetentionPolicy.SOURCE) {
+                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
                     continue;
                 }
                 annotations.add(annotType);
