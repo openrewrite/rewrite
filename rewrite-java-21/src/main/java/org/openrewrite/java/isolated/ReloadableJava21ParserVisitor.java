@@ -1527,7 +1527,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
         TypeTree typeExpr;
-        if (vartype == null || vartype instanceof JCErroneous) {
+        if (vartype == null) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
             if ((node.sym.flags() & Flags.PARAMETER) > 0) {
