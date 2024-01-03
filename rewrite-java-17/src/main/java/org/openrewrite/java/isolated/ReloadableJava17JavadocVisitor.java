@@ -36,6 +36,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.LeadingBrace;
+import org.openrewrite.java.marker.OmitBrackets;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -1159,18 +1160,20 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             int saveCursor = cursor;
             Space before = whitespace();
             JLeftPadded<Space> dimension;
-            if (source.startsWith("[", cursor)) {
+            Markers markers = Markers.EMPTY;
+            if (source.startsWith("...", cursor)) {
+                cursor = saveCursor;
+                dimension = JLeftPadded.build(EMPTY).withBefore(EMPTY);
+                markers = markers.addIfAbsent(new OmitBrackets(Tree.randomId()));
+            } else {
                 cursor++;
                 dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
-            } else {
-                cursor = saveCursor;
-                return elemType;
             }
 
             return new J.ArrayType(
                     randomId(),
                     fmt,
-                    Markers.EMPTY,
+                    markers,
                     elemType,
                     null,
                     dimension,

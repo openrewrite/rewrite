@@ -16,6 +16,8 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -394,6 +396,31 @@ class AnnotationTest implements RewriteTest {
                 assertThat(firstDimension.get()).isTrue();
                 assertThat(secondDimension.get()).isTrue();
             })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3881")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "",
+      "[]"
+    })
+    void annotatedVararg(String input) {
+        rewriteRun(
+          java(
+            String.format("""
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              
+              class TypeAnnotationTest {
+                  void method(Integer @A1 %s ... integers) {}
+              
+                  @Target(ElementType.TYPE_USE)
+                  private @interface A1 {
+                  }
+              }
+              """, input)
           )
         );
     }
