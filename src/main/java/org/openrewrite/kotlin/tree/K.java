@@ -1672,7 +1672,7 @@ public interface K extends J {
 
         @Override
         public @Nullable JavaType getType() {
-            return expression.getType() != null ? new JavaType.Array(null, expression.getType()) : null;
+            return expression.getType() != null ? new JavaType.Array(null, expression.getType(), null) : null;
         }
 
         @Override
