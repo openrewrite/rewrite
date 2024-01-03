@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -565,6 +566,41 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   @Target(ElementType.TYPE_USE)
                   @interface Anno {}
                   """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3870")
+    @Test
+    void typeFullyQualifiedAnnotatedField() {
+        rewriteRun(
+          java(
+            """
+              import java.sql.DatabaseMetaData;
+              import java.util.List;
+              import java.lang.annotation.*;
+
+              class TypeAnnotationTest {
+                  protected java.sql.@A DatabaseMetaData metadata;
+
+                  @Target({ElementType.FIELD, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER})
+                  private @interface A {
+                  }
+              }
+              """,
+            """
+              import java.sql.DatabaseMetaData;
+              import java.util.List;
+              import java.lang.annotation.*;
+
+              class TypeAnnotationTest {
+                  protected @A DatabaseMetaData metadata;
+
+                  @Target({ElementType.FIELD, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER})
+                  private @interface A {
+                  }
+              }
+              """
           )
         );
     }
