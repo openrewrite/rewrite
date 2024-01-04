@@ -35,7 +35,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.CompactConstructor;
-import org.openrewrite.java.marker.OmitBrackets;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -1357,22 +1356,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         Space prefix = whitespace();
-        Markers markers = Markers.EMPTY;
         TypeTree elemType = convert(typeIdent);
         List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
-        JLeftPadded<Space> dimension;
-        int saveCursor = cursor;
-        whitespace();
-        if (source.startsWith("...", cursor)) {
-            cursor = saveCursor;
-            markers = markers.addIfAbsent(new OmitBrackets(randomId()));
-            dimension = padLeft(EMPTY, EMPTY);
-        } else {
-            cursor = saveCursor;
-            dimension = padLeft(sourceBefore("["), sourceBefore("]"));
-        }
+        JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
         assert arrayTypeTree != null;
-        return new J.ArrayType(randomId(), prefix, markers,
+        return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
                 count == 1 ? elemType : mapDimensions(elemType, arrayTypeTree.getType(), annotationPosTable),
                 annotations,
                 dimension,
@@ -1390,26 +1378,20 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
             int saveCursor = cursor;
             whitespace();
-            Markers markers = Markers.EMPTY;
-            JLeftPadded<Space> dimension;
-            if (source.startsWith("...", cursor)) {
+            if (source.startsWith("[", cursor)) {
                 cursor = saveCursor;
-                markers = markers.addIfAbsent(new OmitBrackets(randomId()));
-                dimension = padLeft(EMPTY, EMPTY);
-            } else {
-                cursor = saveCursor;
-                dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+                JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+                return new J.ArrayType(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
+                        annotations,
+                        dimension,
+                        typeMapping.type(tree)
+                );
             }
-
-            return new J.ArrayType(
-                    randomId(),
-                    EMPTY,
-                    markers,
-                    mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
-                    annotations,
-                    dimension,
-                    typeMapping.type(tree)
-            );
+            cursor = saveCursor;
         }
         return baseType;
     }

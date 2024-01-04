@@ -19,7 +19,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.CompactConstructor;
-import org.openrewrite.java.marker.OmitBrackets;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.J.*;
@@ -182,7 +181,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         }
         visit(type, p);
         visit(arrayType.getAnnotations(), p);
-        if (arrayType.getDimension() != null && !arrayType.getMarkers().findFirst(OmitBrackets.class).isPresent()) {
+        if (arrayType.getDimension() != null) {
             visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
             p.append('[');
             visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
@@ -199,14 +198,12 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     private void printDimensions(J.ArrayType arrayType, PrintOutputCapture<P> p) {
         beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
         visit(arrayType.getAnnotations(), p);
-        if (arrayType.getDimension() != null && !arrayType.getMarkers().findFirst(OmitBrackets.class).isPresent()) {
-            visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
-            p.append('[');
-            visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
-            p.append(']');
-            if (arrayType.getElementType() instanceof J.ArrayType) {
-                printDimensions((ArrayType) arrayType.getElementType(), p);
-            }
+        visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
+        p.append('[');
+        visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
+        p.append(']');
+        if (arrayType.getElementType() instanceof J.ArrayType) {
+            printDimensions((ArrayType) arrayType.getElementType(), p);
         }
         afterSyntax(arrayType, p);
     }
