@@ -175,15 +175,37 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitArrayType(ArrayType arrayType, PrintOutputCapture<P> p) {
         beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
-        visit(arrayType.getElementType(), p);
-        for (JRightPadded<Space> d : arrayType.getDimensions()) {
-            visitSpace(d.getElement(), Space.Location.DIMENSION, p);
+        TypeTree type = arrayType;
+        while (type instanceof ArrayType) {
+            type = ((ArrayType) type).getElementType();
+        }
+        visit(type, p);
+        visit(arrayType.getAnnotations(), p);
+        if (arrayType.getDimension() != null) {
+            visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
             p.append('[');
-            visitSpace(d.getAfter(), Space.Location.DIMENSION_SUFFIX, p);
+            visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
             p.append(']');
+
+            if (arrayType.getElementType() instanceof J.ArrayType) {
+                printDimensions((ArrayType) arrayType.getElementType(), p);
+            }
         }
         afterSyntax(arrayType, p);
         return arrayType;
+    }
+
+    private void printDimensions(J.ArrayType arrayType, PrintOutputCapture<P> p) {
+        beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
+        visit(arrayType.getAnnotations(), p);
+        visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
+        p.append('[');
+        visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
+        p.append(']');
+        if (arrayType.getElementType() instanceof J.ArrayType) {
+            printDimensions((ArrayType) arrayType.getElementType(), p);
+        }
+        afterSyntax(arrayType, p);
     }
 
     @Override
@@ -619,9 +641,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitIdentifier(Identifier ident, PrintOutputCapture<P> p) {
+        visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(ident.getAnnotations(), p);
         beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
-        visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         p.append(ident.getSimpleName());
         afterSyntax(ident, p);
         return ident;
@@ -659,6 +681,14 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(instanceOf.getPattern(), p);
         afterSyntax(instanceOf, p);
         return instanceOf;
+    }
+
+    @Override
+    public J visitIntersectionType(IntersectionType intersectionType, PrintOutputCapture<P> p) {
+        beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
+        visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);
+        afterSyntax(intersectionType, p);
+        return intersectionType;
     }
 
     @Override
@@ -792,6 +822,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             visitModifier(m, p);
         }
         visit(multiVariable.getTypeExpression(), p);
+        // For backwards compatibility.
         for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
             visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
             p.append('[');
@@ -833,6 +864,16 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(newClass.getBody(), p);
         afterSyntax(newClass, p);
         return newClass;
+    }
+
+    @Override
+    public J visitNullableType(J.NullableType nt, PrintOutputCapture<P> p) {
+        beforeSyntax(nt, Space.Location.NULLABLE_TYPE_PREFIX, p);
+        visit(nt.getTypeTree(), p);
+        visitSpace(nt.getPadding().getTypeTree().getAfter(), Space.Location.NULLABLE_TYPE_SUFFIX, p);
+        p.append("?");
+        afterSyntax(nt, p);
+        return nt;
     }
 
     @Override

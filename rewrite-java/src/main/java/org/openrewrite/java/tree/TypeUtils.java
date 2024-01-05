@@ -205,7 +205,22 @@ public class TypeUtils {
                        IntStream.range(0, parameterCount).allMatch(i -> isAssignableTo(toParameters.get(i), fromParameters.get(i)));
             } else if (to instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
-                return isAssignableTo(toFq.getFullyQualifiedName(), from);
+                if (from instanceof JavaType.Primitive) {
+                    JavaType.Primitive toPrimitive = JavaType.Primitive.fromClassName(toFq.getFullyQualifiedName());
+                    if (toPrimitive != null) {
+                        return isAssignableTo(toPrimitive, from);
+                    } else if (toFq.getFullyQualifiedName().equals("java.lang.Object")) {
+                        return true;
+                    }
+                } else if (from instanceof JavaType.Intersection) {
+                    for (JavaType intersectionType : ((JavaType.Intersection) from).getBounds()) {
+                        if (isAssignableTo(to, intersectionType)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                return !(from instanceof JavaType.GenericTypeVariable) && isAssignableTo(toFq.getFullyQualifiedName(), from);
             } else if (to instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
                 List<JavaType> toBounds = toGeneric.getBounds();
@@ -214,6 +229,13 @@ public class TypeUtils {
                 } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT) {
                     for (JavaType toBound : toBounds) {
                         if (!isAssignableTo(toBound, from)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) {
+                    for (JavaType toBound : toBounds) {
+                        if (!isAssignableTo(from, toBound)) {
                             return false;
                         }
                     }
@@ -319,6 +341,12 @@ public class TypeUtils {
                 return isAssignableTo(to, ((JavaType.Variable) from).getType());
             } else if (from instanceof JavaType.Method) {
                 return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+            } else if (from instanceof JavaType.Intersection) {
+                for (JavaType bound : ((JavaType.Intersection) from).getBounds()) {
+                    if (isAssignableTo(to, bound)) {
+                        return true;
+                    }
+                }
             }
         } catch (Exception e) {
             return false;

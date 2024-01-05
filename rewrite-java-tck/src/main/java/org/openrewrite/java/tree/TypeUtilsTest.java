@@ -177,6 +177,34 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    void arrayIsFullyQualifiedOfType() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  Integer[][] integer1;
+                  Integer[] integer2;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
+                    assertThat(multiVariable.getTypeExpression().getType()).isInstanceOf(JavaType.Array.class);
+                    assertThat(TypeUtils.isOfClassType(multiVariable.getTypeExpression().getType(), "java.lang.Integer")).isTrue();
+                    return super.visitVariableDeclarations(multiVariable, o);
+                }
+
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                    assertThat(variable.getVariableType().getType()).isInstanceOf(JavaType.Array.class);
+                    return super.visitVariable(variable, o);
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
     void isFullyQualifiedOfType() {
         rewriteRun(
           java(
@@ -253,7 +281,7 @@ class TypeUtilsTest implements RewriteTest {
             """
               import java.util.Map;
               import java.util.function.Supplier;
-              
+                            
               class Test {
                   <K, V> void m(Supplier<? extends Map<K, ? extends V>> map) {
                   }
@@ -272,6 +300,49 @@ class TypeUtilsTest implements RewriteTest {
                     assertThat(argType).isInstanceOf(JavaType.Parameterized.class);
                     assertThat(TypeUtils.isAssignableTo(paramType, argType)).isTrue();
                     return method;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @SuppressWarnings("RedundantCast")
+    @Test
+    void isAssignableFromIntersection() {
+        rewriteRun(
+          java(
+            """
+              import java.io.Serializable;
+                            
+              class Test {
+                  Object o1 = (Serializable & Runnable) null;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                    JavaType variableType = variable.getVariableType().getType();
+                    assertThat(variableType).satisfies(
+                      type -> assertThat(type).isInstanceOf(JavaType.Class.class),
+                      type -> assertThat(((JavaType.Class) type).getFullyQualifiedName()).isEqualTo("java.lang.Object")
+                    );
+                    J.TypeCast typeCast = (J.TypeCast) variable.getInitializer();
+                    assertThat(typeCast.getType()).satisfies(
+                      type -> assertThat(type).isInstanceOf(JavaType.Intersection.class),
+                      type -> assertThat(((JavaType.Intersection) type).getBounds()).satisfiesExactly(
+                        bound -> assertThat(((JavaType.Class) bound).getFullyQualifiedName()).isEqualTo("java.io.Serializable"),
+                        bound -> assertThat(((JavaType.Class) bound).getFullyQualifiedName()).isEqualTo("java.lang.Runnable")
+                      ),
+                      type -> assertThat(((JavaType.Intersection) type).getBounds()).allSatisfy(
+                        bound -> {
+                            assertThat(TypeUtils.isAssignableTo(bound, type)).isTrue();
+                            assertThat(TypeUtils.isAssignableTo(((JavaType.FullyQualified) bound).getFullyQualifiedName(), type)).isTrue();
+                        }
+                      ),
+                      type -> assertThat(TypeUtils.isAssignableTo(JavaType.ShallowClass.build("java.lang.Object"), type)).isTrue(),
+                      type -> assertThat(TypeUtils.isAssignableTo("java.lang.Object", type)).isTrue()
+                    );
+                    return variable;
                 }
             }.visit(cu, new InMemoryExecutionContext()))
           )

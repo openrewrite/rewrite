@@ -21,7 +21,6 @@ import lombok.With;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.GitProvenance;
 
-import java.util.Collections;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
@@ -65,10 +64,10 @@ public class CircleCiBuildEnvironment implements BuildEnvironment {
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
         if (StringUtils.isBlank(repositoryURL) || StringUtils.isBlank(sha1) || (
-                StringUtils.isBlank(branch)&& StringUtils.isBlank(tag))) {
+                StringUtils.isBlank(branch) && StringUtils.isBlank(tag))) {
             throw new IncompleteGitConfigException();
         }
-        return new GitProvenance(UUID.randomUUID(), repositoryURL, StringUtils.isBlank(branch)? tag : branch,
+        return new GitProvenance(UUID.randomUUID(), repositoryURL, StringUtils.isBlank(branch) ? tag : branch,
                 sha1, null, null, emptyList());
     }
 }

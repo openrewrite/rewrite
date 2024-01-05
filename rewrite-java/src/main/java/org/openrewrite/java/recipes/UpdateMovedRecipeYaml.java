@@ -56,7 +56,7 @@ public class UpdateMovedRecipeYaml extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
-            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext executionContext) {
+            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext ctx) {
                 List<String> keys = getCursor().getPathAsStream()
                     .filter(Yaml.Mapping.Entry.class::isInstance)
                     .map(Yaml.Mapping.Entry.class::cast)
@@ -70,7 +70,7 @@ public class UpdateMovedRecipeYaml extends Recipe {
                     && scalar.getValue().equals(oldRecipeFullyQualifiedClassName)) {
                     return scalar.withValue(newRecipeFullyQualifiedClassName);
                 }
-                return super.visitScalar(scalar, executionContext);
+                return super.visitScalar(scalar, ctx);
             }
         };
     }

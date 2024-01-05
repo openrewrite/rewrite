@@ -21,6 +21,10 @@ import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.ByteArrayInputStream;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -50,5 +54,40 @@ class ParserTest implements RewriteTest {
           new RuntimeException("bad file!!"));
 
         assertThat(pe.printAll()).isEqualTo("bad file");
+    }
+
+    @Test
+    void printIdempotentDiffPrint() {
+        Parser parser = new PlainTextParser();
+        ExecutionContext ctx = new InMemoryExecutionContext();
+
+        String before = """
+          line 1
+          line 2
+          """;
+        String after = """
+          line 1
+          DIFF HERE
+          line 2
+          """;
+        Path path = Paths.get("1.txt");
+        String expectedDiff = """
+          --- a/1.txt
+          +++ b/1.txt
+          @@ -1,3 +1,2 @@\s
+           line 1
+          -DIFF HERE
+           line 2
+          """;
+
+        Parser.Input input1 = new Parser.Input(path, () -> new ByteArrayInputStream(before.getBytes()));
+        Parser.Input input2 = new Parser.Input(path, () -> new ByteArrayInputStream(after.getBytes()));
+        SourceFile s1 = parser.parse(input1.getSource(ctx).readFully()).toList().get(0);
+        SourceFile out = parser.requirePrintEqualsInput(s1, input2, null, ctx);
+        assertThat(out).isInstanceOf(ParseError.class);
+        ParseExceptionResult parseExceptionResult = out.getMarkers().findFirst(ParseExceptionResult.class).get();
+        int startIndex = parseExceptionResult.getMessage().indexOf(expectedDiff);
+        int endIndex = startIndex + expectedDiff.length();
+        assertThat(parseExceptionResult.getMessage().substring(startIndex, endIndex)).isEqualTo(expectedDiff);
     }
 }

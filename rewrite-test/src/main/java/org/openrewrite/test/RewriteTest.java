@@ -182,6 +182,12 @@ public interface RewriteTest extends SourceSpecs {
             validateRecipeOptions(recipe);
         }
 
+        if (testMethodSpec.getRecipePrinter() != null) {
+            testMethodSpec.getRecipePrinter().printTree(recipe);
+        } else if (testClassSpec.getRecipePrinter() != null) {
+            testClassSpec.getRecipePrinter().printTree(recipe);
+        }
+
         int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();
 
         // There may not be any tests that have "after" assertions, but that change file attributes or file names.

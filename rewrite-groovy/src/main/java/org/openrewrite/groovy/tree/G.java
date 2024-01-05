@@ -804,8 +804,7 @@ public interface G extends J {
 
         @Override
         public Range withType(@Nullable JavaType type) {
-            return new Range(null, id, prefix, markers, from.withType(type), inclusive,
-                    to.withType(type));
+            return withFrom(from.withType(type)).withTo(to.withType(type));
         }
 
         @Override

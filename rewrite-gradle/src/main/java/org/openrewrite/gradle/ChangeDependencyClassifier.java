@@ -66,6 +66,11 @@ public class ChangeDependencyClassifier extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s` to `%s`", groupId, artifactId, newClassifier);
+    }
+
+    @Override
     public String getDescription() {
         return "Finds dependencies declared in `build.gradle` files.";
     }
@@ -82,8 +87,8 @@ public class ChangeDependencyClassifier extends Recipe {
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (!dependencyDsl.matches(m) || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
                     return m;
                 }
@@ -94,7 +99,7 @@ public class ChangeDependencyClassifier extends Recipe {
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
                         if (dependency.getVersion() != null && dependency.getClassifier() != null && !newClassifier.equals(dependency.getClassifier()) &&
-                                depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
+                            depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
                             Dependency newDependency = dependency.withClassifier(newClassifier);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
                         }
@@ -137,9 +142,9 @@ public class ChangeDependencyClassifier extends Recipe {
                         }
                     }
                     if (groupId == null || artifactId == null
-                            || (version == null && !depMatcher.matches(groupId, artifactId))
-                            || (version != null && !depMatcher.matches(groupId, artifactId, version))
-                            || classifier == null) {
+                        || (version == null && !depMatcher.matches(groupId, artifactId))
+                        || (version != null && !depMatcher.matches(groupId, artifactId, version))
+                        || classifier == null) {
                         return m;
                     }
                     String delimiter = classifierStringDelimiter;

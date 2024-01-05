@@ -53,13 +53,13 @@ public class FindEmptyClasses extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
-            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 if (classDecl.getType() != null && JavaType.Class.Kind.Class.equals(classDecl.getType().getKind()) &&
                     (classDecl.getBody() == null || classDecl.getBody().getStatements().isEmpty()) &&
                     classDecl.getLeadingAnnotations().isEmpty() && classDecl.getExtends() == null && classDecl.getImplements() == null) {
                     return SearchResult.found(classDecl);
                 }
-                return super.visitClassDeclaration(classDecl, executionContext);
+                return super.visitClassDeclaration(classDecl, ctx);
             }
         };
     }

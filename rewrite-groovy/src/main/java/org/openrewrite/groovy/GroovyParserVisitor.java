@@ -109,11 +109,12 @@ public class GroovyParserVisitor {
             shebang = source.substring(0, i);
             cursor += i;
         }
+        Space prefix = EMPTY;
         JRightPadded<J.Package> pkg = null;
         if (ast.getPackage() != null) {
-            Space prefix = whitespace();
+            prefix = whitespace();
             cursor += "package".length();
-            pkg = JRightPadded.build(new J.Package(randomId(), prefix, Markers.EMPTY,
+            pkg = JRightPadded.build(new J.Package(randomId(), EMPTY, Markers.EMPTY,
                     typeTree(null), emptyList()));
         }
 
@@ -156,7 +157,12 @@ public class GroovyParserVisitor {
                         // Inner classes will be visited as part of visiting their containing class
                         continue;
                     }
-                    statements.add(convertTopLevelStatement(unit, value));
+                    JRightPadded<Statement> statement = convertTopLevelStatement(unit, value);
+                    if (statements.isEmpty() && pkg == null && statement.getElement() instanceof J.Import) {
+                        prefix = statement.getElement().getPrefix();
+                        statement = statement.withElement(statement.getElement().withPrefix(EMPTY));
+                    }
+                    statements.add(statement);
                 }
             } catch (Throwable t) {
                 if (t instanceof StringIndexOutOfBoundsException) {
@@ -172,7 +178,7 @@ public class GroovyParserVisitor {
         return new G.CompilationUnit(
                 randomId(),
                 shebang,
-                Space.EMPTY,
+                prefix,
                 Markers.EMPTY,
                 sourcePath,
                 fileAttributes,
@@ -964,17 +970,16 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitCaseStatement(CaseStatement statement) {
-            queue.add(
-                    new J.Case(randomId(),
-                            sourceBefore("case"),
-                            Markers.EMPTY,
-                            J.Case.Type.Statement,
-                            null,
-                            JContainer.build(singletonList(JRightPadded.build(visit(statement.getExpression())))),
-                            JContainer.build(sourceBefore(":"),
-                                    convertStatements(((BlockStatement) statement.getCode()).getStatements(), t -> Space.EMPTY), Markers.EMPTY),
-                            null
-                    )
+            queue.add(new J.Case(randomId(),
+                    sourceBefore("case"),
+                    Markers.EMPTY,
+                    J.Case.Type.Statement,
+                    null,
+                    JContainer.build(singletonList(JRightPadded.build(visit(statement.getExpression())))),
+                    statement.getCode() instanceof EmptyStatement
+                            ? JContainer.build(sourceBefore(":"), convertStatements(emptyList(), t -> Space.EMPTY), Markers.EMPTY)
+                            : JContainer.build(sourceBefore(":"), convertStatements(((BlockStatement) statement.getCode()).getStatements(), t -> Space.EMPTY), Markers.EMPTY)
+                    , null)
             );
         }
 
@@ -1690,10 +1695,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitRangeExpression(RangeExpression range) {
-            queue.add(new G.Range(randomId(), whitespace(), Markers.EMPTY,
+            queue.add(insideParentheses(range, fmt -> new G.Range(randomId(), fmt, Markers.EMPTY,
                     visit(range.getFrom()),
                     JLeftPadded.build(range.isInclusive()).withBefore(sourceBefore(range.isInclusive() ? ".." : "..>")),
-                    visit(range.getTo())));
+                    visit(range.getTo()))));
         }
 
         @Override
@@ -2121,6 +2126,10 @@ public class GroovyParserVisitor {
     }
 
     private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode) {
+        if (classNode != null && classNode.isArray()) {
+            //noinspection unchecked
+            return (T) arrayType(classNode);
+        }
         Space prefix = whitespace();
         String maybeFullyQualified = name();
         String[] parts = maybeFullyQualified.split("\\.");
@@ -2160,20 +2169,43 @@ public class GroovyParserVisitor {
         if (classNode != null) {
             if (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
                 expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
-            } else if (classNode.isArray()) {
-                expr = new J.ArrayType(randomId(), EMPTY, Markers.EMPTY, (TypeTree) expr, arrayDimensionsFrom(classNode));
             }
         }
         return expr.withPrefix(prefix);
     }
 
-    private List<JRightPadded<Space>> arrayDimensionsFrom(ClassNode classNode) {
-        List<JRightPadded<Space>> result = new ArrayList<>();
-        while (classNode != null && classNode.isArray()) {
-            classNode = classNode.getComponentType();
-            result.add(JRightPadded.build(sourceBefore("[")).withAfter(sourceBefore("]")));
+    private TypeTree arrayType(ClassNode classNode) {
+        ClassNode typeTree = classNode.getComponentType();
+        int count = 1;
+        while (typeTree.isArray()) {
+            count++;
+            typeTree = typeTree.getComponentType();
         }
-        return result;
+        Space prefix = whitespace();
+        TypeTree elemType = typeTree(typeTree);
+        JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+        return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
+                count == 1 ? elemType : mapDimensions(elemType, classNode.getComponentType()),
+                null,
+                dimension,
+                typeMapping.type(classNode));
+    }
+
+    private TypeTree mapDimensions(TypeTree baseType, ClassNode classNode) {
+        if (classNode.isArray()) {
+            Space prefix = whitespace();
+            JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+            return new J.ArrayType(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    mapDimensions(baseType, classNode.getComponentType()),
+                    null,
+                    dimension,
+                    typeMapping.type(classNode)
+            );
+        }
+        return baseType;
     }
 
     private Space sourceBefore(String untilDelim) {
@@ -2313,10 +2345,11 @@ public class GroovyParserVisitor {
 
     private String name() {
         int i = cursor;
-        char c = source.charAt(i);
-        while (Character.isJavaIdentifierPart(c) || c == '.' || c == '*') {
-            i++;
-            c = source.charAt(i);
+        for (; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*')) {
+                break;
+            }
         }
         String result = source.substring(cursor, i);
         cursor += i - cursor;
@@ -2433,7 +2466,7 @@ public class GroovyParserVisitor {
                     .withAfter(EMPTY));
             bounds = JContainer.build(boundsPrefix, convertedBounds, Markers.EMPTY);
         }
-        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), name, bounds);
+        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), emptyList(), name, bounds);
     }
 
     private J.Wildcard visitWildcard(GenericsType genericType) {

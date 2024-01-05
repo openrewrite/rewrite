@@ -25,6 +25,8 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -41,12 +43,26 @@ public class AddProperty extends Recipe {
             description = "The value of the new property key.")
     String value;
 
+    @Option(displayName = "Optional comment to be prepended to the property",
+            description = "A comment that will be added to the new property.",
+            required = false,
+            example = "This is a comment")
+    @Nullable
+    String comment;
+
     @Option(displayName = "Optional delimiter",
             description = "Property entries support different delimiters (`=`, `:`, or whitespace). The default value is `=` unless provided the delimiter of the new property entry.",
             required = false,
             example = ":")
     @Nullable
     String delimiter;
+
+    public AddProperty(String property, String value, @Nullable String comment, @Nullable String delimiter) {
+        this.property = property;
+        this.value = value;
+        this.comment = comment;
+        this.delimiter = delimiter;
+    }
 
     @Override
     public String getDisplayName() {
@@ -75,14 +91,19 @@ public class AddProperty extends Recipe {
                     Set<Properties.Entry> properties = FindProperties.find(p, property, false);
                     if (properties.isEmpty()) {
                         Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value);
-                        Properties.Entry.Delimiter delimitedBy = delimiter != null && !delimiter.isEmpty() ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
+                        Properties.Entry.Delimiter delimitedBy = StringUtils.isNotEmpty(delimiter) ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
                         String beforeEquals = delimitedBy == Properties.Entry.Delimiter.NONE ? delimiter : "";
                         String prefix = "";
                         if (!p.getContent().isEmpty()) {
                             prefix = "\n";
                         }
-                        Properties.Entry entry = new Properties.Entry(Tree.randomId(), prefix, Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
-                        List<Properties.Content> contentList = ListUtils.concat(p.getContent(), entry);
+                        List<Properties.Content> newContent = StringUtils.isNotEmpty(comment)
+                                ? Arrays.asList(
+                                        new Properties.Comment(Tree.randomId(), prefix, Markers.EMPTY, Properties.Comment.Delimiter.HASH_TAG, String.format(" %s%n", comment)),
+                                        new Properties.Entry(Tree.randomId(), "", Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue)
+                                )
+                                : Collections.singletonList(new Properties.Entry(Tree.randomId(), prefix, Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue));
+                        List<Properties.Content> contentList = ListUtils.concatAll(p.getContent(), newContent);
                         p = p.withContent(contentList);
                     }
                 }

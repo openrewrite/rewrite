@@ -331,4 +331,34 @@ public class AddPluginTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addPluginWithExistingPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.1.5</version>
+                </parent>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-maven-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          )
+        );
+    }
 }

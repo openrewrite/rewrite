@@ -59,6 +59,11 @@ public class ChangePackaging extends Recipe {
         return "Set Maven project packaging";
     }
 
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("for `%s:%s` to `%s`", groupId, artifactId, packaging);
+    }
+
     public String getDescription() {
         return "Sets the packaging type of Maven projects. Either adds the packaging tag if it is missing or changes its context if present.";
     }
@@ -73,7 +78,7 @@ public class ChangePackaging extends Recipe {
                     return document;
                 }
                 document = document.withMarkers(document.getMarkers().withMarkers(ListUtils.map(document.getMarkers().getMarkers(), m -> {
-                    if(m instanceof MavenResolutionResult) {
+                    if (m instanceof MavenResolutionResult) {
                         return getResolutionResult().withPom(pom.withRequested(pom.getRequested().withPackaging(packaging)));
                     }
                     return m;
@@ -82,10 +87,10 @@ public class ChangePackaging extends Recipe {
             }
 
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (PROJECT_MATCHER.matches(getCursor())) {
-                    if (packaging == null) {
+                    if (packaging == null || "jar".equals(packaging)) {
                         t = filterTagChildren(t, it -> !"packaging".equals(it.getName()));
                     } else {
                         t = addOrUpdateChild(t, Xml.Tag.build("\n<packaging>" + packaging + "</packaging>"), getCursor().getParentOrThrow());

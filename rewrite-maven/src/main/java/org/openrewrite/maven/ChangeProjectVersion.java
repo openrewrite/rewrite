@@ -42,24 +42,13 @@ public class ChangeProjectVersion extends Recipe {
             "${version}", "${project.version}", "${pom.version}", "${project.parent.version}"
     );
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven Project Version";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Change the project version of a Maven pom.xml. Identifies the project to be changed by its groupId and artifactId. " +
-               "If the version is defined as a property, this recipe will only change the property value if the property exists within the same pom.";
-    }
-
-    @Option(displayName = "GroupId",
-            description = "The groupId of the maven project to change its version. This can be a glob expression.",
+    @Option(displayName = "Group",
+            description = "The group ID of the maven project to change its version. This can be a glob expression.",
             example = "org.openrewrite")
     String groupId;
 
-    @Option(displayName = "ArtifactId",
-            description = "The artifactId of the maven project to change its version. This can be a glob expression.",
+    @Option(displayName = "Artifact",
+            description = "The artifact ID of the maven project to change its version. This can be a glob expression.",
             example = "*")
     String artifactId;
 
@@ -70,10 +59,25 @@ public class ChangeProjectVersion extends Recipe {
 
     @Option(displayName = "Override Parent Version",
             description = "This flag can be set to explicitly override the inherited parent version. Default `false`.",
-            required = false
-    )
+            required = false)
     @Nullable
     Boolean overrideParentVersion;
+
+    @Override
+    public String getDisplayName() {
+        return "Change Maven Project Version";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
+    }
+
+    @Override
+    public String getDescription() {
+        return "Change the project version of a Maven pom.xml. Identifies the project to be changed by its groupId and artifactId. " +
+               "If the version is defined as a property, this recipe will only change the property value if the property exists within the same pom.";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

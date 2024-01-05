@@ -18,18 +18,16 @@ package org.openrewrite.protobuf;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainText;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class ProtoParserTest implements RewriteTest {
-
+class ProtoParserTest implements RewriteTest {
     @Test
     void noNullsForProto3Files() {
-        List<SourceFile> sources = ProtoParser.builder().build().parse("syntax = \"proto3\";")
-          .collect(Collectors.toList());
-        assertThat(sources).isEmpty();
+        List<SourceFile> sources = ProtoParser.builder().build().parse("syntax = \"proto3\";").toList();
+        assertThat(sources).singleElement().isInstanceOf(PlainText.class);
     }
 }

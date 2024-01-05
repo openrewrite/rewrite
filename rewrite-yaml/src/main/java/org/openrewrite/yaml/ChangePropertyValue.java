@@ -52,7 +52,7 @@ public class ChangePropertyValue extends Recipe {
 
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
-                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+                          "rules. Default is `true`. Set to `false`  to use exact matching.",
             required = false)
     @Nullable
     Boolean relaxedBinding;
@@ -60,6 +60,11 @@ public class ChangePropertyValue extends Recipe {
     @Override
     public String getDisplayName() {
         return "Change YAML property";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", propertyKey, newValue);
     }
 
     @Override
@@ -116,9 +121,9 @@ public class ChangePropertyValue extends Recipe {
         }
         Yaml.Scalar scalar = (Yaml.Scalar) value;
         return StringUtils.isNullOrEmpty(oldValue) ||
-                (Boolean.TRUE.equals(regex)
-                        ? scalar.getValue().matches(oldValue)
-                        : scalar.getValue().equals(oldValue));
+               (Boolean.TRUE.equals(regex)
+                       ? scalar.getValue().matches(oldValue)
+                       : scalar.getValue().equals(oldValue));
     }
 
     private static String getProperty(Cursor cursor) {

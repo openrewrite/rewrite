@@ -48,32 +48,32 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java.migrate;
-
+              
               import org.openrewrite.ExecutionContext;
               import org.openrewrite.Recipe;
               import org.openrewrite.TreeVisitor;
               import org.openrewrite.java.JavaVisitor;
               import org.openrewrite.java.cleanup.UnnecessaryCatch;
               import org.openrewrite.java.tree.J;
-
+              
               public class UseJavaUtilBase64 extends Recipe {
-
+              
                   @Override
                   public String getDisplayName() {return "Prefer `java.util.Base64` instead of `sun.misc`";}
-
+              
                   @Override
                   public String getDescription() {return "Prefer `java.util.Base64` instead of `sun.misc`.";}
-
+              
                   @Override
                   public TreeVisitor<?, ExecutionContext> getVisitor() {
                       return new JavaVisitor<ExecutionContext>() {
                           @Override
                           public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                               J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-
+              
                               // expect to change
                               doAfterVisit(new UnnecessaryCatch(false).getVisitor());
-                              var v1 = new org.openrewrite.java.cleanup.UnnecessaryCatch(true);
+                              UnnecessaryCatch v1 = new org.openrewrite.java.cleanup.UnnecessaryCatch(true);
                               return m;
                           }
                       };
@@ -82,32 +82,32 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
               """,
             """
               package org.openrewrite.java.migrate;
-
+              
               import org.openrewrite.ExecutionContext;
               import org.openrewrite.Recipe;
               import org.openrewrite.TreeVisitor;
               import org.openrewrite.java.JavaVisitor;
               import org.openrewrite.java.tree.J;
               import org.openrewrite.staticanalysis.UnnecessaryCatch;
-
+              
               public class UseJavaUtilBase64 extends Recipe {
-
+              
                   @Override
                   public String getDisplayName() {return "Prefer `java.util.Base64` instead of `sun.misc`";}
-
+              
                   @Override
                   public String getDescription() {return "Prefer `java.util.Base64` instead of `sun.misc`.";}
-
+              
                   @Override
                   public TreeVisitor<?, ExecutionContext> getVisitor() {
                       return new JavaVisitor<ExecutionContext>() {
                           @Override
                           public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                               J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-
+              
                               // expect to change
                               doAfterVisit(new UnnecessaryCatch(false).getVisitor());
-                              var v1 = new org.openrewrite.staticanalysis.UnnecessaryCatch(true);
+                              UnnecessaryCatch v1 = new org.openrewrite.staticanalysis.UnnecessaryCatch(true);
                               return m;
                           }
                       };

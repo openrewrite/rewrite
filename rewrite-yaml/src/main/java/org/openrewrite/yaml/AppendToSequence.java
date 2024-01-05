@@ -58,6 +58,12 @@ public class AppendToSequence extends Recipe {
     }
 
     @Override
+    public String getInstanceName() {
+        return String.format("Append %s to sequence `%s`",
+                value, sequencePath);
+    }
+
+    @Override
     public String getDescription() {
         return "Append item to YAML sequence.";
     }

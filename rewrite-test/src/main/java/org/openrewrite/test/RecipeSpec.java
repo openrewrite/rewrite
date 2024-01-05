@@ -34,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -96,6 +97,9 @@ public class RecipeSpec {
 
     @Nullable
     Function<List<SourceFile>, LargeSourceSet> sourceSet;
+
+    @Nullable
+    RecipePrinter recipePrinter;
 
     /**
      * Configuration that applies to all source file inputs.
@@ -161,13 +165,13 @@ public class RecipeSpec {
         return this;
     }
 
-    public RecipeSpec executionContext(ExecutionContext executionContext) {
-        this.executionContext = executionContext;
+    public RecipeSpec executionContext(ExecutionContext ctx) {
+        this.executionContext = ctx;
         return this;
     }
 
-    public RecipeSpec recipeExecutionContext(ExecutionContext executionContext) {
-        this.recipeExecutionContext = executionContext;
+    public RecipeSpec recipeExecutionContext(ExecutionContext ctx) {
+        this.recipeExecutionContext = ctx;
         return this;
     }
 
@@ -209,7 +213,14 @@ public class RecipeSpec {
                     return;
                 }
             }
-            fail("No data table found with row type " + rowType);
+            String message = "No data table found with row type: " + rowType;
+            Set<DataTable<?>> tables = run.getDataTables().keySet();
+            if (!tables.isEmpty()) {
+                message += "\nFound data tables row type(s): " + tables.stream()
+                        .map(it -> it.getType().getName().replace("$", "."))
+                        .collect(Collectors.joining(","));
+            }
+            fail(message);
         });
     }
 
@@ -273,5 +284,11 @@ public class RecipeSpec {
     @Nullable
     ExecutionContext getExecutionContext() {
         return executionContext;
+    }
+
+    @Incubating(since = "8.12.1")
+    public RecipeSpec printRecipe(RecipePrinter recipePrinter) {
+        this.recipePrinter = recipePrinter;
+        return this;
     }
 }

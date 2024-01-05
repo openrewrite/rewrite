@@ -21,6 +21,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.Arrays;
@@ -77,7 +78,7 @@ public class SourceSpecTextBlockIndentation extends Recipe {
                                     nonSpaceCharacter[0] &&
                                     nonSpaceCharacter[indentations.length - 2] &&
                                     indentations[0] == indentations[indentations.length - 2] &&
-                                    indentations[0] > expectedIndent) {
+                                    indentations[0] >= expectedIndent) {
 
                                     for (int i = 0; i < indentations.length - 1; i++) {
                                         if (nonSpaceCharacter[i] && indentations[i] < indentations[0]) {
@@ -91,14 +92,19 @@ public class SourceSpecTextBlockIndentation extends Recipe {
                                     StringJoiner fixedSource = new StringJoiner("\n");
                                     for (int i = 0; i < lines.length; i++) {
                                         String line = lines[i];
-                                        if(i == 0 || i == lines.length - 1 || indentations[i - 1] < expectedIndent) {
+                                        if (i == 0 || i == lines.length - 1 || indentations[i - 1] < expectedIndent) {
                                             fixedSource.add(line);
                                         } else {
                                             fixedSource.add(line.substring(marginTrim));
                                         }
                                     }
 
-                                    return source.withValueSource(fixedSource.toString());
+                                    J.Literal withFixedSource = source.withValueSource(fixedSource.toString());
+                                    if (withFixedSource.getPrefix().getComments().isEmpty()
+                                        && withFixedSource.getPrefix().getWhitespace().isEmpty()) {
+                                        return maybeAutoFormat(withFixedSource, withFixedSource.withPrefix(Space.format("\n")), ctx);
+                                    }
+                                    return withFixedSource;
                                 }
 
                             }

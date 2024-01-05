@@ -221,7 +221,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitExpression(Expression expression, Integer p) {
-                if (loc.equals(EXPRESSION_PREFIX) && expression.isScope(insertionPoint)) {
+                if ((loc.equals(EXPRESSION_PREFIX) ||
+                     loc.equals(STATEMENT_PREFIX) && expression instanceof Statement) &&
+                    expression.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
@@ -235,14 +237,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
                 if (loc.equals(FIELD_ACCESS_PREFIX) && fa.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    new Cursor(getCursor(), insertionPoint),
+                                    getCursor(),
                                     substitutedTemplate,
                                     loc))
                             .withPrefix(fa.getPrefix()), p);
                 } else if (loc.equals(STATEMENT_PREFIX) && fa.isScope(insertionPoint)) {
                     // NOTE: while `J.FieldAccess` inherits from `Statement` they can only ever be used as expressions
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    new Cursor(getCursor(), insertionPoint),
+                                    getCursor(),
                                     substitutedTemplate,
                                     loc))
                             .withPrefix(fa.getPrefix()), p);
@@ -255,7 +257,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 // ONLY for backwards compatibility, otherwise the same as expression replacement
                 if (loc.equals(IDENTIFIER_PREFIX) && ident.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    new Cursor(getCursor(), insertionPoint),
+                                    getCursor(),
                                     substitutedTemplate,
                                     loc))
                             .withPrefix(ident.getPrefix()), p);
@@ -363,7 +365,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 type = type.withParameterNames(paramNames).withParameterTypes(paramTypes);
                             }
 
-                            return method.withParameters(parameters).withMethodType(type);
+                            return method.withParameters(parameters).withMethodType(type).withName(method.getName().withType(type));
                         }
                         case THROWS: {
                             J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(getCursor(), substitutedTemplate)));
@@ -382,12 +384,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
                             //noinspection ConstantConditions
                             m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")))
-                                    .withMethodType(type);
+                                    .withMethodType(type).withName(method.getName().withType(type));
                             return m;
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(getCursor(), substitutedTemplate));
                             J.MethodDeclaration m = method.withTypeParameters(typeParameters);
+                            if (m.getName().getType() != null) {
+                                m = m.withName(method.getName().withType(m.getMethodType()));
+                            }
                             return autoFormat(m, typeParameters.get(typeParameters.size() - 1), p,
                                     getCursor().getParentOrThrow());
                         }
@@ -427,6 +432,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 .collect(toList());
                         mt = mt.withParameterTypes(argTypes);
                         m = m.withMethodType(mt);
+                    }
+                    if (m.getName().getType() != null) {
+                        m = m.withName(m.getName().withType(m.getType()));
                     }
                     return m;
                 }
@@ -474,7 +482,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             }
                             throw new IllegalArgumentException("Expected a template that would generate exactly one " +
                                                                "statement to replace one statement, but generated " + gen.size() +
-                                                               ". Template:\n" + substitutedTemplate);
+                                                               ". Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
+                                                               "\nStatement:\n" + statement);
                         }
 
                         return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);

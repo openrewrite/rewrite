@@ -53,7 +53,7 @@ public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSource
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 assert tree instanceof SourceFile;
                 Path p = ((SourceFile) tree).getSourcePath();
                 if(acc.getSourcePaths().contains(p)) {
@@ -76,11 +76,11 @@ public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSource
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if(tree instanceof SourceFile) {
                     Path p = ((SourceFile) tree).getSourcePath();
                     if(acc.getDuplicates().contains(p)) {
-                        collidingSourceFiles.insertRow(executionContext, new CollidingSourceFiles.Row(
+                        collidingSourceFiles.insertRow(ctx, new CollidingSourceFiles.Row(
                                 p.toString(),
                                 tree.getClass().toString()
                         ));
