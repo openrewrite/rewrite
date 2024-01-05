@@ -307,12 +307,15 @@ public interface RewriteTest extends SourceSpecs {
                 int j = 0;
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
-                        assertThat(sourceFile.printAll(out.clone()))
-                                .as("When parsing and printing the source code back to text without modifications, " +
-                                        "the printed source didn't match the original source code. This means there is a bug in the " +
-                                        "parser implementation itself. Please open an issue to report this, providing a sample of the " +
-                                        "code that generated this error!")
-                                .isEqualTo(StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx)));
+                        assertContentEquals(
+                                sourceFile,
+                                StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx)),
+                                sourceFile.printAll(out.clone()),
+                                "When parsing and printing the source code back to text without modifications, " +
+                                "the printed source didn't match the original source code. This means there is a bug in the " +
+                                "parser implementation itself. Please open an issue to report this, providing a sample of the " +
+                                "code that generated this error for"
+                        );
                     }
                 }
 
