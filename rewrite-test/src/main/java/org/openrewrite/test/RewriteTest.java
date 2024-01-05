@@ -206,19 +206,19 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        ExecutionContext executionContext;
+        ExecutionContext ctx;
         if (testMethodSpec.getExecutionContext() != null) {
-            executionContext = testMethodSpec.getExecutionContext();
+            ctx = testMethodSpec.getExecutionContext();
         } else if (testClassSpec.getExecutionContext() != null) {
-            executionContext = testClassSpec.getExecutionContext();
+            ctx = testClassSpec.getExecutionContext();
         } else {
-            executionContext = defaultExecutionContext(sourceSpecs);
+            ctx = defaultExecutionContext(sourceSpecs);
         }
         for (SourceSpec<?> s : sourceSpecs) {
-            s.customizeExecutionContext.accept(executionContext);
+            s.customizeExecutionContext.accept(ctx);
         }
         List<Validated<Object>> validations = new ArrayList<>();
-        recipe.validateAll(executionContext, validations);
+        recipe.validateAll(ctx, validations);
         assertThat(validations)
                 .as("Recipe validation must have no failures")
                 .noneMatch(Validated::isInvalid);
@@ -267,18 +267,28 @@ public interface RewriteTest extends SourceSpecs {
                 for (UncheckedConsumer<SourceSpec<?>> consumer : testClassSpec.allSources) {
                     consumer.accept(sourceSpec);
                 }
-                inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(parser.getCharset(executionContext)))));
+                inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(parser.getCharset(ctx)))));
             }
 
             Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
 
             Iterator<SourceSpec<?>> sourceSpecIter = inputs.keySet().iterator();
 
-            List<SourceFile> sourceFiles = parser.parseInputs(inputs.values(), relativeTo, executionContext)
+            boolean requirePrintEqualsInput = ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true);
+            if (requirePrintEqualsInput) {
+                // this gets checked by the test framework itself a few statements further down
+                ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+            }
+
+            List<SourceFile> sourceFiles = parser.parseInputs(inputs.values(), relativeTo, ctx)
                     .collect(Collectors.toList());
             assertThat(sourceFiles.size())
                     .as("Every input should be parsed into a SourceFile.")
                     .isEqualTo(inputs.size());
+
+            if (requirePrintEqualsInput) {
+                ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true);
+            }
 
             for (int i = 0; i < sourceFiles.size(); i++) {
                 SourceFile sourceFile = sourceFiles.get(i);
@@ -297,12 +307,15 @@ public interface RewriteTest extends SourceSpecs {
                 int j = 0;
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
-                        assertThat(sourceFile.printAll(out.clone()))
-                                .as("When parsing and printing the source code back to text without modifications, " +
-                                        "the printed source didn't match the original source code. This means there is a bug in the " +
-                                        "parser implementation itself. Please open an issue to report this, providing a sample of the " +
-                                        "code that generated this error!")
-                                .isEqualTo(StringUtils.readFully(input.getSource(executionContext), parser.getCharset(executionContext)));
+                        assertContentEquals(
+                                sourceFile,
+                                StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx)),
+                                sourceFile.printAll(out.clone()),
+                                "When parsing and printing the source code back to text without modifications, " +
+                                "the printed source didn't match the original source code. This means there is a bug in the " +
+                                "parser implementation itself. Please open an issue to report this, providing a sample of the " +
+                                "code that generated this error for"
+                        );
                     }
                 }
 
@@ -331,11 +344,11 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        ExecutionContext recipeExecutionContext = executionContext;
+        ExecutionContext recipeCtx = ctx;
         if (testMethodSpec.getRecipeExecutionContext() != null) {
-            recipeExecutionContext = testMethodSpec.getRecipeExecutionContext();
+            recipeCtx = testMethodSpec.getRecipeExecutionContext();
         } else if (testClassSpec.getRecipeExecutionContext() != null) {
-            recipeExecutionContext = testClassSpec.getRecipeExecutionContext();
+            recipeCtx = testClassSpec.getRecipeExecutionContext();
         }
 
         LargeSourceSet lss;
@@ -349,7 +362,7 @@ public interface RewriteTest extends SourceSpecs {
 
         RecipeRun recipeRun = recipe.run(
                 lss,
-                recipeExecutionContext,
+                recipeCtx,
                 cycles,
                 expectedCyclesThatMakeChanges + 1
         );
