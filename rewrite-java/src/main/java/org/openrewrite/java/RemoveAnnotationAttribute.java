@@ -22,6 +22,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveAnnotationAttribute extends Recipe {
@@ -64,16 +66,35 @@ public class RemoveAnnotationAttribute extends Recipe {
                 if (!annotationMatcher.matches(a)) {
                     return a;
                 }
+
+                AtomicBoolean didPassFirstAttribute = new AtomicBoolean(false);
+                AtomicBoolean shouldTrimNextPrefix = new AtomicBoolean(false);
                 return a.withArguments(ListUtils.map(a.getArguments(), arg -> {
-                    if (arg instanceof J.Assignment) {
-                        J.Assignment assignment = (J.Assignment) arg;
-                        J.Identifier variable = (J.Identifier) assignment.getVariable();
-                        if (attributeName.equals(variable.getSimpleName())) {
+                    try {
+                        if (arg instanceof J.Assignment) {
+                            J.Assignment assignment = (J.Assignment) arg;
+                            J.Identifier variable = (J.Identifier) assignment.getVariable();
+                            if (attributeName.equals(variable.getSimpleName())) {
+                                if (!didPassFirstAttribute.get()) {
+                                    shouldTrimNextPrefix.set(true);
+                                }
+                                return null;
+                            }
+                        } else if (attributeName.equals("value")) {
+                            if (!didPassFirstAttribute.get()) {
+                                shouldTrimNextPrefix.set(true);
+                            }
                             return null;
                         }
-                    } else if (attributeName.equals("value")) {
-                        return null;
+
+                        if (shouldTrimNextPrefix.get()) {
+                            shouldTrimNextPrefix.set(false);
+                            return arg.withPrefix(arg.getPrefix().withWhitespace(""));
+                        }
+                    } finally {
+                        didPassFirstAttribute.set(true);
                     }
+
                     return arg;
                 }));
             }
