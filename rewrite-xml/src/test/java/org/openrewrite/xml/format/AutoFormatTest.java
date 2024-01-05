@@ -63,7 +63,7 @@ class AutoFormatTest implements RewriteTest {
     void autoFormatTag() {
         rewriteRun(
           xml(
-                """
+            """
               <project>
                 <dependencies>
                   <dependency>
