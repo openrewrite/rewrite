@@ -45,7 +45,7 @@ public class AdHocRecipe extends Recipe {
     Boolean causesAnotherCycle;
 
     @With
-    Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
+    transient Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
 
     @With
     @Nullable

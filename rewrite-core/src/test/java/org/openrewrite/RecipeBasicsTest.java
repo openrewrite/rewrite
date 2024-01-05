@@ -31,10 +31,18 @@ class RecipeBasicsTest {
         ChangeText ct = new ChangeText("hi");
         ChangeText ct2 = (ChangeText) ct.clone();
         ObjectMapper mapper = new ObjectMapper();
-        mapper.updateValue(ct2, new HashMap<String, String>() {{ put("toText", "hello"); }});
+        mapper.updateValue(ct2, new HashMap<String, String>() {{
+            put("toText", "hello");
+        }});
 
         assertThat(ct2).isNotSameAs(ct);
         assertThat(ct.getToText()).isEqualTo("hi");
         assertThat(ct2.getToText()).isEqualTo("hello");
+    }
+
+    @Test
+    void instanceName() {
+        ChangeText ct = new ChangeText("hi");
+        assertThat(ct.getInstanceName()).isEqualTo("Change text to `hi`");
     }
 }

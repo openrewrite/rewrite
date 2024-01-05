@@ -35,7 +35,7 @@ public class IsInRepository extends Recipe {
     @Override
     public String getDescription() {
         return "A search recipe which marks files that are in a repository with one of the supplied names. " +
-               "Intended for use as a precondition for other recipes being run over many different repositories";
+               "Intended for use as a precondition for other recipes being run over many different repositories.";
     }
 
     @Option(displayName = "Allowed repositories",
@@ -48,14 +48,14 @@ public class IsInRepository extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree == null) {
                     return null;
                 }
                 Optional<GitProvenance> maybeGp = tree.getMarkers().findFirst(GitProvenance.class);
                 if (maybeGp.isPresent()) {
                     GitProvenance gp = maybeGp.get();
-                    if (!allowedRepositories.contains(gp.getRepositoryName())) {
+                    if (allowedRepositories.contains(gp.getRepositoryName())) {
                         return SearchResult.found(tree);
                     }
                 }

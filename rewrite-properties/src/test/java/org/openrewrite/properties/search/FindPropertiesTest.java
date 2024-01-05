@@ -103,4 +103,21 @@ class FindPropertiesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void valueWithLineContinuation() {
+        rewriteRun(
+          spec -> spec.recipe(new FindProperties("foo", null)),
+          properties(
+            """
+              foo=tr\\
+                ue
+              """,
+            """
+              foo=~~>tr\\
+                ue
+              """
+          )
+        );
+    }
 }

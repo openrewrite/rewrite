@@ -77,6 +77,11 @@ public class ChangePluginConfiguration extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("for `%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "Apply the specified configuration to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
     }

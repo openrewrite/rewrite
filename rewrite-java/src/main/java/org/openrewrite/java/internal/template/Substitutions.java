@@ -175,7 +175,8 @@ public class Substitutions {
             }
             return ((JavaType.Parameterized) type).getFullyQualifiedName() + joiner;
         } else if (type instanceof JavaType.GenericTypeVariable) {
-            return ((JavaType.GenericTypeVariable) type).getName();
+            String name = ((JavaType.GenericTypeVariable) type).getName();
+            return "?".equals(name) ? "Object" : name;
         } else if (type instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Primitive) {

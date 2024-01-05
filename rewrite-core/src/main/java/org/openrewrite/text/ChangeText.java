@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collections;
 import java.util.Set;
@@ -30,7 +31,6 @@ import static java.util.Collections.emptyList;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeText extends Recipe {
-
     @Option(displayName = "Text after change",
             description = "The text file will have only this text after the change.",
             example = "Some text.")
@@ -47,15 +47,21 @@ public class ChangeText extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return "to `" + toText + "`";
+    }
+
+    @Override
     public String getDescription() {
-        return "Completely replaces the contents of the text file with other text.";
+        return "Completely replaces the contents of the text file with other text. " +
+               "Use together with a `FindSourceFiles` precondition to limit which files are changed.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PlainTextVisitor<ExecutionContext>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 return text
                         .withSnippets(emptyList())
                         .withText(toText);

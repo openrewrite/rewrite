@@ -96,8 +96,8 @@ gradleEnterprise {
     buildCache {
         remote(HttpBuildCache::class) {
             url = uri("https://ge.openrewrite.org/cache/")
-            isPush = isCiServer
             if (!gradleCacheRemoteUsername.isNullOrBlank() && !gradleCacheRemotePassword.isNullOrBlank()) {
+                isPush = isCiServer
                 credentials {
                     username = gradleCacheRemoteUsername
                     password = gradleCacheRemotePassword

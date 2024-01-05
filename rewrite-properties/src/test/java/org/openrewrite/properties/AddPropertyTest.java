@@ -18,8 +18,10 @@ package org.openrewrite.properties;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("UnusedProperty")
@@ -31,6 +33,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "",
             "true",
+            null,
             null
           )),
           properties(
@@ -47,6 +50,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "",
+            null,
             null
           )),
           properties(
@@ -63,6 +67,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             null
           )),
           properties(
@@ -80,6 +85,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             null
           )),
           properties(
@@ -101,6 +107,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             ":"
           )),
           properties(
@@ -122,6 +129,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             "    "
           )),
           properties(
@@ -142,6 +150,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             null
           )),
           properties(
@@ -149,6 +158,73 @@ class AddPropertyTest implements RewriteTest {
             """
               management.metrics.enable.process.files=true
               """
+          )
+        );
+    }
+
+    @Test
+    void addCommentedPropertyToEmptyFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "management.metrics.enable.process.files",
+            "true",
+            "Management metrics",
+            null
+          )),
+          properties(
+            "",
+            """
+              # Management metrics
+              management.metrics.enable.process.files=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void addCommentedPropertyToExistingFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "management.metrics.enable.process.files",
+            "true",
+            "Management metrics",
+            null
+          )),
+          properties(
+            "management=true",
+            """
+              management=true
+              # Management metrics
+              management.metrics.enable.process.files=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepPropertyValueWithLineContinuations() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "management.metrics.enable.process.files",
+            "true",
+            null,
+            null
+          )),
+          properties(
+            """
+              management=tr\\
+                ue
+              """,
+            """
+              management=tr\\
+                ue
+              management.metrics.enable.process.files=true
+              """,
+            spec -> spec.afterRecipe(after -> {
+                Properties.Entry entry = (Properties.Entry) after.getContent().get(0);
+                assertThat(entry.getValue().getText()).isEqualTo("true");
+                assertThat(entry.getValue().getSource()).isEqualTo("tr\\\n  ue");
+            })
           )
         );
     }

@@ -110,17 +110,19 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             return charData;
         } else if (ctx.reference() != null) {
             if (ctx.reference().EntityRef() != null) {
-                cursor += ctx.reference().EntityRef().getSymbol().getStopIndex() + 1;
+                String prefix = prefix(ctx);
+                cursor = ctx.reference().EntityRef().getSymbol().getStopIndex() + 1;
                 return new Xml.CharData(randomId(),
-                        "",
+                        prefix,
                         Markers.EMPTY,
                         false,
                         ctx.reference().EntityRef().getText(),
                         "");
             } else if (ctx.reference().CharRef() != null) {
-                cursor += ctx.reference().CharRef().getSymbol().getStopIndex() + 1;
+                String prefix = prefix(ctx);
+                cursor = ctx.reference().CharRef().getSymbol().getStopIndex() + 1;
                 return new Xml.CharData(randomId(),
-                        "",
+                        prefix,
                         Markers.EMPTY,
                         false,
                         ctx.reference().CharRef().getText(),

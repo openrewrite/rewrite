@@ -134,6 +134,25 @@ public interface J extends Tree {
             return withTypeExpression(typeExpression.withType(type));
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
+        public List<Annotation> getAllAnnotations() {
+            List<J.Annotation> allAnnotations = annotations;
+            List<J.Annotation> moreAnnotations;
+            if (typeExpression instanceof FieldAccess &&
+                !(moreAnnotations = ((FieldAccess) typeExpression).getName().getAnnotations()).isEmpty()) {
+                if (allAnnotations.isEmpty()) {
+                    allAnnotations = moreAnnotations;
+                } else {
+                    allAnnotations = new ArrayList<>(annotations);
+                    allAnnotations.addAll(moreAnnotations);
+                }
+            }
+            return allAnnotations;
+        }
+
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotatedType(this, p);
@@ -178,9 +197,14 @@ public interface J extends Tree {
         NameTree annotationType;
 
         public String getSimpleName() {
-            return annotationType instanceof Identifier ?
-                    ((Identifier) annotationType).getSimpleName() :
-                    ((J.FieldAccess) annotationType).getSimpleName();
+            if (annotationType instanceof Identifier) {
+                return ((Identifier) annotationType).getSimpleName();
+            } else if (annotationType instanceof J.FieldAccess) {
+                return ((J.FieldAccess) annotationType).getSimpleName();
+            } else {
+                // allow for extending languages like Kotlin to supply a different representation
+                return annotationType.printTrimmed();
+            }
         }
 
         @Nullable
@@ -293,33 +317,80 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @With
     @Data
     final class ArrayType implements J, TypeTree, Expression {
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Space prefix;
-
-        @With
         Markers markers;
-
-        @With
         TypeTree elementType;
 
-        @With
-        List<JRightPadded<Space>> dimensions;
+        @Nullable
+        List<J.Annotation> annotations;
 
-        @Override
-        public JavaType getType() {
-            return elementType.getType();
+        @Nullable // nullable for backwards compatibility only
+        JLeftPadded<Space> dimension;
+
+        JavaType type;
+
+        /**
+         * For backwards compatibility with older LSTs.
+         * Do not remove until we're confident older LSTs are no longer in use.
+         */
+        @Deprecated
+        @JsonCreator
+        static ArrayType create(
+                UUID id,
+                Space prefix,
+                Markers markers,
+                TypeTree elementType,
+                @Nullable List<JRightPadded<Space>> dimensions, // Do not remove or rename, required for backwards compatibility.
+                @Nullable List<J.Annotation> annotations,
+                @Nullable JLeftPadded<Space> dimension,
+                @Nullable JavaType type) {
+            if (dimensions != null) {
+                // To create a consistent JavaType$Array from old Groovy and Java LSTs, we need to map the element type.
+                // The JavaType from GroovyTypeMapping was a JavaType$Array, while the JavaType from JavaTypeMapping was a JavaType$Class.
+                JavaType updated = elementType.getType();
+                while (updated instanceof JavaType.Array) {
+                    updated = ((JavaType.Array) updated).getElemType();
+                }
+                elementType = elementType.withType(updated);
+
+                if (dimensions.isEmpty()) {
+                    // varargs in Javadoc
+                    type = new JavaType.Array(null, elementType.getType(), null);
+                } else {
+                    int dimensionCount = dimensions.size();
+                    elementType = mapOldFormat(elementType, dimensions.subList(0, dimensionCount - 1));
+                    type = new JavaType.Array(null, elementType.getType(), null);
+                    dimension = JLeftPadded.build(dimensions.get(dimensionCount - 1).getAfter()).withBefore(dimensions.get(dimensionCount - 1).getElement());
+                }
+            }
+
+            return new ArrayType(id, prefix, markers, elementType, annotations, dimension, type == null ? JavaType.Unknown.getInstance() : type);
         }
 
-        @SuppressWarnings("unchecked")
-        @Override
-        public ArrayType withType(@Nullable JavaType type) {
-            return type == getType() ? this : withElementType(elementType.withType(type));
+        private static TypeTree mapOldFormat(TypeTree elementType, List<JRightPadded<Space>> dimensions) {
+            int count = dimensions.size();
+            if (count == 0) {
+                return elementType;
+            }
+            return mapOldFormat(
+                    new ArrayType(
+                            Tree.randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            elementType,
+                            null,
+                            JLeftPadded.build(dimensions.get(0).getAfter()).withBefore(dimensions.get(0).getElement()),
+                            new JavaType.Array(null, elementType.getType(), null)
+                    ),
+                    dimensions.subList(1, count)
+            );
         }
 
         @Override
@@ -1219,6 +1290,10 @@ public interface J extends Tree {
             return v.visitClassDeclaration(this, p);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
@@ -2350,7 +2425,7 @@ public interface J extends Tree {
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @With
     class ParenthesizedTypeTree implements J, TypeTree, Expression {
         @Getter
@@ -2391,7 +2466,7 @@ public interface J extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @With
     class Identifier implements J, TypeTree, Expression {
         @Getter
@@ -2634,22 +2709,22 @@ public interface J extends Tree {
 
         @Nullable
         public J.Identifier getAlias() {
-            if(alias == null) {
+            if (alias == null) {
                 return null;
             }
             return alias.getElement();
         }
 
         public J.Import withAlias(@Nullable J.Identifier alias) {
-            if(this.alias == null) {
-                if(alias == null) {
+            if (this.alias == null) {
+                if (alias == null) {
                     return this;
                 }
                 return new J.Import(null, id, prefix, markers, statik, qualid, JLeftPadded
                         .build(alias)
                         .withBefore(Space.format(" ")));
             }
-            if(alias == null) {
+            if (alias == null) {
                 return new J.Import(null, id, prefix, markers, statik, qualid, null);
             }
             return getPadding().withAlias(this.alias.withElement(alias));
@@ -2668,6 +2743,7 @@ public interface J extends Tree {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
 
                 // the compiler doesn't type attribute static imports of classes
+                Expression target = qualid.getTarget();
                 if (fq == null) {
                     String possibleInnerClassFqn = getTypeName(qualid);
                     String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.lastIndexOf('$') + 1);
@@ -2678,8 +2754,8 @@ public interface J extends Tree {
                         possibleInnerClassName = possibleInnerClassName.substring(possibleInnerClassName.indexOf('$') + 1);
                     }
 
-                    JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
-                    if (owner != null && !(qualid.getTarget().getType() instanceof JavaType.ShallowClass)) {
+                    JavaType.Class owner = TypeUtils.asClass(target.getType());
+                    if (owner != null && !(target.getType() instanceof JavaType.ShallowClass)) {
                         Iterator<JavaType.Method> visibleMethods = owner.getVisibleMethods();
                         while (visibleMethods.hasNext()) {
                             JavaType.Method method = visibleMethods.next();
@@ -2700,7 +2776,7 @@ public interface J extends Tree {
                     }
                 }
 
-                return getTypeName((FieldAccess) qualid.getTarget());
+                return target instanceof Identifier ? ((Identifier) target).getSimpleName() : getTypeName((FieldAccess) target);
             }
 
             return getTypeName(qualid);
@@ -3616,6 +3692,10 @@ public interface J extends Tree {
             return new CoordinateBuilder.MethodDeclaration(this);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
@@ -3926,7 +4006,7 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @Data
     final class Modifier implements J {
         public static boolean hasModifier(Collection<Modifier> modifiers, Modifier.Type modifier) {
@@ -4418,6 +4498,94 @@ public interface J extends Tree {
 
             public NewClass withArguments(JContainer<Expression> arguments) {
                 return t.arguments == arguments ? t : new NewClass(t.id, t.prefix, t.markers, t.enclosing, t.nooh, t.clazz, arguments, t.body, t.constructorType);
+            }
+        }
+    }
+
+    @Incubating(since = "8.12.0")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
+    class NullableType implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<J.NullableType.Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Space prefix;
+
+        @Getter
+        Markers markers;
+
+        @Getter
+        List<J.Annotation> annotations;
+
+        JRightPadded<TypeTree> typeTree;
+
+        public TypeTree getTypeTree() {
+            return typeTree.getElement();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            // TODO also support `nullable` in type attribution
+            return typeTree.getElement().getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public NullableType withType(@Nullable JavaType type) {
+            JRightPadded<TypeTree> rp = getPadding().getTypeTree();
+            TypeTree tt = rp.getElement();
+            tt = tt.withType(type);
+            return getPadding().withTypeTree(rp.withElement(tt));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitNullableType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public J.NullableType.Padding getPadding() {
+            J.NullableType.Padding p;
+            if (this.padding == null) {
+                p = new J.NullableType.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new J.NullableType.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final J.NullableType t;
+
+            public JRightPadded<TypeTree> getTypeTree() {
+                return t.typeTree;
+            }
+
+            public J.NullableType withTypeTree(JRightPadded<TypeTree> typeTree) {
+                return t.typeTree == typeTree ? t : new J.NullableType(t.id,
+                        t.prefix,
+                        t.markers,
+                        t.annotations,
+                        typeTree);
             }
         }
     }
@@ -5629,6 +5797,12 @@ public interface J extends Tree {
         @Getter
         Space varargs;
 
+        /**
+         * @deprecated Use {@link ArrayType} instead.
+         */
+        // For backwards compatibility.
+        @SuppressWarnings("DeprecatedIsStillUsed")
+        @Deprecated
         @With
         @Getter
         List<JLeftPadded<Space>> dimensionsBeforeName;
@@ -5654,6 +5828,10 @@ public interface J extends Tree {
             return new CoordinateBuilder.VariableDeclarations(this);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
@@ -5769,7 +5947,7 @@ public interface J extends Tree {
             public boolean isField(Cursor cursor) {
                 Cursor declaringScope = getDeclaringScope(cursor);
                 return declaringScope.getValue() instanceof J.Block
-                        && declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
+                       && declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
             }
 
             public Padding getPadding() {

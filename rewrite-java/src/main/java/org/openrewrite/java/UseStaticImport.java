@@ -18,9 +18,12 @@ package org.openrewrite.java;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
+import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Javadoc;
 
 @ToString
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -50,7 +53,15 @@ public class UseStaticImport extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesMethod<>(methodPattern), new UseStaticImportVisitor());
+        TreeVisitor<?, ExecutionContext> preconditions = new UsesMethod<>(methodPattern);
+        if (!methodPattern.contains(" *(")) {
+            int indexSpace = methodPattern.indexOf(' ');
+            int indexBrace = methodPattern.indexOf('(', indexSpace);
+            String methodNameMatcher = methodPattern.substring(indexSpace, indexBrace);
+            preconditions = Preconditions.and(preconditions,
+                    Preconditions.not(new DeclaresMethod<>("* " + methodNameMatcher + "(..)")));
+        }
+        return Preconditions.check(preconditions, new UseStaticImportVisitor());
     }
 
     private class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -63,6 +74,10 @@ public class UseStaticImport extends Recipe {
                     return m;
                 }
                 if (m.getMethodType() != null) {
+                    if (!m.getMethodType().hasFlags(Flag.Static)) {
+                        return m;
+                    }
+
                     JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
                     maybeRemoveImport(receiverType);
 
@@ -77,6 +92,20 @@ public class UseStaticImport extends Recipe {
                 }
             }
             return m;
+        }
+
+        @Override
+        protected JavadocVisitor<ExecutionContext> getJavadocVisitor() {
+            return new JavadocVisitor<ExecutionContext>(this) {
+                /**
+                 * Do not visit the method referenced from the Javadoc.
+                 * Otherwise, the Javadoc method reference would eventually be refactored to static import, which is not valid for Javadoc.
+                 */
+                @Override
+                public Javadoc visitReference(Javadoc.Reference reference, ExecutionContext ctx) {
+                    return reference;
+                }
+            };
         }
     }
 }

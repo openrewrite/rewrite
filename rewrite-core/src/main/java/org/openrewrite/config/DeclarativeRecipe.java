@@ -16,10 +16,7 @@
 package org.openrewrite.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Value;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
@@ -64,10 +61,14 @@ public class DeclarativeRecipe extends Recipe {
     private final List<Maintainer> maintainers;
 
     private final List<Recipe> uninitializedRecipes = new ArrayList<>();
-    private final List<Recipe> recipeList = new ArrayList<>();
+
+    @Setter
+    private List<Recipe> recipeList = new ArrayList<>();
 
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
-    private final List<Recipe> preconditions = new ArrayList<>();
+
+    @Setter
+    private List<Recipe> preconditions = new ArrayList<>();
 
     public void addPrecondition(Recipe recipe) {
         uninitializedPreconditions.add(recipe);
@@ -97,7 +98,7 @@ public class DeclarativeRecipe extends Recipe {
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
                 Optional<Recipe> next = availableRecipes.stream()
-                        .filter(r -> r.getName().equals(recipeFqn)).findAny();
+                        .filter(r -> recipeFqn.equals(r.getName())).findAny();
                 if (next.isPresent()) {
                     Recipe subRecipe = next.get();
                     if (subRecipe instanceof DeclarativeRecipe) {
@@ -146,6 +147,11 @@ public class DeclarativeRecipe extends Recipe {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
+                @Override
+                public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                    return precondition.isAcceptable(sourceFile, ctx);
+                }
+
                 @Override
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                     Tree t = precondition.visit(tree, ctx);
@@ -232,9 +238,8 @@ public class DeclarativeRecipe extends Recipe {
         }
     }
 
-
     @Override
-    public List<Recipe> getRecipeList() {
+    public final List<Recipe> getRecipeList() {
         if(preconditions.isEmpty()) {
             return recipeList;
         }

@@ -108,6 +108,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       boolean a = !false;
                       boolean b = !true;
+                      boolean c = !(false);
+                      boolean d = !(true);
+                      boolean e = !((false));
+                      boolean f = !((true));
                   }
               }
               """,
@@ -116,6 +120,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       boolean a = true;
                       boolean b = false;
+                      boolean c = true;
+                      boolean d = false;
+                      boolean e = true;
+                      boolean f = false;
                   }
               }
               """
@@ -398,6 +406,56 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       if (false) {
                           System.out.println("");
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void differentFieldAccesses() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  Object f = null;
+                  class B extends A {
+                      boolean m(Object o) {
+                          B other = (B) o;
+                          if (this.f == null || other.f == null) {
+                              return true;
+                          }
+                          return false;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveComments() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m(boolean a) {
+                      if (/*a*/!!a) {
+                          return true;
+                      }
+                      return /*a*/!true || !true;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m(boolean a) {
+                      if (/*a*/a) {
+                          return true;
+                      }
+                      return /*a*/false;
                   }
               }
               """

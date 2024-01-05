@@ -208,6 +208,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             case PLAIN:
                                 scalarValue = reader.readStringFromBuffer(valueStart, event.getEndMark().getIndex() - 1);
                                 break;
+                            case FOLDED:
                             case LITERAL:
                                 scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
                                 if (scalarValue.endsWith("\n")) {
@@ -215,7 +216,6 @@ public class YamlParser implements org.openrewrite.Parser {
                                     scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
                                 }
                                 break;
-                            case FOLDED:
                             default:
                                 scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
                                 break;

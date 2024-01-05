@@ -20,8 +20,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.tree.TypeUtils.findDeclaredMethod;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
@@ -86,6 +89,43 @@ class MethodInvocationTest implements RewriteTest {
                   Integer p = this . < Integer > generic ( 0, 1, 2 );
                             
                   public <TTTT> TTTT generic(TTTT n, TTTT... ns) { return n; }
+              }
+              """, spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                    if ("ns".equals(variable.getSimpleName())) {
+                        assertThat(variable.getPrefix().getWhitespace()).isEqualTo(" ");
+                    }
+                    return super.visitVariable(variable, o);
+                }
+            })
+          )
+        );
+    }
+
+    @Test
+    void intersectionTypeSignature() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  JavaType.Method methodType = method.getMethodType();
+                  Optional<JavaType.Method> ignore = findDeclaredMethod(methodType.getDeclaringType(), methodType.getName(), methodType.getParameterTypes());
+                  return method;
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.HashSet;
+              import java.util.Set;
+              
+              class A {
+                  void m() {
+                      Set<Class<?>> primitiveTypes = new HashSet<>(32);
+                      Collections.addAll(primitiveTypes, boolean[].class, byte[].class, char[].class,
+                              double[].class, float[].class, int[].class, long[].class, short[].class);
+                  }
               }
               """
           )

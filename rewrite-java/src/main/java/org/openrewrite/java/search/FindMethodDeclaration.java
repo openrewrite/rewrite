@@ -27,15 +27,6 @@ import org.openrewrite.marker.SearchResult;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindMethodDeclaration extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Find method declaration";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Locates the declaration of a method.";
-    }
 
     @Option(displayName = "Method pattern",
             description = "A method pattern that is used to find matching method invocations.",
@@ -49,17 +40,28 @@ public class FindMethodDeclaration extends Recipe {
     Boolean matchOverrides;
 
     @Override
+    public String getDisplayName() {
+        return "Find method declaration";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Locates the declaration of a method.";
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new DeclaresMethod<>(methodPattern, matchOverrides), new JavaIsoVisitor<ExecutionContext>() {
             final MethodMatcher m = new MethodMatcher(methodPattern, matchOverrides);
+
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                J.MethodDeclaration md = super.visitMethodDeclaration(method, executionContext);
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
                 J.ClassDeclaration cd = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                if(cd == null) {
+                if (cd == null) {
                     return md;
                 }
-                if(m.matches(md, cd)) {
+                if (m.matches(md, cd)) {
                     md = SearchResult.found(md);
                 }
                 return md;

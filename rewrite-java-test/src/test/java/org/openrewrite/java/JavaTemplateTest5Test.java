@@ -38,7 +38,7 @@ class JavaTemplateTest5Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
+              public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                   if (classDecl.getBody().getStatements().isEmpty()) {
                       return JavaTemplate.apply("int n;", getCursor(), classDecl.getBody().getCoordinates().lastStatement());
                   }
@@ -64,7 +64,7 @@ class JavaTemplateTest5Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   if (method.getBody().getStatements().size() == 1) {
                       return JavaTemplate.builder("n = 1;")
                         .contextSensitive()
@@ -101,7 +101,7 @@ class JavaTemplateTest5Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitAssert(J.Assert assert_, ExecutionContext p) {
+              public J visitAssert(J.Assert assert_, ExecutionContext ctx) {
                   maybeAddImport("java.util.List");
                   return JavaTemplate.builder("List<String> s = null;")
                     .imports("java.util.List")
@@ -140,10 +140,11 @@ class JavaTemplateTest5Test implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if (method.getArguments().size() == 1) {
-                      return JavaTemplate.builder("m, Integer.valueOf(n), \"foo\"")
+                      method = JavaTemplate.builder("m, Integer.valueOf(n), \"foo\"")
                         .contextSensitive()
                         .build()
                         .apply(getCursor(), method.getCoordinates().replaceArguments());
+                      method = method.withName(method.getName().withType(method.getMethodType()));
                   }
                   return method;
               }
@@ -182,13 +183,13 @@ class JavaTemplateTest5Test implements RewriteTest {
 
     Recipe replaceAnnotationRecipe = toRecipe(() -> new JavaIsoVisitor<>() {
         @Override
-        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
+        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
             if (annotation.getSimpleName().equals("SuppressWarnings")) {
                 return JavaTemplate.apply("@Deprecated", getCursor(), annotation.getCoordinates().replace());
             } else if (annotation.getSimpleName().equals("A1")) {
                 return JavaTemplate.apply("@A2", getCursor(), annotation.getCoordinates().replace());
             }
-            return super.visitAnnotation(annotation, p);
+            return super.visitAnnotation(annotation, ctx);
         }
     });
 
@@ -285,12 +286,12 @@ class JavaTemplateTest5Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   if (method.getLeadingAnnotations().isEmpty()) {
                       return JavaTemplate.apply("@SuppressWarnings(\"other\")",
                         getCursor(), method.getCoordinates().replaceAnnotations());
                   }
-                  return super.visitMethodDeclaration(method, p);
+                  return super.visitMethodDeclaration(method, ctx);
               }
           })),
           java(
@@ -334,11 +335,11 @@ class JavaTemplateTest5Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                   if (classDecl.getLeadingAnnotations().isEmpty() && !classDecl.getSimpleName().equals("Test")) {
                       return JavaTemplate.apply("@SuppressWarnings(\"other\")", getCursor(), classDecl.getCoordinates().replaceAnnotations());
                   }
-                  return super.visitClassDeclaration(classDecl, p);
+                  return super.visitClassDeclaration(classDecl, ctx);
               }
           })),
           java(
@@ -368,11 +369,11 @@ class JavaTemplateTest5Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext p) {
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (multiVariable.getLeadingAnnotations().isEmpty()) {
                       return JavaTemplate.apply("@SuppressWarnings(\"other\")", getCursor(), multiVariable.getCoordinates().replaceAnnotations());
                   }
-                  return super.visitVariableDeclarations(multiVariable, p);
+                  return super.visitVariableDeclarations(multiVariable, ctx);
               }
           })),
           java(
@@ -405,11 +406,11 @@ class JavaTemplateTest5Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext p) {
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (multiVariable.getLeadingAnnotations().size() == 1) {
                       return JavaTemplate.apply("@Deprecated", getCursor(), multiVariable.getCoordinates().addAnnotation(comparing(a -> 0)));
                   }
-                  return super.visitVariableDeclarations(multiVariable, p);
+                  return super.visitVariableDeclarations(multiVariable, ctx);
               }
           })),
           java(

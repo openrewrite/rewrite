@@ -60,6 +60,11 @@ public class AddProperty extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s=%s`", key, value);
+    }
+
+    @Override
     public String getDescription() {
         return "Add a new property to the Maven project property.";
     }
@@ -68,7 +73,7 @@ public class AddProperty extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 String currentValue = getResolutionResult().getPom().getProperties().get(key);
                 boolean trust = Boolean.TRUE.equals(trustParent);
                 if (!trust && !value.equals(currentValue)) {

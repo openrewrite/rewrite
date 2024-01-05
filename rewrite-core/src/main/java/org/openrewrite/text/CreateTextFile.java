@@ -66,17 +66,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean shouldCreate) {
-        Path path = Paths.get(relativeFileName);
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                if (path.equals(sourceFile.getSourcePath())) {
-                    shouldCreate.set(false);
-                }
-                return sourceFile;
-            }
-        };
+        return new CreateFileVisitor(Paths.get(relativeFileName), shouldCreate);
     }
 
     @Override
@@ -94,7 +84,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
         Path path = Paths.get(relativeFileName);
         return new TreeVisitor<SourceFile, ExecutionContext>() {
             @Override
-            public SourceFile visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public SourceFile visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(sourceFile.getSourcePath())) {
                     if (sourceFile instanceof PlainText) {

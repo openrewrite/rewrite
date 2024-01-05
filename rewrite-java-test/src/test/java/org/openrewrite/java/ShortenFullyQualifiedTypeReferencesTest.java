@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -507,6 +508,100 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                 }
             }
           """)
+        );
+    }
+
+    @Test
+    void importWithLeadingComment() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+              
+              /* comment */
+              import java.util.List;
+              
+              class Test {
+                  List<String> l = new java.util.ArrayList<>();
+              }
+              """,
+            """
+              package foo;
+              
+              /* comment */
+              import java.util.ArrayList;
+              import java.util.List;
+              
+              class Test {
+                  List<String> l = new ArrayList<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedFieldAccess() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              
+              class Test {
+                  java.util. @Anno List<String> l;
+              }
+              @Target(ElementType.TYPE_USE)
+              @interface Anno {}
+              """,
+            """
+                  import java.lang.annotation.ElementType;
+                  import java.lang.annotation.Target;
+                  import java.util.List;
+                  
+                  class Test {
+                      @Anno List<String> l;
+                  }
+                  @Target(ElementType.TYPE_USE)
+                  @interface Anno {}
+                  """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3870")
+    @Test
+    void typeFullyQualifiedAnnotatedField() {
+        rewriteRun(
+          java(
+            """
+              import java.sql.DatabaseMetaData;
+              import java.util.List;
+              import java.lang.annotation.*;
+
+              class TypeAnnotationTest {
+                  protected java.sql.@A DatabaseMetaData metadata;
+
+                  @Target({ElementType.FIELD, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER})
+                  private @interface A {
+                  }
+              }
+              """,
+            """
+              import java.sql.DatabaseMetaData;
+              import java.util.List;
+              import java.lang.annotation.*;
+
+              class TypeAnnotationTest {
+                  protected @A DatabaseMetaData metadata;
+
+                  @Target({ElementType.FIELD, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER})
+                  private @interface A {
+                  }
+              }
+              """
+          )
         );
     }
 }
