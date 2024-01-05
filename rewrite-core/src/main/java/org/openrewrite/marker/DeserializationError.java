@@ -16,34 +16,27 @@
 package org.openrewrite.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.ExceptionUtils;
 
 import java.util.UUID;
 
-@Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = {@JsonCreator})
 @With
+@Getter
 public class DeserializationError implements Marker {
     @EqualsAndHashCode.Include
     UUID id;
-
     String message;
-
     String detail;
 
+    @SuppressWarnings("unused")
     public DeserializationError(UUID id, String message, Throwable cause) {
         this.id = id;
         this.message = message;
         this.detail = ExceptionUtils.sanitizeStackTrace(cause, Object.class);
-    }
-
-    @JsonCreator
-    DeserializationError(UUID id, String message, String detail) {
-        this.id = id;
-        this.message = message;
-        this.detail = detail;
     }
 }
