@@ -22,7 +22,7 @@ import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.HasSourcePath;
+import org.openrewrite.FindSourceFiles;
 import org.openrewrite.Option;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -86,7 +86,8 @@ public class XsltTransformation extends Recipe {
 
         @SuppressWarnings("unchecked")
         TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                .map(HasSourcePath<ExecutionContext>::new)
+                .map(FindSourceFiles::new)
+                .map(FindSourceFiles::getVisitor)
                 .toArray(TreeVisitor[]::new));
 
         return Preconditions.check(check, visitor);
