@@ -24,7 +24,6 @@ import java.util.UUID;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = {@JsonCreator})
 @With
 @Getter
 public class DeserializationError implements Marker {
@@ -38,5 +37,12 @@ public class DeserializationError implements Marker {
         this.id = id;
         this.message = message;
         this.detail = ExceptionUtils.sanitizeStackTrace(cause, Object.class);
+    }
+
+    @JsonCreator
+    DeserializationError(UUID id, String message, String detail) {
+        this.id = id;
+        this.message = message;
+        this.detail = detail;
     }
 }
