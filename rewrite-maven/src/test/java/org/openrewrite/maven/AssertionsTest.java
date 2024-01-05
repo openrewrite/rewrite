@@ -46,19 +46,20 @@ class AssertionsTest implements RewriteTest {
     void xmlAndPomXmlUseCorrectParserWhenPomXmlIsFirst() {
         rewriteRun(
           spec -> spec.recipe(new MavenOnlyRecipe()),
-          pomXml("""
-                        <project>
-                            <groupId>org.openrewrite</groupId>
-                            <artifactId>test</artifactId>
-                            <version>1.0.0</version>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>com.fasterxml.jackson</groupId>
-                                    <artifactId>jackson-base</artifactId>
-                                    <version>2.14.2</version>
-                                </dependency>
-                            </dependencies>
-                        </project>
+          pomXml(
+                """
+            <project>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.fasterxml.jackson</groupId>
+                        <artifactId>jackson-base</artifactId>
+                        <version>2.14.2</version>
+                    </dependency>
+                </dependencies>
+            </project>
             """), xml("""
               <?xml version="1.0" encoding="UTF-8" ?>
               <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -77,19 +78,20 @@ class AssertionsTest implements RewriteTest {
               <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
               </suppressions>""",
             spec -> spec.path("suppressions.xml")),
-          pomXml("""
-                        <project>
-                            <groupId>org.openrewrite</groupId>
-                            <artifactId>test</artifactId>
-                            <version>1.0.0</version>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>com.fasterxml.jackson</groupId>
-                                    <artifactId>jackson-base</artifactId>
-                                    <version>2.14.2</version>
-                                </dependency>
-                            </dependencies>
-                        </project>
+          pomXml(
+                """
+            <project>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.fasterxml.jackson</groupId>
+                        <artifactId>jackson-base</artifactId>
+                        <version>2.14.2</version>
+                    </dependency>
+                </dependencies>
+            </project>
             """)
         );
         assertThat(xmlCount.get()).isEqualTo(2);

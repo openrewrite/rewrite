@@ -1756,7 +1756,8 @@ class MavenParserTest implements RewriteTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
     void ciFriendlyVersionWithoutExplicitProperty() {
-        rewriteRun(pomXml("""
+        rewriteRun(pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1773,7 +1774,8 @@ class MavenParserTest implements RewriteTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
     void ciFriendlyVersionWithParent() {
-        rewriteRun(pomXml("""
+        rewriteRun(pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1789,7 +1791,8 @@ class MavenParserTest implements RewriteTest {
           
           </project>
           """, spec -> spec.path("pom.xml")),
-          pomXml("""
+          pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1812,7 +1815,8 @@ class MavenParserTest implements RewriteTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
     void canConnectProjectPomsWhenUsingCiFriendlyVersions() {
-        rewriteRun(pomXml("""
+        rewriteRun(pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1834,7 +1838,8 @@ class MavenParserTest implements RewriteTest {
             </properties>
           </project>
           """, spec -> spec.path("pom.xml")),
-          pomXml("""
+          pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1864,7 +1869,8 @@ class MavenParserTest implements RewriteTest {
             </dependencyManagement>
           </project>
           """, spec -> spec.path("parent/pom.xml")),
-          pomXml("""
+          pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1893,7 +1899,8 @@ class MavenParserTest implements RewriteTest {
             </dependencies>
           </project>
           """, spec -> spec.path("app/pom.xml")),
-          pomXml("""
+          pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1910,7 +1917,8 @@ class MavenParserTest implements RewriteTest {
             </parent>
           </project>
           """, spec -> spec.path("rest/pom.xml")),
-          pomXml("""
+          pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1935,7 +1943,8 @@ class MavenParserTest implements RewriteTest {
     void ciFriendlyVersionsStillWorkAfterUpdateMavenModel() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("junit", "junit", "4.1", null, null, null)),
-          pomXml("""
+          pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1957,7 +1966,8 @@ class MavenParserTest implements RewriteTest {
             </properties>
           </project>
           """, spec -> spec.path("pom.xml")),
-          pomXml("""
+          pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1987,7 +1997,8 @@ class MavenParserTest implements RewriteTest {
             </dependencyManagement>
           </project>
           """, spec -> spec.path("parent/pom.xml")),
-          pomXml("""
+          pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -2056,7 +2067,8 @@ class MavenParserTest implements RewriteTest {
             </dependencies>
           </project>
           """, spec -> spec.path("app/pom.xml")),
-          pomXml("""
+          pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -2073,7 +2085,8 @@ class MavenParserTest implements RewriteTest {
             </parent>
           </project>
           """, spec -> spec.path("rest/pom.xml")),
-          pomXml("""
+          pomXml(
+                """
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -2097,7 +2110,8 @@ class MavenParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2373")
     void multipleCiFriendlyVersionPlaceholders() {
         rewriteRun(
-          pomXml("""
+          pomXml(
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -2117,7 +2131,8 @@ class MavenParserTest implements RewriteTest {
                   </properties>
                 </project>
                 """),
-          pomXml("""
+          pomXml(
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -2306,23 +2321,23 @@ class MavenParserTest implements RewriteTest {
         rewriteRun(
           pomXml(
               """
-                    <project>
-                        <groupId>org.openrewrite.maven</groupId>
-                        <artifactId>a</artifactId>
-                        <version>0.1.0-SNAPSHOT</version>
+                <project>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>a</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
     
-                        <build>
-                            <plugins>
-                                <plugin>
-                                    <artifactId>maven-compiler-plugin</artifactId>
-                                    <version>3.11.0</version>
-                                    <configuration>
-                                        <release>11</release>
-                                    </configuration>
-                                </plugin>
-                            </plugins>
-                        </build>
-                    </project>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <artifactId>maven-compiler-plugin</artifactId>
+                                <version>3.11.0</version>
+                                <configuration>
+                                    <release>11</release>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
                 """,
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins()
@@ -2389,25 +2404,25 @@ class MavenParserTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.openrewrite.maven</groupId>
-                      <artifactId>a</artifactId>
-                      <version>0.1.0-SNAPSHOT</version>
+              <project>
+                  <groupId>org.openrewrite.maven</groupId>
+                  <artifactId>a</artifactId>
+                  <version>0.1.0-SNAPSHOT</version>
   
-                      <build>
-                        <pluginManagement>
-                          <plugins>
-                              <plugin>
-                                  <artifactId>maven-compiler-plugin</artifactId>
-                                  <version>3.11.0</version>
-                                  <configuration>
-                                      <release>11</release>
-                                  </configuration>
-                              </plugin>
-                          </plugins>
-                         </pluginManagement>
-                      </build>
-                  </project>
+                  <build>
+                    <pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.11.0</version>
+                              <configuration>
+                                  <release>11</release>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                     </pluginManagement>
+                  </build>
+              </project>
               """,
             spec -> spec.afterRecipe(pomXml ->
               assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPluginManagement()
