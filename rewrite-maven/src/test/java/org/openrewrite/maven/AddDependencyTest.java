@@ -126,33 +126,33 @@ class AddDependencyTest implements RewriteTest {
     void pomType() {
         rewriteRun(
           spec -> spec
-            .recipe(new AddDependency("com.google.guava","guava", "29.0-jre",null, null, null, null, "pom", null, null, null, null)),
+            .recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, null, null, "pom", null, null, null, null)),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>29.0-jre</version>
-                                <type>pom</type>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <type>pom</type>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
