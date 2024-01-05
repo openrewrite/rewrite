@@ -21,11 +21,17 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.marker.Markers;
+
+import static java.util.Collections.emptyList;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.Space.EMPTY;
+import static org.openrewrite.java.tree.Space.SINGLE_SPACE;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeAnnotationAttributeName extends Recipe {
-
 
     @Option(displayName = "Annotation Type",
             description = "The fully qualified name of the annotation.",
@@ -73,11 +79,16 @@ public class ChangeAnnotationAttributeName extends Recipe {
                 }
                 return a.withArguments(ListUtils.map(a.getArguments(), arg -> {
                     if (arg instanceof J.Assignment) {
-                        J.Assignment assignment = (J.Assignment) arg;
-                        J.Identifier variable = (J.Identifier) assignment.getVariable();
-                        if (oldAttributeName.equals(variable.getSimpleName())) {
-                            return assignment.withVariable(variable.withSimpleName(newAttributeName));
+                        if (!oldAttributeName.equals(newAttributeName)) {
+                            J.Assignment assignment = (J.Assignment) arg;
+                            J.Identifier variable = (J.Identifier) assignment.getVariable();
+                            if (oldAttributeName.equals(variable.getSimpleName())) {
+                                return assignment.withVariable(variable.withSimpleName(newAttributeName));
+                            }
                         }
+                    } else if (oldAttributeName.equals("value")) {
+                        J.Identifier name = new J.Identifier(randomId(), arg.getPrefix(), Markers.EMPTY, emptyList(), newAttributeName, arg.getType(), null);
+                        return new J.Assignment(randomId(), EMPTY, arg.getMarkers(), name, new JLeftPadded<>(SINGLE_SPACE, arg.withPrefix(SINGLE_SPACE), Markers.EMPTY), arg.getType());
                     }
                     return arg;
                 }));
