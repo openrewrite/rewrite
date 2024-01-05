@@ -111,11 +111,11 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
           xml(
             null,
             """
-                <gradleEnterprise>
-                  <server>
-                    <url>https://foo</url>
-                  </server>
-                </gradleEnterprise>
+              <gradleEnterprise>
+                <server>
+                  <url>https://foo</url>
+                </server>
+              </gradleEnterprise>
               """,
             spec -> spec.path(".mvn/gradle-enterprise.xml")
           )

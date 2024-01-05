@@ -28,7 +28,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
+class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ShortenFullyQualifiedTypeReferences());
@@ -470,44 +470,48 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     @Test
     void nestedReferenceCollision() {
         rewriteRun(
-          java("""            
-            class List {
-                class A {
-                }
-            }
-          """),
-          java("""           
-            import java.util.ArrayList;
-            
-            class Test {
-                void test(List.A l1) {
-                    java.util.List<Integer> l2 = new ArrayList<>();
-                }
-            }
-          """)
+          java(
+            """            
+              class List {
+                  class A {
+                  }
+              }
+              """),
+          java(
+            """           
+              import java.util.ArrayList;
+                        
+              class Test {
+                  void test(List.A l1) {
+                      java.util.List<Integer> l2 = new ArrayList<>();
+                  }
+              }
+              """)
         );
     }
 
     @Test
     void deeperNestedReferenceCollision() {
         rewriteRun(
-          java("""            
-            class List {
-                class A {
-                    class B {
-                    }
-                }
-            }
-          """),
-          java("""           
-            import java.util.ArrayList;
-            
-            class Test {
-                void test(List.A.B l1) {
-                    java.util.List<Integer> l2 = new ArrayList<>();
-                }
-            }
-          """)
+          java(
+            """            
+              class List {
+                  class A {
+                      class B {
+                      }
+                  }
+              }
+              """),
+          java(
+            """           
+              import java.util.ArrayList;
+                        
+              class Test {
+                  void test(List.A.B l1) {
+                      java.util.List<Integer> l2 = new ArrayList<>();
+                  }
+              }
+              """)
         );
     }
 
@@ -517,21 +521,21 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           java(
             """
               package foo;
-              
+                            
               /* comment */
               import java.util.List;
-              
+                            
               class Test {
                   List<String> l = new java.util.ArrayList<>();
               }
               """,
             """
               package foo;
-              
+                            
               /* comment */
               import java.util.ArrayList;
               import java.util.List;
-              
+                            
               class Test {
                   List<String> l = new ArrayList<>();
               }
@@ -548,7 +552,7 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
             """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-              
+                            
               class Test {
                   java.util. @Anno List<String> l;
               }
@@ -556,16 +560,16 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               @interface Anno {}
               """,
             """
-                  import java.lang.annotation.ElementType;
-                  import java.lang.annotation.Target;
-                  import java.util.List;
-                  
-                  class Test {
-                      @Anno List<String> l;
-                  }
-                  @Target(ElementType.TYPE_USE)
-                  @interface Anno {}
-                  """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              import java.util.List;
+                                
+              class Test {
+                  @Anno List<String> l;
+              }
+              @Target(ElementType.TYPE_USE)
+              @interface Anno {}
+              """
           )
         );
     }
