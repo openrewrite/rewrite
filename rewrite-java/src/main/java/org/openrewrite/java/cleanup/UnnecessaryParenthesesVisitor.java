@@ -51,7 +51,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P ctx) {
         J par = super.visitParentheses(parens, ctx);
         Cursor c = getCursor().pollNearestMessage(UNNECESSARY_PARENTHESES_MESSAGE);
-        if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier)) {
+        if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier || c.getValue() instanceof J.Binary)) {
             par = new UnwrapParentheses<>((J.Parentheses<?>) par).visit(par, ctx, getCursor().getParentOrThrow());
         }
 
@@ -210,5 +210,14 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
             te = (J.Ternary) new UnwrapParentheses<>((J.Parentheses<?>) te.getCondition()).visitNonNull(te, ctx, getCursor().getParentOrThrow());
         }
         return te;
+    }
+
+    @Override
+    public J visitUnary(J.Unary unary, P ctx) {
+        J.Unary u = (J.Unary) super.visitUnary(unary, ctx);
+        if (u.getExpression() instanceof J.Parentheses) {
+            u = (J.Unary) new UnwrapParentheses<>((J.Parentheses<?>) u.getExpression()).visitNonNull(u, ctx, getCursor().getParentOrThrow());
+        }
+        return u;
     }
 }
