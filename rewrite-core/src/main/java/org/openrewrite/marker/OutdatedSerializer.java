@@ -24,7 +24,7 @@ import java.util.UUID;
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
-public class OutdatedSerializationVersion implements Marker {
+public class OutdatedSerializer implements Marker {
     @EqualsAndHashCode.Include
     UUID id;
     String language;
