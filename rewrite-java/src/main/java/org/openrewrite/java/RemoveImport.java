@@ -116,7 +116,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             AtomicReference<Space> spaceForNextImport = new AtomicReference<>();
             c = c.withImports(ListUtils.flatMap(c.getImports(), import_ -> {
                 if (spaceForNextImport.get() != null) {
-                    import_ = import_.withPrefix(spaceForNextImport.get());
+                    Space removedPrefix = spaceForNextImport.get();
+                    Space currentPrefix = import_.getPrefix();
+                    if (removedPrefix.getLastWhitespace().isEmpty() ||
+                        (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix))) {
+                        import_ = import_.withPrefix(currentPrefix.withWhitespace(removedPrefix.getLastWhitespace()));
+                    }
                     spaceForNextImport.set(null);
                 }
 
@@ -143,9 +148,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         return null;
                     }
                 } else if (!keepImport && TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)) {
-                    if (import_.getPrefix().isEmpty() || import_.getPrefix().getLastWhitespace().chars().filter(s -> s == '\n').count() > 1) {
-                        spaceForNextImport.set(import_.getPrefix());
-                    }
+                    spaceForNextImport.set(import_.getPrefix());
                     return null;
                 } else if (!keepImport && import_.getPackageName().equals(owner) &&
                         "*".equals(import_.getClassName()) &&
@@ -170,6 +173,10 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         }
 
         return j;
+    }
+
+    private long countTrailingLinebreaks(Space space) {
+        return space.getLastWhitespace().chars().filter(s -> s == '\n').count();
     }
 
     private Object unfoldStarImport(J.Import starImport, Set<String> otherImportsUsed) {
