@@ -51,7 +51,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P ctx) {
         J par = super.visitParentheses(parens, ctx);
         Cursor c = getCursor().pollNearestMessage(UNNECESSARY_PARENTHESES_MESSAGE);
-        if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier || c.getValue() instanceof J.Binary)) {
+        if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier)) {
             par = new UnwrapParentheses<>((J.Parentheses<?>) par).visit(par, ctx, getCursor().getParentOrThrow());
         }
 
@@ -147,7 +147,8 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitLambda(J.Lambda lambda, P ctx) {
         J.Lambda l = (J.Lambda) super.visitLambda(lambda, ctx);
-        if (l.getParameters().getParameters().size() == 1 &&
+        if (style.getLambda() &&
+            l.getParameters().getParameters().size() == 1 &&
             l.getParameters().isParenthesized() &&
             l.getParameters().getParameters().get(0) instanceof J.VariableDeclarations &&
             ((J.VariableDeclarations) l.getParameters().getParameters().get(0)).getTypeExpression() == null) {
