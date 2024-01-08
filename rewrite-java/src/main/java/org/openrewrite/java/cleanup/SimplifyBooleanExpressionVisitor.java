@@ -24,6 +24,7 @@ import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.MethodCall;
 
 import java.util.Collections;
 
@@ -42,7 +43,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
@@ -54,7 +56,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
@@ -163,8 +166,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J.MethodInvocation asMethod = (J.MethodInvocation) j;
         Expression select = asMethod.getSelect();
         if (isEmpty.matches(asMethod)
-                && select instanceof J.Literal
-                && select.getType() == JavaType.Primitive.String) {
+            && select instanceof J.Literal
+            && select.getType() == JavaType.Primitive.String) {
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
         }
         return j;
