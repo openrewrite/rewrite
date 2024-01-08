@@ -470,7 +470,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               public class A {
                   void foo() {
-                      boolean a = !(booleanExpression() && booleanExpression());
+                      boolean a = booleanExpression() || booleanExpression();
+                      boolean b = !(booleanExpression() && booleanExpression());
+                      boolean c = booleanExpression() == booleanExpression();
+                      boolean d = booleanExpression() != booleanExpression();
                   }
                   boolean booleanExpression() {
                     return true;
