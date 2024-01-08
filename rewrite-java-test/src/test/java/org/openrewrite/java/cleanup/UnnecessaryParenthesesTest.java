@@ -966,6 +966,21 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void negatedTernaryNotUnwrapped() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  void foo(String s, String other) {
+                      boolean a = !(s == null ? other == null : s.equalsIgnoreCase(other));
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/3883")
     @Test
     void unwrapNotMethodInvocation() {
