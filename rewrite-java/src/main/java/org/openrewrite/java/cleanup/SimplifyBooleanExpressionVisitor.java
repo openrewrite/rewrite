@@ -43,8 +43,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight()) &&
-                       !(asBinary.getLeft() instanceof MethodCall)) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
@@ -56,8 +56,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight()) &&
-                       !(asBinary.getLeft() instanceof MethodCall)) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
