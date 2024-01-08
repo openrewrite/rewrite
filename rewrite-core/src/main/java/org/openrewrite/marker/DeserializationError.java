@@ -26,6 +26,7 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
 @Getter
+@ToString
 public class DeserializationError implements Marker {
     @EqualsAndHashCode.Include
     UUID id;

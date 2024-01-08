@@ -147,7 +147,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitLambda(J.Lambda lambda, P ctx) {
         J.Lambda l = (J.Lambda) super.visitLambda(lambda, ctx);
-        if (style.getLambda() &&
+        if (getStyle().getLambda() &&
             l.getParameters().getParameters().size() == 1 &&
             l.getParameters().isParenthesized() &&
             l.getParameters().getParameters().get(0) instanceof J.VariableDeclarations &&
