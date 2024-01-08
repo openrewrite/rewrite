@@ -463,6 +463,24 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doubleMethodInvocationNotSimplified() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  void foo() {
+                      boolean a = !(booleanExpression() && booleanExpression());
+                  }
+                  boolean booleanExpression() {
+                    return true;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @Issue("https://github.com/openrewrite/rewrite-templating/issues/28")
     // Mimic what would be inserted by a Refaster template using two nullable parameters, with the second one a literal
