@@ -27,9 +27,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
