@@ -747,4 +747,21 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/557")
+    @Test
+    void annotatedTypeInFunctionTypeParens() {
+        rewriteRun(
+          kotlin(
+            """
+              @Target(AnnotationTarget.TYPE)
+              @Retention(AnnotationRetention.SOURCE)
+              annotation class Anno
+              fun method ( ) {
+                  val lambda : suspend (   @Anno Int ) -> Int = { number : Int -> number * number }
+              }
+              """
+          )
+        );
+    }
 }

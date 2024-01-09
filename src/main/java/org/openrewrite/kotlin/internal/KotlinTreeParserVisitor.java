@@ -638,11 +638,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                             Markers.EMPTY.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(ktParameter.getColon()))),
                             createIdentifier(ktParameter.getNameIdentifier(), type(ktParameter.getTypeReference())),
                             (TypeTree) requireNonNull(ktParameter.getTypeReference()).accept(this, data)
-                    );
+                    ).withPrefix(prefix(ktParameter));
                 } else {
                     typeTree = (TypeTree) requireNonNull(ktParameter.getTypeReference()).accept(this, data);
+                    if (typeTree instanceof J.Identifier) {
+                        typeTree = mergePrefix(prefix(ktParameter), (J.Identifier) typeTree);
+                    } else {
+                        typeTree = typeTree.withPrefix(prefix(ktParameter));
+                    }
                 }
-                params.add(maybeTrailingComma(ktParameter, padRight(typeTree.withPrefix(prefix(ktParameter)), endFixAndSuffix(ktParameter)), i == parameters.size() - 1));
+                params.add(maybeTrailingComma(ktParameter, padRight(typeTree, endFixAndSuffix(ktParameter)), i == parameters.size() - 1));
             }
         }
 
@@ -4275,6 +4280,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             newComments.addAll(s2.getComments());
             return Space.build(s1.getWhitespace(), newComments);
         }
+    }
+
+    private static J.Identifier mergePrefix(Space prefix, J.Identifier id) {
+        return id.getAnnotations().isEmpty() ? id.withPrefix(merge(prefix, id.getPrefix())) :
+                id.withAnnotations(ListUtils.mapFirst(id.getAnnotations(), ann -> ann.withPrefix(merge(prefix, ann.getPrefix()))));
     }
 
     private J.Modifier buildFinalModifier() {
