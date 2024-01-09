@@ -82,7 +82,7 @@ class WhileLoopTest implements RewriteTest {
           kotlin(
             """
               fun test ( ) {
-                  while ( true );
+                  while ( true )   ;
               }
               """
           )

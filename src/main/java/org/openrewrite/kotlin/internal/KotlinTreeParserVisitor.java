@@ -1623,7 +1623,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 deepPrefix(expression),
                 Markers.EMPTY,
                 mapControlParentheses(requireNonNull(expression.getCondition()), data).withPrefix(prefix(expression.getLeftParenthesis())),
-                expression.getBody() == null ? JRightPadded.build(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY)) : JRightPadded.build(requireNonNull(expression.getBody()).accept(this, data).withPrefix(prefix(expression.getBody().getParent())))
+                expression.getBody() == null ? JRightPadded.build(new J.Empty(randomId(), suffix(expression.getRightParenthesis()), Markers.EMPTY)) :
+                        JRightPadded.build(requireNonNull(expression.getBody()).accept(this, data).withPrefix(prefix(expression.getBody().getParent())))
         );
     }
 
