@@ -520,6 +520,20 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/560")
+    @Test
+    void accessorAfterTrailingSemiColon() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  var n: Int = 0  ;   protected set
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/135")
     @Test
     void checkNonNull() {

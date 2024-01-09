@@ -352,13 +352,13 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         if (prop.getPadding().getReceiver() != null) {
             prop = prop.getPadding().withReceiver(prop.getPadding().getReceiver().withAfter(updateSpace(prop.getPadding().getReceiver().getAfter(), false)));
         }
+
         if (prop.getVariableDeclarations() != null && !prop.getVariableDeclarations().getVariables().isEmpty()) {
-            prop = prop.withVariableDeclarations(
-                    prop.getVariableDeclarations().withVariables(
-                            ListUtils.mapFirst(prop.getVariableDeclarations().getVariables(),
-                                    v -> spaceBefore(v, false))
-                    )
-            );
+            List<J.VariableDeclarations.NamedVariable> variables = ListUtils.mapFirst(prop.getVariableDeclarations().getVariables(),
+                    v -> spaceBefore(v, false));
+            JRightPadded<J.VariableDeclarations> rp = prop.getPadding().getVariableDeclarations();
+            rp = rp.withElement(rp.getElement().withVariables(variables));
+            prop = prop.getPadding().withVariableDeclarations(rp);
         }
         return prop;
     }

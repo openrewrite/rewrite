@@ -1504,7 +1504,7 @@ public interface K extends J {
             return typeParameters == null ? null : typeParameters.getElements();
         }
 
-        J.VariableDeclarations variableDeclarations;
+        JRightPadded<J.VariableDeclarations> paddedVariableDeclarations;
 
         @Nullable
         TypeConstraints typeConstraints;
@@ -1523,7 +1523,8 @@ public interface K extends J {
                         Space prefix,
                         Markers markers,
                         JContainer<TypeParameter> typeParameters,
-                        VariableDeclarations variableDeclarations,
+                        @Nullable JRightPadded<J.VariableDeclarations> paddedVariableDeclarations,
+                        @Nullable VariableDeclarations variableDeclarations,
                         @Nullable K.TypeConstraints typeConstraints,
                         @Nullable @JsonProperty("getter") J.MethodDeclaration getter,
                         @Nullable @JsonProperty("setter") J.MethodDeclaration setter,
@@ -1535,7 +1536,14 @@ public interface K extends J {
             this.prefix = prefix;
             this.markers = markers;
             this.typeParameters = typeParameters;
-            this.variableDeclarations = variableDeclarations;
+
+            if (variableDeclarations != null) {
+                // from old LST
+                this.paddedVariableDeclarations = new JRightPadded<>(variableDeclarations, Space.EMPTY, Markers.EMPTY);
+            } else {
+                this.paddedVariableDeclarations = requireNonNull(paddedVariableDeclarations);
+            }
+
             this.typeConstraints = typeConstraints;
 
             if (getter != null || setter != null || isSetterFirst != null) {
@@ -1559,6 +1567,10 @@ public interface K extends J {
             }
 
             this.receiver = receiver;
+        }
+
+        public J.VariableDeclarations getVariableDeclarations() {
+            return paddedVariableDeclarations.getElement();
         }
 
         @Nullable
@@ -1602,6 +1614,15 @@ public interface K extends J {
         public static class Padding {
             private final Property t;
 
+            public JRightPadded<J.VariableDeclarations> getVariableDeclarations() {
+                return t.paddedVariableDeclarations;
+            }
+
+            public Property withVariableDeclarations(JRightPadded<J.VariableDeclarations> variableDeclarations) {
+                return t.paddedVariableDeclarations == variableDeclarations ? t : new Property(t.id, t.prefix, t.markers, t.typeParameters,
+                        variableDeclarations, t.typeConstraints, t.accessors, t.receiver);
+            }
+
             @Nullable
             public JContainer<TypeParameter> getTypeParameters() {
                 return t.typeParameters;
@@ -1609,7 +1630,7 @@ public interface K extends J {
 
             public Property withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
                 return t.typeParameters == typeParameters ? t : new Property(t.id, t.prefix, t.markers, typeParameters,
-                        t.variableDeclarations, t.typeConstraints, t.accessors, t.receiver);
+                        t.paddedVariableDeclarations, t.typeConstraints, t.accessors, t.receiver);
             }
 
             @Nullable
@@ -1620,7 +1641,7 @@ public interface K extends J {
             @Nullable
             public Property withReceiver(@Nullable JRightPadded<Expression> receiver) {
                 return t.receiver == receiver ? t : new Property(t.id, t.prefix, t.markers, t.typeParameters,
-                        t.variableDeclarations, t.typeConstraints, t.accessors, receiver);
+                        t.paddedVariableDeclarations, t.typeConstraints, t.accessors, receiver);
             }
         }
     }

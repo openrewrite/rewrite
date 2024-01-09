@@ -2959,7 +2959,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (!ktPropertyAccessors.isEmpty() || receiver != null || typeConstraints != null) {
             List<JRightPadded<J.MethodDeclaration>> accessors = new ArrayList<>(ktPropertyAccessors.size());
 
-            for (KtPropertyAccessor ktPropertyAccessor : ktPropertyAccessors) {
+            Space beforeSemiColon = Space.EMPTY;
+            Markers rpMarkers = Markers.EMPTY;
+            for (int i = 0; i < ktPropertyAccessors.size(); i++) {
+                KtPropertyAccessor ktPropertyAccessor = ktPropertyAccessors.get(i);
+
+                if (i == 0) {
+                    PsiElement maybeSemiColon = PsiTreeUtil.findSiblingBackward(ktPropertyAccessor, KtTokens.SEMICOLON, null);
+                    if (maybeSemiColon != null) {
+                        beforeSemiColon = prefix(maybeSemiColon);
+                        rpMarkers = rpMarkers.addIfAbsent(new Semicolon(randomId()));
+                    }
+                }
+
                 J.MethodDeclaration accessor = (J.MethodDeclaration) ktPropertyAccessor.accept(this, data);
                 accessors.add(maybeTrailingSemicolonInternal(accessor, ktPropertyAccessor));
             }
@@ -2969,7 +2981,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     deepPrefix(property),
                     markers,
                     typeParameters,
-                    variableDeclarations.withPrefix(Space.EMPTY),
+                    padRight(variableDeclarations.withPrefix(Space.EMPTY), beforeSemiColon, rpMarkers),
                     typeConstraints,
                     JContainer.build(accessors),
                     receiver
