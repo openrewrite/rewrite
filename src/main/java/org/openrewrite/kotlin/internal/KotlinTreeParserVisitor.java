@@ -895,10 +895,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1);
         Set<PsiElement> consumedSpaces = preConsumedInfix(parameter);
 
-        if (!parameter.getAnnotations().isEmpty()) {
-            throw new UnsupportedOperationException("TODO");
-        }
-
         // todo, simplify this logic
         int valOrVarOffset = parameter.getValOrVarKeyword() != null ? parameter.getValOrVarKeyword().getTextOffset() : -1;
         int modifierOffset = parameter.getModifierList() != null ? parameter.getModifierList().getTextOffset() : -1;
@@ -1773,7 +1769,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         return mapType(new J.Annotation(randomId(),
-                Space.EMPTY,
+                deepPrefix(annotation),
                 Markers.EMPTY,
                 annotationType,
                 null
