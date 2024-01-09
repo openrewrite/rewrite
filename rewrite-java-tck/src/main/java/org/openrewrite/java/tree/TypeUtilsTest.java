@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
@@ -27,6 +28,7 @@ import java.util.function.Consumer;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
 
 @SuppressWarnings("ConstantConditions")
 class TypeUtilsTest implements RewriteTest {
@@ -347,5 +349,44 @@ class TypeUtilsTest implements RewriteTest {
             }.visit(cu, new InMemoryExecutionContext()))
           )
         );
+    }
+
+    @Nested
+    class ToFQN {
+        @Test
+        void simpleClass() {
+            assertThat(toFullyQualifiedName("com.example.Test"))
+              .isEqualTo("com.example.Test");
+        }
+
+        @Test
+        void innerClass() {
+            assertThat(toFullyQualifiedName("com.example.Test$InnerTest"))
+              .isEqualTo("com.example.Test.InnerTest");
+        }
+
+        @Test
+        void className$() {
+            assertThat(toFullyQualifiedName("com.example.Test.$"))
+              .isEqualTo("com.example.Test.$");
+        }
+
+        @Test
+        void packageName$() {
+            assertThat(toFullyQualifiedName("com.example.$.Test"))
+              .isEqualTo("com.example.$.Test");
+        }
+
+        @Test
+        void packageName$WithInnerClass() {
+            assertThat(toFullyQualifiedName("com.example.$.Test$Inner"))
+              .isEqualTo("com.example.$.Test.Inner");
+        }
+
+        @Test
+        void innerClassWithName$() {
+            assertThat(toFullyQualifiedName("com.example.$.Test$$"))
+              .isEqualTo("com.example.$.Test.$");
+        }
     }
 }

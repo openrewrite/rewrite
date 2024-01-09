@@ -23,7 +23,9 @@ import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 public class TypeUtils {
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
@@ -39,7 +41,14 @@ public class TypeUtils {
     }
 
     public static String toFullyQualifiedName(String fqn) {
-        return fqn.replace('$', '.');
+        /// replace every $ that is not prefixed by a dot in an iterative waz to handle inner classes wich name $
+        while (true) {
+            String nxt = fqn.replaceFirst("(?<!\\.)\\$", ".");
+            if (nxt.equals(fqn)) break;
+            else fqn = nxt;
+        }
+
+        return fqn;
     }
 
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
