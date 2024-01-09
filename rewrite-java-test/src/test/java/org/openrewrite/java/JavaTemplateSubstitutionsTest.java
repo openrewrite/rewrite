@@ -19,9 +19,19 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
+import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -66,6 +76,60 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
 
                   int value() {
                       return 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @DocumentExample
+    @Issue("https://github.com/openrewrite/rewrite/issues/3623")
+    @SuppressWarnings("InstantiationOfUtilityClass")
+    @Test
+    void anyForInnerClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  if (method.getSimpleName().equals("of")) {
+                      J.Identifier $type = new J.Identifier(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, emptyList(),
+                        ((JavaType.FullyQualified) Objects.requireNonNull(method.getType())).getClassName(),
+                        method.getType(), null);
+
+                      J.NewClass newClass = new J.NewClass(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
+                        Space.EMPTY, $type, JContainer.empty(), null, null);
+
+                      return JavaTemplate.builder("#{any()}")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), newClass);
+                  }
+                  return method;
+              }
+          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              class A {
+                  void foo() {
+                      $ test = $.of();
+                  }
+                  static class $ {
+                      static $ of() {
+                          return new $();
+                      }
+                  }
+              }
+              """,
+            """
+              class A {
+                  void foo() {
+                      $ test = new $();
+                  }
+                  static class $ {
+                      static $ of() {
+                          return new $();
+                      }
                   }
               }
               """
