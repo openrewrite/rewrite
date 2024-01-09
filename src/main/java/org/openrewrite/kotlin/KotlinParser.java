@@ -437,6 +437,7 @@ public class KotlinParser implements Parser {
                 libraryScope,
                 compilerConfiguration.get(LOOKUP_TRACKER),
                 compilerConfiguration.get(ENUM_WHEN_TRACKER),
+                compilerConfiguration.get(IMPORT_TRACKER),
                 null, // Do not incrementally compile
                 emptyList(), // Add extension registrars when needed here.
                 true,

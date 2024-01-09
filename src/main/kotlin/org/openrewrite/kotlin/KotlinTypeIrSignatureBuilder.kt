@@ -132,8 +132,8 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
             throw UnsupportedOperationException("Unsupported parent of alias signature " + type.javaClass)
         }
         val s = StringBuilder()
-        if ((type.parent as IrFile).fqName.asString().isNotEmpty()) {
-            s.append((type.parent as IrFile).fqName.asString()).append(".")
+        if ((type.parent as IrFile).packageFqName.asString().isNotEmpty()) {
+            s.append((type.parent as IrFile).packageFqName.asString()).append(".")
         }
         s.append(type.name.asString())
         val joiner = StringJoiner(", ", "<", ">")
@@ -145,13 +145,13 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
     }
 
     private fun externalPackageFragmentSignature(baseType: IrExternalPackageFragment): String {
-        return baseType.fqName.asString()
+        return baseType.packageFqName.asString()
     }
 
     private fun fileSignature(type: IrFile): String {
-        return (if (type.fqName.asString()
+        return (if (type.packageFqName.asString()
                 .isNotEmpty()
-        ) type.fqName.asString() + "." else "") + type.name.replace(".kt", "Kt")
+        ) type.packageFqName.asString() + "." else "") + type.name.replace(".kt", "Kt")
     }
 
     /**
