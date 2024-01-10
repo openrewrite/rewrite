@@ -40,16 +40,21 @@ import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.semver.*;
+import org.openrewrite.properties.PropertiesVisitor;
+import org.openrewrite.properties.tree.Properties;
+import org.openrewrite.semver.DependencyMatcher;
+import org.openrewrite.semver.Semver;
 
+import java.nio.file.Paths;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpgradeDependencyVersion extends Recipe {
+public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVersion.DependencyVersionState> {
     private static final String VERSION_VARIABLE_KEY = "VERSION_VARIABLE";
     private static final String NEW_VERSION_KEY = "NEW_VERSION";
 
@@ -116,8 +121,59 @@ public class UpgradeDependencyVersion extends Recipe {
 
     private static final String UPDATE_VERSION_ERROR_KEY = "UPDATE_VERSION_ERROR_KEY";
 
+    public static class DependencyVersionState {
+        List<Properties.Entry> availableGradlePoperties = new ArrayList<>();
+        List<Expression> dependencyExpressions = new ArrayList<>();
+    }
+
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public DependencyVersionState getInitialValue(ExecutionContext ctx) {
+        // create the accumulator object
+        return new DependencyVersionState();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
+        // run two visitors in getScanner, one PropertiesVisitor and one GroovyVisitor, and have those fill your accumulator object
+        MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
+        DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+
+        return Preconditions.or(
+                new PropertiesVisitor<ExecutionContext>() {
+                    @Override
+                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                        if (!super.isAcceptable(sourceFile, ctx)) {
+                            return false;
+                        }
+                        return equalIgnoringSeparators(sourceFile.getSourcePath(), Paths.get("gradle.properties"));
+                    }
+
+                    @Override
+                    public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+                        acc.availableGradlePoperties.add(entry);
+                        return entry;
+                    }
+                },
+                new GroovyVisitor<ExecutionContext>() {
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                        J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                        if (dependencyDsl.matches(m)) {
+                            List<Expression> depArgs = m.getArguments();
+                            if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
+                                acc.dependencyExpressions.addAll(depArgs);
+                            }
+                        }
+                        return m;
+                    }
+
+                }
+        );
+
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
         MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new GroovyVisitor<ExecutionContext>() {
