@@ -55,4 +55,36 @@ class FindPluginsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findPluginWithVariable() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'com.jfrog.bintray'
+                  id 'com.jfrog.bintray' version "${jfrogBintrayVersion}"
+              }
+              """,
+            """
+              plugins {
+                  /*~~>*/id 'com.jfrog.bintray'
+                  /*~~>*/id 'com.jfrog.bintray' version "${jfrogBintrayVersion}"
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "com.jfrog.bintray"))
+              .isNotEmpty()
+              .anySatisfy(p -> {
+                  assertThat(p.getPluginId()).isEqualTo("com.jfrog.bintray");
+                  assertThat(p.getVersion()).isEqualTo("1.8.5");
+              }))
+          ),
+          properties(
+            """
+              jfrogBintrayVersion=1.8.5
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
 }
