@@ -22,6 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.properties.Assertions.properties;
 
 class FindPluginsTest implements RewriteTest {
     @Override
