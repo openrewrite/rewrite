@@ -75,6 +75,20 @@ class NewClassTest implements RewriteTest {
               class Test {
                   List<String> l = new ArrayList < > ();
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeAttribution() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+              class Test {
+                  List<String> l = new ArrayList < > ();
+              }
               """,
             spec -> spec.afterRecipe(cu -> {
                 J.VariableDeclarations.NamedVariable l =

@@ -656,7 +656,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
         JCIdent ident = (JCIdent) node;
         // no `JavaType.Method` attribution for `super()` and `this()`
-        JavaType type = ((JCIdent) node).sym.isConstructor() ? null : typeMapping.type(node);
+        JavaType type = ident.sym != null && ident.sym.isConstructor() ? null : typeMapping.type(ident);
         return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), name, type, typeMapping.variableType(ident.sym));
     }
 
