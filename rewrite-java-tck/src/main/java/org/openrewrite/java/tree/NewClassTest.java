@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -124,6 +125,7 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    @MinimumJava11
     void anonymousTypeAttribution() {
         rewriteRun(
           java(
