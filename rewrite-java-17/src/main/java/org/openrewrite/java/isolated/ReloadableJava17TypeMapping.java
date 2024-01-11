@@ -537,9 +537,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             return null;
         }
 
-        if (!methodSymbol.isConstructor()) {
-            assert returnType != null;
-        }
+        assert methodSymbol.isConstructor() || returnType != null;
 
         method.unsafeSet(resolvedDeclaringType,
                 methodSymbol.isConstructor() ? resolvedDeclaringType : returnType,
