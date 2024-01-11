@@ -223,8 +223,10 @@ public class AnnotationTemplateGenerator {
                 classDeclaration(before, (J.ClassDeclaration) statement, templated, cursor);
             }
         }
-        c = c.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
-        before.insert(0, c.printTrimmed(cursor).trim() + '{');
+        c = c.withBody(J.Block.createEmptyBlock()).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
+        String printed = c.printTrimmed(cursor);
+        int braceIndex = printed.lastIndexOf('{');
+        before.insert(0, braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));
     }
 
     private String variable(J.VariableDeclarations variable, Cursor cursor) {
