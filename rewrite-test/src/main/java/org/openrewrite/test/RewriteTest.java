@@ -570,25 +570,23 @@ public interface RewriteTest extends SourceSpecs {
         }
         newFilesGenerated.assertAll();
 
-        for (Result result : allResults) {
-            if (result.getBefore() == null
-                    && !(result.getAfter() instanceof Remote)
-                    && !expectedNewResults.contains(result)
-                    && testMethodSpec.afterRecipes.isEmpty()
-            ) {
-                assertThat(result.getAfter()).isNotNull();
-                //noinspection DuplicatedCode
-                String paths = allResults.stream()
-                        .map(it -> {
-                            String beforePath = (it.getBefore() == null) ? "null" : it.getBefore().getSourcePath().toString();
-                            String afterPath = (it.getAfter() == null) ? "null" : it.getAfter().getSourcePath().toString();
-                            return "    " + beforePath + " -> " + afterPath;
-                        })
-                        .collect(Collectors.joining("\n"));
-                // falsely added files detected.
-                fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
-                        + "\" that was not expected. All source file paths, before and after recipe run:\n" + paths);
-            }
+        Map<Result, Boolean> resultToUnexpected = allResults.stream()
+                .collect(Collectors.toMap(result -> result, result -> result.getBefore() == null
+                                                                      && !(result.getAfter() instanceof Remote)
+                                                                      && !expectedNewResults.contains(result)
+                                                                      && testMethodSpec.afterRecipes.isEmpty()));
+        if(!resultToUnexpected.isEmpty()) {
+            String paths = resultToUnexpected.entrySet().stream()
+                    .map(it -> {
+                        Result result = it.getKey();
+                        assert result.getAfter() != null;
+                        String beforePath = (result.getBefore() == null) ? "null" : result.getAfter().getSourcePath().toString();
+                        String afterPath = (result.getAfter() == null) ? "null" : result.getAfter().getSourcePath().toString();
+                        String status = it.getValue() ? "❌️" : "✔";
+                        return "    " + beforePath + " -> " + afterPath + " " + status;
+                    })
+                    .collect(Collectors.joining("\n"));
+            fail("The recipe added a source file that was not expected. All source file paths, before and after recipe run:\n" + paths);
         }
     }
 
