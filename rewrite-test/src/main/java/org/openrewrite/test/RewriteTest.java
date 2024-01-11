@@ -575,7 +575,7 @@ public interface RewriteTest extends SourceSpecs {
                                                                       && !(result.getAfter() instanceof Remote)
                                                                       && !expectedNewResults.contains(result)
                                                                       && testMethodSpec.afterRecipes.isEmpty()));
-        if(!resultToUnexpected.isEmpty()) {
+        if(resultToUnexpected.values().stream().anyMatch(it -> it)) {
             String paths = resultToUnexpected.entrySet().stream()
                     .map(it -> {
                         Result result = it.getKey();
