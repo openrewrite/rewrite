@@ -1010,4 +1010,21 @@ class UnnecessaryParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3904")
+    @Test
+    void negatedInstanceOf() {
+        rewriteRun(
+          unnecessaryParentheses(style -> style),
+          java(
+            """
+              class Test {
+                  boolean isNotString(Object o) {
+                      return !(o instanceof String);
+                  }
+              }
+              """
+          )
+        );
+    }
 }
