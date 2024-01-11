@@ -413,7 +413,15 @@ public interface RewriteTest extends SourceSpecs {
                         continue nextSourceSpec;
                     }
                 }
-                fail("Expected a new source file with the source path " + sourceSpec.getSourcePath());
+                String paths = allResults.stream()
+                        .map(it -> {
+                            String beforePath = (it.getBefore() == null) ? "null" : it.getBefore().getSourcePath().toString();
+                            String afterPath = (it.getAfter() == null) ? "null" : it.getAfter().getSourcePath().toString();
+                            return "    " + beforePath + " -> " + afterPath;
+                        })
+                        .collect(Collectors.joining("\n"));
+                fail("Expected a new source file with the source path: " + sourceSpec.getSourcePath()
+                     +"\nAll source file paths, before and after recipe run:\n" + paths);
             }
 
             // If the source spec has not defined a source path, look for a result with the exact contents. This logic
@@ -569,9 +577,17 @@ public interface RewriteTest extends SourceSpecs {
                     && testMethodSpec.afterRecipes.isEmpty()
             ) {
                 assertThat(result.getAfter()).isNotNull();
+                //noinspection DuplicatedCode
+                String paths = allResults.stream()
+                        .map(it -> {
+                            String beforePath = (it.getBefore() == null) ? "null" : it.getBefore().getSourcePath().toString();
+                            String afterPath = (it.getAfter() == null) ? "null" : it.getAfter().getSourcePath().toString();
+                            return "    " + beforePath + " -> " + afterPath;
+                        })
+                        .collect(Collectors.joining("\n"));
                 // falsely added files detected.
                 fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
-                        + "\" that was not expected.");
+                        + "\" that was not expected. All source file paths, before and after recipe run:\n" + paths);
             }
         }
     }
