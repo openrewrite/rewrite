@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class NewClassTest implements RewriteTest {
@@ -74,7 +75,17 @@ class NewClassTest implements RewriteTest {
               class Test {
                   List<String> l = new ArrayList < > ();
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable l =
+                  ((J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0);
+                J.NewClass arrayList = (J.NewClass) l.getInitializer();
+                JavaType.Parameterized javaType = (JavaType.Parameterized) arrayList.getType();
+                assertThat(javaType.getType().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
+                assertThat(javaType.getTypeParameters()).satisfiesExactly(
+                  p -> assertThat(((JavaType.Class) p).getFullyQualifiedName()).isEqualTo("java.lang.String")
+                );
+            })
           )
         );
     }
