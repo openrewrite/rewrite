@@ -449,7 +449,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             resolvedOwner = type instanceof Type.MethodType ?
-                    methodInvocationType(type, sym) :
+                    methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type)) :
                     type(type);
             assert resolvedOwner != null;
         }
@@ -549,12 +549,13 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             returnType = JavaType.Unknown.getInstance();
         }
 
-        JavaType.FullyQualified resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+        JavaType.FullyQualified resolvedDeclaringType =
+                TypeUtils.asFullyQualified(type(methodSymbol.isConstructor() ? selectType : methodSymbol.owner.type));
         if (resolvedDeclaringType == null) {
             return null;
         }
 
-        assert returnType != null;
+        assert methodSymbol.isConstructor() || returnType != null;
 
         method.unsafeSet(resolvedDeclaringType,
                 methodSymbol.isConstructor() ? resolvedDeclaringType : returnType,

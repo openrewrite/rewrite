@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.isolated;
 
-import com.sun.tools.javac.code.*;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.JCTree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
@@ -23,7 +25,10 @@ import org.openrewrite.java.tree.JavaType;
 
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.StringJoiner;
 
 class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
@@ -233,13 +238,14 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String methodSignature(Type selectType, Symbol.MethodSymbol symbol) {
         String s = classSignature(symbol.owner.type);
         if (symbol.isConstructor()) {
-            s += "{name=<constructor>,return=" + s;
+            s += "{name=<constructor>,return=";
+            s += selectType instanceof Type.MethodType ? s : signature(selectType);
         } else {
             s += "{name=" + symbol.getSimpleName().toString() +
                     ",return=" + signature(selectType.getReturnType());
         }
 
-        return s + ",parameters=" + methodArgumentSignature(selectType) + '}';
+        return s + ",parameters=" + methodArgumentSignature(symbol) + '}';
     }
 
     public String methodSignature(Symbol.MethodSymbol symbol) {

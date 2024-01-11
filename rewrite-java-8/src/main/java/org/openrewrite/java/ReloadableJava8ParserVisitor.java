@@ -655,7 +655,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         cursor += name.length();
 
         JCIdent ident = (JCIdent) node;
-        JavaType type = typeMapping.type(node);
+        JavaType type = ((JCIdent) node).sym.isConstructor() ? null : typeMapping.type(node);
         return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), name, type, typeMapping.variableType(ident.sym));
     }
 
@@ -1044,7 +1044,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;
-        JavaType.Method constructorType = typeMapping.methodInvocationType(jcNewClass.constructorType, jcNewClass.constructor);
+        JavaType.Method constructorType = typeMapping.methodInvocationType(jcNewClass.clazz.type, jcNewClass.constructor);
 
         return new J.NewClass(randomId(), fmt, Markers.EMPTY, encl, whitespaceBeforeNew,
                 clazz, args, body, constructorType);
