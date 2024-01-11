@@ -81,6 +81,25 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void delegate() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private String name;
+                  A() {
+                    this("ABC");
+                  }
+                  A(String name) {
+                    this.name = name;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void typeAttribution() {
         rewriteRun(
           java(
