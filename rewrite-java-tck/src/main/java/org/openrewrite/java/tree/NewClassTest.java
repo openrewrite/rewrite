@@ -100,13 +100,13 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
-    void typeAttribution() {
+    void parameterizedTypeAttribution() {
         rewriteRun(
           java(
             """
               import java.util.*;
               class Test {
-                  List<String> l = new ArrayList < > ();
+                  List<String> l = new ArrayList<>();
               }
               """,
             spec -> spec.afterRecipe(cu -> {
@@ -116,6 +116,31 @@ class NewClassTest implements RewriteTest {
                 JavaType.Parameterized javaType = (JavaType.Parameterized) arrayList.getType();
                 assertThat(javaType.getType().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
                 assertThat(javaType.getTypeParameters()).satisfiesExactly(
+                  p -> assertThat(((JavaType.Class) p).getFullyQualifiedName()).isEqualTo("java.lang.String")
+                );
+            })
+          )
+        );
+    }
+
+    @Test
+    void anonymousTypeAttribution() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+              class Test {
+                  List<String> l = new ArrayList<>() {};
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable l =
+                  ((J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0);
+                J.NewClass arrayList = (J.NewClass) l.getInitializer();
+                JavaType.Class javaType = (JavaType.Class) arrayList.getType();
+                JavaType.Parameterized arrayListType = (JavaType.Parameterized) javaType.getSupertype();
+                assertThat(arrayListType.getType().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
+                assertThat(arrayListType.getTypeParameters()).satisfiesExactly(
                   p -> assertThat(((JavaType.Class) p).getFullyQualifiedName()).isEqualTo("java.lang.String")
                 );
             })

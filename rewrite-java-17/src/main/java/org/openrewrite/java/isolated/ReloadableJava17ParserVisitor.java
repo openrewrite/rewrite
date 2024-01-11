@@ -1115,7 +1115,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         JCNewClass jcNewClass = (JCNewClass) node;
         JavaType.Method constructorType = typeMapping.methodInvocationType(jcNewClass.constructorType, jcNewClass.constructor);
-        if (constructorType != null && jcNewClass.clazz.type.isParameterized()) {
+        if (constructorType != null && jcNewClass.clazz.type.isParameterized() && node.getClassBody() == null) {
             constructorType = constructorType.withReturnType(typeMapping.type(jcNewClass.clazz.type));
         }
 
