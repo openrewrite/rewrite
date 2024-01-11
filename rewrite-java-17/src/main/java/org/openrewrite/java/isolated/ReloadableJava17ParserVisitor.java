@@ -55,7 +55,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.Math.max;
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
@@ -1113,7 +1114,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;
-        JavaType.Method constructorType = typeMapping.methodInvocationType(jcNewClass.clazz.type, jcNewClass.constructor);
+        JavaType.Method constructorType = typeMapping.methodInvocationType(jcNewClass.constructorType, jcNewClass.constructor);
+        if (constructorType != null && jcNewClass.clazz.type.isParameterized()) {
+            constructorType = constructorType.withReturnType(typeMapping.type(jcNewClass.clazz.type));
+        }
 
         return new J.NewClass(randomId(), fmt, Markers.EMPTY, encl, whitespaceBeforeNew,
                 clazz, args, body, constructorType);

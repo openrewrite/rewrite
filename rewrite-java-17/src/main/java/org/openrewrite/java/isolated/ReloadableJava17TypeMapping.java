@@ -47,7 +47,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
     public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
-                type instanceof NullType) {
+            type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
@@ -267,8 +267,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             if (sym.members_field != null) {
                 for (Symbol elem : sym.members_field.getSymbols()) {
                     if (elem instanceof Symbol.VarSymbol &&
-                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                    Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                        (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                             Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
                         if (fqn.equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
@@ -281,7 +281,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                         }
                         fields.add(variableType(elem, clazz));
                     } else if (elem instanceof Symbol.MethodSymbol &&
-                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
+                               (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
                         if (methods == null) {
                             methods = new ArrayList<>();
                         }
@@ -531,13 +531,12 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             returnType = JavaType.Unknown.getInstance();
         }
 
-        JavaType.FullyQualified resolvedDeclaringType =
-                TypeUtils.asFullyQualified(type(methodSymbol.isConstructor() ? selectType : methodSymbol.owner.type));
+        JavaType.FullyQualified resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
         if (resolvedDeclaringType == null) {
             return null;
         }
 
-        assert methodSymbol.isConstructor() || returnType != null;
+        assert returnType != null;
 
         method.unsafeSet(resolvedDeclaringType,
                 methodSymbol.isConstructor() ? resolvedDeclaringType : returnType,
@@ -575,8 +574,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
             List<String> defaultValues = null;
-            if(methodSymbol.getDefaultValue() != null) {
-                if(methodSymbol.getDefaultValue() instanceof Attribute.Array) {
+            if (methodSymbol.getDefaultValue() != null) {
+                if (methodSymbol.getDefaultValue() instanceof Attribute.Array) {
                     defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
                             .map(attr -> attr.getValue().toString())
                             .collect(Collectors.toList());

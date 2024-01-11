@@ -237,14 +237,13 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String methodSignature(Type selectType, Symbol.MethodSymbol symbol) {
         String s = classSignature(symbol.owner.type);
         if (symbol.isConstructor()) {
-            s += "{name=<constructor>,return=";
-            s += selectType instanceof Type.MethodType ? s : signature(selectType);
+            s += "{name=<constructor>,return=" + s;
         } else {
             s += "{name=" + symbol.getSimpleName().toString() +
-                    ",return=" + signature(selectType.getReturnType());
+                 ",return=" + signature(selectType.getReturnType());
         }
 
-        return s + ",parameters=" + methodArgumentSignature(symbol) + '}';
+        return s + ",parameters=" + methodArgumentSignature(selectType) + '}';
     }
 
     public String methodSignature(Symbol.MethodSymbol symbol) {
@@ -261,7 +260,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s += "{name=<constructor>,return=" + s;
         } else {
             s += "{name=" + symbol.getSimpleName().toString() +
-                    ",return=" + returnType;
+                 ",return=" + returnType;
         }
 
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';

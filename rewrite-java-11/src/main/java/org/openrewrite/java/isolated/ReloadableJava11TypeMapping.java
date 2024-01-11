@@ -530,13 +530,12 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             returnType = JavaType.Unknown.getInstance();
         }
 
-        JavaType.FullyQualified resolvedDeclaringType =
-                TypeUtils.asFullyQualified(type(methodSymbol.isConstructor() ? selectType : methodSymbol.owner.type));
+        JavaType.FullyQualified resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
         if (resolvedDeclaringType == null) {
             return null;
         }
 
-        assert methodSymbol.isConstructor() || returnType != null;
+        assert returnType != null;
 
         method.unsafeSet(resolvedDeclaringType,
                 methodSymbol.isConstructor() ? resolvedDeclaringType : returnType,
