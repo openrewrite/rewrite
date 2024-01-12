@@ -124,6 +124,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private static final String UPDATE_VERSION_ERROR_KEY = "UPDATE_VERSION_ERROR_KEY";
 
     public static class DependencyVersionState {
+        GradleProject gradleProject;
         List<Expression> dependencyExpressions = new ArrayList<>();
     }
 
@@ -139,21 +140,29 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
 
-        return Preconditions.or(
-            new GroovyVisitor<ExecutionContext>() {
-                @Override
-                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                    if (dependencyDsl.matches(m)) {
-                        List<Expression> depArgs = m.getArguments();
-                        if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
-                            acc.dependencyExpressions.addAll(depArgs);
-                        }
+        return new GroovyVisitor<ExecutionContext>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if (dependencyDsl.matches(m)) {
+                    List<Expression> depArgs = m.getArguments();
+                    if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
+                        acc.dependencyExpressions.addAll(depArgs);
                     }
-                    return m;
                 }
+                return m;
             }
-        );
+
+            @Override
+            public J postVisit(J tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) tree;
+                    Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
+                    maybeGp.ifPresent(gradleProject -> acc.gradleProject = gradleProject);
+                }
+                return tree;
+            }
+        };
     }
 
     @Override
@@ -221,23 +230,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             if (tree instanceof JavaSourceFile) {
                                 JavaSourceFile cu = (JavaSourceFile) tree;
                                 Map<String, Map<GroupArtifact, Set<String>>>  variableNames = getCursor().getMessage(VERSION_VARIABLE_KEY);
-                                if (variableNames != null) {
-                                    Optional<GradleProject> maybeGp = cu.getMarkers()
-                                        .findFirst(GradleProject.class);
-                                    if (!maybeGp.isPresent()) {
-                                        return cu;
-                                    }
-
-                                    cu = (JavaSourceFile) new UpdateVariable(variableNames, maybeGp.get()).visitNonNull(cu, ctx);
+                                if (variableNames != null && acc.gradleProject != null) {
+                                    cu = (JavaSourceFile) new UpdateVariable(variableNames, acc.gradleProject).visitNonNull(cu, ctx);
                                 }
                                 Map<GroupArtifactVersion, Set<String>> versionUpdates = getCursor().getMessage(NEW_VERSION_KEY);
-                                if (versionUpdates != null) {
-                                    Optional<GradleProject> maybeGp = cu.getMarkers()
-                                        .findFirst(GradleProject.class);
-                                    if (!maybeGp.isPresent()) {
-                                        return cu;
-                                    }
-                                    GradleProject newGp = maybeGp.get();
+                                if (versionUpdates != null && acc.gradleProject != null) {
+                                    GradleProject newGp = acc.gradleProject;
                                     for (Map.Entry<GroupArtifactVersion, Set<String>> gavToConfigurations : versionUpdates.entrySet()) {
                                         newGp = replaceVersion(newGp, ctx, gavToConfigurations.getKey(), gavToConfigurations.getValue());
                                     }
