@@ -203,16 +203,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
                                     if (entry.getKey().equals(versionVariableName)) {
                                         if (!StringUtils.isBlank(newVersion)) {
-//                                                    List<MavenRepository> repositories = gradleProject.getMavenRepositories();
-//                                                    String resolvedVersion;
-//                                                    try {
-//                                                        resolvedVersion = AddDependencyVisitor.resolveDependencyVersion(dep.getGroupId(), dep.getArtifactId(), "0", newVersion, versionPattern, repositories, null, ctx).orElse(null);
-//                                                    } catch (MavenDownloadingException e) {
-//                                                        return e.warn(entry);
-//                                                    }
-//                                                    if (resolvedVersion != null) {
-//                                                        return entry.withValue(entry.getValue().withText(resolvedVersion));
-//                                                    }
+                                            String resolvedVersion = null;
+                                            try {
+                                                resolvedVersion = findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), newVersion, acc.gradleProject, ctx);
+                                            } catch (MavenDownloadingException e) {
+                                                // TODO warn about this exception but continue?
+                                            }
+                                            if(resolvedVersion != null) {
+                                                return entry.withValue(entry.getValue().withText(resolvedVersion));
+                                            }
                                             return entry.withValue(entry.getValue().withText(newVersion));
                                         }
                                     }
