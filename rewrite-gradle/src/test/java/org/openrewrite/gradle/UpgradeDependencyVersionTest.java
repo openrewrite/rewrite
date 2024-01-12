@@ -457,14 +457,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
               }
-              """,
-            """
-              plugins {
-                id 'java-library'
-              }
-              dependencies {
-                implementation ("com.google.guava:guava:$guavaVersion")
-              }
               """
           )
         );

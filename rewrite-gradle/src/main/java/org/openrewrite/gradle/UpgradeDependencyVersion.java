@@ -28,6 +28,7 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -57,6 +58,7 @@ import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVersion.DependencyVersionState> {
     private static final String VERSION_VARIABLE_KEY = "VERSION_VARIABLE";
     private static final String NEW_VERSION_KEY = "NEW_VERSION";
+    private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
 
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -145,7 +147,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (!super.isAcceptable(sourceFile, ctx)) {
                             return false;
                         }
-                        return equalIgnoringSeparators(sourceFile.getSourcePath(), Paths.get("gradle.properties"));
+                        return equalIgnoringSeparators(sourceFile.getSourcePath(), Paths.get(GRADLE_PROPERTIES_FILE_NAME));
                     }
 
                     @Override
@@ -166,7 +168,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         }
                         return m;
                     }
-
                 }
         );
 
@@ -176,7 +177,61 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
         MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
-        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new GroovyVisitor<ExecutionContext>() {
+        return
+                        Preconditions.or(
+                        new PropertiesVisitor<ExecutionContext>() {
+                            @Override
+                            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                                if (!super.isAcceptable(sourceFile, ctx)) {
+                                    return false;
+                                }
+                                return equalIgnoringSeparators(sourceFile.getSourcePath(), Paths.get(GRADLE_PROPERTIES_FILE_NAME));
+                            }
+
+                            @Override
+                            public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+                                for (Expression dependencyExpression : acc.dependencyExpressions) {
+                                    if (dependencyExpression instanceof G.GString) {
+                                        G.GString gString = (G.GString) dependencyExpression;
+                                        List<J> strings = gString.getStrings();
+                                        if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
+                                            return entry;
+                                        }
+                                        J.Literal groupArtifact = (J.Literal) strings.get(0);
+                                        G.GString.Value versionValue = (G.GString.Value) strings.get(1);
+                                        if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
+                                            return entry;
+                                        }
+
+                                        // here we have "groupArtifact" which is an object that contains the field "value" which is "com.google.guava:guava:"
+                                        // we also have "versionValue" which has a field called "tree" which has a field "simpleName" which is "guavaVersion"
+
+                                        Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                                        if (dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
+                                            String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
+                                            if (entry.getKey().equals(versionVariableName)) {
+                                                if (!StringUtils.isBlank(newVersion)) {
+//                                                    List<MavenRepository> repositories = gradleProject.getMavenRepositories();
+//                                                    String resolvedVersion;
+//                                                    try {
+//                                                        resolvedVersion = AddDependencyVisitor.resolveDependencyVersion(dep.getGroupId(), dep.getArtifactId(), "0", newVersion, versionPattern, repositories, null, ctx).orElse(null);
+//                                                    } catch (MavenDownloadingException e) {
+//                                                        return e.warn(entry);
+//                                                    }
+//                                                    if (resolvedVersion != null) {
+//                                                        return entry.withValue(entry.getValue().withText(resolvedVersion));
+//                                                    }
+                                                    return entry.withValue(entry.getValue().withText(newVersion));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                return entry;
+                            }
+                        },
+            Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker),
+            new GroovyVisitor<ExecutionContext>() {
 
             @Override
             public J postVisit(J tree, ExecutionContext ctx) {
@@ -354,7 +409,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                 return m;
             }
-        });
+        }
+        )
+        );
     }
 
     @Value
