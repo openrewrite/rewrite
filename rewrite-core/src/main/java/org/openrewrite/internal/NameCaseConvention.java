@@ -153,26 +153,27 @@ public enum NameCaseConvention {
 
         boolean uppercaseAbbreviationIncluded = false;
         int uppercaseAbbreviationEndIndex = -1;
-        for (int i = 0; i < strLength; i++) {
+        int i = 0;
+        while (i < strLength) {
             final char c = str.charAt(i);
             if (Character.isLowerCase(c)) {
                 allUpperCase = false;
                 break;
             }
-
-            if ((i + 1) >= uppercaseAbbreviationMinLength) {
-                uppercaseAbbreviationIncluded = true;
-                uppercaseAbbreviationEndIndex = i - 1;
-            }
+            i++;
+        }
+        if (i > uppercaseAbbreviationMinLength) {
+            uppercaseAbbreviationIncluded = true;
+            uppercaseAbbreviationEndIndex = i - 1;
         }
 
         StringBuilder sb = new StringBuilder(strLength);
         if (allUpperCase) {
             str = str.toLowerCase();
         } else if (uppercaseAbbreviationIncluded) {
-            final String uppercaseAbbreviation = str.substring(0, uppercaseAbbreviationEndIndex + 1);
+            final String uppercaseAbbreviation = str.substring(0, uppercaseAbbreviationEndIndex);
             sb.append(StringUtils.capitalize(uppercaseAbbreviation.toLowerCase()));
-            str = str.substring(uppercaseAbbreviationEndIndex + 1);
+            str = str.substring(uppercaseAbbreviationEndIndex);
         }
 
         for (String s : CAMEL_CASE_SPLIT.split(str)) {
@@ -215,8 +216,7 @@ public enum NameCaseConvention {
                         builder.append(lowerCaseChar);
                     } else if (Character.isUpperCase(last) || last == '.') {
                         builder.append(lowerCaseChar);
-                    } else if (Character.isDigit(last) && (Character.isUpperCase(secondLast)
-                                                           || secondLast == separatorChar)) {
+                    } else if (Character.isDigit(last) && (Character.isUpperCase(secondLast) || secondLast == separatorChar)) {
                         builder.append(lowerCaseChar);
                     } else {
                         builder.append(separatorChar).append(lowerCaseChar);
