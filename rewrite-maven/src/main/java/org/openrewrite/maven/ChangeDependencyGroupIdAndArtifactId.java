@@ -34,6 +34,10 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
+import static org.openrewrite.Validated.required;
+import static org.openrewrite.Validated.test;
+import static org.openrewrite.internal.StringUtils.isBlank;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
@@ -90,8 +94,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
         this.newGroupId = newGroupId;
         this.newArtifactId = newArtifactId;
         this.newVersion = newVersion;
-        this.overrideManagedVersion = false;
         this.versionPattern = versionPattern;
+        this.overrideManagedVersion = false;
     }
 
     @JsonCreator
@@ -111,6 +115,18 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
+        validated = validated.and(required("newGroupId", newGroupId).or(required("newArtifactId", newArtifactId)));
+        validated =
+            validated.and(test(
+                "coordinates",
+                "newGroupId OR newArtifactId must be different from before",
+                this,
+                r -> {
+                    boolean sameGroupId = isBlank(r.newGroupId) || Objects.equals(r.oldGroupId, r.newGroupId);
+                    boolean sameArtifactId = isBlank(r.newArtifactId) || Objects.equals(r.oldArtifactId, r.newArtifactId);
+                    return !(sameGroupId && sameArtifactId);
+                }
+            ));
         return validated;
     }
 
