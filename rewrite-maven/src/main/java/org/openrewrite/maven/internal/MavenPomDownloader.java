@@ -639,18 +639,19 @@ public class MavenPomDownloader {
         return gav.getVersion();
     }
 
-    private Collection<MavenRepository> distinctNormalizedRepositories(List<MavenRepository> repositories,
-                                                                       @Nullable ResolvedPom containingPom,
-                                                                       @Nullable String acceptsVersion) {
-        Set<MavenRepository> normalizedRepositories = new LinkedHashSet<>();
+    Collection<MavenRepository> distinctNormalizedRepositories(
+            List<MavenRepository> repositories,
+            @Nullable ResolvedPom containingPom,
+            @Nullable String acceptsVersion) {
+        LinkedHashMap<String, MavenRepository> normalizedRepositories = new LinkedHashMap<>();
         if (addDefaultRepositories) {
-            normalizedRepositories.add(ctx.getLocalRepository());
+            normalizedRepositories.put(ctx.getLocalRepository().getId(), ctx.getLocalRepository());
         }
 
         for (MavenRepository repo : repositories) {
             MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
             if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.add(normalizedRepo);
+                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
         }
 
@@ -658,16 +659,16 @@ public class MavenPomDownloader {
         for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
             MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
             if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.add(normalizedRepo);
+                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
         }
-        if (addDefaultRepositories) {
+        if (addDefaultRepositories && !normalizedRepositories.containsKey(MavenRepository.MAVEN_CENTRAL.getId())) {
             MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, containingPom);
             if (normalizedRepo != null) {
-                normalizedRepositories.add(normalizedRepo);
+                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
         }
-        return normalizedRepositories;
+        return normalizedRepositories.values();
     }
 
     @Nullable
