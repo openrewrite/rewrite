@@ -39,7 +39,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               import static java.util.Objects.isNull;
               public class A {
                   public void test() {
-                      boolean a = true;
+                      Boolean a = true;
                       if (java.util.Objects.isNull(a)) {
                           System.out.println("a is null");
                       }
@@ -50,7 +50,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               import static java.util.Objects.isNull;
               public class A {
                   public void test() {
-                      boolean a = true;
+                      Boolean a = true;
                       if (a == null) {
                           System.out.println("a is null");
                       }
@@ -63,27 +63,35 @@ class RemoveObjectsIsNullTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1547")
     @Test
-    void transformCallToIsNullNeedsParentheses() {
+    void downcastToPrimitiveBoolean() {
         rewriteRun(
           java(
             """
               import static java.util.Objects.isNull;
               public class A {
                   public void test() {
-                      boolean a = true, b = false;
+                      Boolean a = true, b = false;
                       if (isNull(a || b)) {
                           System.out.println("a || b is null");
                       }
                   }
               }
-              """,
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3915")
+    @Test
+    void upcastToBoolean() {
+        rewriteRun(
+          java(
             """
               import static java.util.Objects.isNull;
               public class A {
-                  public void test() {
-                      boolean a = true, b = false;
-                      if ((a || b) == null) {
-                          System.out.println("a || b is null");
+                  public void test(boolean a) {
+                      if (isNull(a)) {
+                          System.out.println("a is null");
                       }
                   }
               }
@@ -101,7 +109,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               import static java.util.Objects.nonNull;
               public class A {
                   public void test() {
-                      boolean a = true;
+                      Boolean a = true;
                       if (java.util.Objects.nonNull(a)) {
                           System.out.println("a is non-null");
                       }
@@ -112,40 +120,9 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               import static java.util.Objects.nonNull;
               public class A {
                   public void test() {
-                      boolean a = true;
+                      Boolean a = true;
                       if (a != null) {
                           System.out.println("a is non-null");
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1547")
-    @Test
-    void transformCallToNonNullNeedsParentheses() {
-        rewriteRun(
-          java(
-            """
-              import static java.util.Objects.nonNull;
-              public class A {
-                  public void test() {
-                      boolean a = true, b = false;
-                      if (nonNull(a || b)) {
-                          System.out.println("a || b is non-null");
-                      }
-                  }
-              }
-              """,
-            """
-              import static java.util.Objects.nonNull;
-              public class A {
-                  public void test() {
-                      boolean a = true, b = false;
-                      if ((a || b) != null) {
-                          System.out.println("a || b is non-null");
                       }
                   }
               }

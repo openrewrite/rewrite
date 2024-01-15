@@ -23,6 +23,7 @@ import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
 public class RemoveObjectsIsNull extends Recipe {
     private static final MethodMatcher IS_NULL = new MethodMatcher("java.util.Objects isNull(..)");
@@ -46,18 +47,25 @@ public class RemoveObjectsIsNull extends Recipe {
             public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (IS_NULL.matches(m)) {
-                    return replace(ctx, m, "(#{any(boolean)}) == null");
+                    return maybeReplace(ctx, m, "(#{any(boolean)}) == null");
                 } else if (NON_NULL.matches(m)) {
-                    return replace(ctx, m, "(#{any(boolean)}) != null");
+                    return maybeReplace(ctx, m, "(#{any(boolean)}) != null");
                 }
                 return m;
+            }
+
+            private Expression maybeReplace(ExecutionContext ctx, J.MethodInvocation m, String pattern) {
+                JavaType type = m.getArguments().get(0).getType();
+                if (type instanceof JavaType.Primitive && JavaType.Primitive.String != type) {
+                    return m;
+                }
+                return replace(ctx, m, pattern);
             }
 
             private Expression replace(ExecutionContext ctx, J.MethodInvocation m, String pattern) {
                 Expression e = m.getArguments().get(0);
                 Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), e);
-                return (Expression) new UnnecessaryParenthesesVisitor()
-                        .visitNonNull(replaced, ctx, getCursor());
+                return (Expression) new UnnecessaryParenthesesVisitor().visitNonNull(replaced, ctx, getCursor());
             }
         });
     }
