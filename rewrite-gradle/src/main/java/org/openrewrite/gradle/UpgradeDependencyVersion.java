@@ -177,7 +177,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (!super.isAcceptable(sourceFile, ctx)) {
                             return false;
                         }
-                        return equalIgnoringSeparators(sourceFile.getSourcePath(), Paths.get(GRADLE_PROPERTIES_FILE_NAME));
+                        return sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
                     }
 
                     @Override
@@ -295,9 +295,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     if (dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())
                                         && dep.getVersion() != null
                                         && !dep.getVersion().startsWith("$")) {
-                                        GradleProject gradleProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
-                                            .getMarkers()
-                                            .findFirst(GradleProject.class)
+                                        GradleProject gradleProject = Optional.ofNullable(acc.gradleProject)
                                             .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
                                         String version = dep.getVersion();
                                         try {
@@ -347,9 +345,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 G.MapEntry versionEntry = (G.MapEntry) depArgs.get(2);
                                 Expression versionExp = versionEntry.getValue();
                                 if (versionExp instanceof J.Literal && ((J.Literal) versionExp).getValue() instanceof String) {
-                                    GradleProject gradleProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
-                                        .getMarkers()
-                                        .findFirst(GradleProject.class)
+                                    GradleProject gradleProject = Optional.ofNullable(acc.gradleProject)
                                         .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
                                     J.Literal versionLiteral = (J.Literal) versionExp;
                                     String version = (String) versionLiteral.getValue();
