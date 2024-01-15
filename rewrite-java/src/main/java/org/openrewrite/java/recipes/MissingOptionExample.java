@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java.recipes;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
@@ -47,6 +44,8 @@ public class MissingOptionExample extends Recipe {
                         if (!TypeUtils.isOfClassType(annotation.getType(), "org.openrewrite.Option") || an.getArguments() == null) {
                             return an;
                         }
+
+                        // Skip if there is already an example value
                         boolean hasExample = an.getArguments().stream().anyMatch(exp -> {
                             if (exp instanceof J.Assignment) {
                                 Expression variable = ((J.Assignment) exp).getVariable();
@@ -56,7 +55,21 @@ public class MissingOptionExample extends Recipe {
                             }
                             return false;
                         });
-                        return hasExample ? an : SearchResult.found(an, "Missing example value for documentation");
+                        if (hasExample) {
+                            return an;
+                        }
+
+                        // Skip boolean fields, as examples there are trivial
+                        Cursor parent = getCursor().getParent();
+                        if (parent != null && parent.getValue() instanceof J.VariableDeclarations) {
+                            J.VariableDeclarations variableDeclarations = parent.getValue();
+                            if (variableDeclarations.getTypeExpression() != null &&
+                                    TypeUtils.isOfClassType(variableDeclarations.getTypeExpression().getType(), "java.lang.Boolean")) {
+                                return an;
+                            }
+                        }
+
+                        return SearchResult.found(an, "Missing example value for documentation");
                     }
                 });
     }
