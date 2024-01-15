@@ -46,12 +46,10 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
-import java.nio.file.Paths;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
