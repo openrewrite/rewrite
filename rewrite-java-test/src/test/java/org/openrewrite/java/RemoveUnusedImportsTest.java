@@ -1748,7 +1748,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3909")
-    void bug() {
+    void importUsedOnlyInReturnType() {
         // language=java
         rewriteRun(
           java(
