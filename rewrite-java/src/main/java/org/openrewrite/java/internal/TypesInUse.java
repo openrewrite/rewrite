@@ -65,8 +65,8 @@ public class TypesInUse {
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
             Object parent = Objects.requireNonNull(getCursor().getParent()).getValue();
-            if (parent instanceof J.ClassDeclaration || parent instanceof J.MethodDeclaration) {
-                // skip type of class and method declaration name
+            if (parent instanceof J.ClassDeclaration) {
+                // skip type of class
                 return identifier;
             }
             return super.visitIdentifier(identifier, p);
