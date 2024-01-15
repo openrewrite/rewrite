@@ -201,7 +201,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                             try {
                                                 resolvedVersion = findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), newVersion, acc.gradleProject, ctx);
                                             } catch (MavenDownloadingException e) {
-                                                // TODO warn about this exception but continue?
+                                                return e.warn(entry);
                                             }
                                             if(resolvedVersion != null) {
                                                 return entry.withValue(entry.getValue().withText(resolvedVersion));
