@@ -68,6 +68,9 @@ public class TypesInUse {
             if (parent instanceof J.ClassDeclaration) {
                 // skip type of class
                 return identifier;
+            } else if (parent instanceof J.MethodDeclaration && ((J.MethodDeclaration) parent).getName() == identifier) {
+                // skip method name
+                return identifier;
             }
             return super.visitIdentifier(identifier, p);
         }
