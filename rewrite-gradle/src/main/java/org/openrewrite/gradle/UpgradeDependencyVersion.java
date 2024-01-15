@@ -192,10 +192,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
                                     return entry;
                                 }
-
-                                // here we have "groupArtifact" which is an object that contains the field "value" which is "com.google.guava:guava:"
-                                // we also have "versionValue" which has a field called "tree" which has a field "simpleName" which is "guavaVersion"
-
                                 Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
                                 if (dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
                                     String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
