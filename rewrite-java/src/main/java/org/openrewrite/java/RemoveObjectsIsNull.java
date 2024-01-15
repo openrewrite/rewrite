@@ -63,6 +63,8 @@ public class RemoveObjectsIsNull extends Recipe {
             }
 
             private Expression replace(ExecutionContext ctx, J.MethodInvocation m, String pattern) {
+                maybeRemoveImport("java.util.Objects");
+                maybeRemoveImport("java.util.Objects." + m.getSimpleName());
                 Expression e = m.getArguments().get(0);
                 Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), e);
                 return (Expression) new UnnecessaryParenthesesVisitor().visitNonNull(replaced, ctx, getCursor());
