@@ -56,6 +56,7 @@ public enum NameCaseConvention {
     UPPER_UNDERSCORE;
 
     private static final Pattern CAMEL_CASE_SPLIT = Pattern.compile("[\\s_-]");
+    private static final int uppercaseAbbreviationMinLength = 3;
 
     /**
      * Formats the input to the style of this {@link NameCaseConvention}.
@@ -149,18 +150,32 @@ public enum NameCaseConvention {
     private static String toCamelCase(String str, boolean lowerCaseFirstLetter) {
         boolean allUpperCase = true;
         final int strLength = str.length();
-        for (int i = 0; i < strLength; i++) {
+
+        boolean uppercaseAbbreviationIncluded = false;
+        int uppercaseAbbreviationEndIndex = -1;
+        int i = 0;
+        while (i < strLength) {
             final char c = str.charAt(i);
             if (Character.isLowerCase(c)) {
                 allUpperCase = false;
                 break;
             }
+            i++;
         }
-        if (allUpperCase) {
-            str = str.toLowerCase();
+        if (i > uppercaseAbbreviationMinLength) {
+            uppercaseAbbreviationIncluded = true;
+            uppercaseAbbreviationEndIndex = i - 1;
         }
 
         StringBuilder sb = new StringBuilder(strLength);
+        if (allUpperCase) {
+            str = str.toLowerCase();
+        } else if (uppercaseAbbreviationIncluded) {
+            final String uppercaseAbbreviation = str.substring(0, uppercaseAbbreviationEndIndex);
+            sb.append(StringUtils.capitalize(uppercaseAbbreviation.toLowerCase()));
+            str = str.substring(uppercaseAbbreviationEndIndex);
+        }
+
         for (String s : CAMEL_CASE_SPLIT.split(str)) {
             String capitalize = StringUtils.capitalize(s);
             sb.append(capitalize);

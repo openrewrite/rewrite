@@ -4412,7 +4412,7 @@ public interface J extends Tree {
         @Nullable
         @Override
         public JavaType getType() {
-            return constructorType == null ? null : constructorType.getDeclaringType();
+            return constructorType == null ? null : constructorType.getReturnType();
         }
 
         /**

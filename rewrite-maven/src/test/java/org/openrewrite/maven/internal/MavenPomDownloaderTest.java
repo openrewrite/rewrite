@@ -15,9 +15,8 @@
  */
 package org.openrewrite.maven.internal;
 
-import dev.failsafe.Failsafe;
-import dev.failsafe.RetryPolicy;
 import okhttp3.mockwebserver.*;
+import org.assertj.core.api.Condition;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
@@ -25,34 +24,29 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Issue;
+import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.net.SocketTimeoutException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeoutException;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -80,6 +74,48 @@ class MavenPomDownloaderTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3908")
+    @Test
+    void centralIdOverridesDefaultRepository() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+          //language=xml
+          """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                                  https://maven.apache.org/xsd/settings-1.0.0.xsd">
+              <profiles>
+                <profile>
+                    <id>central</id>
+                    <repositories>
+                        <repository>
+                            <id>central</id>
+                            <url>https://internalartifactrepository.yourorg.com</url>
+                        </repository>
+                    </repositories>
+                </profile>
+              </profiles>
+              <activeProfiles>
+                <activeProfile>central</activeProfile>
+              </activeProfiles>
+            </settings>
+            """.getBytes()
+        )), ctx));
+
+        // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
+        for (MavenRepository repository : ctx.getRepositories()) {
+            repository.setKnownToExist(true);
+        }
+
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        Collection<MavenRepository> repos = downloader.distinctNormalizedRepositories(emptyList(), null, null);
+        assertThat(repos).areExactly(1, new Condition<>(repo -> "central".equals(repo.getId()),
+          "id \"central\""));
+        assertThat(repos).areExactly(1, new Condition<>(repo -> "https://internalartifactrepository.yourorg.com".equals(repo.getUri()),
+          "URI https://internalartifactrepository.yourorg.com"));
     }
 
     @Disabled("Flaky on CI")
@@ -177,6 +213,7 @@ class MavenPomDownloaderTest {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest recordedRequest) {
+                    assert recordedRequest.getPath() != null;
                     return !recordedRequest.getPath().endsWith("fred/fred/2020.0.2-SNAPSHOT/fred-2020.0.2-20210127.131051-2.pom") ?
                       new MockResponse().setResponseCode(404).setBody("") :
                       new MockResponse().setResponseCode(200).setBody(
@@ -579,6 +616,7 @@ class MavenPomDownloaderTest {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
 
         var result = downloader.download(gav, null, null, List.of());
+        assertThat(result.getRepository()).isNotNull();
         assertThat(result.getRepository().getUri()).startsWith(tempDir.toUri().toString());
     }
 

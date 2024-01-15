@@ -449,7 +449,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             resolvedOwner = type instanceof Type.MethodType ?
-                    methodInvocationType(type, sym) :
+                    methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type)) :
                     type(type);
             assert resolvedOwner != null;
         }

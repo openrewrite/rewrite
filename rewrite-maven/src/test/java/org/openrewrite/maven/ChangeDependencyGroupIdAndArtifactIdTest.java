@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -96,6 +97,40 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
+    void requireNewGroupIdOrNewArtifactId() {
+        assertThatExceptionOfType(AssertionError.class)
+          .isThrownBy(() -> rewriteRun(
+            spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+              "javax.activation",
+              "javax.activation-api",
+              null,
+              null,
+              null,
+              null,
+              null
+            ))
+          )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
+    void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
+        assertThatExceptionOfType(AssertionError.class)
+          .isThrownBy(() -> rewriteRun(
+            spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+              "javax.activation",
+              "javax.activation-api",
+              "javax.activation",
+              null,
+              null,
+              null,
+              null
+            ))
+          )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
     }
 
     @Test

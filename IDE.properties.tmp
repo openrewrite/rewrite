@@ -21,6 +21,7 @@ rewrite-java
 rewrite-java-test
 rewrite-java-tck
 rewrite-java-17
+rewrite-java-21
 
 # Other language modules
 
