@@ -136,7 +136,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
-        // run two visitors in getScanner, one PropertiesVisitor and one GroovyVisitor, and have those fill your accumulator object
         MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
 
