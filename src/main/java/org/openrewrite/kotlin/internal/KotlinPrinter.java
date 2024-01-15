@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
@@ -646,7 +645,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             return visitClassDeclaration0(classDecl, null, p);
         }
 
-        @NotNull
         private J.ClassDeclaration visitClassDeclaration0(J.ClassDeclaration classDecl, @Nullable K.TypeConstraints typeConstraints, PrintOutputCapture<P> p) {
             beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
             visit(classDecl.getLeadingAnnotations(), p);
@@ -885,7 +883,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             return visitMethodDeclaration0(method, null, p);
         }
 
-        @NotNull
         private J.MethodDeclaration visitMethodDeclaration0(J.MethodDeclaration method, @Nullable K.TypeConstraints typeConstraints, PrintOutputCapture<P> p) {
             // Do not print generated methods.
             for (Marker marker : method.getMarkers().getMarkers()) {
@@ -996,6 +993,17 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             afterSyntax(method, p);
             return method;
+        }
+
+        @Override
+        public J visitNullableType(J.NullableType nt, PrintOutputCapture<P> p) {
+            visit(nt.getAnnotations(), p);
+            beforeSyntax(nt, Space.Location.NULLABLE_TYPE_PREFIX, p);
+            visit(nt.getTypeTree(), p);
+            visitSpace(nt.getPadding().getTypeTree().getAfter(), Space.Location.NULLABLE_TYPE_SUFFIX, p);
+            p.append("?");
+            afterSyntax(nt, p);
+            return nt;
         }
 
         private void visitArgumentsContainer(JContainer<Expression> argContainer, Space.Location argsLocation, PrintOutputCapture<P> p) {
@@ -1321,7 +1329,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
     }
 
-    @NotNull
     private static String getClassKind(J.ClassDeclaration classDecl) {
         String kind;
         if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Class || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Annotation) {
@@ -1436,7 +1443,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
     }
 
-    @NotNull
     private static String getEqualsText(J.VariableDeclarations vd) {
         String equals = "=";
         for (Marker marker : vd.getMarkers().getMarkers()) {

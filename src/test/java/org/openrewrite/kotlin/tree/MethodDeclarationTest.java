@@ -44,6 +44,13 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void annotatedNullableType() {
+        rewriteRun(
+          kotlin("fun method(i : @Suppress(\"b\") Int?) { }")
+        );
+    }
+
+    @Test
     void functionTypeReference() {
         rewriteRun(
           kotlin("fun method( input : (  ) -> String ) { }")

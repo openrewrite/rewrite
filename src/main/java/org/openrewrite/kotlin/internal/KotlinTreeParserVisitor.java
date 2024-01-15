@@ -3191,6 +3191,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (!leadingAnnotations.isEmpty()) {
                 j = new J.AnnotatedType(randomId(), Space.EMPTY, Markers.EMPTY, leadingAnnotations, (TypeTree) j);
             }
+        } else if (j instanceof J.NullableType) {
+            j = ((J.NullableType) j).withAnnotations(leadingAnnotations);
         }
 
         // Handle potential redundant nested parentheses
