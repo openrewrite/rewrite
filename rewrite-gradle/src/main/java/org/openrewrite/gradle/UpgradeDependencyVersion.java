@@ -168,8 +168,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
         MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
-        return
-            Preconditions.or(
+        return Preconditions.or(
                 new PropertiesVisitor<ExecutionContext>() {
                     @Override
                     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
