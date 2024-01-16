@@ -92,6 +92,9 @@ public interface Xml extends Tree {
         @With
         String prefixUnsafe;
 
+        /**
+         * @return a map of namespace prefixes (without the <code>xmlns</code> prefix) to URIs for this document.
+         */
         public Map<String, String> getNamespaces() {
             if (root == null) {
                 throw new IllegalStateException("Cannot get namespaces if root tag is null");
@@ -301,6 +304,9 @@ public interface Xml extends Tree {
         @With
         String prefixUnsafe;
 
+        /**
+         * @return a map of namespace prefixes (without the <code>xmlns</code> prefix) to URIs for this tag.
+         */
         public Map<String, String> getNamespaces() {
             return XmlUtils.extractNamespaces(attributes);
         }
@@ -309,7 +315,7 @@ public interface Xml extends Tree {
             List<Xml.Attribute> attributes = this.attributes;
             if (attributes.isEmpty()) {
                 for (Map.Entry<String, String> ns : namespaces.entrySet()) {
-                    String key = ns.getKey().isEmpty() ? "xmlns" : "xmlns:" + ns.getKey();
+                    String key = XmlUtils.getAttributeNameFor(ns.getKey());
                     attributes = ListUtils.concat(attributes, new Xml.Attribute(
                             randomId(),
                             "",
@@ -337,7 +343,7 @@ public interface Xml extends Tree {
                         ));
 
                 for (Map.Entry<String, String> ns : namespaces.entrySet()) {
-                    String key = ns.getKey().isEmpty() ? "xmlns" : "xmlns:" + ns.getKey();
+                    String key = XmlUtils.getAttributeNameFor(ns.getKey());
                     if (attributeByKey.containsKey(key)) {
                         Xml.Attribute attribute = attributeByKey.get(key);
                         if (!ns.getValue().equals(attribute.getValueAsString())) {

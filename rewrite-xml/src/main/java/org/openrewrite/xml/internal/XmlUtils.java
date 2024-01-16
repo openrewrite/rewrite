@@ -35,7 +35,15 @@ public class XmlUtils {
     }
 
     @NonNull
+    public static String getAttributeNameFor(String namespacePrefix) {
+        return namespacePrefix.isEmpty() ? "xmlns" : "xmlns:" + namespacePrefix;
+    }
+
+    @NonNull
     public static String extractNamespacePrefix(String name) {
+        if (!isNamespaceAttribute("xmlns")) {
+            throw new IllegalArgumentException("Namespace attribute names must start with \"xmlns\".");
+        }
         int colon = name.indexOf(':');
         return colon == -1 ? "" : name.substring(colon + 1);
     }
