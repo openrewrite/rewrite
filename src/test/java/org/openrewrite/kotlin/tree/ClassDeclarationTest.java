@@ -58,6 +58,19 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void annotatedSupertype() {
+        rewriteRun(
+          kotlin(
+            """
+              interface I1 {}
+              class Test :    @Suppress  Any() ,I1  {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void annotatedDelegatingConstructor() {
         rewriteRun(
           kotlin(

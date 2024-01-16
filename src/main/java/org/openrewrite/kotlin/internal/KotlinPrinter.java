@@ -767,9 +767,10 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 return ident;
             }
 
-            visit(ident.getAnnotations(), p);
-            beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+            visit(ident.getAnnotations(), p);
+
+            beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
             boolean isQuoted = ident.getMarkers().findFirst(Quoted.class).isPresent();
             if (isQuoted) {
                 p.append("`");
