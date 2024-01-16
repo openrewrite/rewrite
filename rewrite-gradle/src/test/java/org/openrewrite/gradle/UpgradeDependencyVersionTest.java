@@ -556,5 +556,35 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mapNotationVariableInPropertiesFile() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation group: "com.google.guava", name: "guava", version: guavaVersion
+              }
+              """
+          )
+        );
+    }
+
 
 }

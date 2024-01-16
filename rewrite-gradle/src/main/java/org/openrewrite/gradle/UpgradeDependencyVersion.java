@@ -15,8 +15,7 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -121,9 +120,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     private static final String UPDATE_VERSION_ERROR_KEY = "UPDATE_VERSION_ERROR_KEY";
 
+
     public static class DependencyVersionState {
         GradleProject gradleProject;
-        List<Expression> dependencyExpressions = new ArrayList<>();
+        Map<String, GroupArtifact> buildDependencies = new HashMap<>();
     }
 
     @Override
@@ -139,11 +139,61 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (dependencyDsl.matches(m)) {
-                    List<Expression> depArgs = m.getArguments();
-                    if (depArgs.get(0) instanceof J.Literal ||
-                        depArgs.get(0) instanceof G.GString ||
-                        depArgs.get(0) instanceof G.MapEntry) {
-                        acc.dependencyExpressions.addAll(depArgs);
+                    if(m.getArguments().get(0) instanceof G.MapEntry) {
+                        String groupId = null;
+                        String artifactId = null;
+                        String version = null;
+
+                        for (Expression e : m.getArguments()) {
+                            if (!(e instanceof G.MapEntry)) {
+                                continue;
+                            }
+                            G.MapEntry arg = (G.MapEntry) e;
+                            if (!(arg.getKey() instanceof J.Literal)) {
+                                continue;
+                            }
+                            J.Literal key = (J.Literal) arg.getKey();
+                            String valueValue = null;
+                            if(arg.getValue() instanceof J.Literal) {
+                                J.Literal value = (J.Literal) arg.getValue();
+                                if(value.getValue() instanceof String) {
+                                    valueValue = (String)value.getValue();
+                                }
+                            } else if(arg.getValue() instanceof J.Identifier) {
+                                J.Identifier value = (J.Identifier) arg.getValue();
+                                valueValue = value.getSimpleName();
+                            }
+                            if (!(key.getValue() instanceof String)) {
+                                continue;
+                            }
+                            String keyValue = (String) key.getValue();
+                            if ("group".equals(keyValue)) {
+                                groupId = valueValue;
+                            } else if ("name".equals(keyValue)) {
+                                artifactId = valueValue;
+                            } else if ("version".equals(keyValue)) {
+                                version = valueValue;
+                            }
+                        }
+                        acc.buildDependencies.put(version, new GroupArtifact(groupId, artifactId));
+                    } else {
+                        for (Expression depArg : m.getArguments()) {
+                            if (depArg instanceof G.GString) {
+                                G.GString gString = (G.GString) depArg;
+                                List<J> strings = gString.getStrings();
+                                if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
+                                    continue;
+                                }
+                                J.Literal groupArtifact = (J.Literal) strings.get(0);
+                                G.GString.Value versionValue = (G.GString.Value) strings.get(1);
+                                if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
+                                    continue;
+                                }
+                                Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                                String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
+                                acc.buildDependencies.put(versionVariableName, new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                            }
+                        }
                     }
                 }
                 return m;
@@ -173,38 +223,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                     @Override
                     public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                        for (Expression dependencyExpression : acc.dependencyExpressions) {
-                            if (dependencyExpression instanceof G.GString) {
-                                G.GString gString = (G.GString) dependencyExpression;
-                                List<J> strings = gString.getStrings();
-                                if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
-                                    return entry;
+
+                        if(acc.buildDependencies.containsKey(entry.getKey())) {
+                            GroupArtifact groupArtifact = acc.buildDependencies.get(entry.getKey());
+                            if (!StringUtils.isBlank(newVersion)) {
+                                String resolvedVersion = null;
+                                try {
+                                    resolvedVersion = findNewerProjectDependencyVersion(groupArtifact.getGroupId(), groupArtifact.getArtifactId(), newVersion, acc.gradleProject, ctx);
+                                } catch (MavenDownloadingException e) {
+                                    return e.warn(entry);
                                 }
-                                J.Literal groupArtifact = (J.Literal) strings.get(0);
-                                G.GString.Value versionValue = (G.GString.Value) strings.get(1);
-                                if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
-                                    return entry;
+                                if (resolvedVersion != null) {
+                                    return entry.withValue(entry.getValue().withText(resolvedVersion));
                                 }
-                                Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                                if (dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
-                                    String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
-                                    if (entry.getKey().equals(versionVariableName)) {
-                                        if (!StringUtils.isBlank(newVersion)) {
-                                            String resolvedVersion = null;
-                                            try {
-                                                resolvedVersion = findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), newVersion, acc.gradleProject, ctx);
-                                            } catch (MavenDownloadingException e) {
-                                                return e.warn(entry);
-                                            }
-                                            if (resolvedVersion != null) {
-                                                return entry.withValue(entry.getValue().withText(resolvedVersion));
-                                            }
-                                            return entry.withValue(entry.getValue().withText(newVersion));
-                                        }
-                                    }
-                                }
+                                return entry.withValue(entry.getValue().withText(newVersion));
                             }
                         }
+
                         return entry;
                     }
                 },
