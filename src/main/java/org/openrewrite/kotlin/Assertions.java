@@ -17,7 +17,6 @@ package org.openrewrite.kotlin;
 
 
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.internal.lang.Nullable;
@@ -248,7 +247,6 @@ public final class Assertions {
                     return next(space);
                 }
 
-                @NotNull
                 private Space next(Space space) {
                     if (!space.getComments().isEmpty()) {
                         return space;

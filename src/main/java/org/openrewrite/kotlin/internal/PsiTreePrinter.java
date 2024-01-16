@@ -17,7 +17,6 @@ package org.openrewrite.kotlin.internal;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -133,7 +132,7 @@ public class PsiTreePrinter {
         TreePrinterContext context = new TreePrinterContext(lines, 1);
         new FirDefaultVisitor<Void, TreePrinterContext>() {
             @Override
-            public Void visitElement(@NotNull FirElement firElement, TreePrinterContext ctx) {
+            public Void visitElement(FirElement firElement, TreePrinterContext ctx) {
                 StringBuilder line = new StringBuilder();
                 line.append(leftPadding(ctx.getDepth()))
                         .append(printFirElement(firElement));
@@ -164,7 +163,7 @@ public class PsiTreePrinter {
         TreePrinterContext context = new TreePrinterContext(lines, 1);
         new FirDefaultVisitor<Void, TreePrinterContext>() {
             @Override
-            public Void visitElement(@NotNull FirElement fir, TreePrinterContext ctx) {
+            public Void visitElement(FirElement fir, TreePrinterContext ctx) {
                 StringBuilder line = new StringBuilder();
                 line.append(leftPadding(ctx.getDepth()))
                         .append(printFirElement(fir));
@@ -190,7 +189,7 @@ public class PsiTreePrinter {
     }
 
     public static class IrPrinter {
-        public void printElement(@NotNull IrElement element, @NotNull PsiTreePrinter.TreePrinterContext ctx) {
+        public void printElement(IrElement element, PsiTreePrinter.TreePrinterContext ctx) {
             StringBuilder line = new StringBuilder();
             line.append(leftPadding(ctx.getDepth()))
                     .append(printIrElement(element));
