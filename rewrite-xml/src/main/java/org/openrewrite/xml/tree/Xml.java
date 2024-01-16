@@ -159,6 +159,20 @@ public interface Xml extends Tree {
             return new Document(id, sourcePath, prefixUnsafe, namespaces, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
         }
 
+        /**
+         * @return The namespace prefix of the root tag of this document, if any.
+         */
+        public Optional<String> getNamespacePrefix() {
+            return root == null ? Optional.empty() : root.getNamespacePrefix();
+        }
+
+        /**
+         * @return The namespace URI of the root tag of this document, if any.
+         */
+        public Optional<String> getNamespaceUri(Cursor cursor) {
+            return root == null ? Optional.empty() : root.getNamespaceUri(cursor);
+        }
+
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitDocument(this, p);
