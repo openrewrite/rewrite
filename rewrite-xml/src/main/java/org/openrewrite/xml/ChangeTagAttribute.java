@@ -88,7 +88,7 @@ public class ChangeTagAttribute extends Recipe {
                 }
 
                 String stringValue = attribute.getValueAsString();
-                if (oldValue != null && !stringValue.startsWith(oldValue)) {
+                if (oldValue != null) {
                     if (Boolean.TRUE.equals(regex) && !Pattern.matches(oldValue, stringValue)) {
                         return attribute;
                     } else if ((regex == null || Boolean.FALSE.equals(regex)) && !stringValue.startsWith(oldValue)) {
