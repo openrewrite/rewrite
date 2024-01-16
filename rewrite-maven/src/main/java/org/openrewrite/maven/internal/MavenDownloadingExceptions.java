@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,22 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven;
+package org.openrewrite.maven.internal;
 
 import lombok.Getter;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.openrewrite.maven.MavenVisitor.*;
 
 @Getter
 public class MavenDownloadingExceptions extends Exception {
@@ -65,7 +63,7 @@ public class MavenDownloadingExceptions extends Exception {
                     exception.getRoot().getArtifactId()), ga -> new ArrayList<>()).add(exception);
         }
 
-        return (Xml.Document) new XmlIsoVisitor<Integer>() {
+        return (Xml.Document) new MavenIsoVisitor<Integer>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, Integer integer) {
                 return sourceFile instanceof Xml.Document;
@@ -75,7 +73,7 @@ public class MavenDownloadingExceptions extends Exception {
             public Xml.Tag visitTag(Xml.Tag tag, Integer integer) {
                 Xml.Tag t = tag;
                 for (GroupArtifact ga : byGav.keySet()) {
-                    boolean hasException = (DEPENDENCY_MATCHER.matches(getCursor()) || MANAGED_DEPENDENCY_MATCHER.matches(getCursor()) || PARENT_MATCHER.matches(getCursor())) &&
+                    boolean hasException = (isDependencyTag() || isManagedDependencyTag() || isParentTag()) &&
                                            tag.getChildValue("groupId").map(a -> ga.getGroupId().equals(a)).orElse(false) &&
                                            tag.getChildValue("artifactId").map(a -> ga.getArtifactId().equals(a)).orElse(false);
                     if (hasException) {

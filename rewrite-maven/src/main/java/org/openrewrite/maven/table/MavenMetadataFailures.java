@@ -20,7 +20,7 @@ import lombok.Value;
 import org.openrewrite.DataTable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;

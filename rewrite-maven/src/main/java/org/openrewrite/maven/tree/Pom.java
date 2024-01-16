@@ -19,7 +19,7 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;

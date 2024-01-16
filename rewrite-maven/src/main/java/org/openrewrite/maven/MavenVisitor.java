@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.XPathMatcher;

@@ -15,8 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import org.openrewrite.maven.MavenDownloadingException;
-
 public interface DownloadOperation<V> {
     V call() throws MavenDownloadingException;
 }

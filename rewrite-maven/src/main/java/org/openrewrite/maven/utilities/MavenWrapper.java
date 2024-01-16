@@ -20,7 +20,7 @@ import org.openrewrite.Checksum;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenMetadata;

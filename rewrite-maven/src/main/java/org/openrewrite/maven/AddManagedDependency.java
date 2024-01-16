@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenResolutionResult;

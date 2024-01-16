@@ -30,7 +30,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.Semver;

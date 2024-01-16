@@ -33,7 +33,7 @@ import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.BuildTool;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.Semver;

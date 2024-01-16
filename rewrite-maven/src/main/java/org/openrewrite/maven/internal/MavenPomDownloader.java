@@ -28,7 +28,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenPomCache;
@@ -590,6 +589,10 @@ public class MavenPomDownloader {
             ctx.getResolutionListener().downloadError(originalGav, containingPom.getRequested());
         }
 
+        if (normalizedRepos.isEmpty()) {
+            throw new MavenDownloadingException("No repositories to download from are configured.", null, originalGav)
+                    .setRepositoryResponses(repositoryResponses);
+        }
         throw new MavenDownloadingException("Unable to download POM.", null, originalGav)
                 .setRepositoryResponses(repositoryResponses);
     }

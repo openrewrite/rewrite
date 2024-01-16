@@ -21,7 +21,7 @@ import dev.failsafe.RetryPolicy;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.tree.MavenRepository;

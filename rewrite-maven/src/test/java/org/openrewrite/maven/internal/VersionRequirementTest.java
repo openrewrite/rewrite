@@ -16,7 +16,6 @@
 package org.openrewrite.maven.internal;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.maven.MavenDownloadingException;
 
 import java.util.List;
 

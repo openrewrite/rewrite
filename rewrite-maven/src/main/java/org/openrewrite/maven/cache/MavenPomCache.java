@@ -16,7 +16,7 @@
 package org.openrewrite.maven.cache;
 
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.tree.*;
 
 import java.net.URI;

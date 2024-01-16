@@ -29,7 +29,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenMetadata;

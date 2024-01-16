@@ -20,8 +20,8 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenDownloadingExceptions;
+import org.openrewrite.maven.internal.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingExceptions;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 

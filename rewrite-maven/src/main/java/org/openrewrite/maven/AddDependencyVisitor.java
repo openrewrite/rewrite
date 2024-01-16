@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.ResolvedDependency;

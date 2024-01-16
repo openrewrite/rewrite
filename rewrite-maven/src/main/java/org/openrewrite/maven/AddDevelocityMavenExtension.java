@@ -34,6 +34,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.tree.GroupArtifact;

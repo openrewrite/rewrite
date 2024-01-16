@@ -27,7 +27,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
-import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.MavenSettings;

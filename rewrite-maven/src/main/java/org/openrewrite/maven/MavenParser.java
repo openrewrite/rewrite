@@ -19,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawPom;
 import org.openrewrite.maven.tree.MavenResolutionResult;

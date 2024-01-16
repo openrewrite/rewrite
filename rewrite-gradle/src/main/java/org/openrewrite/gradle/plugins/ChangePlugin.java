@@ -33,7 +33,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.Semver;
 
