@@ -18,6 +18,7 @@ package org.openrewrite.xml;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
@@ -26,6 +27,11 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
 
 class RemoveContentTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipeOutputStabilityVerification(false);
+    }
 
     @DocumentExample
     @Test
@@ -37,7 +43,7 @@ class RemoveContentTest implements RewriteTest {
                   doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getContent()).get(1), false));
                   return super.visitDocument(x, ctx);
               }
-          }).withMaxCycles(1)),
+          })),
           xml(
             """
               <dependency>
@@ -64,7 +70,7 @@ class RemoveContentTest implements RewriteTest {
                     .getChildren().get(0).getChildren().get(0), true));
                   return super.visitDocument(x, ctx);
               }
-          }).withMaxCycles(1)),
+          })),
           xml(
             """
               <project>
@@ -95,7 +101,7 @@ class RemoveContentTest implements RewriteTest {
                     .getChildren().get(0).getChildren().get(0), true));
                   return super.visitDocument(x, ctx);
               }
-          }).withMaxCycles(1)),
+          })),
           xml(
             """
               <project>

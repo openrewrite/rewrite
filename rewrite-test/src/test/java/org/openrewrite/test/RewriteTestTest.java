@@ -79,7 +79,7 @@ class RewriteTestTest implements RewriteTest {
           })),
           text("", "Hello world")
         ),
-          "Recipes are expected to be stable, that is to say not make further changes to their output. " +
+          "Recipes are expected to be stable, meaning they do not make further changes to their output after a single application. " +
           "The test framework enforces this by running the recipe again on its own output, asserting no further changes.");
     }
 

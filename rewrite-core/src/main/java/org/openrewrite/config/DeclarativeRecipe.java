@@ -50,13 +50,6 @@ public class DeclarativeRecipe extends Recipe {
 
     private final URI source;
 
-    private final boolean causesAnotherCycle;
-
-    @Override
-    public boolean causesAnotherCycle() {
-        return causesAnotherCycle || super.causesAnotherCycle();
-    }
-
     @Getter
     private final List<Maintainer> maintainers;
 

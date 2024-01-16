@@ -568,10 +568,12 @@ public interface RewriteTest extends SourceSpecs {
             fail("The recipe added a source file that was not expected. All source file paths, before and after recipe run:\n" + paths);
         }
 
-        boolean shouldValidateOutputStability =
-                (testMethodSpec.getRecipeOutputStabilityValidation() == null &&
-                 (testClassSpec.getRecipeOutputStabilityValidation() == null || testClassSpec.getRecipeOutputStabilityValidation()))
-                || (testMethodSpec.getRecipeOutputStabilityValidation() == null || testMethodSpec.getRecipeOutputStabilityValidation());
+        boolean shouldValidateOutputStability;
+        if(testMethodSpec.getRecipeOutputStabilityValidation() == null) {
+            shouldValidateOutputStability = testClassSpec.getRecipeOutputStabilityValidation() == null || testClassSpec.getRecipeOutputStabilityValidation();
+        } else {
+            shouldValidateOutputStability = testMethodSpec.getRecipeOutputStabilityValidation();
+        }
         if(shouldValidateOutputStability) {
             List<SourceFile> afterSources = recipeRun.getChangeset().getAllResults().stream()
                     .map(Result::getAfter)

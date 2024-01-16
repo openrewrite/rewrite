@@ -123,7 +123,6 @@ class RecipeSchedulerTest implements RewriteTest {
           emptySet(),
           null,
           URI.create("dummy:recipe.yml"),
-          false,
           emptyList()
         );
         recipe.addUninitialized(new RecipeWritingToFile(1));

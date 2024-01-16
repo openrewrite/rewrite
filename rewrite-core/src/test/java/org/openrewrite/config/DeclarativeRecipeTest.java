@@ -44,7 +44,7 @@ public class DeclarativeRecipeTest implements RewriteTest {
           spec -> {
               spec.validateRecipeSerialization(false);
               DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
-                null, null, true, null);
+                null, null, null);
               dr.addPrecondition(
                 toRecipe(() -> new PlainTextVisitor<>() {
                     @Override
