@@ -448,6 +448,31 @@ public interface Xml extends Tree {
         @With
         String beforeTagDelimiterPrefix;
 
+        /**
+         * @return The namespace prefix for this tag, if any.
+         */
+        public Optional<String> getNamespacePrefix() {
+            String namespacePrefix = XmlUtils.extractNamespacePrefix(name);
+            return Optional.ofNullable(namespacePrefix.isEmpty() ? null : namespacePrefix);
+        }
+
+        /**
+         * @return The namespace URI for this tag, if any.
+         */
+        public Optional<String> getNamespaceUri(Cursor cursor) {
+            Optional<String> maybeNamespacePrefix = getNamespacePrefix();
+            if (!maybeNamespacePrefix.isPresent()) {
+                return Optional.empty();
+            }
+
+            String namespacePrefix = maybeNamespacePrefix.get();
+            if (namespaces != null && namespaces.containsKey(namespacePrefix)) {
+                return Optional.of(namespaces.get(namespacePrefix));
+            }
+
+            return XmlUtils.findNamespacePrefix(cursor, namespacePrefix);
+        }
+
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitTag(this, p);
@@ -512,6 +537,22 @@ public interface Xml extends Tree {
         Ident key;
         String beforeEquals;
         Value value;
+
+        /**
+         * @return The namespace prefix for this attribute, if any.
+         */
+        public Optional<String> getNamespacePrefix() {
+            String namespacePrefix = XmlUtils.extractNamespacePrefix(key.getName());
+            return Optional.ofNullable(namespacePrefix.isEmpty() ? null : namespacePrefix);
+        }
+
+        /**
+         * @return The namespace URI for this attribute, if any.
+         */
+        public Optional<String> getNamespaceUri(Cursor cursor) {
+            Optional<String> maybeNamespacePrefix = getNamespacePrefix();
+            return maybeNamespacePrefix.flatMap(s -> XmlUtils.findNamespacePrefix(cursor, s));
+        }
 
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
