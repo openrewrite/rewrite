@@ -26,12 +26,14 @@ import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
+import org.openrewrite.xml.internal.XmlUtils;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -89,6 +91,9 @@ public interface Xml extends Tree {
         @With
         String prefixUnsafe;
 
+        @With
+        Map<String, String> namespaces;
+
         public Document withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
@@ -134,8 +139,15 @@ public interface Xml extends Tree {
         Prolog prolog;
 
         @Getter
-        @With
         Tag root;
+
+        public Document withRoot(Tag root) {
+            if (this.root == root) {
+                return this;
+            }
+            Map<String, String> namespaces = XmlUtils.extractNamespaces(root.getAttributes());
+            return new Document(id, sourcePath, prefixUnsafe, namespaces, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
+        }
 
         @Getter
         String eof;
@@ -144,7 +156,7 @@ public interface Xml extends Tree {
             if (this.eof.equals(eof)) {
                 return this;
             }
-            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
+            return new Document(id, sourcePath, prefixUnsafe, namespaces, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
         }
 
         @Override
@@ -261,6 +273,13 @@ public interface Xml extends Tree {
         @With
         String prefixUnsafe;
 
+        Map<String, String> namespaces;
+
+        public Tag withNamespaces(Map<String, String> namespaces) {
+            return new Tag(id, prefixUnsafe, namespaces, markers, name, attributes, content, closing,
+                    beforeTagDelimiterPrefix);
+        }
+
         public Tag withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
@@ -286,7 +305,7 @@ public interface Xml extends Tree {
         }
 
         public Tag withName(String name) {
-            return new Tag(id, prefixUnsafe, markers, name, attributes, content,
+            return new Tag(id, prefixUnsafe, namespaces, markers, name, attributes, content,
                     closing == null ? null : closing.withName(name),
                     beforeTagDelimiterPrefix);
         }
@@ -394,7 +413,7 @@ public interface Xml extends Tree {
                 return this;
             }
 
-            Tag tag = new Tag(id, prefixUnsafe, markers, name, attributes, content, closing,
+            Tag tag = new Tag(id, prefixUnsafe, namespaces, markers, name, attributes, content, closing,
                     beforeTagDelimiterPrefix);
 
             if (closing == null) {

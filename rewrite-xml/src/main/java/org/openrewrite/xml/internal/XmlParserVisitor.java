@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiFunction;
 
 import static java.util.stream.Collectors.toList;
@@ -60,18 +61,28 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     @Override
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
-        return convert(ctx, (c, prefix) -> new Xml.Document(
-                randomId(),
-                path,
-                prefix,
-                Markers.EMPTY,
-                charset.name(),
-                charsetBomMarked,
-                null,
-                fileAttributes,
-                visitProlog(ctx.prolog()),
-                visitElement(ctx.element()),
-                source.substring(cursor))
+        return convert(ctx, (c, prefix) -> {
+                    Xml.Prolog prolog = visitProlog(ctx.prolog());
+                    Xml.Tag root = visitElement(ctx.element());
+
+                    Map<String, String> namespaces = root != null
+                            ? XmlUtils.extractNamespaces(root.getAttributes())
+                            : Collections.emptyMap();
+
+                    return new Xml.Document(
+                            randomId(),
+                            path,
+                            prefix,
+                            namespaces,
+                            Markers.EMPTY,
+                            charset.name(),
+                            charsetBomMarked,
+                            null,
+                            fileAttributes,
+                            prolog,
+                            root,
+                            source.substring(cursor));
+                }
         );
     }
 
@@ -229,6 +240,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
                     List<Xml.Attribute> attributes = ctx.attribute().stream().map(this::visitAttribute).collect(toList());
 
+                    Map<String, String> namespaces = XmlUtils.extractNamespaces(attributes);
+
                     List<Content> content = null;
                     String beforeTagDelimiterPrefix;
                     Xml.Tag.Closing closeTag = null;
@@ -258,7 +271,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         cursor++;
                     }
 
-                    return new Xml.Tag(randomId(), prefix, Markers.EMPTY, name, attributes,
+                    return new Xml.Tag(randomId(), prefix, namespaces, Markers.EMPTY, name, attributes,
                             content, closeTag, beforeTagDelimiterPrefix);
                 }
         );
