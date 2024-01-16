@@ -393,7 +393,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
     }
 
     private static MavenMetadata downloadMetadata(String groupId, String artifactId, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new MavenPomDownloader(emptyMap(), ctx, null, null)
+        return new MavenPomDownloader(ctx)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
                         repositories);
     }
