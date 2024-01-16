@@ -20,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
@@ -91,8 +92,21 @@ public interface Xml extends Tree {
         @With
         String prefixUnsafe;
 
-        @With
-        Map<String, String> namespaces;
+        public Map<String, String> getNamespaces() {
+            if (root == null) {
+                throw new IllegalStateException("Cannot get namespaces if root tag is null");
+            }
+
+            return root.getNamespaces();
+        }
+
+        public Document withNamespaces(Map<String, String> namespaces) {
+            if (root == null) {
+                throw new IllegalStateException("Cannot add namespaces if root tag is null");
+            }
+
+            return withRoot(root.withNamespaces(namespaces));
+        }
 
         public Document withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
@@ -146,7 +160,7 @@ public interface Xml extends Tree {
                 return this;
             }
             Map<String, String> namespaces = XmlUtils.extractNamespaces(root.getAttributes());
-            return new Document(id, sourcePath, prefixUnsafe, namespaces, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
+            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
         }
 
         @Getter
@@ -156,7 +170,7 @@ public interface Xml extends Tree {
             if (this.eof.equals(eof)) {
                 return this;
             }
-            return new Document(id, sourcePath, prefixUnsafe, namespaces, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
+            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
         }
 
         /**
@@ -287,10 +301,75 @@ public interface Xml extends Tree {
         @With
         String prefixUnsafe;
 
-        Map<String, String> namespaces;
+        public Map<String, String> getNamespaces() {
+            return XmlUtils.extractNamespaces(attributes);
+        }
 
         public Tag withNamespaces(Map<String, String> namespaces) {
-            return new Tag(id, prefixUnsafe, namespaces, markers, name, attributes, content, closing,
+            List<Xml.Attribute> attributes = this.attributes;
+            if (attributes.isEmpty()) {
+                for (Map.Entry<String, String> ns : namespaces.entrySet()) {
+                    String key = ns.getKey().isEmpty() ? "xmlns" : "xmlns:" + ns.getKey();
+                    attributes = ListUtils.concat(attributes, new Xml.Attribute(
+                            randomId(),
+                            "",
+                            Markers.EMPTY,
+                            new Xml.Ident(
+                                    randomId(),
+                                    "",
+                                    Markers.EMPTY,
+                                    key
+                            ),
+                            "",
+                            new Xml.Attribute.Value(
+                                    randomId(),
+                                    "",
+                                    Markers.EMPTY,
+                                    Xml.Attribute.Value.Quote.Double, ns.getValue()
+                            )
+                    ));
+                }
+            } else {
+                Map<String, Xml.Attribute> attributeByKey = attributes.stream()
+                        .collect(Collectors.toMap(
+                                Attribute::getKeyAsString,
+                                a -> a
+                        ));
+
+                for (Map.Entry<String, String> ns : namespaces.entrySet()) {
+                    String key = ns.getKey().isEmpty() ? "xmlns" : "xmlns:" + ns.getKey();
+                    if (attributeByKey.containsKey(key)) {
+                        Xml.Attribute attribute = attributeByKey.get(key);
+                        if (!ns.getValue().equals(attribute.getValueAsString())) {
+                            ListUtils.map(attributes, a -> a.getKeyAsString().equals(key)
+                                    ? attribute.withValue(new Xml.Attribute.Value(randomId(), "", Markers.EMPTY, Xml.Attribute.Value.Quote.Double, ns.getValue()))
+                                    : a
+                            );
+                        }
+                    } else {
+                        attributes = ListUtils.concat(attributes, new Xml.Attribute(
+                                randomId(),
+                                "",
+                                Markers.EMPTY,
+                                new Xml.Ident(
+                                        randomId(),
+                                        "",
+                                        Markers.EMPTY,
+                                        key
+                                ),
+                                "",
+                                new Xml.Attribute.Value(
+                                        randomId(),
+                                        "",
+                                        Markers.EMPTY,
+                                        Xml.Attribute.Value.Quote.Double, ns.getValue()
+                                )
+                        ));
+                    }
+                }
+            }
+
+            return new Tag(id, prefixUnsafe, markers, name, attributes, content, closing,
                     beforeTagDelimiterPrefix);
         }
 
@@ -319,7 +398,7 @@ public interface Xml extends Tree {
         }
 
         public Tag withName(String name) {
-            return new Tag(id, prefixUnsafe, namespaces, markers, name, attributes, content,
+            return new Tag(id, prefixUnsafe, markers, name, attributes, content,
                     closing == null ? null : closing.withName(name),
                     beforeTagDelimiterPrefix);
         }
@@ -427,7 +506,7 @@ public interface Xml extends Tree {
                 return this;
             }
 
-            Tag tag = new Tag(id, prefixUnsafe, namespaces, markers, name, attributes, content, closing,
+            Tag tag = new Tag(id, prefixUnsafe, markers, name, attributes, content, closing,
                     beforeTagDelimiterPrefix);
 
             if (closing == null) {
@@ -480,7 +559,8 @@ public interface Xml extends Tree {
             }
 
             String namespacePrefix = maybeNamespacePrefix.get();
-            if (namespaces != null && namespaces.containsKey(namespacePrefix)) {
+            Map<String, String> namespaces = XmlUtils.extractNamespaces(attributes);
+            if (namespaces.containsKey(namespacePrefix)) {
                 return Optional.of(namespaces.get(namespacePrefix));
             }
 
