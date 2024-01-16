@@ -52,13 +52,9 @@ class RecipeStack {
 
             this.recipePosition = recipePosition.getAndIncrement();
             Stack<Recipe> recipeStack = allRecipesStack.pop();
-            if (recipeStack.peek().maxCycles() >= ctx.getCycle()) {
-                sourceSet.setRecipe(recipeStack);
-                acc = consumer.apply(acc, recipeStack);
-                recurseRecipeList(recipeStack);
-            } else {
-                this.recipePosition = recipePosition.getAndAdd(countRecipes(recipeStack.peek()));
-            }
+            sourceSet.setRecipe(recipeStack);
+            acc = consumer.apply(acc, recipeStack);
+            recurseRecipeList(recipeStack);
         }
         return acc;
     }

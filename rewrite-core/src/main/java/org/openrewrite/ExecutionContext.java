@@ -98,7 +98,7 @@ public interface ExecutionContext {
     BiConsumer<Throwable, ExecutionContext> getOnTimeout();
 
     default int getCycle() {
-        return getCycleDetails().getCycle();
+        return 0;
     }
 
     default RecipeRunCycle<?> getCycleDetails() {

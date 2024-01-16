@@ -41,10 +41,6 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
     String name;
 
     @With
-    @Nullable
-    Boolean causesAnotherCycle;
-
-    @With
     Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
 
     @Nullable
@@ -54,10 +50,6 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
     @With
     @Nullable
     List<Maintainer> maintainers;
-
-    @With
-    @Nullable
-    Integer maxCycles;
 
     public String getDisplayName() {
         return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
@@ -70,16 +62,6 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
 
     public String getName() {
         return StringUtils.isBlank(name) ? super.getName() : name;
-    }
-
-    @Override
-    public boolean causesAnotherCycle() {
-        return causesAnotherCycle == null ? super.causesAnotherCycle() : causesAnotherCycle;
-    }
-
-    @Override
-    public int maxCycles() {
-        return maxCycles == null ? super.maxCycles() : maxCycles;
     }
 
     public List<Maintainer> getMaintainers() {

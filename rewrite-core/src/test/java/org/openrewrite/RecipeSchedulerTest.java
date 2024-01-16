@@ -204,7 +204,7 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
         assertThat(workingDirectory).hasParent(ctx.getMessage(WORKING_DIRECTORY_ROOT));
         assertThat(ctx.getCycleDetails().getRecipePosition()).isEqualTo(position);
         assertThat(workingDirectory.getFileName().toString())
-          .isEqualTo("cycle" + ctx.getCycle() + "_recipe" + position);
+          .isEqualTo("recipe" + position);
         return workingDirectory;
     }
 

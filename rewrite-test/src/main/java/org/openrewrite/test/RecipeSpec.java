@@ -73,10 +73,7 @@ public class RecipeSpec {
     Path relativeTo;
 
     @Nullable
-    Integer cycles;
-
-    @Nullable
-    Integer expectedCyclesThatMakeChanges;
+    Boolean recipeOutputStabilityValidation;
 
     @Nullable
     TypeValidation typeValidation;
@@ -185,8 +182,13 @@ public class RecipeSpec {
         return this;
     }
 
+    @Deprecated
     public RecipeSpec cycles(int cycles) {
-        this.cycles = cycles;
+        return recipeOutputStabilityVerification(false);
+    }
+
+    public RecipeSpec recipeOutputStabilityVerification(boolean validateRecipeOutputStability) {
+        this.recipeOutputStabilityValidation = validateRecipeOutputStability;
         return this;
     }
 
@@ -224,6 +226,7 @@ public class RecipeSpec {
         });
     }
 
+    @SuppressWarnings("unused")
     @Incubating(since = "7.35.0")
     public <E, V> RecipeSpec dataTableAsCsv(Class<DataTable<?>> dataTableClass, String expect) {
         return dataTableAsCsv(dataTableClass.getName(), expect);
@@ -257,18 +260,14 @@ public class RecipeSpec {
         return this;
     }
 
+    @Deprecated
     public RecipeSpec expectedCyclesThatMakeChanges(int expectedCyclesThatMakeChanges) {
-        this.expectedCyclesThatMakeChanges = expectedCyclesThatMakeChanges;
+        return recipeOutputStabilityValidation(false);
+    }
+
+    public RecipeSpec recipeOutputStabilityValidation(boolean validate) {
+        recipeOutputStabilityValidation = validate;
         return this;
-    }
-
-    int getCycles() {
-        return cycles == null ? 2 : cycles;
-    }
-
-    int getExpectedCyclesThatMakeChanges(int cycles) {
-        return expectedCyclesThatMakeChanges == null ? cycles - 1 :
-                expectedCyclesThatMakeChanges;
     }
 
     public RecipeSpec typeValidationOptions(TypeValidation typeValidation) {
