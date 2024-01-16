@@ -26,8 +26,8 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
+import org.openrewrite.xml.internal.XmlNamespaceUtils;
 import org.openrewrite.xml.internal.XmlPrinter;
-import org.openrewrite.xml.internal.XmlUtils;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -162,7 +162,7 @@ public interface Xml extends Tree {
             if (this.root == root) {
                 return this;
             }
-            Map<String, String> namespaces = XmlUtils.extractNamespaces(root.getAttributes());
+            Map<String, String> namespaces = XmlNamespaceUtils.extractNamespaces(root.getAttributes());
             return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
         }
 
@@ -308,14 +308,14 @@ public interface Xml extends Tree {
          * @return a map of namespace prefixes (without the <code>xmlns</code> prefix) to URIs for this tag.
          */
         public Map<String, String> getNamespaces() {
-            return XmlUtils.extractNamespaces(attributes);
+            return XmlNamespaceUtils.extractNamespaces(attributes);
         }
 
         public Tag withNamespaces(Map<String, String> namespaces) {
             List<Xml.Attribute> attributes = this.attributes;
             if (attributes.isEmpty()) {
                 for (Map.Entry<String, String> ns : namespaces.entrySet()) {
-                    String key = XmlUtils.getAttributeNameFor(ns.getKey());
+                    String key = XmlNamespaceUtils.getAttributeNameFor(ns.getKey());
                     attributes = ListUtils.concat(attributes, new Xml.Attribute(
                             randomId(),
                             "",
@@ -343,7 +343,7 @@ public interface Xml extends Tree {
                         ));
 
                 for (Map.Entry<String, String> ns : namespaces.entrySet()) {
-                    String key = XmlUtils.getAttributeNameFor(ns.getKey());
+                    String key = XmlNamespaceUtils.getAttributeNameFor(ns.getKey());
                     if (attributeByKey.containsKey(key)) {
                         Xml.Attribute attribute = attributeByKey.get(key);
                         if (!ns.getValue().equals(attribute.getValueAsString())) {
@@ -551,7 +551,7 @@ public interface Xml extends Tree {
          * @return The namespace prefix for this tag, if any.
          */
         public Optional<String> getNamespacePrefix() {
-            String namespacePrefix = XmlUtils.extractNamespacePrefix(name);
+            String namespacePrefix = XmlNamespaceUtils.extractNamespacePrefix(name);
             return Optional.ofNullable(namespacePrefix.isEmpty() ? null : namespacePrefix);
         }
 
@@ -565,12 +565,12 @@ public interface Xml extends Tree {
             }
 
             String namespacePrefix = maybeNamespacePrefix.get();
-            Map<String, String> namespaces = XmlUtils.extractNamespaces(attributes);
+            Map<String, String> namespaces = XmlNamespaceUtils.extractNamespaces(attributes);
             if (namespaces.containsKey(namespacePrefix)) {
                 return Optional.of(namespaces.get(namespacePrefix));
             }
 
-            return XmlUtils.findNamespacePrefix(cursor, namespacePrefix);
+            return XmlNamespaceUtils.findNamespacePrefix(cursor, namespacePrefix);
         }
 
         @Override
@@ -642,7 +642,7 @@ public interface Xml extends Tree {
          * @return The namespace prefix for this attribute, if any.
          */
         public Optional<String> getNamespacePrefix() {
-            String namespacePrefix = XmlUtils.extractNamespacePrefix(key.getName());
+            String namespacePrefix = XmlNamespaceUtils.extractNamespacePrefix(key.getName());
             return Optional.ofNullable(namespacePrefix.isEmpty() ? null : namespacePrefix);
         }
 
@@ -651,7 +651,7 @@ public interface Xml extends Tree {
          */
         public Optional<String> getNamespaceUri(Cursor cursor) {
             Optional<String> maybeNamespacePrefix = getNamespacePrefix();
-            return maybeNamespacePrefix.flatMap(s -> XmlUtils.findNamespacePrefix(cursor, s));
+            return maybeNamespacePrefix.flatMap(s -> XmlNamespaceUtils.findNamespacePrefix(cursor, s));
         }
 
         @Override

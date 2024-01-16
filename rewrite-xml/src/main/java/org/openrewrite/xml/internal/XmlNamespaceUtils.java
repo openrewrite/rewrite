@@ -16,7 +16,6 @@
 package org.openrewrite.xml.internal;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
@@ -25,42 +24,38 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-public class XmlUtils {
+public class XmlNamespaceUtils {
 
-    private XmlUtils() {
+    private XmlNamespaceUtils() {
     }
 
     private static boolean isNamespaceAttribute(String name) {
         return name.startsWith("xmlns");
     }
 
-    @NonNull
     public static String getAttributeNameFor(String namespacePrefix) {
         return namespacePrefix.isEmpty() ? "xmlns" : "xmlns:" + namespacePrefix;
     }
 
-    @NonNull
     public static String extractNamespacePrefix(String name) {
-        if (!isNamespaceAttribute("xmlns")) {
+        if (!isNamespaceAttribute(name)) {
             throw new IllegalArgumentException("Namespace attribute names must start with \"xmlns\".");
         }
         int colon = name.indexOf(':');
         return colon == -1 ? "" : name.substring(colon + 1);
     }
 
-    @NonNull
     public static Map<String, String> extractNamespaces(Collection<Xml.Attribute> attributes) {
         return attributes.isEmpty()
                 ? Collections.emptyMap()
                 : attributes.stream()
-                    .filter(attribute -> isNamespaceAttribute(attribute.getKeyAsString()))
-                    .collect(Collectors.toMap(
-                            attribute -> extractNamespacePrefix(attribute.getKeyAsString()),
-                            attribute -> attribute.getValue().getValue()
-                    ));
+                .filter(attribute -> isNamespaceAttribute(attribute.getKeyAsString()))
+                .collect(Collectors.toMap(
+                        attribute -> extractNamespacePrefix(attribute.getKeyAsString()),
+                        attribute -> attribute.getValue().getValue()
+                ));
     }
 
-    @NonNull
     public static Optional<String> findNamespacePrefix(Cursor cursor, String namespacePrefix) {
         String resolvedNamespace = null;
         while (cursor != null) {
