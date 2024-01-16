@@ -235,7 +235,7 @@ public class UpgradeDependencyVersion extends Recipe {
                     return arg;
                 }));
                 Exception err = getCursor().pollMessage(UPDATE_VERSION_ERROR_KEY);
-                if(err != null) {
+                if (err != null) {
                     m = Markup.warn(m, err);
                 }
                 List<Expression> depArgs = m.getArguments();
