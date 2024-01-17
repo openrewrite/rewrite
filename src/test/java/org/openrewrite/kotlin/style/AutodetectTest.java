@@ -1139,4 +1139,23 @@ class AutodetectTest implements RewriteTest {
         var otherStyle = NamedStyles.merge(OtherStyle.class, singletonList(styles));
         assertThat(otherStyle.getUseTrailingComma()).isFalse();
     }
+
+    @Test
+    void unqualifiedFunctionImport() {
+        var cus = kp().parse(
+          """
+            fun a() = 1
+            """,
+          """
+            package b
+            import a
+            fun b() = a()
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        assertThat(styles).isNotNull();
+    }
 }

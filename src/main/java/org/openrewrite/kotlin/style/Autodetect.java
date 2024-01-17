@@ -69,7 +69,7 @@ public class Autodetect extends NamedStyles {
         private final FindTrailingCommaVisitor findTrailingComma = new FindTrailingCommaVisitor();
 
         public void sample(SourceFile cu) {
-            if(cu instanceof JavaSourceFile) {
+            if (cu instanceof JavaSourceFile) {
                 findImportLayout.visitNonNull(cu, 0);
                 findIndent.visitNonNull(cu, indentStatistics);
                 findSpaces.visitNonNull(cu, spacesStatistics);
@@ -87,7 +87,7 @@ public class Autodetect extends NamedStyles {
                     wrappingAndBracesStatistics.getWrappingAndBracesStyle(),
                     generalFormatStatistics.getFormatStyle(),
                     trailingCommaStatistics.getOtherStyle()
-                    ));
+            ));
         }
     }
 
@@ -440,7 +440,7 @@ public class Autodetect extends NamedStyles {
             boolean isContinuation = !(expression instanceof J.Annotation && !(
                     // ...but annotations which are *arguments* to other annotations can be continuations
                     getCursor().getParentTreeCursor().getValue() instanceof J.Annotation
-                            || getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
+                    || getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
             ));
             countIndents(expression.getPrefix().getWhitespace(), isContinuation, stats);
 
@@ -858,7 +858,7 @@ public class Autodetect extends NamedStyles {
 
                         Map<String, List<Integer>> weightMap = new HashMap<>();
 
-                        for ( int i = 0 ; i < longestImports.size(); i++) {
+                        for (int i = 0; i < longestImports.size(); i++) {
                             ImportAttributes importAttributes = longestImports.get(i);
                             int weight = longestImports.size() - i;
                             if (importAttributes.isAlias()) {
@@ -998,6 +998,10 @@ public class Autodetect extends NamedStyles {
         @Override
         public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, Integer integer) {
             for (J.Import anImport : cu.getImports()) {
+                if (anImport.getQualid().getTarget() instanceof J.Empty) {
+                    // skip unqualified imports
+                    continue;
+                }
                 importedPackages.add(anImport.getPackageName() + ".");
 
                 if (anImport.getQualid().getSimpleName().equals("*")) {
@@ -1036,6 +1040,8 @@ public class Autodetect extends NamedStyles {
             }
 
             importsBySourceFile.add(cu.getImports().stream()
+                    // skip unqualified imports
+                    .filter(i -> !(i.getQualid().getTarget() instanceof J.Empty))
                     .map(it -> new ImportAttributes(it.getPackageName(),
                             it.getPrefix().getWhitespace(),
                             it.getAlias() != null))
