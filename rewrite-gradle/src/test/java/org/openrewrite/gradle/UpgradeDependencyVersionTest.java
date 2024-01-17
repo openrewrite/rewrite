@@ -480,6 +480,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
               }
@@ -502,6 +507,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                 implementation ("com.google.guava:guava:30.1.1-jre")
               }
@@ -536,6 +546,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
               }
@@ -547,6 +562,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
               }
@@ -573,6 +593,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
               }
@@ -641,6 +666,4 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
-
-
 }
