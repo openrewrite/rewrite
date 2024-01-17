@@ -61,4 +61,7 @@ public interface ResolutionEventListener {
 
     default void repository(MavenRepository mavenRepository, @Nullable ResolvedPom containing) {
     }
+
+    default void repositoryAccessFailed(String uri, Throwable e) {
+    }
 }
