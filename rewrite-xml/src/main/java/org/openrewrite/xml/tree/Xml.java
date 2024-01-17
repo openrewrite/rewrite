@@ -312,6 +312,11 @@ public interface Xml extends Tree {
         }
 
         public Tag withNamespaces(Map<String, String> namespaces) {
+            Map<String, String> currentNamespaces = getNamespaces();
+            if (currentNamespaces.equals(namespaces)) {
+                return this;
+            }
+
             List<Xml.Attribute> attributes = this.attributes;
             if (attributes.isEmpty()) {
                 for (Map.Entry<String, String> ns : namespaces.entrySet()) {
