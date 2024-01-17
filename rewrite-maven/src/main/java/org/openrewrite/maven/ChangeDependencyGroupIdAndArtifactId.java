@@ -110,14 +110,28 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Change Maven dependency";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", oldGroupId, oldArtifactId);
+    }
+
+    @Override
+    public String getDescription() {
+        return "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.";
+    }
+
+    @Override
     public Validated<Object> validate() {
         Validated<Object> validated = super.validate();
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
         validated = validated.and(required("newGroupId", newGroupId).or(required("newArtifactId", newArtifactId)));
-        validated =
-            validated.and(test(
+        validated = validated.and(test(
                 "coordinates",
                 "newGroupId OR newArtifactId must be different from before",
                 this,
@@ -126,18 +140,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     boolean sameArtifactId = isBlank(r.newArtifactId) || Objects.equals(r.oldArtifactId, r.newArtifactId);
                     return !(sameGroupId && sameArtifactId);
                 }
-            ));
+        ));
         return validated;
-    }
-
-    @Override
-    public String getDisplayName() {
-        return "Change Maven dependency groupId, artifactId and optionally the version";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Change the groupId, artifactId and optionally the version of a specified Maven dependency.";
     }
 
     @Override
