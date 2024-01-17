@@ -15,58 +15,142 @@
  */
 package org.openrewrite.xml.internal;
 
+import lombok.Value;
 import org.openrewrite.Cursor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class XmlNamespaceUtils {
 
+    public static final String XML_SCHEMA_INSTANCE_PREFIX = "xsi";
+    public static final String XML_SCHEMA_INSTANCE_URI = "http://www.w3.org/2001/XMLSchema-instance";
+
     private XmlNamespaceUtils() {
     }
 
-    private static boolean isNamespaceAttribute(String name) {
+    public static boolean isNamespaceDefinitionAttribute(String name) {
         return name.startsWith("xmlns");
     }
 
-    public static String getAttributeNameFor(String namespacePrefix) {
+    public static String getAttributeNameForPrefix(String namespacePrefix) {
         return namespacePrefix.isEmpty() ? "xmlns" : "xmlns:" + namespacePrefix;
     }
 
+    /**
+     * Extract the namespace prefix from a tag or attribute name.
+     *
+     * @param name the tag or attribute name
+     * @return the namespace prefix (empty string for the default namespace)
+     */
     public static String extractNamespacePrefix(String name) {
-        if (!isNamespaceAttribute(name)) {
-            throw new IllegalArgumentException("Namespace attribute names must start with \"xmlns\".");
-        }
         int colon = name.indexOf(':');
-        return colon == -1 ? "" : name.substring(colon + 1);
+        return colon == -1 ? "" : name.substring(0, colon);
+    }
+
+    /**
+     * Extract the local name from a tag or attribute name.
+     *
+     * @param name the tag or attribute name
+     * @return the local name
+     */
+    static String extractLocalName(String name) {
+        int colon = name.indexOf(':');
+        return colon == -1 ? name : name.substring(colon + 1);
+    }
+
+    /**
+     * Extract the namespace prefix from a namespace definition attribute name (xmlns* attributes).
+     *
+     * @param name the attribute name
+     * @return the namespace prefix
+     */
+    public static String extractPrefixFromNamespaceDefinition(String name) {
+        if (!isNamespaceDefinitionAttribute(name)) {
+            throw new IllegalArgumentException("Namespace definition attribute names must start with \"xmlns\".");
+        }
+        return "xmlns".equals(name) ? "" : extractLocalName(name);
     }
 
     public static Map<String, String> extractNamespaces(Collection<Xml.Attribute> attributes) {
         return attributes.isEmpty()
                 ? Collections.emptyMap()
                 : attributes.stream()
-                .filter(attribute -> isNamespaceAttribute(attribute.getKeyAsString()))
-                .collect(Collectors.toMap(
-                        attribute -> extractNamespacePrefix(attribute.getKeyAsString()),
-                        attribute -> attribute.getValue().getValue()
-                ));
+                .filter(attribute -> isNamespaceDefinitionAttribute(attribute.getKeyAsString()))
+                .map(attribute -> new PrefixUri(
+                        extractPrefixFromNamespaceDefinition(attribute.getKeyAsString()),
+                        attribute.getValueAsString()
+                ))
+                .distinct()
+                .collect(Collectors.toMap(PrefixUri::getPrefix, PrefixUri::getUri));
     }
 
-    public static Optional<String> findNamespacePrefix(Cursor cursor, String namespacePrefix) {
-        String resolvedNamespace = null;
+    /**
+     * Gets a map containing all namespaces defined in the current scope, including all parent scopes.
+     *
+     * @param cursor     the cursor to search from
+     * @param currentTag the current tag
+     * @return a map containing all namespaces defined in the current scope, including all parent scopes.
+     */
+    public static Map<String, String> findNamespaces(Cursor cursor, @Nullable Xml.Tag currentTag) {
+        Map<String, String> namespaces = new HashMap<>();
+        if (currentTag != null) {
+            namespaces.putAll(currentTag.getNamespaces());
+        }
+
         while (cursor != null) {
             Xml.Tag enclosing = cursor.firstEnclosing(Xml.Tag.class);
             if (enclosing != null) {
-                resolvedNamespace = enclosing.getNamespaces().get(namespacePrefix);
-                break;
+                for (Map.Entry<String, String> ns : enclosing.getNamespaces().entrySet()) {
+                    if (namespaces.containsValue(ns.getKey())) {
+                        throw new IllegalStateException(java.lang.String.format("Cannot have two namespaces with the same prefix (%s): '%s' and '%s'", ns.getKey(), namespaces.get(ns.getKey()), ns.getValue()));
+                    }
+                    namespaces.put(ns.getKey(), ns.getValue());
+                }
             }
             cursor = cursor.getParent();
         }
 
-        return Optional.ofNullable(resolvedNamespace);
+        return namespaces;
+    }
+
+    /**
+     * Find the tag that contains the declaration of the {@link #XML_SCHEMA_INSTANCE_URI} namespace.
+     *
+     * @param cursor     the cursor to search from
+     * @param currentTag the current tag
+     * @return the tag that contains the declaration of the given namespace URI.
+     */
+    public static Xml.Tag findTagContainingXmlSchemaInstanceNamespace(Cursor cursor, Xml.Tag currentTag) {
+        Xml.Tag tag = currentTag;
+        if (tag.getNamespaces().containsValue(XML_SCHEMA_INSTANCE_URI)) {
+            return tag;
+        }
+        while (cursor != null) {
+            if (cursor.getValue() instanceof Xml.Document) {
+                return ((Xml.Document) cursor.getValue()).getRoot();
+            }
+            tag = cursor.firstEnclosing(Xml.Tag.class);
+            if (tag != null) {
+                if (tag.getNamespaces().containsValue(XML_SCHEMA_INSTANCE_URI)) {
+                    return tag;
+                }
+            }
+            cursor = cursor.getParent();
+        }
+
+        // Should never happen
+        throw new IllegalArgumentException("Could not find tag containing namespace '" + XML_SCHEMA_INSTANCE_URI + "' or the enclosing Xml.Document instance.");
+    }
+
+    @Value
+    static class PrefixUri {
+        String prefix;
+        String uri;
     }
 }

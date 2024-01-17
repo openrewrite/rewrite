@@ -315,7 +315,7 @@ public interface Xml extends Tree {
             List<Xml.Attribute> attributes = this.attributes;
             if (attributes.isEmpty()) {
                 for (Map.Entry<String, String> ns : namespaces.entrySet()) {
-                    String key = XmlNamespaceUtils.getAttributeNameFor(ns.getKey());
+                    String key = XmlNamespaceUtils.getAttributeNameForPrefix(ns.getKey());
                     attributes = ListUtils.concat(attributes, new Xml.Attribute(
                             randomId(),
                             "",
@@ -343,7 +343,7 @@ public interface Xml extends Tree {
                         ));
 
                 for (Map.Entry<String, String> ns : namespaces.entrySet()) {
-                    String key = XmlNamespaceUtils.getAttributeNameFor(ns.getKey());
+                    String key = XmlNamespaceUtils.getAttributeNameForPrefix(ns.getKey());
                     if (attributeByKey.containsKey(key)) {
                         Xml.Attribute attribute = attributeByKey.get(key);
                         if (!ns.getValue().equals(attribute.getValueAsString())) {
@@ -355,7 +355,7 @@ public interface Xml extends Tree {
                     } else {
                         attributes = ListUtils.concat(attributes, new Xml.Attribute(
                                 randomId(),
-                                "",
+                                " ",
                                 Markers.EMPTY,
                                 new Xml.Ident(
                                         randomId(),
@@ -551,8 +551,7 @@ public interface Xml extends Tree {
          * @return The namespace prefix for this tag, if any.
          */
         public Optional<String> getNamespacePrefix() {
-            String namespacePrefix = XmlNamespaceUtils.extractNamespacePrefix(name);
-            return Optional.ofNullable(namespacePrefix.isEmpty() ? null : namespacePrefix);
+            return Optional.of(XmlNamespaceUtils.extractNamespacePrefix(name));
         }
 
         /**
@@ -570,7 +569,7 @@ public interface Xml extends Tree {
                 return Optional.of(namespaces.get(namespacePrefix));
             }
 
-            return XmlNamespaceUtils.findNamespacePrefix(cursor, namespacePrefix);
+            return Optional.ofNullable(XmlNamespaceUtils.findNamespaces(cursor, null).get(namespacePrefix));
         }
 
         @Override
@@ -642,8 +641,10 @@ public interface Xml extends Tree {
          * @return The namespace prefix for this attribute, if any.
          */
         public Optional<String> getNamespacePrefix() {
-            String namespacePrefix = XmlNamespaceUtils.extractNamespacePrefix(key.getName());
-            return Optional.ofNullable(namespacePrefix.isEmpty() ? null : namespacePrefix);
+            if (XmlNamespaceUtils.isNamespaceDefinitionAttribute(key.getName())) {
+                return Optional.empty();
+            }
+            return Optional.of(XmlNamespaceUtils.extractNamespacePrefix(key.getName()));
         }
 
         /**
@@ -651,7 +652,7 @@ public interface Xml extends Tree {
          */
         public Optional<String> getNamespaceUri(Cursor cursor) {
             Optional<String> maybeNamespacePrefix = getNamespacePrefix();
-            return maybeNamespacePrefix.flatMap(s -> XmlNamespaceUtils.findNamespacePrefix(cursor, s));
+            return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(XmlNamespaceUtils.findNamespaces(cursor, null).get(s)));
         }
 
         @Override
