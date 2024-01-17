@@ -218,6 +218,8 @@ public class MavenPomDownloader {
             throw new MavenDownloadingException("Missing group id.", null, gav);
         }
 
+        ctx.getResolutionListener().downloadMetadata(gav);
+
         Timer.Sample sample = Timer.start();
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "metadata");
 
@@ -456,6 +458,8 @@ public class MavenPomDownloader {
             }
             throw new MavenDownloadingException("Group id, artifact id, or version are missing.", null, gav);
         }
+
+        ctx.getResolutionListener().download(gav);
 
         // The pom being examined might be from a remote repository or a local filesystem.
         // First try to match the requested download with one of the project POMs.

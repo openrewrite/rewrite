@@ -21,30 +21,41 @@ import java.util.List;
 
 @SuppressWarnings("unused")
 public interface ResolutionEventListener {
-    ResolutionEventListener NOOP = new ResolutionEventListener() {};
+    ResolutionEventListener NOOP = new ResolutionEventListener() {
+    };
 
     default void clear() {
+    }
+
+    default void downloadMetadata(GroupArtifactVersion gav) {
+    }
+
+    default void download(GroupArtifactVersion gav) {
     }
 
     default void downloadSuccess(ResolvedGroupArtifactVersion gav, @Nullable ResolvedPom containing) {
     }
 
     /**
-     *
-     * @param gav - GAV coordinate of the dependency which failed to download
+     * @param gav           - GAV coordinate of the dependency which failed to download
      * @param attemptedUris - The URIs which were attempted, in the order they were attempted, before resolution was determined to have failed
-     * @param containing - The pom containing the dependency which failed to resolve, if resolution was attempted from such a context
+     * @param containing    - The pom containing the dependency which failed to resolve, if resolution was attempted from such a context
      */
     default void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
     }
+
     default void parent(Pom parent, Pom containing) {
     }
+
     default void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing) {
     }
+
     default void bomImport(ResolvedGroupArtifactVersion gav, Pom containing) {
     }
+
     default void property(String key, String value, Pom containing) {
     }
+
     default void dependencyManagement(ManagedDependency dependencyManagement, Pom containing) {
     }
 
