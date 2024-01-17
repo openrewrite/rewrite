@@ -39,7 +39,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class UpgradePluginVersion extends Recipe {
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
