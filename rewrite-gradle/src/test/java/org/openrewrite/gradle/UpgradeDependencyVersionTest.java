@@ -97,6 +97,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void noRepos() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              dependencies {
+                compileOnly 'com.google.guava:guava:29.0-jre'
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              dependencies {
+                /*~~(com.google.guava:guava failed. Unable to download metadata.)~~>*/compileOnly 'com.google.guava:guava:29.0-jre'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void updateVersionInVariable() {
         rewriteRun(
           buildGradle(

@@ -25,16 +25,14 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.MavenSettings;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -116,6 +114,41 @@ class MavenPomDownloaderTest {
           "id \"central\""));
         assertThat(repos).areExactly(1, new Condition<>(repo -> "https://internalartifactrepository.yourorg.com".equals(repo.getUri()),
           "URI https://internalartifactrepository.yourorg.com"));
+    }
+
+    @Test
+    void listenerRecordsAttemptedUris() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
+        for (MavenRepository repository : ctx.getRepositories()) {
+            repository.setKnownToExist(true);
+        }
+
+        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, true, null, null, null);
+        List<String> attemptedUris = new ArrayList<>();
+        List<MavenRepository> discoveredRepositories = new ArrayList<>();
+        ctx.setResolutionListener(new ResolutionEventListener() {
+            @Override
+            public void downloadError(GroupArtifactVersion gav, List<String> uris, @Nullable Pom containing) {
+                attemptedUris.addAll(uris);
+            }
+
+            @Override
+            public void repository(MavenRepository mavenRepository, @Nullable ResolvedPom containing) {
+                discoveredRepositories.add(mavenRepository);
+            }
+        });
+
+        try {
+            new MavenPomDownloader(ctx)
+              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, Collections.singletonList(nonexistentRepo));
+        } catch (Exception e) {
+            // not expected to succeed
+        }
+        assertThat(attemptedUris)
+          .containsExactly("http://internalartifactrepository.yourorg.com/org/openrewrite/rewrite-core/7.0.0/rewrite-core-7.0.0.pom");
+        assertThat(discoveredRepositories)
+          .containsExactly(nonexistentRepo);
     }
 
     @Disabled("Flaky on CI")

@@ -132,12 +132,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change Maven dependency groupId, artifactId and/or the version";
+        return "Change Maven dependency groupId, artifactId and optionally the version";
     }
 
     @Override
     public String getDescription() {
-        return "Change the groupId, artifactId and/or the version of a specified Maven dependency.";
+        return "Change the groupId, artifactId and optionally the version of a specified Maven dependency.";
     }
 
     @Override
