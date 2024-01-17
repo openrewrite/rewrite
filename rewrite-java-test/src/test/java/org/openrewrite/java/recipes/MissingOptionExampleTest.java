@@ -126,4 +126,30 @@ class MissingOptionExampleTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void skipValidOptions() {
+        rewriteRun(
+          java(
+            """
+              import org.openrewrite.Option;
+              import org.openrewrite.Recipe;
+
+              class SomeRecipe extends Recipe {
+                  @Option(displayName = "Test", description = "Test", valid = {"foo", "bar"})
+                  private String test;
+              
+                  @Override
+                  public String getDisplayName() {
+                      return "Find missing `@Option` `example` values";
+                  }
+                  @Override
+                  public String getDescription() {
+                      return "Find `@Option` annotations that are missing `example` values.";
+                  }
+              }
+              """
+          )
+        );
+    }
 }

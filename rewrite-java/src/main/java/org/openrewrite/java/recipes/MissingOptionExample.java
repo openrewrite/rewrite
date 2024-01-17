@@ -45,12 +45,13 @@ public class MissingOptionExample extends Recipe {
                             return an;
                         }
 
-                        // Skip if there is already an example value
+                        // Skip if there is already an example value, or valid options
                         boolean hasExample = an.getArguments().stream().anyMatch(exp -> {
                             if (exp instanceof J.Assignment) {
                                 Expression variable = ((J.Assignment) exp).getVariable();
                                 if (variable instanceof J.Identifier) {
-                                    return "example".equals(((J.Identifier) variable).getSimpleName());
+                                    String simpleName = ((J.Identifier) variable).getSimpleName();
+                                    return "example".equals(simpleName) || "valid".equals(simpleName);
                                 }
                             }
                             return false;
