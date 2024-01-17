@@ -91,7 +91,8 @@ public class ChangeTagAttribute extends Recipe {
                 if (oldValue != null) {
                     if (Boolean.TRUE.equals(regex) && !Pattern.matches(oldValue, stringValue)) {
                         return attribute;
-                    } else if ((regex == null || Boolean.FALSE.equals(regex)) && !stringValue.startsWith(oldValue)) {
+                    }
+                    if ((regex == null || Boolean.FALSE.equals(regex)) && !stringValue.startsWith(oldValue)) {
                         return attribute;
                     }
                 }
@@ -101,7 +102,10 @@ public class ChangeTagAttribute extends Recipe {
                     return null;
                 }
 
-                String changedValue = (oldValue != null) ? stringValue.replaceAll(oldValue, newValue) : newValue;
+                String changedValue = oldValue != null
+                        ? (Boolean.TRUE.equals(regex) ? stringValue.replaceAll(oldValue, newValue) : stringValue.replace(oldValue, newValue))
+                        : newValue;
+
                 return attribute.withValue(
                         new Xml.Attribute.Value(attribute.getId(),
                                 "",
