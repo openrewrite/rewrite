@@ -162,6 +162,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             } else if(arg.getValue() instanceof J.Identifier) {
                                 J.Identifier value = (J.Identifier) arg.getValue();
                                 valueValue = value.getSimpleName();
+                            } else if(arg.getValue() instanceof G.GString) {
+                                G.GString value = (G.GString) arg.getValue();
+                                List<J> strings = value.getStrings();
+                                if(!strings.isEmpty() && strings.get(0) instanceof G.GString.Value) {
+                                    G.GString.Value versionGStringValue = (G.GString.Value) strings.get(0);
+                                    if(versionGStringValue.getTree() instanceof J.Identifier) {
+                                        valueValue = ((J.Identifier) versionGStringValue.getTree()).getSimpleName();
+                                    }
+                                }
                             }
                             if (!(key.getValue() instanceof String)) {
                                 continue;
