@@ -634,7 +634,8 @@ public class ChangeType extends Recipe {
     }
 
     public static JavaType.FullyQualified getTopLevelClassName(JavaType.FullyQualified classType) {
-        if (classType.getOwningClass() == null) {
+        if (classType.getOwningClass() == null || TypeUtils.fullyQualifiedNamesAreEqual(classType.getFullyQualifiedName(),
+                classType.getOwningClass().getFullyQualifiedName())) {) {
             return classType;
         }
         return getTopLevelClassName(classType.getOwningClass());
