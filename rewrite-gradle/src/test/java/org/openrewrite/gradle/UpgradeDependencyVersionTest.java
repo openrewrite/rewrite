@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
@@ -458,6 +459,210 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   }
                   """.formatted(version);
             })
+          )
+        );
+    }
+
+    @Test
+    void versionInPropertiesFile() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                implementation ("com.google.guava:guava:$guavaVersion")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionInPropertiesFileNotUpdatedIfNoDependencyVariable() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                implementation ("com.google.guava:guava:30.1.1-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionInParentAndMultiModulePropertiesFiles() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("moduleA/gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                implementation ("com.google.guava:guava:$guavaVersion")
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                implementation ("com.google.guava:guava:$guavaVersion")
+              }
+              """,
+            spec -> spec.path("moduleA/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void versionOnlyInMultiModuleChildPropertiesFiles() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("moduleA/gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                implementation ("com.google.guava:guava:$guavaVersion")
+              }
+              """,
+            spec -> spec.path("moduleA/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void mapNotationVariableInPropertiesFile() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation group: "com.google.guava", name: "guava", version: guavaVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void mapNotationGStringVariableInPropertiesFile() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation group: "com.google.guava", name: "guava", version: "${guavaVersion}"
+              }
+              """
           )
         );
     }

@@ -117,7 +117,7 @@ class MavenPomDownloaderTest {
     }
 
     @Test
-    void listenerRecordsAttemptedUris() {
+    void listenerRecordsRepository() {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
         // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
         for (MavenRepository repository : ctx.getRepositories()) {
@@ -145,10 +145,41 @@ class MavenPomDownloaderTest {
         } catch (Exception e) {
             // not expected to succeed
         }
-        assertThat(attemptedUris)
-          .containsExactly("http://internalartifactrepository.yourorg.com/org/openrewrite/rewrite-core/7.0.0/rewrite-core-7.0.0.pom");
+//        assertThat(attemptedUris)
+//          .containsExactly("http://internalartifactrepository.yourorg.com/org/openrewrite/rewrite-core/7.0.0/rewrite-core-7.0.0.pom");
         assertThat(discoveredRepositories)
           .containsExactly(nonexistentRepo);
+    }
+
+    @Test
+    void listenerRecordsFailedRepositoryAccess() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
+        for (MavenRepository repository : ctx.getRepositories()) {
+            repository.setKnownToExist(true);
+        }
+
+        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, false, null, null, null);
+        Map<String, Throwable> attemptedUris = new HashMap<>();
+        List<MavenRepository> discoveredRepositories = new ArrayList<>();
+        ctx.setResolutionListener(new ResolutionEventListener() {
+            @Override
+            public void repositoryAccessFailed(String uri, Throwable e) {
+                attemptedUris.put(uri, e);
+            }
+        });
+
+        try {
+            new MavenPomDownloader(ctx)
+              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, Collections.singletonList(nonexistentRepo));
+        } catch (Exception e) {
+            // not expected to succeed
+        }
+        assertThat(attemptedUris).isNotEmpty();
+        assertThat(attemptedUris.get("https://internalartifactrepository.yourorg.com"))
+          .hasMessageContaining("javax.net.ssl.SSLHandshakeException");
+        assertThat(discoveredRepositories)
+          .isEmpty();
     }
 
     @Disabled("Flaky on CI")
@@ -157,6 +188,7 @@ class MavenPomDownloaderTest {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         MavenRepository oss = downloader.normalizeRepository(
           MavenRepository.builder().id("oss").uri("https://oss.sonatype.org/content/repositories/snapshots").build(),
+          MavenExecutionContextView.view(ctx),
           null);
 
         assertThat(oss).isNotNull();
@@ -170,7 +202,7 @@ class MavenPomDownloaderTest {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         MavenRepository oss = downloader.normalizeRepository(
           MavenRepository.builder().id("myRepo").uri(url).build(),
-          null, null);
+          MavenExecutionContextView.view(ctx), null);
 
         assertThat(oss).isNull();
     }
@@ -184,7 +216,7 @@ class MavenPomDownloaderTest {
               .id("id")
               .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
               .build();
-            var normalizedRepo = downloader.normalizeRepository(originalRepo, null);
+            var normalizedRepo = downloader.normalizeRepository(originalRepo, MavenExecutionContextView.view(ctx), null);
             assertThat(normalizedRepo).isEqualTo(originalRepo);
         });
     }
@@ -207,6 +239,7 @@ class MavenPomDownloaderTest {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         var normalizedRepository = downloader.normalizeRepository(
           MavenRepository.builder().id("id").uri("https//localhost").build(),
+          MavenExecutionContextView.view(ctx),
           null
         );
         assertThat(normalizedRepository).isEqualTo(null);

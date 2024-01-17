@@ -44,7 +44,6 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -217,6 +216,8 @@ public class MavenPomDownloader {
         if (gav.getGroupId() == null) {
             throw new MavenDownloadingException("Missing group id.", null, gav);
         }
+
+        ctx.getResolutionListener().downloadMetadata(gav);
 
         Timer.Sample sample = Timer.start();
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "metadata");
@@ -457,6 +458,8 @@ public class MavenPomDownloader {
             throw new MavenDownloadingException("Group id, artifact id, or version are missing.", null, gav);
         }
 
+        ctx.getResolutionListener().download(gav);
+
         // The pom being examined might be from a remote repository or a local filesystem.
         // First try to match the requested download with one of the project POMs.
         final Pom projectPomWithResolvedVersion = projectPomsByGav.get(gav);
@@ -653,7 +656,7 @@ public class MavenPomDownloader {
         }
 
         for (MavenRepository repo : repositories) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
+            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
             if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
@@ -661,13 +664,13 @@ public class MavenPomDownloader {
 
         // repositories from maven settings
         for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
+            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
             if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
         }
         if (addDefaultRepositories && !normalizedRepositories.containsKey(MavenRepository.MAVEN_CENTRAL.getId())) {
-            MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, containingPom);
+            MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, ctx, containingPom);
             if (normalizedRepo != null) {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
@@ -676,12 +679,7 @@ public class MavenPomDownloader {
     }
 
     @Nullable
-    public MavenRepository normalizeRepository(MavenRepository originalRepository, @Nullable ResolvedPom containingPom) {
-        return normalizeRepository(originalRepository, containingPom, null);
-    }
-
-    @Nullable
-    public MavenRepository normalizeRepository(MavenRepository originalRepository, @Nullable ResolvedPom containingPom, @Nullable Consumer<Throwable> nullReasonConsumer) {
+    public MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
         Optional<MavenRepository> result = null;
         MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
         if (containingPom != null) {
@@ -696,12 +694,16 @@ public class MavenPomDownloader {
             // There is also an edge case in which this condition is transient during `resolveParentPropertiesAndRepositoriesRecursively()`
             // and therefore, we do not want to cache a null normalization result.
             if (repository.getUri().contains("${")) {
+                ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(),
+                        new IllegalArgumentException("Repository " + repository.getUri() + " contains an unresolved property placeholder."));
                 return null;
             }
 
             // Skip blocked repositories
             // https://github.com/openrewrite/rewrite/issues/3141
             if (repository.getUri().contains("0.0.0.0")) {
+                ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(),
+                        new IllegalArgumentException("Repository " + repository.getUri() + " has invalid IP address."));
                 return null;
             }
 
@@ -713,9 +715,7 @@ public class MavenPomDownloader {
             if (result == null) {
                 if (!repository.getUri().toLowerCase().startsWith("http")) {
                     // can be s3 among potentially other types for which there is a maven wagon implementation
-                    if (nullReasonConsumer != null) {
-                        nullReasonConsumer.accept(new RuntimeException("Repository " + repository.getUri() + " is not HTTP(S)."));
-                    }
+                    ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), new IllegalArgumentException("Repository " + repository.getUri() + " is not HTTP(S)."));
                     return null;
                 }
 
@@ -732,6 +732,7 @@ public class MavenPomDownloader {
                     sendRequest(request.build());
                     normalized = repository.withUri(httpsUri).withKnownToExist(true);
                 } catch (Throwable t) {
+                    ctx.getResolutionListener().repositoryAccessFailed(httpsUri, t);
                     if (t instanceof HttpSenderResponseException) {
                         HttpSenderResponseException e = (HttpSenderResponseException) t;
                         // response was returned from the server, but it was not a 200 OK. The server therefore exists.
@@ -765,26 +766,20 @@ public class MavenPomDownloader {
                                 }
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
-                                if (nullReasonConsumer != null) {
-                                    nullReasonConsumer.accept(e);
-                                }
+                                ctx.getResolutionListener().repositoryAccessFailed(originalUrl, t);
                             }
                         }
                     }
                     if (normalized == null) {
-                        if (nullReasonConsumer != null) {
-                            nullReasonConsumer.accept(t);
-                        }
+                        ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), t);
                     }
                 }
                 mavenCache.putNormalizedRepository(repository, normalized);
                 result = Optional.ofNullable(normalized);
             }
         } catch (Exception e) {
+            ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), e);
             ctx.getOnError().accept(e);
-            if (nullReasonConsumer != null) {
-                nullReasonConsumer.accept(e);
-            }
             mavenCache.putNormalizedRepository(repository, null);
         }
 
