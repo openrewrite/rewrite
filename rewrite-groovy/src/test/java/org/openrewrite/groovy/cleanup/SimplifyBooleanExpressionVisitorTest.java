@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.cleanup;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -32,7 +33,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
 
     @Override
-    public void defaults(RecipeSpec spec) {
+    public void defaults(@NotNull RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new SimplifyBooleanExpressionVisitor()));
     }
 

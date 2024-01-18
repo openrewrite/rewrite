@@ -23,6 +23,7 @@ import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
@@ -50,12 +51,11 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
-        return new AdHocRecipe(null, null, null, visitor, null, null);
+        return new AdHocRecipe(null, null, visitor, null);
     }
 
     static AdHocRecipe toRecipe() {
-        return new AdHocRecipe(null, null, null,
-                TreeVisitor::noop, null, null);
+        return new AdHocRecipe(null, null, TreeVisitor::noop, null);
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {
@@ -186,24 +186,6 @@ public interface RewriteTest extends SourceSpecs {
             testMethodSpec.getRecipePrinter().printTree(recipe);
         } else if (testClassSpec.getRecipePrinter() != null) {
             testClassSpec.getRecipePrinter().printTree(recipe);
-        }
-
-        int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();
-
-        // There may not be any tests that have "after" assertions, but that change file attributes or file names.
-        // If so, the test can declare an expected set of cycles that make changes.
-        int expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
-                (testClassSpec.expectedCyclesThatMakeChanges == null ? 0 : testClassSpec.expectedCyclesThatMakeChanges) :
-                testMethodSpec.expectedCyclesThatMakeChanges;
-
-        // If there are any tests that have assertions (an "after"), then set the expected cycles.
-        for (SourceSpec<?> s : sourceSpecs) {
-            if (s.after != null) {
-                expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
-                        testClassSpec.getExpectedCyclesThatMakeChanges(cycles) :
-                        testMethodSpec.getExpectedCyclesThatMakeChanges(cycles);
-                break;
-            }
         }
 
         ExecutionContext ctx;
@@ -357,15 +339,12 @@ public interface RewriteTest extends SourceSpecs {
         } else if (testClassSpec.getSourceSet() != null) {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
         } else {
-            lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
+            lss = new InMemoryLargeSourceSet(runnableSourceFiles);
         }
 
         RecipeRun recipeRun = recipe.run(
                 lss,
-                recipeCtx,
-                cycles,
-                expectedCyclesThatMakeChanges + 1
-        );
+                recipeCtx);
 
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
@@ -587,6 +566,48 @@ public interface RewriteTest extends SourceSpecs {
                     })
                     .collect(Collectors.joining("\n"));
             fail("The recipe added a source file that was not expected. All source file paths, before and after recipe run:\n" + paths);
+        }
+
+        boolean shouldValidateOutputStability;
+        if(testMethodSpec.getRecipeOutputStabilityValidation() == null) {
+            shouldValidateOutputStability = testClassSpec.getRecipeOutputStabilityValidation() == null || testClassSpec.getRecipeOutputStabilityValidation();
+        } else {
+            shouldValidateOutputStability = testMethodSpec.getRecipeOutputStabilityValidation();
+        }
+        if(shouldValidateOutputStability) {
+            List<SourceFile> afterSources = recipeRun.getChangeset().getAllResults().stream()
+                    .map(Result::getAfter)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            if(!afterSources.isEmpty()) {
+                new InMemoryLargeSourceSet(afterSources);
+                RecipeRun secondRun = recipe.run(new InMemoryLargeSourceSet(afterSources), recipeCtx);
+                List<Result> unstableResults = secondRun.getChangeset().getAllResults().stream()
+                        .filter(it -> it.getBefore() != null && it.getAfter() != null && !it.getBefore().printAll().equals(it.getAfter().printAll()))
+                        .collect(Collectors.toList());
+                if (!unstableResults.isEmpty()) {
+                    String unstableMessage = unstableResults.stream()
+                            .map(unstable -> {
+                                assert unstable.getBefore() != null;
+                                assert unstable.getAfter() != null;
+                                return
+                                        "\n------------------------------------------------------------------------\n" +
+                                        unstable.getBefore().getSourcePath() + " after first recipe application" +
+                                        "\n------------------------------------------------------------------------\n" +
+                                        unstable.getBefore().printAll() +
+                                        "\n------------------------------------------------------------------------\n" +
+                                        unstable.getAfter().getSourcePath() + " after second recipe application" +
+                                        "\n------------------------------------------------------------------------\n" +
+                                        unstable.getAfter().printAll();
+                            })
+                            .collect(Collectors.joining("\n"));
+                    fail("Running the recipe on its expected output resulted in additional changes.\n" +
+                         "For correctness and performance recipes are expected to be stable, making all of their changes in a single application.\n" +
+                         "This error is typically resolved by adding defensive guards against unnecessary changes.\n" +
+                         "You can opt out of this validation by setting recipeOutputStabilityValidation(false).\n" +
+                         "The recipe produced unstable results for these sources: \n" + unstableMessage);
+                }
+            }
         }
     }
 

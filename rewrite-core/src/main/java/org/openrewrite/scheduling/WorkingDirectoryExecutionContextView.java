@@ -71,8 +71,7 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
                 putMessage(WORKING_DIRECTORY_ROOT, root);
             }
             RecipeRunCycle<?> cycle = getCycleDetails();
-            return Files.createDirectories(root.resolve("cycle" + cycle.getCycle() + "_" +
-                                                        "recipe" + cycle.getRecipePosition()));
+            return Files.createDirectories(root.resolve("recipe" + cycle.getRecipePosition()));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

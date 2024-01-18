@@ -49,10 +49,6 @@
             "type": "string",
             "format": "duration"
           },
-          "causesAnotherCycle": {
-            "type": "boolean",
-            "default": false
-          },
           "preconditions": {
             "$ref": "#/$defs/recipeList"
           },

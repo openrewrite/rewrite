@@ -48,13 +48,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
      * also be iterated as part of this cycle.
      */
     Recipe recipe;
-
-    /**
-     * The current cycle in the range [1, maxCycles].
-     */
-    @Getter
-    int cycle;
-
     Cursor rootCursor;
     WatchableExecutionContext ctx;
     RecipeRunStats recipeRunStats;
@@ -208,7 +201,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 parentName,
                 recipeName,
                 effortSeconds,
-                cycle));
+                0));
         if (hierarchical) {
             recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
         }
@@ -233,7 +226,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 parentName,
                 recipe.getName(),
                 effortSeconds,
-                cycle));
+                0));
         recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
     }
 
