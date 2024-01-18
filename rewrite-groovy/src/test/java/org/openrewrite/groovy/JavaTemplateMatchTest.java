@@ -29,7 +29,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 public class JavaTemplateMatchTest implements RewriteTest {
 
-
     @Test
     void nonJavaCode() {
         rewriteRun(

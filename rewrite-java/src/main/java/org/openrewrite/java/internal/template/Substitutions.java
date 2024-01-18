@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
+import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
 import org.openrewrite.java.tree.*;
 
 import java.util.HashMap;
@@ -100,7 +101,7 @@ public class Substitutions {
         Object parameter = parameters[index];
         String s;
         String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
-        List<TemplateParameterParser.MatcherParameterContext> params = typedPattern.patternType().matcherParameter();
+        TypeContext param = typedPattern.patternType().type();
 
         if ("anyArray".equals(matcherName)) {
             if (!(parameter instanceof TypedTree)) {
@@ -132,13 +133,8 @@ public class Substitutions {
             s += "[0]" + extraDim + ")";
         } else if ("any".equals(matcherName)) {
             String fqn;
-
-            if (params.size() == 1) {
-                if (params.get(0).Identifier() != null) {
-                    fqn = params.get(0).Identifier().getText();
-                } else {
-                    fqn = params.get(0).FullyQualifiedName().getText();
-                }
+            if (param != null) {
+                fqn = TypeParameter.toFullyQualifiedName(param);
             } else {
                 if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null
                     && ((J.NewClass) parameter).getClazz() != null) {
@@ -150,9 +146,8 @@ public class Substitutions {
                 } else {
                     fqn = getTypeName(((TypedTree) parameter).getType());
                 }
+                fqn = fqn.replace("$", ".");
             }
-
-            fqn = fqn.replace("$", ".");
 
             JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
             s = "__P__." + (primitive == null || primitive.equals(JavaType.Primitive.String) ?
