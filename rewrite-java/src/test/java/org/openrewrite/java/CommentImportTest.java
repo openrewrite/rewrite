@@ -63,4 +63,18 @@ public class CommentImportTest implements RewriteTest {
             """)
         );
     }
+
+    @Test
+    void noChanges() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentImport("java.util.Map", "comment", true)),
+          //language=java
+          java("""
+            // An existing comment
+            import java.util.UUID;
+                      
+            class A {}
+            """)
+        );
+    }
 }
