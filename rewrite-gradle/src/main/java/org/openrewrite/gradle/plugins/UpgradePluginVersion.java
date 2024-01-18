@@ -106,7 +106,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
     public TreeVisitor<?, ExecutionContext> getScanner(UpgradePluginVersion.DependencyVersionState acc) {
         MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
         MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
-        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new GroovyVisitor<ExecutionContext>() {
+        GroovyVisitor<ExecutionContext> groovyVisitor = new GroovyVisitor<ExecutionContext>() {
 
             @Override
             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
@@ -131,8 +131,8 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (!(versionMatcher.matches(m) &&
-                    m.getSelect() instanceof J.MethodInvocation &&
-                    pluginMatcher.matches(m.getSelect()))) {
+                      m.getSelect() instanceof J.MethodInvocation &&
+                      pluginMatcher.matches(m.getSelect()))) {
                     return m;
                 }
                 List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
@@ -149,7 +149,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     return m;
                 }
                 // TODO error handling here
-                String currentVersion = (String) ((G.GString.Value)((G.GString) versionArgs.get(0)).getStrings().get(0)).getTree().toString();
+                String currentVersion = (String) ((G.GString.Value) ((G.GString) versionArgs.get(0)).getStrings().get(0)).getTree().toString();
                 acc.pluginDependencies.put(currentVersion, pluginId);
                 return m;
             }
@@ -160,119 +160,119 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 }
                 return acc.gradleProject.getMavenPluginRepositories();
             }
-        });
+        };
+        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), groovyVisitor);
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
         MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
         MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
-        return Preconditions.or(
-            new PropertiesVisitor<ExecutionContext>() {
-                @Override
-                public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                    return super.isAcceptable(sourceFile, ctx) && sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
-                }
+        PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return super.isAcceptable(sourceFile, ctx) && sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
+            }
 
-                @Override
-                public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+            @Override
+            public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
 
-                    if (acc.pluginDependencies.containsKey(entry.getKey())) {
-                        String currentVersion = entry.getValue().getText();
-                        String pluginId = acc.pluginDependencies.get(entry.getKey());
-                        if (!StringUtils.isBlank(newVersion)) {
-                            String resolvedVersion = null;
-                            try {
-                                // TODO this is where we figure out what the new version should be
-                                resolvedVersion = AddPluginVisitor.resolvePluginVersion(pluginId, currentVersion, newVersion, versionPattern, getRepositories(), ctx).orElse(null);
-                            } catch (MavenDownloadingException e) {
-                                return e.warn(entry);
-                            }
-                            if (resolvedVersion != null) {
-                                return entry.withValue(entry.getValue().withText(resolvedVersion));
-                            }
-                            return entry.withValue(entry.getValue().withText(newVersion));
+                if (acc.pluginDependencies.containsKey(entry.getKey())) {
+                    String currentVersion = entry.getValue().getText();
+                    String pluginId = acc.pluginDependencies.get(entry.getKey());
+                    if (!StringUtils.isBlank(newVersion)) {
+                        String resolvedVersion = null;
+                        try {
+                            // TODO this is where we figure out what the new version should be
+                            resolvedVersion = AddPluginVisitor.resolvePluginVersion(pluginId, currentVersion, newVersion, versionPattern, getRepositories(), ctx).orElse(null);
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(entry);
                         }
+                        if (resolvedVersion != null) {
+                            return entry.withValue(entry.getValue().withText(resolvedVersion));
+                        }
+                        return entry.withValue(entry.getValue().withText(newVersion));
                     }
-
-                    return entry;
                 }
 
-                private List<MavenRepository> getRepositories() {
-                    if (acc.gradleSettings != null) {
-                        return acc.gradleSettings.getPluginRepositories();
-                    }
-                    return acc.gradleProject.getMavenPluginRepositories();
+                return entry;
+            }
+
+            private List<MavenRepository> getRepositories() {
+                if (acc.gradleSettings != null) {
+                    return acc.gradleSettings.getPluginRepositories();
                 }
-            },
-            Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new GroovyVisitor<ExecutionContext>() {
-                private GradleProject gradleProject;
-                private GradleSettings gradleSettings;
+                return acc.gradleProject.getMavenPluginRepositories();
+            }
+        };
+        GroovyVisitor<ExecutionContext> groovyVisitor = new GroovyVisitor<ExecutionContext>() {
+            private GradleProject gradleProject;
+            private GradleSettings gradleSettings;
 
-                @Override
-                public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                    Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
-                    Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
-                    if (!maybeGradleProject.isPresent() && !maybeGradleSettings.isPresent()) {
-                        return cu;
-                    }
-
-                    gradleProject = maybeGradleProject.orElse(null);
-                    gradleSettings = maybeGradleSettings.orElse(null);
-                    return super.visitCompilationUnit(cu, ctx);
+            @Override
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
+                Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
+                if (!maybeGradleProject.isPresent() && !maybeGradleSettings.isPresent()) {
+                    return cu;
                 }
 
-                @Override
-                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                    if (!(versionMatcher.matches(m) &&
-                        m.getSelect() instanceof J.MethodInvocation &&
-                        pluginMatcher.matches(m.getSelect()))) {
-                        return m;
-                    }
-                    List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
-                    if (!(pluginArgs.get(0) instanceof J.Literal)) {
-                        return m;
-                    }
-                    String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
-                    if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
-                        return m;
-                    }
+                gradleProject = maybeGradleProject.orElse(null);
+                gradleSettings = maybeGradleSettings.orElse(null);
+                return super.visitCompilationUnit(cu, ctx);
+            }
 
-                    List<Expression> versionArgs = m.getArguments();
-                    if (!(versionArgs.get(0) instanceof J.Literal)) {
-                        return m;
-                    }
-                    String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
-                    if (currentVersion == null) {
-                        return m;
-                    }
-                    Optional<String> version;
-                    try {
-                        version = AddPluginVisitor.resolvePluginVersion(pluginId, currentVersion, newVersion, versionPattern, getRepositories(), ctx);
-                        J.MethodInvocation finalM = m;
-                        m = version.map(upgradeVersion -> finalM.withArguments(ListUtils.map(versionArgs, v -> {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if (!(versionMatcher.matches(m) &&
+                      m.getSelect() instanceof J.MethodInvocation &&
+                      pluginMatcher.matches(m.getSelect()))) {
+                    return m;
+                }
+                List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
+                if (!(pluginArgs.get(0) instanceof J.Literal)) {
+                    return m;
+                }
+                String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
+                if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
+                    return m;
+                }
+
+                List<Expression> versionArgs = m.getArguments();
+                if (!(versionArgs.get(0) instanceof J.Literal)) {
+                    return m;
+                }
+                String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
+                if (currentVersion == null) {
+                    return m;
+                }
+                Optional<String> version;
+                try {
+                    version = AddPluginVisitor.resolvePluginVersion(pluginId, currentVersion, newVersion, versionPattern, getRepositories(), ctx);
+                    J.MethodInvocation finalM = m;
+                    m = version.map(upgradeVersion -> finalM.withArguments(ListUtils.map(versionArgs, v -> {
                                 J.Literal versionLiteral = (J.Literal) v;
                                 assert versionLiteral.getValueSource() != null;
                                 return versionLiteral
-                                    .withValue(upgradeVersion)
-                                    .withValueSource(versionLiteral.getValueSource().replace(currentVersion, upgradeVersion));
+                                        .withValue(upgradeVersion)
+                                        .withValueSource(versionLiteral.getValueSource().replace(currentVersion, upgradeVersion));
                             })))
                             .orElse(m);
 
-                        return m;
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(m);
-                    }
+                    return m;
+                } catch (MavenDownloadingException e) {
+                    return e.warn(m);
                 }
+            }
 
-                private List<MavenRepository> getRepositories() {
-                    if (gradleSettings != null) {
-                        return gradleSettings.getPluginRepositories();
-                    }
-                    return gradleProject.getMavenPluginRepositories();
+            private List<MavenRepository> getRepositories() {
+                if (gradleSettings != null) {
+                    return gradleSettings.getPluginRepositories();
                 }
-            })
-        );
+                return gradleProject.getMavenPluginRepositories();
+            }
+        };
+        return Preconditions.or(propertiesVisitor, groovyVisitor);
     }
 }
