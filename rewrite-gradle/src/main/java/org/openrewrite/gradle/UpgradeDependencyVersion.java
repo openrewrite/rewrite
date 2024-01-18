@@ -15,7 +15,8 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -139,7 +140,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (dependencyDsl.matches(m)) {
-                    if(m.getArguments().get(0) instanceof G.MapEntry) {
+                    if (m.getArguments().get(0) instanceof G.MapEntry) {
                         String groupId = null;
                         String artifactId = null;
                         String version = null;
@@ -154,20 +155,20 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             }
                             J.Literal key = (J.Literal) arg.getKey();
                             String valueValue = null;
-                            if(arg.getValue() instanceof J.Literal) {
+                            if (arg.getValue() instanceof J.Literal) {
                                 J.Literal value = (J.Literal) arg.getValue();
-                                if(value.getValue() instanceof String) {
-                                    valueValue = (String)value.getValue();
+                                if (value.getValue() instanceof String) {
+                                    valueValue = (String) value.getValue();
                                 }
-                            } else if(arg.getValue() instanceof J.Identifier) {
+                            } else if (arg.getValue() instanceof J.Identifier) {
                                 J.Identifier value = (J.Identifier) arg.getValue();
                                 valueValue = value.getSimpleName();
-                            } else if(arg.getValue() instanceof G.GString) {
+                            } else if (arg.getValue() instanceof G.GString) {
                                 G.GString value = (G.GString) arg.getValue();
                                 List<J> strings = value.getStrings();
-                                if(!strings.isEmpty() && strings.get(0) instanceof G.GString.Value) {
+                                if (!strings.isEmpty() && strings.get(0) instanceof G.GString.Value) {
                                     G.GString.Value versionGStringValue = (G.GString.Value) strings.get(0);
-                                    if(versionGStringValue.getTree() instanceof J.Identifier) {
+                                    if (versionGStringValue.getTree() instanceof J.Identifier) {
                                         valueValue = ((J.Identifier) versionGStringValue.getTree()).getSimpleName();
                                     }
                                 }
@@ -233,7 +234,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     @Override
                     public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
 
-                        if(acc.buildDependencies.containsKey(entry.getKey())) {
+                        if (acc.buildDependencies.containsKey(entry.getKey())) {
                             GroupArtifact groupArtifact = acc.buildDependencies.get(entry.getKey());
                             if (!StringUtils.isBlank(newVersion)) {
                                 String resolvedVersion = null;
@@ -254,17 +255,28 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 },
                 Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker),
                         new GroovyVisitor<ExecutionContext>() {
+                            GradleProject gradleProject;
+
+                            @Override
+                            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                                gradleProject = acc.gradleProject != null ?
+                                        acc.gradleProject :
+                                        cu.getMarkers().findFirst(GradleProject.class)
+                                                .orElseThrow(() -> new IllegalStateException("Unable to find Gradle project."));
+                                return super.visitCompilationUnit(cu, ctx);
+                            }
+
                             @Override
                             public J postVisit(J tree, ExecutionContext ctx) {
                                 if (tree instanceof JavaSourceFile) {
                                     JavaSourceFile cu = (JavaSourceFile) tree;
                                     Map<String, Map<GroupArtifact, Set<String>>> variableNames = getCursor().getMessage(VERSION_VARIABLE_KEY);
-                                    if (variableNames != null && acc.gradleProject != null) {
-                                        cu = (JavaSourceFile) new UpdateVariable(variableNames, acc.gradleProject).visitNonNull(cu, ctx);
+                                    if (variableNames != null && gradleProject != null) {
+                                        cu = (JavaSourceFile) new UpdateVariable(variableNames, gradleProject).visitNonNull(cu, ctx);
                                     }
                                     Map<GroupArtifactVersion, Set<String>> versionUpdates = getCursor().getMessage(NEW_VERSION_KEY);
-                                    if (versionUpdates != null && acc.gradleProject != null) {
-                                        GradleProject newGp = acc.gradleProject;
+                                    if (versionUpdates != null && gradleProject != null) {
+                                        GradleProject newGp = gradleProject;
                                         for (Map.Entry<GroupArtifactVersion, Set<String>> gavToConfigurations : versionUpdates.entrySet()) {
                                             newGp = replaceVersion(newGp, ctx, gavToConfigurations.getKey(), gavToConfigurations.getValue());
                                         }
@@ -325,8 +337,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                         if (dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())
                                             && dep.getVersion() != null
                                             && !dep.getVersion().startsWith("$")) {
-                                            GradleProject gradleProject = Optional.ofNullable(acc.gradleProject)
-                                                    .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
                                             String version = dep.getVersion();
                                             try {
                                                 String newVersion = "classpath".equals(method.getSimpleName()) ?
@@ -375,8 +385,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     G.MapEntry versionEntry = (G.MapEntry) depArgs.get(2);
                                     Expression versionExp = versionEntry.getValue();
                                     if (versionExp instanceof J.Literal && ((J.Literal) versionExp).getValue() instanceof String) {
-                                        GradleProject gradleProject = Optional.ofNullable(acc.gradleProject)
-                                                .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
                                         J.Literal versionLiteral = (J.Literal) versionExp;
                                         String version = (String) versionLiteral.getValue();
                                         if (version.startsWith("$")) {
