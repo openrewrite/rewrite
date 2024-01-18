@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
+import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradePluginVersionTest implements RewriteTest {
     @Override
@@ -150,6 +151,31 @@ class UpgradePluginVersionTest implements RewriteTest {
             """
               plugins {
                   id 'io.spring.dependency-management' version '1.1.0'
+              }
+              """
+          )
+        );
+    }
+
+    @DocumentExample("Upgrading a build plugin with version in gradle.properties")
+    @Test
+    void upgradePluginVersionInProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.7", null)),
+          properties(
+            """
+              rewriteVersion=5.40.0
+              """,
+            """
+              rewriteVersion=5.40.7
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version "$rewriteVersion"
+                  id 'com.github.johnrengelman.shadow' version '6.1.0'
               }
               """
           )
