@@ -70,6 +70,30 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    void skipDependencyResolution() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().skipDependencyResolution(true)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>foo</groupId>
+                    <artifactId>bar</artifactId>
+                    <version>42</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2603")
     void repositoryWithPropertyPlaceholder() {
         rewriteRun(
