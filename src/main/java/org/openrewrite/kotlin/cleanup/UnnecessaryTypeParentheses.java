@@ -18,7 +18,9 @@ package org.openrewrite.kotlin.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.kotlin.KotlinVisitor;
 
 import java.time.Duration;
@@ -44,12 +46,17 @@ public class UnnecessaryTypeParentheses extends Recipe {
         return new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, ExecutionContext ctx) {
-                Space prefix = parTree.getPrefix();
-                TypeTree tt = parTree;
-
-                while (tt instanceof J.ParenthesizedTypeTree) {
-                    tt = ((J.ParenthesizedTypeTree)tt).getParenthesizedType().getTree();
+                J j = super.visitParenthesizedTypeTree(parTree, ctx);
+                if (!(j instanceof J.ParenthesizedTypeTree)) {
+                    return j;
                 }
+
+                Space prefix = j.getPrefix();
+                TypeTree tt = (TypeTree) j;
+                while (tt instanceof J.ParenthesizedTypeTree) {
+                    tt = ((J.ParenthesizedTypeTree) tt).getParenthesizedType().getTree();
+                }
+
                 return tt.withPrefix(prefix);
             }
         };
