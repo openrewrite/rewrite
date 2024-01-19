@@ -181,4 +181,30 @@ class UpgradePluginVersionTest implements RewriteTest {
           )
         );
     }
+
+    @DocumentExample("Don't touch gradle.properties if version is hardcoded in build.gradle")
+    @Test
+    void upgradePluginVersionInBuildGradleNotProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.7", null)),
+          properties(
+            """
+              org.openrewrite.rewrite=5.40.0
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version "5.40.0"
+              }
+              """,
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version "5.40.7"
+              }
+              """
+          )
+        );
+    }
 }
