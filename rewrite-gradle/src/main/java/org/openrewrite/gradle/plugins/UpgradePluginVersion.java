@@ -148,8 +148,15 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (!(versionArgs.get(0) instanceof G.GString)) {
                     return m;
                 }
-                // TODO error handling here
-                String currentVersion = (String) ((G.GString.Value) ((G.GString) versionArgs.get(0)).getStrings().get(0)).getTree().toString();
+
+                G.GString gString = (G.GString) versionArgs.get(0);
+                if(gString == null || gString.getStrings().isEmpty() || !(gString.getStrings().get(0) instanceof G.GString.Value)) {
+                    return m;
+                }
+
+                G.GString.Value gStringValue = (G.GString.Value) gString.getStrings().get(0);
+                String currentVersion = (String) gStringValue.getTree().toString();
+
                 acc.pluginDependencies.put(currentVersion, pluginId);
                 return m;
             }
@@ -183,7 +190,6 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     if (!StringUtils.isBlank(newVersion)) {
                         String resolvedVersion = null;
                         try {
-                            // TODO this is where we figure out what the new version should be
                             resolvedVersion = AddPluginVisitor.resolvePluginVersion(pluginId, currentVersion, newVersion, versionPattern, getRepositories(), ctx).orElse(null);
                         } catch (MavenDownloadingException e) {
                             return e.warn(entry);
@@ -273,6 +279,6 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 return gradleProject.getMavenPluginRepositories();
             }
         };
-        return Preconditions.or(propertiesVisitor, groovyVisitor);
+        return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), groovyVisitor));
     }
 }
