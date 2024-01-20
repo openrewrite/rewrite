@@ -740,4 +740,8 @@ public class StringUtils {
         }
         return cursor;
     }
+
+    public static String formatUriForPropertiesFile(String uri) {
+        return uri.replaceAll("(?<!\\\\)://", "\\\\://");
+    }
 }

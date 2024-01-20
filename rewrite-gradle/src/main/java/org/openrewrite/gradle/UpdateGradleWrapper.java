@@ -44,6 +44,7 @@ import java.util.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
+import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
 @RequiredArgsConstructor
@@ -91,6 +92,16 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             required = false)
     @Nullable
     final Boolean addIfMissing;
+
+    @Option(displayName = "Wrapper URI",
+            description = "The URI of the Gradle wrapper distribution. " +
+                          "Lookup of available versions still requires access to https://services.gradle.org" +
+                          "When this is specified the exact literal values supplied for `version` and `distribution` " +
+                          "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively." +
+                          "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
+            required = false)
+    @Nullable
+    final String wrapperUri;
 
     @Override
     public Validated<Object> validate() {
@@ -393,7 +404,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         return script;
     }
 
-    private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
+    private class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
 
         private static final String DISTRIBUTION_SHA_256_SUM_KEY = "distributionSha256Sum";
         private final GradleWrapper gradleWrapper;
@@ -420,8 +431,14 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             if ("distributionUrl".equals(entry.getKey())) {
                 Properties.Value value = entry.getValue();
                 String currentUrl = value.getText();
-                // Prefer the existing artifact repository URL over changing to services.gradle.org if that isn't already what's in use
-                if(currentUrl.startsWith("https\\://services.gradle.org/distributions/")) {
+                // Prefer wrapperUri specified directly in the recipe over other options
+                // If that isn't set, prefer the existing artifact repository URL over changing to services.gradle.org
+                if(wrapperUri != null) {
+                    String effectiveWrapperUri = formatUriForPropertiesFile(wrapperUri
+                            .replace("${version}", gradleWrapper.getVersion())
+                            .replace("${distribution}", distribution == null ? "bin" : distribution));
+                    return entry.withValue(value.withText(effectiveWrapperUri));
+                } else if(currentUrl.startsWith("https\\://services.gradle.org/distributions/")) {
                     return entry.withValue(value.withText(gradleWrapper.getPropertiesFormattedUrl()));
                 } else {
                     String gradleServicesDistributionUrl = gradleWrapper.getDistributionUrl();
