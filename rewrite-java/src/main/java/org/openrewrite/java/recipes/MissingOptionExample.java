@@ -20,6 +20,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
@@ -60,13 +61,19 @@ public class MissingOptionExample extends Recipe {
                             return an;
                         }
 
-                        // Skip boolean fields, as examples there are trivial
+                        // Skip boolean and non-String primitive fields, as examples there are trivial
                         Cursor parent = getCursor().getParent();
                         if (parent != null && parent.getValue() instanceof J.VariableDeclarations) {
                             J.VariableDeclarations variableDeclarations = parent.getValue();
-                            if (variableDeclarations.getTypeExpression() != null &&
-                                    TypeUtils.isOfClassType(variableDeclarations.getTypeExpression().getType(), "java.lang.Boolean")) {
-                                return an;
+                            if (variableDeclarations.getTypeExpression() != null) {
+                                JavaType type = variableDeclarations.getTypeExpression().getType();
+                                if (!TypeUtils.isString(type)) {
+                                    if (type instanceof JavaType.Primitive ||
+                                        type instanceof JavaType.FullyQualified &&
+                                        "java.lang".equals(((JavaType.FullyQualified) type).getPackageName())) {
+                                        return an;
+                                    }
+                                }
                             }
                         }
 
