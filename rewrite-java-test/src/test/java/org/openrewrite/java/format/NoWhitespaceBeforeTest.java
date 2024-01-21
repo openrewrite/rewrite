@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.Checkstyle;
@@ -39,6 +40,7 @@ import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
+import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({
@@ -49,7 +51,6 @@ import static org.openrewrite.java.Assertions.java;
   "StatementWithEmptyBody"
 })
 class NoWhitespaceBeforeTest implements RewriteTest {
-
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new NoWhitespaceBefore());
@@ -753,6 +754,12 @@ class NoWhitespaceBeforeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/233")
+    void jenkinsLibrary() {
+        rewriteRun(groovy("library 'someLibrary@version'"));
     }
 
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
