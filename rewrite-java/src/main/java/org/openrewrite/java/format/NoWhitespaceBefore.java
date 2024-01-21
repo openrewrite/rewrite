@@ -53,6 +53,12 @@ public class NoWhitespaceBefore extends Recipe {
         EmptyForIteratorPadStyle emptyForIteratorPadStyle;
 
         @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            // This visitor causes problems for Groovy sources as method invocations without parentheses get squashed
+            return sourceFile instanceof J.CompilationUnit;
+        }
+
+        @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
