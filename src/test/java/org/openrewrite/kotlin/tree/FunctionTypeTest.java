@@ -133,6 +133,8 @@ class FunctionTypeTest implements RewriteTest {
     }
 
     @ExpectedToFail
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/553")
     void trailingAnnotation() {
         rewriteRun(
           kotlin(
@@ -141,6 +143,22 @@ class FunctionTypeTest implements RewriteTest {
               @Retention(AnnotationRetention.SOURCE)
               annotation class Anno
               abstract class  Test   :    suspend @Anno (  )   ->    String
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/571")
+    void suspendBeforeParenthesized() {
+        rewriteRun(
+          kotlin(
+            """
+              class SomeReceiver
+              suspend inline fun SomeReceiver  .   method(
+                crossinline body  : suspend  (    SomeReceiver .  () -> Unit    )
+              ) {}
               """
           )
         );
