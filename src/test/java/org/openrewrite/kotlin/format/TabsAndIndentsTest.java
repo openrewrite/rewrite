@@ -19,8 +19,11 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.style.IntelliJ;
 import org.openrewrite.kotlin.style.TabsAndIndentsStyle;
@@ -2408,5 +2411,32 @@ class TabsAndIndentsTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @ExpectedToFail
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/546")
+    void annotationIndentation() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  J.Annotation a = super.visitAnnotation(annotation, ctx);
+                  return autoFormat(a, ctx);
+              }
+          })).parser(KotlinParser.builder().logCompilationWarningsAndErrors(true)),
+          kotlin("""
+            package org.sample
+            
+            @SafeVarargs
+            @SuppressWarnings
+            class Foo {
+                val x =
+                    3.plus(
+                        3
+                    )
+            }
+            """
+          ));
     }
 }
