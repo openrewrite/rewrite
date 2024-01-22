@@ -464,7 +464,7 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void templatingWhileLoopCondition() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext p) {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
@@ -560,7 +560,7 @@ class JavaTemplateTest implements RewriteTest {
                       unary.getExpression()
                     );
               }
-          })),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {

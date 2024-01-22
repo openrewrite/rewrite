@@ -45,6 +45,7 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private LargeSourceSetCheckingExpectedCycles(LargeSourceSetCheckingExpectedCycles from, @Nullable Map<SourceFile, List<Recipe>> deletions, List<SourceFile> mapped) {
         super(from.getInitialState(), deletions, mapped);
         this.expectedCyclesThatMakeChanges = from.expectedCyclesThatMakeChanges;
+        this.cyclesThatResultedInChanges = from.cyclesThatResultedInChanges;
         this.lastCycleEdits = from.lastCycleEdits;
         this.lastCycleGenerated = from.lastCycleGenerated;
         this.lastCycleDeleted = from.lastCycleDeleted;

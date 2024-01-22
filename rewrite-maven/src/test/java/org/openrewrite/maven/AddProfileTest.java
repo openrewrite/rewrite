@@ -29,7 +29,7 @@ public class AddProfileTest implements RewriteTest {
     @Test
     void addProfileToPom() {
         rewriteRun(
-          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
             "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
@@ -69,7 +69,7 @@ public class AddProfileTest implements RewriteTest {
     @Test
     void preExistingOtherProfile() {
         rewriteRun(
-          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
             "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
@@ -122,7 +122,7 @@ public class AddProfileTest implements RewriteTest {
     @Test
     void preExistingMatchingProfile() {
         rewriteRun(
-          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
             "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
