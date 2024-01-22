@@ -262,10 +262,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 gradleProject = acc.gradleProject != null ?
                                         acc.gradleProject :
                                         cu.getMarkers().findFirst(GradleProject.class)
-                                                .orElse(null);
-                                if(gradleProject == null) {
-                                    return cu;
-                                }
+                                                .orElseThrow(() -> new IllegalStateException("Unable to find Gradle project."));
                                 return super.visitCompilationUnit(cu, ctx);
                             }
 

@@ -37,7 +37,10 @@ import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.Semver;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -223,7 +226,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     cu.getMarkers().findFirst(GradleSettings.class);
 
                 if (!maybeGradleProject.isPresent() && !maybeGradleSettings.isPresent()) {
-                    return cu;
+                    throw new IllegalStateException("Unable to find a gradle project or gradle settings");
                 }
 
                 gradleProject = maybeGradleProject.orElse(null);
@@ -279,10 +282,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (gradleSettings != null) {
                     return gradleSettings.getPluginRepositories();
                 }
-                if(gradleProject != null) {
-                    return gradleProject.getMavenPluginRepositories();
-                }
-                return new ArrayList<>();
+                return gradleProject.getMavenPluginRepositories();
             }
         };
         return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), groovyVisitor));
