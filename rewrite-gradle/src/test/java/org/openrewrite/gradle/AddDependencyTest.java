@@ -23,6 +23,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -63,6 +64,56 @@ class AddDependencyTest implements RewriteTest {
           mavenProject("project",
             srcTestJava(
               java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencies {
+                    testImplementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
+    void multipleCycles(String onlyIfUsing) {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangePackage("foo.math", "com.google.common.math", false),
+            addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing))
+            .typeValidationOptions(TypeValidation.none())
+            .afterTypeValidationOptions(TypeValidation.all()),
+          mavenProject("project",
+            srcTestJava(
+              java(
+                """
+                  import foo.math.IntMath;
+                  public class A {
+                      boolean getMap() {
+                          return IntMath.isPrime(5);
+                      }
+                  }
+                  """
+              )
             ),
             buildGradle(
               """
