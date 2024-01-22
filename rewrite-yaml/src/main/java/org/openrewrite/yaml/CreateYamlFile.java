@@ -95,7 +95,7 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
                     if (StringUtils.isBlank(fileContents)) {
                         return documents.withDocuments(emptyList());
                     }
-                    if(documents.printAll().equals(fileContents)) {
+                    if (documents.printAll().equals(fileContents)) {
                         return documents;
                     }
                     Optional<SourceFile> sourceFiles = YamlParser.builder().build()

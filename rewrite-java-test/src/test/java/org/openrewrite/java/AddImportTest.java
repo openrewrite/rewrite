@@ -122,7 +122,8 @@ class AddImportTest implements RewriteTest {
     void dontDuplicateImports2() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Test", null, false)))
-            .recipeOutputStabilityVerification(false),
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
           java(
             """
               import org.junit.jupiter.api.AfterEach;
@@ -150,7 +151,8 @@ class AddImportTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertNull", false)))
             .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
-            .recipeOutputStabilityVerification(false),
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
           java(
             """
               import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -385,22 +387,24 @@ class AddImportTest implements RewriteTest {
     void addImportIfReferenced() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() ->
-            new JavaIsoVisitor<>() {
-                @Override
-                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                    J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
-                    maybeAddImport("java.math.BigDecimal");
-                    maybeAddImport("java.math.RoundingMode");
-                    return JavaTemplate.builder("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
-                      .imports("java.math.BigDecimal", "java.math.RoundingMode")
-                      .build()
-                      .apply(
-                        updateCursor(c),
-                        c.getBody().getCoordinates().lastStatement()
-                      );
-                }
-            }
-          )).recipeOutputStabilityVerification(false),
+              new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      maybeAddImport("java.math.BigDecimal");
+                      maybeAddImport("java.math.RoundingMode");
+                      return JavaTemplate.builder("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                        .imports("java.math.BigDecimal", "java.math.RoundingMode")
+                        .build()
+                        .apply(
+                          updateCursor(c),
+                          c.getBody().getCoordinates().lastStatement()
+                        );
+                  }
+              }
+            ))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
           java(
             """
               package a;

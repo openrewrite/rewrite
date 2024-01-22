@@ -35,8 +35,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     @Test
     void replaceAnnotation() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
                       return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",

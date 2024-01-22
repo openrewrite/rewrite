@@ -32,7 +32,9 @@ import org.openrewrite.text.PlainTextVisitor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -44,7 +46,7 @@ public class DeclarativeRecipeTest implements RewriteTest {
           spec -> {
               spec.validateRecipeSerialization(false);
               DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
-                null, null, null);
+                null, null, true, null);
               dr.addPrecondition(
                 toRecipe(() -> new PlainTextVisitor<>() {
                     @Override
@@ -91,11 +93,76 @@ public class DeclarativeRecipeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void maxCycles() {
+        rewriteRun(
+          spec -> spec.recipe(new RepeatedFindAndReplace(".+", "$0+1", 1)),
+          text("1", "1+1")
+        );
+        rewriteRun(
+          spec -> spec.recipe(new RepeatedFindAndReplace(".+", "$0+1", 2)),
+          text("1", "1+1+1")
+        );
+    }
+
+    @Test
+    void maxCyclesNested() {
+        AtomicInteger cycleCount = new AtomicInteger();
+        Recipe root = new MaxCycles(
+          100,
+          List.of(new MaxCycles(
+              2,
+              List.of(new RepeatedFindAndReplace(".+", "$0+1", 100))
+            ),
+            toRecipe(() -> new TreeVisitor<>() {
+                @Override
+                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    cycleCount.incrementAndGet();
+                    return tree;
+                }
+            })
+          )
+        );
+        rewriteRun(
+          spec -> spec.recipe(root).cycles(10).expectedCyclesThatMakeChanges(2),
+          text("1", "1+1+1")
+        );
+        assertThat(cycleCount).hasValue(3);
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    static class MaxCycles extends Recipe {
+        int maxCycles;
+        List<Recipe> recipeList;
+
+        @Override
+        public int maxCycles() {
+            return maxCycles;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "Executes recipes multiple times";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Executes recipes multiple times.";
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false)
     static class RepeatedFindAndReplace extends Recipe {
         String find;
         String replace;
+        int maxCycles;
+
+        @Override
+        public int maxCycles() {
+            return maxCycles;
+        }
 
         @Override
         public String getDisplayName() {

@@ -100,6 +100,10 @@ public interface ExecutionContext {
 
     BiConsumer<Throwable, ExecutionContext> getOnTimeout();
 
+    default int getCycle() {
+        return getCycleDetails().getCycle();
+    }
+
     default RecipeRunCycle<?> getCycleDetails() {
         return requireNonNull(getMessage(CURRENT_CYCLE));
     }
