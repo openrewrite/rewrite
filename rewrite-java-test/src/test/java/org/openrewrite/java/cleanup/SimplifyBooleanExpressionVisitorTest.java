@@ -108,6 +108,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       boolean a = !false;
                       boolean b = !true;
+                      boolean c = !(false);
+                      boolean d = !(true);
+                      boolean e = !((false));
+                      boolean f = !((true));
                   }
               }
               """,
@@ -116,6 +120,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       boolean a = true;
                       boolean b = false;
+                      boolean c = true;
+                      boolean d = false;
+                      boolean e = true;
+                      boolean f = false;
                   }
               }
               """
@@ -448,6 +456,27 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                           return true;
                       }
                       return /*a*/false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleMethodInvocationNotSimplified() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  void foo() {
+                      boolean a = booleanExpression() || booleanExpression();
+                      boolean b = !(booleanExpression() && booleanExpression());
+                      boolean c = booleanExpression() == booleanExpression();
+                      boolean d = booleanExpression() != booleanExpression();
+                  }
+                  boolean booleanExpression() {
+                    return true;
                   }
               }
               """

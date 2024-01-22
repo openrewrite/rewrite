@@ -879,9 +879,14 @@ public interface JavaType {
         @NonFinal
         JavaType elemType;
 
-        public Array(@Nullable Integer managedReference, @Nullable JavaType elemType) {
+        @Nullable
+        @NonFinal
+        FullyQualified[] annotations;
+
+        public Array(@Nullable Integer managedReference, @Nullable JavaType elemType, @Nullable FullyQualified[] annotations) {
             this.managedReference = managedReference;
             this.elemType = unknownIfNull(elemType);
+            this.annotations = ListUtils.nullIfEmpty(annotations);
         }
 
         @JsonCreator
@@ -892,14 +897,27 @@ public interface JavaType {
             return elemType;
         }
 
+        public List<FullyQualified> getAnnotations() {
+            return annotations == null ? emptyList() : Arrays.asList(annotations);
+        }
+
+        public Array withAnnotations(@Nullable List<FullyQualified> annotations) {
+            FullyQualified[] annotationsArray = arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY);
+            if (Arrays.equals(annotationsArray, this.annotations)) {
+                return this;
+            }
+            return new Array(this.managedReference, this.elemType, this.annotations);
+        }
+
         @Override
         public Array unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
             return this;
         }
 
-        public Array unsafeSet(JavaType elemType) {
+        public Array unsafeSet(JavaType elemType, @Nullable FullyQualified[] annotations) {
             this.elemType = unknownIfNull(elemType);
+            this.annotations = ListUtils.nullIfEmpty(annotations);
             return this;
         }
 

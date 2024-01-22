@@ -32,38 +32,39 @@ class OrderPomElementsTest implements RewriteTest {
     @Test
     void validOrderNoChange() {
         rewriteRun(
-          pomXml("""
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-
-                <groupId>my.org.project</groupId>
-                <artifactId>my-project</artifactId>
-                <version>4.3.0</version>
-                
-                <name>Some Project</name>
-                <description>Some project desc</description>
-                
-                <properties>
-                </properties>
-                
-                <dependencyManagement>
-                    <dependencies>
-                    </dependencies>
-                </dependencyManagement>
-                
-                <dependencies>
-                </dependencies>
-
-                <repositories>
-                </repositories>
-                
-                <pluginRepositories>
-                </pluginRepositories>
-                
-                <build>
-                </build>
-            </project>
+          pomXml(
             """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+
+                  <groupId>my.org.project</groupId>
+                  <artifactId>my-project</artifactId>
+                  <version>4.3.0</version>
+              
+                  <name>Some Project</name>
+                  <description>Some project desc</description>
+              
+                  <properties>
+                  </properties>
+              
+                  <dependencyManagement>
+                      <dependencies>
+                      </dependencies>
+                  </dependencyManagement>
+              
+                  <dependencies>
+                  </dependencies>
+
+                  <repositories>
+                  </repositories>
+              
+                  <pluginRepositories>
+                  </pluginRepositories>
+              
+                  <build>
+                  </build>
+              </project>
+              """
           )
         );
     }
@@ -81,7 +82,7 @@ class OrderPomElementsTest implements RewriteTest {
                       <version>7.4.0</version>
                   </parent>
                   <!-- modelVersion1 -->
-                  
+              
                   <!-- modelVersion2 -->
                   <modelVersion>4.0.0</modelVersion>
                   <artifactId>my-project</artifactId>
@@ -123,7 +124,7 @@ class OrderPomElementsTest implements RewriteTest {
             """
               <project>
                   <!-- modelVersion1 -->
-                  
+              
                   <!-- modelVersion2 -->
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
@@ -183,22 +184,22 @@ class OrderPomElementsTest implements RewriteTest {
                       <artifactId>jpl</artifactId>
                       <version>7.4.0</version>
                   </parent>
-                  
+              
                   <!-- model version comment -->
-                  
+              
                   <!-- model version comment 2 -->
                   <modelVersion>4.0.0</modelVersion>
-                  
+              
                   <artifactId>my-project</artifactId>
                   <groupId>my.org.project</groupId>
                   <version>4.3.0</version>
-                  
+              
                   <properties>
                   </properties>
-                  
+              
                   <description>Some project desc</description>
                   <name>Some Project</name>
-                  
+              
                   <dependencies>
                       <dependency>
                           <!-- artifact content
@@ -217,12 +218,12 @@ class OrderPomElementsTest implements RewriteTest {
                           <artifactId>my-project-thing</artifactId>
                       </dependency>
                   </dependencyManagement>
-                  
+              
                   <repositories>
                   </repositories>
                   <pluginRepositories>
                   </pluginRepositories>
-                  
+              
                   <build>
                   </build>
               </project>
@@ -230,26 +231,26 @@ class OrderPomElementsTest implements RewriteTest {
             """
               <project>
                   <!-- model version comment -->
-                  
+              
                   <!-- model version comment 2 -->
                   <modelVersion>4.0.0</modelVersion>
-                  
+              
                   <parent>
                       <groupId>jpl</groupId>
                       <artifactId>jpl</artifactId>
                       <version>7.4.0</version>
                   </parent>
-                  
+              
                   <groupId>my.org.project</groupId>
                   <artifactId>my-project</artifactId>
                   <version>4.3.0</version>
-                  
+              
                   <name>Some Project</name>
-                  
+              
                   <description>Some project desc</description>
                   <properties>
                   </properties>
-                  
+              
                   <dependencyManagement>
                       <dependency>
                           <groupId>my.org.project</groupId>
@@ -268,12 +269,12 @@ class OrderPomElementsTest implements RewriteTest {
                           <version>4.3.0</version>
                       </dependency>
                   </dependencies>
-                  
+              
                   <repositories>
                   </repositories>
                   <pluginRepositories>
                   </pluginRepositories>
-                  
+              
                   <build>
                   </build>
               </project>

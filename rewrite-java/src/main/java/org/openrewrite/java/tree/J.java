@@ -362,11 +362,11 @@ public interface J extends Tree {
 
                 if (dimensions.isEmpty()) {
                     // varargs in Javadoc
-                    type = new JavaType.Array(null, elementType.getType());
+                    type = new JavaType.Array(null, elementType.getType(), null);
                 } else {
                     int dimensionCount = dimensions.size();
                     elementType = mapOldFormat(elementType, dimensions.subList(0, dimensionCount - 1));
-                    type = new JavaType.Array(null, elementType.getType());
+                    type = new JavaType.Array(null, elementType.getType(), null);
                     dimension = JLeftPadded.build(dimensions.get(dimensionCount - 1).getAfter()).withBefore(dimensions.get(dimensionCount - 1).getElement());
                 }
             }
@@ -387,7 +387,7 @@ public interface J extends Tree {
                             elementType,
                             null,
                             JLeftPadded.build(dimensions.get(0).getAfter()).withBefore(dimensions.get(0).getElement()),
-                            new JavaType.Array(null, elementType.getType())
+                            new JavaType.Array(null, elementType.getType(), null)
                     ),
                     dimensions.subList(1, count)
             );
@@ -4412,7 +4412,7 @@ public interface J extends Tree {
         @Nullable
         @Override
         public JavaType getType() {
-            return constructorType == null ? null : constructorType.getDeclaringType();
+            return constructorType == null ? null : constructorType.getReturnType();
         }
 
         /**

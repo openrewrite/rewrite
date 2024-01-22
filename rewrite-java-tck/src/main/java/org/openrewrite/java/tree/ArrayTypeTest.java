@@ -63,7 +63,7 @@ class ArrayTypeTest implements RewriteTest {
                             assertThat(arrayType.toString()).isEqualTo("String [] [ ]");
                             secondDimension.set(true);
                         } else {
-                            assertThat(arrayType.toString()).isEqualTo("String []");
+                            assertThat(arrayType.toString()).isEqualTo("String [ ]");
                             firstDimension.set(true);
                         }
                         return super.visitArrayType(arrayType, o);

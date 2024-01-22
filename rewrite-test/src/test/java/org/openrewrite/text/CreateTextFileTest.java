@@ -15,6 +15,7 @@
  */
 package org.openrewrite.text;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -103,6 +104,7 @@ class CreateTextFileTest implements RewriteTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite-jenkins/issues/52")
     void shouldOverrideDifferentSourceFileType() {
+        @Language("groovy")
         String after = """
           /*
            See the documentation for more options:

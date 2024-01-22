@@ -37,8 +37,7 @@ class InvertConditionTest implements RewriteTest {
                 public J.If visitIf(J.If iff, ExecutionContext ctx) {
                     return iff.withIfCondition(InvertCondition.invert(iff.getIfCondition(), getCursor()));
                 }
-            }))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            }).withMaxCycles(1)),
           java(
             """
               class Test {

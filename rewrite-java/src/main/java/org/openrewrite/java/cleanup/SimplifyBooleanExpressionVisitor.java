@@ -24,6 +24,7 @@ import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.MethodCall;
 
 import java.util.Collections;
 
@@ -42,7 +43,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
@@ -54,7 +56,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
@@ -100,32 +103,43 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     @Override
     public J visitUnary(J.Unary unary, ExecutionContext ctx) {
         J j = super.visitUnary(unary, ctx);
-        J.Unary asUnary = (J.Unary) j;
+        if (j instanceof J.Unary) {
+            J.Unary asUnary = (J.Unary) j;
 
-        if (asUnary.getOperator() == J.Unary.Type.Not) {
-            Expression expr = asUnary.getExpression();
-            if (isLiteralTrue(expr)) {
-                j = ((J.Literal) expr).withValue(false).withValueSource("false");
-            } else if (isLiteralFalse(expr)) {
-                j = ((J.Literal) expr).withValue(true).withValueSource("true");
-            } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
-                j = ((J.Unary) expr).getExpression();
-            } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof J.Binary) {
-                J.Binary binary = (J.Binary) ((J.Parentheses<?>) expr).getTree();
+            if (asUnary.getOperator() == J.Unary.Type.Not) {
+                j = unpackExpression(asUnary.getExpression(), j);
+            }
+            if (asUnary != j) {
+                j = j.withPrefix(asUnary.getPrefix());
+            }
+        }
+        return j;
+    }
+
+    private J unpackExpression(Expression expr, J j) {
+        if (isLiteralTrue(expr)) {
+            j = ((J.Literal) expr).withValue(false).withValueSource("false");
+        } else if (isLiteralFalse(expr)) {
+            j = ((J.Literal) expr).withValue(true).withValueSource("true");
+        } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
+            j = ((J.Unary) expr).getExpression();
+        } else if (expr instanceof J.Parentheses) {
+            J parenthesized = ((J.Parentheses<?>) expr).getTree();
+            if (parenthesized instanceof J.Binary) {
+                J.Binary binary = (J.Binary) parenthesized;
                 J.Binary.Type negated = negate(binary.getOperator());
                 if (negated != binary.getOperator()) {
                     j = binary.withOperator(negated).withPrefix(j.getPrefix());
                 }
-            } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof J.Unary) {
-                J.Unary unary1 = (J.Unary) ((J.Parentheses<?>) expr).getTree();
+            } else if (parenthesized instanceof J.Unary) {
+                J.Unary unary1 = (J.Unary) parenthesized;
                 J.Unary.Type operator = unary1.getOperator();
                 if (operator == J.Unary.Type.Not) {
                     j = unary1.getExpression().withPrefix(j.getPrefix());
                 }
+            } else if (parenthesized instanceof Expression) {
+                j = unpackExpression((Expression) parenthesized, j);
             }
-        }
-        if (asUnary != j) {
-            j = j.withPrefix(asUnary.getPrefix());
         }
         return j;
     }
@@ -157,8 +171,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J.MethodInvocation asMethod = (J.MethodInvocation) j;
         Expression select = asMethod.getSelect();
         if (isEmpty.matches(asMethod)
-                && select instanceof J.Literal
-                && select.getType() == JavaType.Primitive.String) {
+            && select instanceof J.Literal
+            && select.getType() == JavaType.Primitive.String) {
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
         }
         return j;
