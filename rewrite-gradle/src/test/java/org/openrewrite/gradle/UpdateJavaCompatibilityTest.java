@@ -301,8 +301,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   id "java"
               }
 
-              sourceCompatibility = 21
-              targetCompatibility = 21
+              java {
+                  sourceCompatibility = 21
+                  targetCompatibility = 21
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(21)
+                  }
+              }
               """
           )
         );
@@ -318,8 +323,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   id "java"
               }
 
-              sourceCompatibility = 21
-              targetCompatibility = 21
+              java {
+                  sourceCompatibility = 21
+                  targetCompatibility = 21
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(21)
+                  }
+              }
               """,
 
             """
@@ -327,8 +337,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   id "java"
               }
 
-              sourceCompatibility = 17
-              targetCompatibility = 17
+              java {
+                  sourceCompatibility = 17
+                  targetCompatibility = 17
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(17)
+                  }
+              }
               """
           )
         );
