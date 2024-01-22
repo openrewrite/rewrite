@@ -39,15 +39,15 @@ public class Repeat {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if(tree instanceof SourceFile && !v.isAcceptable((SourceFile)tree, ctx)) {
+                if (tree instanceof SourceFile && !v.isAcceptable((SourceFile) tree, ctx)) {
                     return tree;
                 }
 
                 Tree previous = tree;
                 Tree current = null;
-                for(int i = 0; i < maxCycles; i++) {
+                for (int i = 0; i < maxCycles; i++) {
                     current = v.visit(previous, ctx);
-                    if(current == previous) {
+                    if (current == previous) {
                         break;
                     }
                     previous = current;

@@ -237,7 +237,6 @@ class MergeYamlTest implements RewriteTest {
     void insertYaml() {
         rewriteRun(
           spec -> spec
-            .cycles(2)
             .recipe(new MergeYaml(
               "$.spec",
               //language=yaml
@@ -585,7 +584,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapAddAdditionalObject() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
               //language=yaml
@@ -621,7 +619,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapAddObject() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
               //language=yaml
@@ -683,7 +680,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapWhenOneIdenticalObjectExistsTheSecondIsAdded() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
               //language=yaml
@@ -721,7 +717,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapWhenOneDifferentObjectExistsValuesAreChanged() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
               //language=yaml
@@ -755,7 +750,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapAddComplexMapping() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.spec",
               //language=yaml
@@ -803,7 +797,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapChangeComplexMapping() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.spec",
               //language=yaml

@@ -27,13 +27,12 @@ import static org.openrewrite.maven.Assertions.pomXml;
 class RemoveDuplicateDependenciesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.expectedCyclesThatMakeChanges(1).recipe(new RemoveDuplicateDependencies());
+        spec.recipe(new RemoveDuplicateDependencies());
     }
 
     @Test
     void notApplicable() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(0),
           pomXml(
             """
               <project>
@@ -286,7 +285,6 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     @Test
     void keepDependencyWithClassifier() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(0),
           pomXml(
             """
               <project>
@@ -319,7 +317,6 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     @Test
     void keepDependencyWithType() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(0),
           pomXml(
             """
               <project>
@@ -351,7 +348,6 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     @Test
     void keepDependencyWithDifferentScope() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(0),
           pomXml(
             """
               <project>
@@ -433,7 +429,6 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3832")
     void retainDuplicateManagedDependenciesWithDifferentClassifier() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(0),
           pomXml(
             """
               <project>

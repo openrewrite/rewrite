@@ -17,7 +17,6 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -31,9 +30,7 @@ public class AddProfileTest implements RewriteTest {
     void addProfileToPom() {
         rewriteRun(
           spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
-            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>"))
-          .cycles(1)
-          .expectedCyclesThatMakeChanges(1),
+            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
               <project>
@@ -73,9 +70,7 @@ public class AddProfileTest implements RewriteTest {
     void preExistingOtherProfile() {
         rewriteRun(
           spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
-            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>"))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
               <project>
@@ -128,9 +123,7 @@ public class AddProfileTest implements RewriteTest {
     void preExistingMatchingProfile() {
         rewriteRun(
           spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
-            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>"))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
               <project>

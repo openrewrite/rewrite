@@ -90,6 +90,14 @@ public abstract class Recipe implements Cloneable {
     }
 
     /**
+     * @return The maximum number of cycles this recipe is allowed to make changes in a recipe run.
+     */
+    @Incubating(since = "8.0.0")
+    public int maxCycles() {
+        return Integer.MAX_VALUE;
+    }
+
+    /**
      * A human-readable display name for the recipe, initial capped with no period.
      * For example, "Find text". The display name can be assumed to be rendered in
      * documentation and other places where markdown is understood, so it is possible
@@ -325,7 +333,15 @@ public abstract class Recipe implements Cloneable {
     }
 
     public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx) {
-        return new RecipeScheduler().scheduleRun(this, before, ctx);
+        return run(before, ctx, 3);
+    }
+
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles) {
+        return run(before, ctx, maxCycles, 1);
+    }
+
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles, int minCycles) {
+        return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
     @SuppressWarnings("unused")

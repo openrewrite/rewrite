@@ -25,7 +25,6 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
 
 import static java.util.Objects.requireNonNull;
 
@@ -74,6 +73,11 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public String getDescription() {
         return "Appends or replaces content of an existing plain text file, or creates a new one if it doesn't already exist.";
+    }
+
+    @Override
+    public int maxCycles() {
+        return 1;
     }
 
     @Override
@@ -136,9 +140,6 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
                         case Continue:
                             if (!maybeNewline.isEmpty() && !existingPlainText.getText().endsWith(maybeNewline)) {
                                 content = maybeNewline + content;
-                            }
-                            if(existingPlainText.getText().endsWith(content)) {
-                                return sourceFile;
                             }
                             return existingPlainText.withText(existingPlainText.getText() + content);
                         case Replace:

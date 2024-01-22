@@ -102,6 +102,25 @@ class AppendToTextFileTest implements RewriteTest {
     }
 
     @Test
+    void multipleInstancesCanAppend() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Continue),
+            new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Continue)
+          ),
+          text(
+            "existing",
+            """
+              existing
+              content
+              content
+              """,
+            spec -> spec.path("file.txt").noTrim()
+          )
+        );
+    }
+
+    @Test
     void noLeadingNewlineIfNoPreamble() {
         rewriteRun(
           spec -> spec.recipe(new AppendToTextFile("file.txt", "content", null, true, AppendToTextFile.Strategy.Replace)),

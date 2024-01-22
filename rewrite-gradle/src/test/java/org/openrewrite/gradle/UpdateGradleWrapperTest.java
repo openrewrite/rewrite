@@ -68,7 +68,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @DocumentExample("Add a new Gradle wrapper")
     void addGradleWrapper() {
         rewriteRun(
-          spec -> spec.afterRecipe(run -> {
+          spec -> spec.expectedCyclesThatMakeChanges(1).afterRecipe(run -> {
               assertThat(run.getChangeset().getAllResults()).hasSize(4);
 
               var gradleSh = result(run, PlainText.class, "gradlew");
@@ -461,6 +461,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
             """,
               "org.openrewrite.gradle.MultipleWrapperUpdates")
             .cycles(1)
+            .expectedCyclesThatMakeChanges(1)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "5.6.4")))
             .afterRecipe(run -> {
                 var gradleSh = result(run, PlainText.class, "gradlew");

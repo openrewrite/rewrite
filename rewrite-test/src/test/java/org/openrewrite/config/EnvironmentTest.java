@@ -448,6 +448,29 @@ class EnvironmentTest implements RewriteTest {
     }
 
     @Test
+    void canCauseAnotherCycle() {
+        var env = Environment.builder()
+          .load(new YamlResourceLoader(
+            //language=yaml
+            new ByteArrayInputStream(
+              """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.Foo
+                displayName: Test
+                causesAnotherCycle: true
+                recipeList:
+                  - org.openrewrite.config.RecipeNoParameters
+                                
+                """.getBytes()
+            ),
+            URI.create("rewrite.yml"),
+            new Properties()
+          )).build();
+        var recipe = env.activateRecipes("test.Foo");
+        assertThat(recipe.getRecipeList().get(0).causesAnotherCycle()).isTrue();
+    }
+
+    @Test
     void willBeValidIfIncludesRecipesFromDependencies() {
         var env = Environment.builder()
           .load(new YamlResourceLoader(

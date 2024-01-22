@@ -55,7 +55,7 @@ class JavaVisitorTest implements RewriteTest {
                     return method;
                 }
             })
-          ).cycles(2).expectedCyclesThatMakeChanges(2),
+          ),
           java(
             """
               class A {
