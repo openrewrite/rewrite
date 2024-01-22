@@ -116,6 +116,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Nullable
     Boolean acceptTransitive;
 
+    transient boolean requiresAnotherCycle = true;
+
     static final String DEPENDENCY_PRESENT = "org.openrewrite.gradle.AddDependency.DEPENDENCY_PRESENT";
 
     @Override
@@ -140,6 +142,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             validated = validated.and(Semver.validate(version, versionPattern));
         }
         return validated;
+    }
+
+    @Override
+    public boolean causesAnotherCycle() {
+        return requiresAnotherCycle;
     }
 
     public static class Scanned {

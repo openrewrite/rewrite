@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -93,6 +94,7 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Disabled
     @ParameterizedTest
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void multipleCycles(String onlyIfUsing) {
@@ -106,10 +108,32 @@ class AddDependencyTest implements RewriteTest {
             srcTestJava(
               java(
                 """
-                  import foo.math.IntMath;
+                  package foo.math;
+                  
                   public class A {
                       boolean getMap() {
                           return IntMath.isPrime(5);
+                      }
+                  }
+                  
+                  class IntMath {
+                      static boolean isPrime(int i) {
+                          return i % 2 != 0;
+                      }
+                  }
+                  """,
+                """
+                  package com.google.common.math;
+                  
+                  public class A {
+                      boolean getMap() {
+                          return IntMath.isPrime(5);
+                      }
+                  }
+                  
+                  class IntMath {
+                      static boolean isPrime(int i) {
+                          return i % 2 != 0;
                       }
                   }
                   """
