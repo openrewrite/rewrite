@@ -217,10 +217,16 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
             @Override
             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
-                Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
+                Optional<GradleProject> maybeGradleProject =  acc.gradleProject != null ?
+                    Optional.of(acc.gradleProject) :
+                    cu.getMarkers().findFirst(GradleProject.class);
+
+                Optional<GradleSettings> maybeGradleSettings = acc.gradleSettings != null ?
+                    Optional.of(acc.gradleSettings) :
+                    cu.getMarkers().findFirst(GradleSettings.class);
+
                 if (!maybeGradleProject.isPresent() && !maybeGradleSettings.isPresent()) {
-                    return cu;
+                    throw new IllegalStateException("Unable to find a gradle project or gradle settings");
                 }
 
                 gradleProject = maybeGradleProject.orElse(null);
