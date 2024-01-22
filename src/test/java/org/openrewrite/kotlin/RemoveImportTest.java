@@ -53,7 +53,7 @@ public class RemoveImportTest implements RewriteTest {
     @Test
     void removeStarFoldPackage() {
         rewriteRun(
-          spec -> spec.recipe(removeTypeImportRecipe("java.io.OutputStream")),
+          spec -> spec.recipe(removeTypeImportRecipe("java.io.OutputStream")).expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               import java.io.*

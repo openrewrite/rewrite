@@ -83,7 +83,8 @@ class BlankLinesTest implements RewriteTest {
         @Test
         void keepMaximumInDeclarations() {
             rewriteRun(
-              blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withInDeclarations(0))),
+              blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withInDeclarations(0)))
+                .andThen(spec -> spec.expectedCyclesThatMakeChanges(2)),
               kotlin(
                 """
                   import java.util.List
@@ -389,9 +390,10 @@ class BlankLinesTest implements RewriteTest {
         class BeforeDeclarationWithCommentOrAnnotationTest {
 
             @Test
-            void BeforeDeclarationWithComment() {
+            void beforeDeclarationWithComment() {
                 rewriteRun(
-                  blankLines(style -> style.withMinimum(style.getMinimum().withBeforeDeclarationWithCommentOrAnnotation(3))),
+                  blankLines(style -> style.withMinimum(style.getMinimum().withBeforeDeclarationWithCommentOrAnnotation(3)))
+                    .andThen(spec -> spec.expectedCyclesThatMakeChanges(2)),
                   kotlin(
                     """
                       annotation class Annotation
@@ -424,9 +426,10 @@ class BlankLinesTest implements RewriteTest {
             }
 
             @Test
-            void BeforeAnnotation() {
+            void feforeAnnotation() {
                 rewriteRun(
-                  blankLines(style -> style.withMinimum(style.getMinimum().withBeforeDeclarationWithCommentOrAnnotation(3))),
+                  blankLines(style -> style.withMinimum(style.getMinimum().withBeforeDeclarationWithCommentOrAnnotation(3)))
+                    .andThen(spec -> spec.expectedCyclesThatMakeChanges(2)),
                   kotlin(
                     """
                       annotation class Annotation
