@@ -121,9 +121,7 @@ class AddImportTest implements RewriteTest {
     @Test
     void dontDuplicateImports2() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Test", null, false)))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Test", null, false))),
           java(
             """
               import org.junit.jupiter.api.AfterEach;
@@ -150,9 +148,7 @@ class AddImportTest implements RewriteTest {
     void dontDuplicateImports3() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertNull", false)))
-            .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")),
           java(
             """
               import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -402,9 +398,7 @@ class AddImportTest implements RewriteTest {
                         );
                   }
               }
-            ))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            ).withMaxCycles(1)),
           java(
             """
               package a;

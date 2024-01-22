@@ -81,6 +81,7 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
             }
 
             if (before != null && after != null) {
+                thisCycleEdits.put(before, after);
                 if (!detectedChangeInThisCycle && before != after) {
                     detectedChangeInThisCycle = true;
                     cyclesThatResultedInChanges++;
@@ -93,18 +94,18 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
                             )
                             .isEqualTo(before.printAllTrimmed());
                 }
-            } else if (!detectedChangeInThisCycle && before == null && after != null) {
-                cyclesThatResultedInChanges++;
-            } else if (!detectedChangeInThisCycle && before != null) {
-                cyclesThatResultedInChanges++;
-            }
-
-            if (before != null && after != null) {
-                thisCycleEdits.put(before, after);
+            } else if (before == null && after != null) {
+                thisCycleGenerated.put(sourcePath, after);
+                if (!detectedChangeInThisCycle) {
+                    detectedChangeInThisCycle = true;
+                    cyclesThatResultedInChanges++;
+                }
             } else if (before != null) {
                 thisCycleDeleted.add(before);
-            } else if (after != null) {
-                thisCycleGenerated.put(sourcePath, after);
+                if (!detectedChangeInThisCycle) {
+                    detectedChangeInThisCycle = true;
+                    cyclesThatResultedInChanges++;
+                }
             }
         }
 

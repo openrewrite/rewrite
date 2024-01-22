@@ -560,7 +560,7 @@ class JavaTemplateTest implements RewriteTest {
                       unary.getExpression()
                     );
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           java(
             """
               class Test {
@@ -593,7 +593,7 @@ class JavaTemplateTest implements RewriteTest {
                     .build()
                     .apply(getCursor(), memberRef.getCoordinates().replace());
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           java(
             """
               import java.util.ArrayList;
@@ -638,7 +638,7 @@ class JavaTemplateTest implements RewriteTest {
                       return fa;
                   }
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          }).withMaxCycles(1)),
           java(
             """
               import java.io.File;
