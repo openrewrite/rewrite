@@ -81,6 +81,8 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
                             )
                             .isEqualTo(before.printAllTrimmed());
                 }
+            } else if (!detectedChangeInThisCycle && before == null && after != null) {
+                cyclesThatResultedInChanges++;
             }
 
             if (result.getAfter() != null) {
