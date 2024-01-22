@@ -100,7 +100,7 @@ public class DeclarativeRecipeTest implements RewriteTest {
           text("1", "1+1")
         );
         rewriteRun(
-          spec -> spec.recipe(new RepeatedFindAndReplace(".+", "$0+1", 2)),
+          spec -> spec.recipe(new RepeatedFindAndReplace(".+", "$0+1", 2)).expectedCyclesThatMakeChanges(2),
           text("1", "1+1+1")
         );
     }
@@ -124,7 +124,7 @@ public class DeclarativeRecipeTest implements RewriteTest {
           )
         );
         rewriteRun(
-          spec -> spec.recipe(root).cycles(10).expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(3),
           text("1", "1+1+1")
         );
         assertThat(cycleCount).hasValue(3);

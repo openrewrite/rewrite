@@ -512,6 +512,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void preferExistingDistributionSource() {
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("8.0.x", null, null, null))
+            .expectedCyclesThatMakeChanges(2)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
           properties(
             """
@@ -549,6 +550,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void customDistributionUri() {
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("8.0.x", null, null, "https://company.com/repo/gradle-${version}-${distribution}.zip"))
+            .expectedCyclesThatMakeChanges(2)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
           properties(
             """
