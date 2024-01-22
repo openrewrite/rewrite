@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
@@ -95,7 +96,12 @@ class ImportTest implements RewriteTest {
     void methodName() {
         rewriteRun(
           kotlin("fun <T : Any> Class<T>.createInstance() {}"),
-          kotlin("import   createInstance /*C1*/")
+          kotlin(
+            "import   createInstance /*C1*/",
+            spec -> spec.afterRecipe(cu -> {
+                System.out.println(cu.getImports().get(0).getPackageName());
+            })
+          )
         );
     }
 
@@ -160,6 +166,22 @@ class ImportTest implements RewriteTest {
             """
               import org.`should be equal to`
               """)
+        );
+    }
+
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/564")
+    @Test
+    void quotedImport() {
+        rewriteRun(
+          kotlin(
+            """
+              import my.org.`x$`
+              
+              fun main() {
+              }
+              """
+          )
         );
     }
 }
