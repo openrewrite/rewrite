@@ -57,6 +57,12 @@ public class UpdateJavaCompatibility extends Recipe {
     @Nullable
     DeclarationStyle declarationStyle;
 
+    @Option(displayName = "Allow Downgrade",
+            description = "Allow downgrading the Java version.",
+            required = false)
+    @Nullable
+    Boolean allowDowngrade;
+
     @Override
     public String getDisplayName() {
         return "Update Gradle project Java compatibility";
@@ -108,7 +114,8 @@ public class UpdateJavaCompatibility extends Recipe {
 
                 DeclarationStyle currentStyle = getCurrentStyle(a.getAssignment());
                 int currentMajor = getMajorVersion(a.getAssignment());
-                if (currentMajor != version || (declarationStyle != null && declarationStyle != currentStyle)) {
+                if ((currentMajor < version || currentMajor > version && Boolean.TRUE.equals(allowDowngrade))
+                    || (declarationStyle != null && declarationStyle != currentStyle)) {
                     DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
                     return a.withAssignment(changeExpression(a.getAssignment(), actualStyle));
                 }
