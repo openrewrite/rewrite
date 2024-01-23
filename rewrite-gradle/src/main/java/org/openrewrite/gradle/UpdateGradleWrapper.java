@@ -93,6 +93,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     final Boolean addIfMissing;
 
+    @Getter
     @Option(displayName = "Wrapper URI",
             description = "The URI of the Gradle wrapper distribution. " +
                           "Lookup of available versions still requires access to https://services.gradle.org" +
