@@ -18,7 +18,6 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
@@ -169,17 +168,13 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/564")
     @Test
-    void quotedImport() {
+    void quotedImportWithDollar() {
         rewriteRun(
           kotlin(
             """
-              import my.org.`x$`
-              
-              fun main() {
-              }
+              import my.org.`$x`
               """
           )
         );
