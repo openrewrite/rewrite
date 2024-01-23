@@ -190,7 +190,6 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         if (resolvedVersion != null) {
                             return entry.withValue(entry.getValue().withText(resolvedVersion));
                         }
-                        return entry.withValue(entry.getValue().withText(newVersion));
                     }
                 }
                 return entry;
