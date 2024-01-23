@@ -1756,5 +1756,36 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Test
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/590")
+        void callWithDefaultedGenericParameters() {
+            rewriteRun(
+              kotlin(
+                """
+                  internal data class Foo<T : Any>(val i: T, val j: T) {
+                      fun f() {
+                          return copy(i = 42)
+                      }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                            if ("copy".equals(method.getSimpleName())) {
+                                String signature = method.getMethodType() != null ? method.getMethodType().toString() : "";
+                                assertThat(signature).isEqualTo("Foo<Generic{T extends kotlin.Any}>{name=copy,return=Foo<Generic{T extends kotlin.Any}>,parameters=[kotlin.Int,Generic{T extends kotlin.Any}]}");
+                                found.set(true);
+                            }
+                            return super.visitMethodInvocation(method, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }

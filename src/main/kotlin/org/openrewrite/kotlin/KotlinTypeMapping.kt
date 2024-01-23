@@ -793,8 +793,12 @@ class KotlinTypeMapping(
             }
             val t = type(p.returnTypeRef)
             if (t is GenericTypeVariable) {
-                if (mapNames && args != null && args.containsKey(p.name.asString())) {
-                    paramTypes.add(type(args[p.name.asString()]!!.typeRef, function)!!)
+                if (mapNames && args != null) {
+                    if (args.containsKey(p.name.asString())) {
+                        paramTypes.add(type(args[p.name.asString()]!!.typeRef, function)!!)
+                    } else {
+                        paramTypes.add(t)
+                    }
                 } else if (index < valueParams.size) {
                     paramTypes.add(type(function.arguments[index].typeRef, function)!!)
                 }
