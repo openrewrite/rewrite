@@ -37,10 +37,9 @@ import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.Semver;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -205,6 +204,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             }
         };
         GroovyVisitor<ExecutionContext> groovyVisitor = new GroovyVisitor<ExecutionContext>() {
+            @Nullable
             private GradleProject gradleProject;
             @Nullable
             private GradleSettings gradleSettings;
@@ -218,11 +218,11 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     Optional.of(acc.gradleSettings) :
                     cu.getMarkers().findFirst(GradleSettings.class);
 
-                if (!maybeGradleProject.isPresent()) {
+                if (!maybeGradleProject.isPresent() && !maybeGradleSettings.isPresent()) {
                     return cu;
                 }
 
-                gradleProject = maybeGradleProject.get();
+                gradleProject = maybeGradleProject.orElse(null);
                 gradleSettings = maybeGradleSettings.orElse(null);
                 return super.visitCompilationUnit(cu, ctx);
             }
