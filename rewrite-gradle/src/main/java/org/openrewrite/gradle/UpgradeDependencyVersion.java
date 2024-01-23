@@ -123,6 +123,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
 
     public static class DependencyVersionState {
+        @Nullable
         GradleProject gradleProject;
         Map<String, GroupArtifact> buildDependencies = new HashMap<>();
     }
@@ -233,11 +234,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                     @Override
                     public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-
-                        if (acc.buildDependencies.containsKey(entry.getKey())) {
+                        if (acc.buildDependencies.containsKey(entry.getKey()) && acc.gradleProject != null) {
                             GroupArtifact groupArtifact = acc.buildDependencies.get(entry.getKey());
                             if (!StringUtils.isBlank(newVersion)) {
-                                String resolvedVersion = null;
+                                String resolvedVersion;
                                 try {
                                     resolvedVersion = findNewerProjectDependencyVersion(groupArtifact.getGroupId(), groupArtifact.getArtifactId(), newVersion, acc.gradleProject, ctx);
                                 } catch (MavenDownloadingException e) {
@@ -249,7 +249,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 return entry.withValue(entry.getValue().withText(newVersion));
                             }
                         }
-
                         return entry;
                     }
                 },
