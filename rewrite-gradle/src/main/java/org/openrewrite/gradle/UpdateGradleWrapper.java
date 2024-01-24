@@ -96,9 +96,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Getter
     @Option(displayName = "Wrapper URI",
             description = "The URI of the Gradle wrapper distribution. " +
-                          "Lookup of available versions still requires access to https://services.gradle.org" +
+                          "Lookup of available versions still requires access to https://services.gradle.org " +
                           "When this is specified the exact literal values supplied for `version` and `distribution` " +
-                          "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively." +
+                          "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively. " +
                           "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
             required = false)
     @Nullable
