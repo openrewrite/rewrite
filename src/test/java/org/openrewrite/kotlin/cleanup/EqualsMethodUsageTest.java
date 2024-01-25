@@ -119,4 +119,18 @@ class EqualsMethodUsageTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void equalsInBlock() {
+        rewriteRun(
+          kotlin(
+            """
+              val v = print(listOf("1").filter { e -> e.equals("1") })
+              """,
+            """
+              val v = print(listOf("1").filter { e -> e == "1" })
+              """
+          )
+        );
+    }
 }

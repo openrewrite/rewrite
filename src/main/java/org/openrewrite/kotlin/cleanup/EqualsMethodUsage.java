@@ -17,9 +17,7 @@ package org.openrewrite.kotlin.cleanup;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -33,6 +31,8 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -103,8 +103,10 @@ public class EqualsMethodUsage extends Recipe {
                 ) {
                     Expression lhs = method.getSelect();
                     Expression rhs = method.getArguments().get(0);
-                    getCursor().getParentTreeCursor().putMessage("replaced", true);
-                    return buildEqualsBinary(lhs, rhs);
+                    Cursor parentCursor = getCursor().getParentTreeCursor();
+                    parentCursor.putMessage("replaced", true);
+                    J.Binary binary = buildEqualsBinary(lhs, rhs);
+                    return parentCursor.getValue() instanceof J.Block ? new K.ExpressionStatement(randomId(), binary) : binary;
                 }
                 return method;
             }
