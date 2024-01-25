@@ -2103,7 +2103,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (elementType == KtNodeTypes.BOOLEAN_CONSTANT) {
             value = ParseUtilsKt.parseBoolean(expression.getText());
         } else if (elementType == KtNodeTypes.CHARACTER_CONSTANT) {
-            value = expression.getText().charAt(0);
+            value = expression.getText().charAt(1);
         } else if (elementType == KtNodeTypes.NULL) {
             value = null;
         } else {

@@ -16,8 +16,10 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class LiteralTest implements RewriteTest {
@@ -45,7 +47,14 @@ class LiteralTest implements RewriteTest {
     @Test
     void literalCharacter() {
         rewriteRun(
-          kotlin("val c : Char = 'c' ")
+          kotlin("val c : Char = 'c' ", spec -> spec.afterRecipe(cu -> {
+              J.VariableDeclarations vd = (J.VariableDeclarations) cu.getStatements().get(0);
+              J.VariableDeclarations.NamedVariable c = vd.getVariables().get(0);
+              J.Literal lit = (J.Literal) c.getInitializer();
+              assertThat(lit).isNotNull();
+              assertThat(lit.getValueSource()).isEqualTo("'c'");
+              assertThat(lit.getValue()).isEqualTo('c');
+          }))
         );
     }
 
