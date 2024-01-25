@@ -2103,7 +2103,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (elementType == KtNodeTypes.BOOLEAN_CONSTANT) {
             value = ParseUtilsKt.parseBoolean(expression.getText());
         } else if (elementType == KtNodeTypes.CHARACTER_CONSTANT) {
-            value = expression.getText().charAt(1);
+            value = unescape(expression.getText().substring(1, expression.getText().length() - 1));
         } else if (elementType == KtNodeTypes.NULL) {
             value = null;
         } else {
@@ -2118,6 +2118,29 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 primitiveType(expression)
         );
+    }
+
+    private Object unescape(String str) {
+        if (str.length() == 1) {
+            return str.charAt(0);
+        } else if (str.length() == 2 && str.charAt(0) == '\\') {
+            switch (str.charAt(1)) {
+                case 't':
+                    return '\t';
+                case 'b':
+                    return '\b';
+                case 'r':
+                    return '\r';
+                case 'n':
+                    return '\n';
+                case '\'':
+                    return '\'';
+                default:
+                    return str.charAt(1);
+            }
+        }
+        // TODO unicode
+        return str;
     }
 
     @Override

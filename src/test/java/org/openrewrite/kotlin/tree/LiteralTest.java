@@ -47,13 +47,13 @@ class LiteralTest implements RewriteTest {
     @Test
     void literalCharacter() {
         rewriteRun(
-          kotlin("val c : Char = 'c' ", spec -> spec.afterRecipe(cu -> {
+          kotlin("val c : Char = '\\n'", spec -> spec.afterRecipe(cu -> {
               J.VariableDeclarations vd = (J.VariableDeclarations) cu.getStatements().get(0);
               J.VariableDeclarations.NamedVariable c = vd.getVariables().get(0);
               J.Literal lit = (J.Literal) c.getInitializer();
               assertThat(lit).isNotNull();
-              assertThat(lit.getValueSource()).isEqualTo("'c'");
-              assertThat(lit.getValue()).isEqualTo('c');
+              assertThat(lit.getValueSource()).isEqualTo("'\\n'");
+              assertThat(lit.getValue()).isEqualTo('\n');
           }))
         );
     }
