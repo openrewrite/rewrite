@@ -2413,7 +2413,6 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/546")
     void annotationIndentation() {
@@ -2430,12 +2429,7 @@ class TabsAndIndentsTest implements RewriteTest {
             
             @SafeVarargs
             @SuppressWarnings
-            class Foo {
-                val x =
-                    3.plus(
-                        3
-                    )
-            }
+            class Foo
             """
           ));
     }

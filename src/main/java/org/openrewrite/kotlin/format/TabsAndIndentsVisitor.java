@@ -93,6 +93,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         if (tree instanceof JavaSourceFile ||
                 tree instanceof J.Package ||
                 tree instanceof J.Import ||
+                tree instanceof J.ClassDeclaration ||
                 tree instanceof J.Label ||
                 tree instanceof J.DoWhileLoop ||
                 tree instanceof J.ArrayDimension) {
@@ -111,8 +112,6 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.Case ||
                 tree instanceof J.EnumValueSet ||
                 (tree instanceof J.Ternary && !wrappingStyle.getElvisExpressions().getUseContinuationIndent()) ||
-                tree instanceof J.ClassDeclaration ||
-                tree instanceof K.ClassDeclaration ||
                 (tree instanceof J.FieldAccess || tree instanceof J.MethodInvocation)
                         && !wrappingStyle.getChainedFunctionCalls().getUseContinuationIndent() ||
                 tree instanceof J.Annotation
@@ -123,6 +122,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                    tree instanceof K.Return ||
                    tree instanceof K.When ||
                    tree instanceof K.WhenBranch ||
+                   tree instanceof K.ClassDeclaration ||
                    (tree != null && tree.getMarkers().findFirst(ImplicitReturn.class).isPresent())) {
             // skip, do nothing
         } else {
