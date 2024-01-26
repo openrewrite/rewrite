@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"KotlinConstantConditions", "ControlFlowWithEmptyBody"})
-class StringTest implements RewriteTest {
+class StringTemplateTest implements RewriteTest {
 
     @Test
     void interpolationWithLeadingWhitespace() {

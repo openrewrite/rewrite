@@ -246,7 +246,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J tree = requireNonNull(entry.getExpression()).accept(this, data);
         boolean inBraces = true;
 
-        return new K.KString.Value(
+        return new K.StringTemplate.Expression(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
@@ -270,7 +270,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitCallableReferenceExpression(KtCallableReferenceExpression expression, ExecutionContext data) {
         FirElement firElement = psiElementAssociations.primary(expression.getCallableReference());
         if (!(firElement instanceof FirResolvedCallableReference || firElement instanceof FirCallableReferenceAccess)) {
-            throw new UnsupportedOperationException(String.format("Unsupported callable reference: fir class: %s, fir: %s, psi class: %s.",
+            throw new UnsupportedOperationException(java.lang.String.format("Unsupported callable reference: fir class: %s, fir: %s, psi class: %s.",
                     firElement == null ? "null" : firElement.getClass().getName(),
                     PsiTreePrinter.print(psiElementAssociations.primary(expression)),
                     expression.getClass().getName()));
@@ -1129,7 +1129,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         Expression returnExpr = returnedExpression != null ?
                 convertToExpression(returnedExpression.accept(this, data).withPrefix(prefix(returnedExpression))) :
                 null;
-        return new K.KReturn(
+        return new K.Return(
                 randomId(),
                 new J.Return(
                         randomId(),
@@ -1216,7 +1216,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitSimpleNameStringTemplateEntry(KtSimpleNameStringTemplateEntry entry, ExecutionContext data) {
-        return new K.KString.Value(
+        return new K.StringTemplate.Expression(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
@@ -1258,7 +1258,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitThisExpression(KtThisExpression expression, ExecutionContext data) {
-        return new K.KThis(
+        return new K.This(
                 randomId(),
                 deepPrefix(expression),
                 Markers.EMPTY,
@@ -3105,7 +3105,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 values.add(entry.accept(this, data));
             }
 
-            return new K.KString(
+            return new K.StringTemplate(
                     randomId(),
                     deepPrefix(expression),
                     Markers.EMPTY,
@@ -3718,14 +3718,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private J.Block convertToBlock(KtExpression ktExpression, ExecutionContext data) {
         Expression returnExpr = convertToExpression(ktExpression.accept(this, data)).withPrefix(Space.EMPTY);
-        K.KReturn kreturn = new K.KReturn(randomId(), new J.Return(randomId(), prefix(ktExpression), Markers.EMPTY.addIfAbsent(new ImplicitReturn(randomId())), returnExpr), null);
+        K.Return return_ = new K.Return(randomId(), new J.Return(randomId(), prefix(ktExpression), Markers.EMPTY.addIfAbsent(new ImplicitReturn(randomId())), returnExpr), null);
         return new J.Block(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY.addIfAbsent(new OmitBraces(randomId()))
                         .addIfAbsent(new SingleExpressionBlock(randomId())),
                 JRightPadded.build(false),
-                singletonList(JRightPadded.build(kreturn)),
+                singletonList(JRightPadded.build(return_)),
                 Space.EMPTY
         );
     }

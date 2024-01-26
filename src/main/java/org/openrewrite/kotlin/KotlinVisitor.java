@@ -178,65 +178,6 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return pa;
     }
 
-    public J visitKReturn(K.KReturn kReturn, P p) {
-        K.KReturn r = kReturn;
-        r = r.withPrefix(visitSpace(r.getPrefix(), KSpace.Location.KRETURN_PREFIX, p));
-        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
-        Statement temp = (Statement) visitStatement(r, p);
-        if (!(temp instanceof K.KReturn)) {
-            return temp;
-        } else {
-            r = (K.KReturn) temp;
-        }
-        Expression temp2 = (Expression) visitExpression(r, p);
-        if (!(temp2 instanceof K.KReturn)) {
-            return temp2;
-        } else {
-            r = (K.KReturn) temp2;
-        }
-        r = r.withExpression(visitAndCast(r.getExpression(), p));
-        r = r.withLabel(visitAndCast(r.getLabel(), p));
-        return r;
-    }
-
-    public J visitKString(K.KString kString, P p) {
-        K.KString k = kString;
-        k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.KSTRING_PREFIX, p));
-        k = k.withMarkers(visitMarkers(k.getMarkers(), p));
-        Expression temp = (Expression) visitExpression(k, p);
-        if (!(temp instanceof K.KString)) {
-            return temp;
-        } else {
-            k = (K.KString) temp;
-        }
-        k = k.withStrings(ListUtils.map(k.getStrings(), s -> visit(s, p)));
-        k = k.withType(visitType(k.getType(), p));
-        return k;
-    }
-
-    public J visitKThis(K.KThis kThis, P p) {
-        K.KThis k = kThis;
-        k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.KTHIS_PREFIX, p));
-        k = k.withMarkers(visitMarkers(k.getMarkers(), p));
-        Expression temp = (Expression) visitExpression(k, p);
-        if (!(temp instanceof K.KThis)) {
-            return temp;
-        } else {
-            k = (K.KThis) temp;
-        }
-        k = k.withType(visitType(k.getType(), p));
-        return k;
-    }
-
-    public J visitKStringValue(K.KString.Value value, P p) {
-        K.KString.Value v = value;
-        v = v.withPrefix(visitSpace(v.getPrefix(), KSpace.Location.KSTRING_VALUE_PREFIX, p));
-        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
-        v = v.withTree(visit(v.getTree(), p));
-        v = v.withAfter(visitSpace(v.getAfter(), KSpace.Location.KSTRING_VALUE_AFTER, p));
-        return v;
-    }
-
     public J visitListLiteral(K.ListLiteral listLiteral, P p) {
         K.ListLiteral l = listLiteral;
         l = l.withPrefix(visitSpace(l.getPrefix(), KSpace.Location.LIST_LITERAL_PREFIX, p));
@@ -295,6 +236,27 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return pr;
     }
 
+    public J visitReturn(K.Return return_, P p) {
+        K.Return r = return_;
+        r = r.withPrefix(visitSpace(r.getPrefix(), KSpace.Location.RETURN_PREFIX, p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(r, p);
+        if (!(temp instanceof K.Return)) {
+            return temp;
+        } else {
+            r = (K.Return) temp;
+        }
+        Expression temp2 = (Expression) visitExpression(r, p);
+        if (!(temp2 instanceof K.Return)) {
+            return temp2;
+        } else {
+            r = (K.Return) temp2;
+        }
+        r = r.withExpression(visitAndCast(r.getExpression(), p));
+        r = r.withLabel(visitAndCast(r.getLabel(), p));
+        return r;
+    }
+
     public J visitSpreadArgument(K.SpreadArgument spreadArgument, P p) {
         K.SpreadArgument s = spreadArgument;
         s = s.withPrefix(visitSpace(s.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, p));
@@ -307,6 +269,44 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         }
         s = s.withExpression(visitAndCast(s.getExpression(), p));
         return s;
+    }
+
+    public J visitStringTemplate(K.StringTemplate stringTemplate, P p) {
+        K.StringTemplate k = stringTemplate;
+        k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.STRING_TEMPLATE_PREFIX, p));
+        k = k.withMarkers(visitMarkers(k.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(k, p);
+        if (!(temp instanceof K.StringTemplate)) {
+            return temp;
+        } else {
+            k = (K.StringTemplate) temp;
+        }
+        k = k.withStrings(ListUtils.map(k.getStrings(), s -> visit(s, p)));
+        k = k.withType(visitType(k.getType(), p));
+        return k;
+    }
+
+    public J visitStringTemplateExpression(K.StringTemplate.Expression expression, P p) {
+        K.StringTemplate.Expression v = expression;
+        v = v.withPrefix(visitSpace(v.getPrefix(), KSpace.Location.STRING_TEMPLATE_EXPRESSION_PREFIX, p));
+        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        v = v.withTree(visit(v.getTree(), p));
+        v = v.withAfter(visitSpace(v.getAfter(), KSpace.Location.STRING_TEMPLATE_EXPRESSION_AFTER, p));
+        return v;
+    }
+
+    public J visitThis(K.This aThis, P p) {
+        K.This k = aThis;
+        k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.THIS_PREFIX, p));
+        k = k.withMarkers(visitMarkers(k.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(k, p);
+        if (!(temp instanceof K.This)) {
+            return temp;
+        } else {
+            k = (K.This) temp;
+        }
+        k = k.withType(visitType(k.getType(), p));
+        return k;
     }
 
     public J visitTypeAlias(K.TypeAlias typeAlias, P p) {

@@ -73,23 +73,23 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
-    public K.KReturn visitKReturn(K.KReturn kReturn, P p) {
-        return (K.KReturn) super.visitKReturn(kReturn, p);
+    public K.Return visitReturn(K.Return return_, P p) {
+        return (K.Return) super.visitReturn(return_, p);
     }
 
     @Override
-    public K.KString visitKString(K.KString kString, P p) {
-        return (K.KString) super.visitKString(kString, p);
+    public K.StringTemplate visitStringTemplate(K.StringTemplate stringTemplate, P p) {
+        return (K.StringTemplate) super.visitStringTemplate(stringTemplate, p);
     }
 
     @Override
-    public K.KString.Value visitKStringValue(K.KString.Value value, P p) {
-        return (K.KString.Value) super.visitKStringValue(value, p);
+    public K.StringTemplate.Expression visitStringTemplateExpression(K.StringTemplate.Expression expression, P p) {
+        return (K.StringTemplate.Expression) super.visitStringTemplateExpression(expression, p);
     }
 
     @Override
-    public K.KThis visitKThis(K.KThis kThis, P p) {
-        return (K.KThis) super.visitKThis(kThis, p);
+    public K.This visitThis(K.This aThis, P p) {
+        return (K.This) super.visitThis(aThis, p);
     }
 
     @Override

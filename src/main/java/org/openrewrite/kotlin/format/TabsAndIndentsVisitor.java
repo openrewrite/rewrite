@@ -119,11 +119,11 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         ) {
             getCursor().putMessage("indentType", IndentType.INDENT);
         } else if (tree instanceof K.ExpressionStatement ||
-                tree instanceof K.StatementExpression ||
-                tree instanceof K.KReturn ||
-                tree instanceof K.When ||
-                tree instanceof K.WhenBranch ||
-                (tree != null && tree.getMarkers().findFirst(ImplicitReturn.class).isPresent())) {
+                   tree instanceof K.StatementExpression ||
+                   tree instanceof K.Return ||
+                   tree instanceof K.When ||
+                   tree instanceof K.WhenBranch ||
+                   (tree != null && tree.getMarkers().findFirst(ImplicitReturn.class).isPresent())) {
             // skip, do nothing
         } else {
             getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
@@ -134,9 +134,9 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
 
     @Override
     public Space visitSpace(Space space, KSpace.Location loc, P p) {
-        if (loc == KSpace.Location.KRETURN_PREFIX &&
-                getCursor().<K.KReturn>getValue().getExpression().getMarkers().findFirst(ImplicitReturn.class).isPresent() &&
-                getCursor().<K.KReturn>getValue().getExpression().getExpression() == null) {
+        if (loc == KSpace.Location.RETURN_PREFIX &&
+            getCursor().<K.Return>getValue().getExpression().getMarkers().findFirst(ImplicitReturn.class).isPresent() &&
+            getCursor().<K.Return>getValue().getExpression().getExpression() == null) {
             // implicit returns without any expression are not indented
             return space;
         }

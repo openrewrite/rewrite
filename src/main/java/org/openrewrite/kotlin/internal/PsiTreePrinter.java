@@ -104,7 +104,7 @@ public class PsiTreePrinter {
         Set<TextRange> covered =  new HashSet<>();
         collectCovered(psiElement, covered);
         treePrinter.printSkeletonNode(psiElement, 1);
-        sb.append(String.join("\n", treePrinter.outputLines));
+        sb.append(java.lang.String.join("\n", treePrinter.outputLines));
         return sb.toString();
     }
 
@@ -112,7 +112,7 @@ public class PsiTreePrinter {
         PsiTreePrinter treePrinter = new PsiTreePrinter();
         StringBuilder sb = new StringBuilder();
         treePrinter.printNode(psiElement, 1);
-        sb.append(String.join("\n", treePrinter.outputLines));
+        sb.append(java.lang.String.join("\n", treePrinter.outputLines));
         return sb.toString();
     }
 
@@ -153,7 +153,7 @@ public class PsiTreePrinter {
                 return null;
             }
         }.visitFile(file, context);
-        sb.append(String.join("\n", lines));
+        sb.append(java.lang.String.join("\n", lines));
         return sb.toString();
     }
 
@@ -184,7 +184,7 @@ public class PsiTreePrinter {
                 return null;
             }
         }.visitElement(firElement, context);
-        sb.append(String.join("\n", lines));
+        sb.append(java.lang.String.join("\n", lines));
         return sb.toString();
     }
 
@@ -210,7 +210,7 @@ public class PsiTreePrinter {
 
         TreePrinterContext context = new TreePrinterContext(lines, 1);
         new IrTreePrinterVisitor(new IrPrinter()).visitFile(file, context);
-        sb.append(String.join("\n", lines));
+        sb.append(java.lang.String.join("\n", lines));
         return sb.toString();
     }
 
@@ -231,7 +231,7 @@ public class PsiTreePrinter {
         }
 
         public String print() {
-            return String.join("\n", outputLines);
+            return java.lang.String.join("\n", outputLines);
         }
 
         @Override
@@ -377,32 +377,32 @@ public class PsiTreePrinter {
     private static String printTreeElement(Tree tree) {
         // skip some specific types printed in the output to make the output looks clean
         if (tree instanceof J.CompilationUnit ||
-                tree instanceof J.ClassDeclaration ||
-                tree instanceof J.Block ||
-                tree instanceof J.Empty||
-                tree instanceof J.Try ||
-                tree instanceof J.Try.Catch ||
-                tree instanceof J.ForLoop ||
-                tree instanceof J.WhileLoop ||
-                tree instanceof J.DoWhileLoop ||
-                tree instanceof J.Lambda ||
-                tree instanceof J.Lambda.Parameters ||
-                tree instanceof J.If ||
-                tree instanceof J.If.Else ||
-                tree instanceof J.EnumValueSet ||
-                tree instanceof J.ParenthesizedTypeTree ||
-                tree instanceof J.TypeParameter ||
-                tree instanceof K.ClassDeclaration ||
-                tree instanceof K.CompilationUnit ||
-                tree instanceof K.SpreadArgument ||
-                tree instanceof K.StatementExpression ||
-                tree instanceof K.KString ||
-                tree instanceof K.KString.Value ||
-                tree instanceof K.ExpressionStatement ||
-                tree instanceof K.FunctionType ||
-                tree instanceof K.ListLiteral ||
-                tree instanceof K.When || tree instanceof J.Package ||
-                tree instanceof J.ForEachLoop
+            tree instanceof J.ClassDeclaration ||
+            tree instanceof J.Block ||
+            tree instanceof J.Empty ||
+            tree instanceof J.Try ||
+            tree instanceof J.Try.Catch ||
+            tree instanceof J.ForLoop ||
+            tree instanceof J.WhileLoop ||
+            tree instanceof J.DoWhileLoop ||
+            tree instanceof J.Lambda ||
+            tree instanceof J.Lambda.Parameters ||
+            tree instanceof J.If ||
+            tree instanceof J.If.Else ||
+            tree instanceof J.EnumValueSet ||
+            tree instanceof J.ParenthesizedTypeTree ||
+            tree instanceof J.TypeParameter ||
+            tree instanceof K.ClassDeclaration ||
+            tree instanceof K.CompilationUnit ||
+            tree instanceof K.SpreadArgument ||
+            tree instanceof K.StatementExpression ||
+            tree instanceof K.StringTemplate ||
+            tree instanceof K.StringTemplate.Expression ||
+            tree instanceof K.ExpressionStatement ||
+            tree instanceof K.FunctionType ||
+            tree instanceof K.ListLiteral ||
+            tree instanceof K.When || tree instanceof J.Package ||
+            tree instanceof J.ForEachLoop
         ) {
             return "";
         }
@@ -680,7 +680,7 @@ public class PsiTreePrinter {
         StringBuilder sb = new StringBuilder();
         int tabCount = depth - 1;
         if (tabCount > 0) {
-            sb.append(String.join("", Collections.nCopies(tabCount, TAB)));
+            sb.append(java.lang.String.join("", Collections.nCopies(tabCount, TAB)));
         }
         // only root has not prefix
         if (depth > 0) {

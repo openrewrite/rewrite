@@ -262,8 +262,8 @@ public final class Assertions {
                     } else if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof J.Break &&
                             ((J.Break) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
                         return space;
-                    } else if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof K.KReturn &&
-                            ((K.KReturn) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
+                    } else if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof K.Return &&
+                               ((K.Return) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
                         return space;
                     } else if (loc == Space.Location.LABEL_SUFFIX) {
                         return space;
@@ -559,7 +559,7 @@ public final class Assertions {
         private boolean isValidated(J.Identifier i) {
             J j = getCursor().dropParentUntil(it -> it instanceof J).getValue();
             // TODO: replace with AnnotationUseSite tree.
-            return !(j instanceof K.KReturn);
+            return !(j instanceof K.Return);
         }
 
         private boolean isValidated(J.MethodInvocation mi) {
