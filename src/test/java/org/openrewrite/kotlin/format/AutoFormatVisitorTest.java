@@ -157,7 +157,7 @@ class AutoFormatVisitorTest implements RewriteTest {
                       try {
                           when (test) {
                               12 -> println("foo")
-                               in 10..42 -> println("baz")
+                              in 10..42 -> println("baz")
                               else -> println("bar")
                           }
                       } catch (e: Exception) {
@@ -432,4 +432,3 @@ class AutoFormatVisitorTest implements RewriteTest {
         );
     }
 }
-

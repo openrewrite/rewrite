@@ -36,7 +36,7 @@ class MinimumViableSpacingTest implements RewriteTest {
           toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
-                  if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                  if (ctx.getCycle() == 1) {
                       return space.withWhitespace("");
                   }
                   return space;
@@ -49,7 +49,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void classDeclaration() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               class A {
@@ -66,7 +65,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void classDeclarationWithFinalModifier() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               private    final    class A {
@@ -82,7 +80,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void classDeclarationWithModifier() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               private    class A {
@@ -98,7 +95,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void method() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               class A {
@@ -116,7 +112,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void returnExpression() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               class A {
@@ -135,7 +130,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void trailingLambda() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               val x = "foo".let {}
@@ -150,7 +144,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void ifElse() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               fun method(a: Int, b: Int) {
@@ -167,7 +160,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclaration() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               val zero: Int = 0
@@ -182,7 +174,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarations() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               val zero: Int = 0
@@ -199,7 +190,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarationsInClass() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               class A {
@@ -236,7 +226,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarationsInMethod() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               class A {
@@ -259,7 +248,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarationsWithIn() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               fun foo(arr: IntArray) {
@@ -276,7 +264,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void forloop() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               fun foo(arr: IntArray) {
@@ -294,7 +281,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarationsInForLoops() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           kotlin(
             """
               class Test {
@@ -432,15 +418,30 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void infixOperator() {
         rewriteRun(
-          spec -> spec.recipes(
-            toRecipe(() -> new MinimumViableSpacingVisitor<>())
-          ),
           kotlin(
             """
               val l = listOf('a'to 1)
               """,
             """
-              val l = listOf('a' to 1)
+              val l=listOf('a' to 1)
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotFoldImport() {
+        rewriteRun(
+          kotlin(
+            """
+              val a = when (5) {
+                  null, !in listOf(1, 2) -> 3
+                  else -> 4
+              }
+              """,
+            """
+              val a=when(5){null,!in listOf(1,2)->3
+              else->4}
               """
           )
         );
