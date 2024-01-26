@@ -680,10 +680,12 @@ public class MavenPomDownloader {
     @Nullable
     public MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
         Optional<MavenRepository> result = null;
-        MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
+        MavenRepository repository = originalRepository;
         if (containingPom != null) {
+            // Parameter substitution in case a repository is defined like "${ARTIFACTORY_URL}/repo"
             repository = repository.withUri(containingPom.getValue(repository.getUri()));
         }
+        repository = applyAuthenticationToRepository(applyMirrors(repository));
         try {
             if (repository.isKnownToExist()) {
                 return repository;
