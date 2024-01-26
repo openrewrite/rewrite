@@ -428,4 +428,21 @@ class MinimumViableSpacingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void infixOperator() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new MinimumViableSpacingVisitor<>())
+          ),
+          kotlin(
+            """
+              val l = listOf('a'to 1)
+              """,
+            """
+              val l = listOf('a' to 1)
+              """
+          )
+        );
+    }
 }

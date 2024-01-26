@@ -92,13 +92,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             return container;
         }
 
-        if (spaceBefore && notSingleSpace(container.getBefore().getWhitespace())) {
-            return container.withBefore(container.getBefore().withWhitespace(" "));
-        } else if (!spaceBefore && onlySpacesAndNotEmpty(container.getBefore().getWhitespace())) {
-            return container.withBefore(container.getBefore().withWhitespace(""));
-        } else {
-            return container;
-        }
+        return container.withBefore(updateSpace(container.getBefore(), spaceBefore));
     }
 
     <T extends J> JLeftPadded<T> spaceBefore(JLeftPadded<T> container, boolean spaceBefore) {
@@ -106,13 +100,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             return container;
         }
 
-        if (spaceBefore && notSingleSpace(container.getBefore().getWhitespace())) {
-            return container.withBefore(container.getBefore().withWhitespace(" "));
-        } else if (!spaceBefore && onlySpacesAndNotEmpty(container.getBefore().getWhitespace())) {
-            return container.withBefore(container.getBefore().withWhitespace(""));
-        } else {
-            return container;
-        }
+        return container.withBefore(updateSpace(container.getBefore(), spaceBefore));
     }
 
     <T extends J> JLeftPadded<T> spaceBeforeLeftPaddedElement(JLeftPadded<T> container, boolean spaceBefore) {
@@ -131,13 +119,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             return container.withAfter(container.getAfter().withComments(comments));
         }
 
-        if (spaceAfter && notSingleSpace(container.getAfter().getWhitespace())) {
-            return container.withAfter(container.getAfter().withWhitespace(" "));
-        } else if (!spaceAfter && onlySpacesAndNotEmpty(container.getAfter().getWhitespace())) {
-            return container.withAfter(container.getAfter().withWhitespace(""));
-        } else {
-            return container;
-        }
+        return container.withAfter(updateSpace(container.getAfter(), spaceAfter));
     }
 
     private static List<Comment> spaceLastCommentSuffix(List<Comment> comments, boolean spaceSuffix) {
@@ -383,13 +365,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         J.MethodInvocation m = super.visitMethodInvocation(method, p);
 
         boolean noParens = m.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent();
-        boolean infix = m.getMarkers().findFirst(Infix.class).isPresent();
 
-        if (infix && m.getPadding().getSelect() != null) {
-            m = m.getPadding().withSelect(
-                    spaceAfter(m.getPadding().getSelect(), true)
-            );
-        }
         // Defaulted to `false` if parens exist and to `true` if parens are omitted in Kotlin's formatting.
         m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), false, false));
         if (m.getArguments().isEmpty() || m.getArguments().get(0) instanceof J.Empty) {

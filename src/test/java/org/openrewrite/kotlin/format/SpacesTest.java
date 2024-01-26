@@ -2800,4 +2800,15 @@ class SpacesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void infixOperator() {
+        rewriteRun(
+          spaces(),
+          kotlin(
+            """
+              val l = listOf('a' to 1)
+              """
+          )
+        );
+    }
 }
