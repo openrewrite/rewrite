@@ -31,7 +31,8 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
-import java.util.Objects;
+
+import static java.util.Objects.requireNonNull;
 
 public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
@@ -335,9 +336,9 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             prop = prop.getPadding().withReceiver(prop.getPadding().getReceiver().withAfter(updateSpace(prop.getPadding().getReceiver().getAfter(), false)));
         }
 
-        if (prop.getVariableDeclarations() != null && !prop.getVariableDeclarations().getVariables().isEmpty()) {
+        if (!requireNonNull(prop).getVariableDeclarations().getVariables().isEmpty()) {
             List<J.VariableDeclarations.NamedVariable> variables = ListUtils.mapFirst(prop.getVariableDeclarations().getVariables(),
-                    v -> spaceBefore(v, false));
+                    v -> spaceBefore(v, property.getReceiver() == null));
             JRightPadded<J.VariableDeclarations> rp = prop.getPadding().getVariableDeclarations();
             rp = rp.withElement(rp.getElement().withVariables(variables));
             prop = prop.getPadding().withVariableDeclarations(rp);
@@ -948,7 +949,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.Lambda visitLambda(J.Lambda lambda, P p) {
         J.Lambda l = super.visitLambda(lambda, p);
-        boolean isFunctionType = Objects.requireNonNull(getCursor().getParent()).getValue() instanceof K.FunctionType;
+        boolean isFunctionType = requireNonNull(getCursor().getParent()).getValue() instanceof K.FunctionType;
         if (isFunctionType) {
             return lambda;
         }

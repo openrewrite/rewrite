@@ -204,6 +204,8 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
         boolean hasReceiverType = method.getMarkers().findFirst(Extension.class).isPresent();
         if (!first && !hasReceiverType) {
             m = m.withName(m.getName().withPrefix(updateSpace(m.getName().getPrefix(), true)));
+        } else if (m.getPrefix().isEmpty() && getCursor().getParentTreeCursor().getValue() instanceof K.Property) {
+            m = spaceBefore(m, true);
         }
 
         if (m.getPadding().getThrows() != null) {

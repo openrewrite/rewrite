@@ -446,4 +446,17 @@ class MinimumViableSpacingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void propertyName() {
+        rewriteRun(
+          kotlin(
+            """
+              val containingFiles: Int
+                  get() = 1
+              """,
+            "val containingFiles:Int get()=1"
+          )
+        );
+    }
 }

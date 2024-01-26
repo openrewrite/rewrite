@@ -60,10 +60,14 @@ class SpacesTest implements RewriteTest {
           )));
     }
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spaces().accept(spec);
+    }
+
     @Test
     void spaceAfterAsKeyword() {
         rewriteRun(
-          spaces(),
           kotlin(
             """
               fun parseValue(input: Any) {
@@ -80,7 +84,6 @@ class SpacesTest implements RewriteTest {
         @Test
         void beforeParensMethodDeclaration() {
             rewriteRun(
-              spaces(),
               kotlin(
                 """
                   fun method1 ( ) {
@@ -106,7 +109,6 @@ class SpacesTest implements RewriteTest {
         @Test
         void beforeParensMethodDeclarationFalseWithLineBreakIgnored() {
             rewriteRun(
-              spaces(),
               kotlin(
                 """
                   fun method 
@@ -120,7 +122,6 @@ class SpacesTest implements RewriteTest {
         @Test
         void beforeParensMethodDeclarationWithComment() {
             rewriteRun(
-              spaces(),
               kotlin(
                 """
                   fun method   /* C */  () {
@@ -133,7 +134,6 @@ class SpacesTest implements RewriteTest {
         @Test
         void beforeClassBody() {
             rewriteRun(
-              spaces(),
               kotlin(
                 """
                   class Test{
@@ -152,7 +152,6 @@ class SpacesTest implements RewriteTest {
         @Test
         void beforeParensMethodCall() {
             rewriteRun(
-              spaces(),
               kotlin(
                 """
                   fun foo() {
@@ -347,7 +346,6 @@ class SpacesTest implements RewriteTest {
         @Test
         void beforeParensAnnotationParameters() {
             rewriteRun(
-              spaces(),
               kotlin(
                 """
                   annotation class Ann(val s: String)
@@ -597,7 +595,6 @@ class SpacesTest implements RewriteTest {
         @Test
         void aroundOperatorsBitwise() {
             rewriteRun(
-              spaces(),
               kotlin(
                 """
                   fun foo() {
@@ -854,7 +851,6 @@ class SpacesTest implements RewriteTest {
         @Test
         void aroundOperatorsLambda() {
             rewriteRun(
-              spaces(),
               kotlin(
                 """
                   class Test {
@@ -877,7 +873,6 @@ class SpacesTest implements RewriteTest {
         @Test
         void aroundOperatorsMethodReferenceDoubleColon() {
             rewriteRun(
-              spaces(),
               kotlin(
                 """
                   class Test {
@@ -1947,7 +1942,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeParensTryParentheses() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       fun foo() {
@@ -1970,7 +1964,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceClassLeftBrace() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test{
@@ -1987,7 +1980,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceMethodLeftBrace() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test{
@@ -2009,7 +2001,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceIfLeftBraceFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test{
@@ -2035,7 +2026,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceElseLeftBraceFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test{
@@ -2062,7 +2052,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceForLeftBraceFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       fun foo() {
@@ -2083,7 +2072,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceWhileLeftBraceFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       fun foo() {
@@ -2104,7 +2092,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceDoLeftBraceFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2129,7 +2116,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceTryLeftBraceFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2156,7 +2142,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceCatchLeftBraceFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2183,7 +2168,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceFinallyLeftBraceFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2212,7 +2196,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeLeftBraceAnnotationArrayInitializerLeftBraceTrue() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       annotation class MyAnno(
@@ -2241,7 +2224,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeKeywordsElseKeywordTrue() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2268,7 +2250,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeKeywordsWhileKeywordTrue() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2293,7 +2274,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeKeywordsCatchKeywordTrue() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2320,7 +2300,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void beforeKeywordsFinallyKeywordTrue() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2350,7 +2329,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinCodeBracesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test { }
@@ -2367,7 +2345,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinBracketsFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2391,7 +2368,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinArrayInitializerBracesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2414,7 +2390,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinGroupingParenthesesTrue() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2437,7 +2412,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinMethodDeclarationParenthesesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2458,7 +2432,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinEmptyMethodDeclarationParenthesesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2479,7 +2452,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinMethodCallParenthesesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2506,7 +2478,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinEmptyMethodCallParenthesesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2533,7 +2504,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinIfParenthesesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2558,7 +2528,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinForParenthesesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2583,7 +2552,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinWhileParenthesesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2612,7 +2580,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinCatchParenthesesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test {
@@ -2639,7 +2606,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void withinAngleBracketsFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       import java.util.ArrayList
@@ -2668,7 +2634,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void typeArgumentsAfterComma() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       import java.util.HashMap
@@ -2707,7 +2672,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void otherInsideOneLineEnumBracesFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       enum class Test { }
@@ -2722,7 +2686,6 @@ class SpacesTest implements RewriteTest {
             @Test
             void typeParametersBeforeOpeningAngleBracketFalse() {
                 rewriteRun(
-                  spaces(),
                   kotlin(
                     """
                       class Test   <T> {
@@ -2757,7 +2720,6 @@ class SpacesTest implements RewriteTest {
     @Test
     void when() {
         rewriteRun(
-          spaces(),
           kotlin(
             """
               fun method ( i : Int ) : String {
@@ -2786,7 +2748,6 @@ class SpacesTest implements RewriteTest {
     @Test
     void extensionProperty() {
         rewriteRun(
-          spaces(),
           kotlin(
             """
               val String .  extension   :   Any
@@ -2803,10 +2764,21 @@ class SpacesTest implements RewriteTest {
     @Test
     void infixOperator() {
         rewriteRun(
-          spaces(),
           kotlin(
             """
               val l = listOf('a' to 1)
+              """
+          )
+        );
+    }
+
+    @Test
+    void propertyName() {
+        rewriteRun(
+          kotlin(
+            """
+              val containingFiles: Int
+                  get() = 1
               """
           )
         );
