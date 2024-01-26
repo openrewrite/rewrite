@@ -101,23 +101,33 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
+                for (Xml.Tag dependency : tag.getChildren()) {
+                    if (dependency.getName().equals("dependency")) {
+                        if (groupId.equals(dependency.getChildValue("groupId").orElse(null)) &&
+                            artifactId.equals(dependency.getChildValue("artifactId").orElse(null))) {
+                            return tag;
+                        }
+                    }
+                }
                 Xml.Tag dependencyTag = Xml.Tag.build(
                         "\n<dependency>\n" +
-                                "<groupId>" + groupId + "</groupId>\n" +
-                                "<artifactId>" + artifactId + "</artifactId>\n" +
-                                "<version>" + version + "</version>\n" +
-                                (classifier == null ? "" :
-                                        "<classifier>" + classifier + "</classifier>\n") +
-                                (type == null || type.equals("jar") ? "" :
-                                        "<type>" + type + "</type>\n") +
-                                (scope == null || "compile".equals(scope) ? "" :
-                                        "<scope>" + scope + "</scope>\n") +
-                                "</dependency>"
+                        "<groupId>" + groupId + "</groupId>\n" +
+                        "<artifactId>" + artifactId + "</artifactId>\n" +
+                        "<version>" + version + "</version>\n" +
+                        (classifier == null ? "" :
+                                "<classifier>" + classifier + "</classifier>\n") +
+                        (type == null || type.equals("jar") ? "" :
+                                "<type>" + type + "</type>\n") +
+                        (scope == null || "compile".equals(scope) ? "" :
+                                "<scope>" + scope + "</scope>\n") +
+                        "</dependency>"
                 );
                 doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
                         new InsertDependencyComparator(tag.getContent() == null ? emptyList() : tag.getContent(), dependencyTag)));
             }
-            return super.visitTag(tag, ctx);
+            return super.
+
+                    visitTag(tag, ctx);
         }
     }
 }

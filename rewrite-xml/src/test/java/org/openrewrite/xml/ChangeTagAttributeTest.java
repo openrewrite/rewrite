@@ -27,7 +27,7 @@ class ChangeTagAttributeTest implements RewriteTest {
     @Test
     void alterAttributeWhenElementAndAttributeMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "myBean.subpackage")),
+          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "myBean.subpackage", null)),
           xml(
             """
               <beans>
@@ -48,8 +48,8 @@ class ChangeTagAttributeTest implements RewriteTest {
     @Test
     void alterAttributeWithNullOldValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", null))
-            .expectedCyclesThatMakeChanges(1).cycles(1),
+          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", null, null))
+            .expectedCyclesThatMakeChanges(2),
           xml(
             """
               <beans>
@@ -70,7 +70,7 @@ class ChangeTagAttributeTest implements RewriteTest {
     @Test
     void removeAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", null, "myBean.subpackage")),
+          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", null, "myBean.subpackage", null)),
           xml(
             """
               <beans>
@@ -91,11 +91,33 @@ class ChangeTagAttributeTest implements RewriteTest {
     @Test
     void attributeNotMatched() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "not.matched")),
+          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "not.matched", null)),
           xml(
             """
               <beans>
                   <bean id='myBean.subpackage.subpackage2'/>
+                  <other id='myBean.subpackage.subpackage2'/>
+              </beans>
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void alterAttributeWithRegex() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.$1", "myBean\\.(.*)", true)),
+          xml(
+            """
+              <beans>
+                  <bean id='myBean.subpackage.subpackage2'/>
+                  <other id='myBean.subpackage.subpackage2'/>
+              </beans>
+              """,
+            """
+              <beans>
+                  <bean id='myBean2.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """

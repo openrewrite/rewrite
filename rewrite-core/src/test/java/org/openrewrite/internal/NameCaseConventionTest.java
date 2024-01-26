@@ -81,6 +81,8 @@ class NameCaseConventionTest {
       "foo bar:fooBar",
       " foo  bar :fooBar",
       "FOO_BAR:fooBar",
+      "XMLParser:xmlParser",
+      "PDFViewModel:pdfViewModel",
     }, delimiter = ':')
     void lowerCamel(String input, String expected) {
         assertThat(NameCaseConvention.LOWER_CAMEL.format(input)).isEqualTo(expected);
@@ -95,6 +97,8 @@ class NameCaseConventionTest {
       "foo-bar:FooBar",
       "foo bar:FooBar",
       " foo  bar :FooBar",
+      "XMLParser:XmlParser",
+      "PDFViewModel:PdfViewModel",
     }, delimiter = ':')
     void upperCamel(String input, String expected) {
         assertThat(NameCaseConvention.UPPER_CAMEL.format(input)).isEqualTo(expected);

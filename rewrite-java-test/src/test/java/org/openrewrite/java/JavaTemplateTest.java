@@ -464,7 +464,7 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void templatingWhileLoopCondition() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext p) {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
@@ -477,7 +477,7 @@ class JavaTemplateTest implements RewriteTest {
                   }
                   return binary;
               }
-          })).expectedCyclesThatMakeChanges(2),
+          })),
           java(
             """
               import java.util.List;
@@ -560,7 +560,7 @@ class JavaTemplateTest implements RewriteTest {
                       unary.getExpression()
                     );
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {
@@ -593,7 +593,7 @@ class JavaTemplateTest implements RewriteTest {
                     .build()
                     .apply(getCursor(), memberRef.getCoordinates().replace());
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           java(
             """
               import java.util.ArrayList;
@@ -638,7 +638,7 @@ class JavaTemplateTest implements RewriteTest {
                       return fa;
                   }
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          }).withMaxCycles(1)),
           java(
             """
               import java.io.File;

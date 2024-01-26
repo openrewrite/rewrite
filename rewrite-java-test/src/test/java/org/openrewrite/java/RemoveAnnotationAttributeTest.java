@@ -21,6 +21,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 class RemoveAnnotationAttributeTest implements RewriteTest {
+
     @Test
     void removeNamedAttribute() {
         rewriteRun(

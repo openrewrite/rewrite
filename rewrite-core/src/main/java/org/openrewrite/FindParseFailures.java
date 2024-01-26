@@ -21,6 +21,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.table.ParseFailures;
 
+import java.util.Objects;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindParseFailures extends Recipe {
@@ -66,7 +68,7 @@ public class FindParseFailures extends Recipe {
             public Tree postVisit(Tree tree, ExecutionContext ctx) {
                 return tree.getMarkers().findFirst(ParseExceptionResult.class)
                         .map(exceptionResult -> {
-                            if (parserType != null && !exceptionResult.getParserType().equals(parserType)) {
+                            if (parserType != null && !Objects.equals(exceptionResult.getParserType(), parserType)) {
                                 return tree;
                             }
 

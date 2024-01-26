@@ -74,7 +74,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return super.visitVariableDeclarations(vd, ctx);
               }
-          })),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {
