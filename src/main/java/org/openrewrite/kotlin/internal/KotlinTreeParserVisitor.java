@@ -2121,9 +2121,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private Object unescape(String str) {
-        if (str.length() == 1) {
+        int length = str.length();
+        if (length == 1) {
             return str.charAt(0);
-        } else if (str.length() == 2 && str.charAt(0) == '\\') {
+        } else if (length == 2 && str.charAt(0) == '\\') {
             switch (str.charAt(1)) {
                 case 't':
                     return '\t';
@@ -2138,8 +2139,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 default:
                     return str.charAt(1);
             }
+        } else if (length == 6 && str.startsWith("\\u")) {
+            return (char) Integer.parseInt(str.substring(2), 16);
         }
-        // TODO unicode
         return str;
     }
 
