@@ -21,6 +21,7 @@ import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
@@ -553,10 +554,18 @@ public interface Xml extends Tree {
         String beforeTagDelimiterPrefix;
 
         /**
+         * @return The local name for this tag, without any namespace prefix.
+         */
+        public String getLocalName() {
+            return XmlNamespaceUtils.extractLocalName(name);
+        }
+
+        /**
          * @return The namespace prefix for this tag, if any.
          */
         public Optional<String> getNamespacePrefix() {
-            return Optional.of(XmlNamespaceUtils.extractNamespacePrefix(name));
+            String extractedNamespacePrefix = XmlNamespaceUtils.extractNamespacePrefix(name);
+            return Optional.ofNullable(StringUtils.isNotEmpty(extractedNamespacePrefix) ? extractedNamespacePrefix : null);
         }
 
         /**
@@ -564,17 +573,7 @@ public interface Xml extends Tree {
          */
         public Optional<String> getNamespaceUri(Cursor cursor) {
             Optional<String> maybeNamespacePrefix = getNamespacePrefix();
-            if (!maybeNamespacePrefix.isPresent()) {
-                return Optional.empty();
-            }
-
-            String namespacePrefix = maybeNamespacePrefix.get();
-            Map<String, String> namespaces = XmlNamespaceUtils.extractNamespaces(attributes);
-            if (namespaces.containsKey(namespacePrefix)) {
-                return Optional.of(namespaces.get(namespacePrefix));
-            }
-
-            return Optional.ofNullable(XmlNamespaceUtils.findNamespaces(cursor, null).get(namespacePrefix));
+            return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(XmlNamespaceUtils.findNamespaces(cursor, null).get(s)));
         }
 
         @Override
@@ -649,7 +648,8 @@ public interface Xml extends Tree {
             if (XmlNamespaceUtils.isNamespaceDefinitionAttribute(key.getName())) {
                 return Optional.empty();
             }
-            return Optional.of(XmlNamespaceUtils.extractNamespacePrefix(key.getName()));
+            String extractedNamespacePrefix = XmlNamespaceUtils.extractNamespacePrefix(key.getName());
+            return Optional.ofNullable(StringUtils.isNotEmpty(extractedNamespacePrefix) ? extractedNamespacePrefix : null);
         }
 
         /**
@@ -693,6 +693,10 @@ public interface Xml extends Tree {
 
         public String getKeyAsString() {
             return key.getName();
+        }
+
+        public String getKeyLocalName() {
+            return key.getLocalName();
         }
 
         public String getValueAsString() {
@@ -886,6 +890,36 @@ public interface Xml extends Tree {
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitIdent(this, p);
+        }
+
+        /**
+         * @return the namespace prefix of this ident (empty string for the default namespace)
+         */
+        public Optional<String> getNamespacePrefix() {
+            String extractedNamespacePrefix = XmlNamespaceUtils.extractNamespacePrefix(name);
+            return Optional.ofNullable(StringUtils.isNotEmpty(extractedNamespacePrefix) ? extractedNamespacePrefix : null);
+        }
+
+        /**
+         * Extract the local name from a tag or attribute name.
+         *
+         * @param name the tag or attribute name
+         * @return the local name
+         */
+
+        public String getLocalName() {
+            return XmlNamespaceUtils.extractLocalName(name);
+        }
+
+        /**
+         * @return The namespace URI of the root tag of this ident, if any.
+         */
+        public Optional<String> getNamespaceUri(Cursor cursor) {
+            Optional<String> maybeNamespacePrefix = getNamespacePrefix();
+            if (!maybeNamespacePrefix.isPresent()) {
+                return Optional.empty();
+            }
+            return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(XmlNamespaceUtils.findNamespaces(cursor, null).get(s)));
         }
 
         @Override

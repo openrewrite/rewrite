@@ -59,7 +59,7 @@ public class XmlNamespaceUtils {
      * @param name the tag or attribute name
      * @return the local name
      */
-    static String extractLocalName(String name) {
+    public static String extractLocalName(String name) {
         int colon = name.indexOf(':');
         return colon == -1 ? name : name.substring(colon + 1);
     }
