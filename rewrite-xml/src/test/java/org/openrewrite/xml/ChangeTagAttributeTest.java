@@ -49,7 +49,7 @@ class ChangeTagAttributeTest implements RewriteTest {
     void alterAttributeWithNullOldValue() {
         rewriteRun(
           spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", null, null))
-            .expectedCyclesThatMakeChanges(1).cycles(1),
+            .expectedCyclesThatMakeChanges(2),
           xml(
             """
               <beans>

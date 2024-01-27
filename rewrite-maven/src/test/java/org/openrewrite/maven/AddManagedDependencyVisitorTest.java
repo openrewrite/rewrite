@@ -59,7 +59,6 @@ public class AddManagedDependencyVisitorTest implements RewriteTest {
     @Test
     void newDependencyManagementTag() {
         rewriteRun(
-          spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1),
           pomXml(
             """
             <project>
@@ -93,7 +92,6 @@ public class AddManagedDependencyVisitorTest implements RewriteTest {
     @Test
     void dependencyManagementTagExists() {
         rewriteRun(
-          spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1),
           pomXml(
             """
             <project>

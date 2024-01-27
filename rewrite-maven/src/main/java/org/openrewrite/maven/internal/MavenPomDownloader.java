@@ -581,7 +581,6 @@ public class MavenPomDownloader {
                         return pom;
                     } catch (HttpSenderResponseException e) {
                         repositoryResponses.put(repo, e.getMessage());
-                        ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
                         if (e.isClientSideException()) {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
@@ -595,7 +594,7 @@ public class MavenPomDownloader {
                 repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
         }
-
+        ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
         sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
         throw new MavenDownloadingException("Unable to download POM.", null, originalGav)
                 .setRepositoryResponses(repositoryResponses);
@@ -681,10 +680,12 @@ public class MavenPomDownloader {
     @Nullable
     public MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
         Optional<MavenRepository> result = null;
-        MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
+        MavenRepository repository = originalRepository;
         if (containingPom != null) {
+            // Parameter substitution in case a repository is defined like "${ARTIFACTORY_URL}/repo"
             repository = repository.withUri(containingPom.getValue(repository.getUri()));
         }
+        repository = applyAuthenticationToRepository(applyMirrors(repository));
         try {
             if (repository.isKnownToExist()) {
                 return repository;

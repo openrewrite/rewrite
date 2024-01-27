@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
@@ -105,9 +106,10 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
         String preamble = this.preamble != null ? this.preamble + maybeNewline : "";
 
         boolean exists = fileExists.get();
+        Path path = Paths.get(relativeFileName);
         if (!exists) {
             for (SourceFile generated : generatedInThisCycle) {
-                if (generated.getSourcePath().toString().equals(Paths.get(relativeFileName).toString())) {
+                if (generated.getSourcePath().toString().equals(path.toString())) {
                     exists = true;
                     break;
                 }
@@ -118,7 +120,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
                 Collections.emptyList() :
                 Collections.singletonList(PlainText.builder()
                         .text(preamble + content)
-                        .sourcePath(Paths.get(relativeFileName))
+                        .sourcePath(path)
                         .build());
     }
 

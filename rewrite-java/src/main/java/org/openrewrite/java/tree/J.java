@@ -2792,10 +2792,12 @@ public interface J extends Tree {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
                                        "." + name);
                     break;
-                } else {
+                } else if (part.getTarget() instanceof J.FieldAccess) {
                     part = (FieldAccess) part.getTarget();
                     String delim = Character.isUpperCase(part.getSimpleName().charAt(0)) ? "$" : ".";
                     typeName.insert(0, delim + name);
+                } else {
+                    break;
                 }
             }
 

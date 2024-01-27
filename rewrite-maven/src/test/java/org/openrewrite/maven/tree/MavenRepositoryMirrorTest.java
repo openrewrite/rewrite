@@ -34,4 +34,47 @@ class MavenRepositoryMirrorTest {
             assertThat(repo.getUri()).isEqualTo(one.getUrl());
         });
     }
+
+    @Test
+    void matchById() {
+        MavenRepositoryMirror oneMirror = new MavenRepositoryMirror("mirror", "https://mirror", "one", true, true);
+
+        MavenRepository one = MavenRepository.builder()
+          .id("one")
+          .uri("https://one")
+          .build();
+
+        MavenRepository two = MavenRepository.builder()
+          .id("two")
+          .uri("https://two")
+          .build();
+
+        assertThat(oneMirror.apply(two))
+          .isEqualTo(two);
+
+        MavenRepository oneMirrored = oneMirror.apply(one);
+        assertThat(oneMirrored).extracting(MavenRepository::getId).isEqualTo("mirror");
+        assertThat(oneMirrored).extracting(MavenRepository::getUri).isEqualTo("https://mirror");
+    }
+
+    @Test
+    void excludeFromWildcard() {
+        MavenRepositoryMirror oneMirror = new MavenRepositoryMirror("mirror", "https://mirror", "*,!two", true, true);
+        MavenRepository one = MavenRepository.builder()
+          .id("one")
+          .uri("https://one")
+          .build();
+
+        MavenRepository two = MavenRepository.builder()
+          .id("two")
+          .uri("https://two")
+          .build();
+
+        assertThat(oneMirror.apply(two))
+          .isEqualTo(two);
+
+        MavenRepository oneMirrored = oneMirror.apply(one);
+        assertThat(oneMirrored).extracting(MavenRepository::getId).isEqualTo("mirror");
+        assertThat(oneMirrored).extracting(MavenRepository::getUri).isEqualTo("https://mirror");
+    }
 }

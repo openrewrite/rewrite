@@ -16,6 +16,8 @@
 package org.openrewrite.java.recipes;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
@@ -42,7 +44,7 @@ class MissingOptionExampleTest implements RewriteTest {
               class SomeRecipe extends Recipe {
                   @Option(displayName = "Test", description = "Test")
                   private String test;
-              
+                            
                   @Override
                   public String getDisplayName() {
                       return "Find missing `@Option` `example` values";
@@ -60,7 +62,7 @@ class MissingOptionExampleTest implements RewriteTest {
               class SomeRecipe extends Recipe {
                   /*~~(Missing example value for documentation)~~>*/@Option(displayName = "Test", description = "Test")
                   private String test;
-              
+                            
                   @Override
                   public String getDisplayName() {
                       return "Find missing `@Option` `example` values";
@@ -86,7 +88,7 @@ class MissingOptionExampleTest implements RewriteTest {
               class SomeRecipe extends Recipe {
                   @Option(displayName = "Test", description = "Test", example = "true")
                   private boolean test = true;
-              
+                            
                   @Override
                   public String getDisplayName() {
                       return "Find missing `@Option` `example` values";
@@ -101,8 +103,16 @@ class MissingOptionExampleTest implements RewriteTest {
         );
     }
 
-    @Test
-    void skipBoolean() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "boolean",
+      "Boolean",
+      "int",
+      "Integer",
+      "long",
+      "Long"
+    })
+    void skipBoolean(String type) {
         rewriteRun(
           java(
             """
@@ -111,8 +121,8 @@ class MissingOptionExampleTest implements RewriteTest {
 
               class SomeRecipe extends Recipe {
                   @Option(displayName = "Test", description = "Test")
-                  private Boolean test;
-              
+                  private %s test;
+                            
                   @Override
                   public String getDisplayName() {
                       return "Find missing `@Option` `example` values";
@@ -122,7 +132,7 @@ class MissingOptionExampleTest implements RewriteTest {
                       return "Find `@Option` annotations that are missing `example` values.";
                   }
               }
-              """
+              """.formatted(type)
           )
         );
     }
@@ -138,7 +148,7 @@ class MissingOptionExampleTest implements RewriteTest {
               class SomeRecipe extends Recipe {
                   @Option(displayName = "Test", description = "Test", valid = {"foo", "bar"})
                   private String test;
-              
+                            
                   @Override
                   public String getDisplayName() {
                       return "Find missing `@Option` `example` values";

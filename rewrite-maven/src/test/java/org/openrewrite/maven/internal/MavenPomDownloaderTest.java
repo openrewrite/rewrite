@@ -44,11 +44,11 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 
 @SuppressWarnings({"HttpUrlsUsage"})
 class MavenPomDownloaderTest {
@@ -141,7 +141,7 @@ class MavenPomDownloaderTest {
 
         try {
             new MavenPomDownloader(ctx)
-              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, Collections.singletonList(nonexistentRepo));
+              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
         } catch (Exception e) {
             // not expected to succeed
         }
@@ -171,7 +171,7 @@ class MavenPomDownloaderTest {
 
         try {
             new MavenPomDownloader(ctx)
-              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, Collections.singletonList(nonexistentRepo));
+              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
         } catch (Exception e) {
             // not expected to succeed
         }
@@ -182,14 +182,62 @@ class MavenPomDownloaderTest {
           .isEmpty();
     }
 
+    @Test
+    void mirrorsOverrideRepositoriesInPom() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+          //language=xml
+          """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                                  https://maven.apache.org/xsd/settings-1.0.0.xsd">
+              <mirrors>
+                <mirror>
+                  <id>mirror</id>
+                  <url>https://artifactory.moderne.ninja/artifactory/moderne-cache</url>
+                  <mirrorOf>*</mirrorOf>
+                </mirror>
+              </mirrors>
+            </settings>
+            """.getBytes()
+        )), ctx));
+
+        Path pomPath = Paths.get("pom.xml");
+        Pom pom = Pom.builder()
+          .sourcePath(pomPath)
+          .repository(MAVEN_CENTRAL)
+          .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+          .gav(new ResolvedGroupArtifactVersion(
+            "${REPO_URL}", "org.openrewrite", "rewrite-core", "7.0.0", null))
+          .build();
+        ResolvedPom resolvedPom = ResolvedPom.builder()
+          .requested(pom)
+          .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+          .repositories(singletonList(MAVEN_CENTRAL))
+          .build();
+
+        Map<Path, Pom> pomsByPath = new HashMap<>();
+        pomsByPath.put(pomPath, pom);
+
+        MavenPomDownloader mpd = new MavenPomDownloader(pomsByPath, ctx);
+        MavenRepository normalized = mpd.normalizeRepository(
+          MavenRepository.builder().id("whatever").uri("${REPO_URL}").build(),
+          ctx,
+          resolvedPom
+        );
+        assertThat(normalized)
+          .extracting(MavenRepository::getUri)
+          .isEqualTo("https://artifactory.moderne.ninja/artifactory/moderne-cache");
+    }
+
     @Disabled("Flaky on CI")
     @Test
     void normalizeOssSnapshots() {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         MavenRepository oss = downloader.normalizeRepository(
           MavenRepository.builder().id("oss").uri("https://oss.sonatype.org/content/repositories/snapshots").build(),
-          MavenExecutionContextView.view(ctx),
-          null);
+          MavenExecutionContextView.view(ctx), null);
 
         assertThat(oss).isNotNull();
         assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
@@ -239,9 +287,7 @@ class MavenPomDownloaderTest {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         var normalizedRepository = downloader.normalizeRepository(
           MavenRepository.builder().id("id").uri("https//localhost").build(),
-          MavenExecutionContextView.view(ctx),
-          null
-        );
+          MavenExecutionContextView.view(ctx), null);
         assertThat(normalizedRepository).isEqualTo(null);
     }
 
