@@ -163,7 +163,6 @@ public interface Xml extends Tree {
             if (this.root == root) {
                 return this;
             }
-            Map<String, String> namespaces = XmlNamespaceUtils.extractNamespaces(root.getAttributes());
             return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
         }
 
@@ -901,12 +900,10 @@ public interface Xml extends Tree {
         }
 
         /**
-         * Extract the local name from a tag or attribute name.
+         * Extract the local name from the identifier.
          *
-         * @param name the tag or attribute name
          * @return the local name
          */
-
         public String getLocalName() {
             return XmlNamespaceUtils.extractLocalName(name);
         }
