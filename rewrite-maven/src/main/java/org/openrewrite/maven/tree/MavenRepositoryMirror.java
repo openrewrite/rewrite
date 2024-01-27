@@ -104,17 +104,15 @@ public class MavenRepositoryMirror {
     }
 
     public MavenRepository apply(MavenRepository repo) {
-        if (Objects.equals(id, repo.getId()) && (repo.getUri().equals(url) || repo.isKnownToExist()) || !matches(repo)) {
-            return repo;
-        } else {
-            MavenRepository repoWithMirror = repo.withUri(url)
+        if (matches(repo)) {
+            return repo.withUri(url)
                     .withId(id)
                     .withReleases(!Boolean.FALSE.equals(releases) ? "true" : "false")
-                    .withSnapshots(!Boolean.FALSE.equals(snapshots) ? "true" : "false");
-            // Since the URL has likely changed we cannot assume that the new repository is known to exist
-            repoWithMirror.setKnownToExist(false);
-            return repoWithMirror;
+                    .withSnapshots(!Boolean.FALSE.equals(snapshots) ? "true" : "false")
+                    // Since the URL has likely changed we cannot assume that the new repository is known to exist
+                    .withKnownToExist(false);
         }
+        return repo;
     }
 
     public boolean matches(MavenRepository repository) {
