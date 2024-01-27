@@ -751,7 +751,9 @@ public class MavenPomDownloader {
                                         repository.getReleases(),
                                         repository.getSnapshots(),
                                         repository.getUsername(),
-                                        repository.getPassword());
+                                        repository.getPassword(),
+                                        repository.getConnectTimeout(),
+                                        repository.getReadTimeout());
                             } catch (HttpSenderResponseException e) {
                                 //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
                                 if (e.getResponseCode() != null) {
@@ -761,7 +763,9 @@ public class MavenPomDownloader {
                                             repository.getReleases(),
                                             repository.getSnapshots(),
                                             repository.getUsername(),
-                                            repository.getPassword());
+                                            repository.getPassword(),
+                                            repository.getConnectTimeout(),
+                                            repository.getReadTimeout());
                                 } else if (!e.isClientSideException()) {
                                     return originalRepository;
                                 }
@@ -792,7 +796,10 @@ public class MavenPomDownloader {
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException {
         try {
-            return sendRequest(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
+            HttpSender.Request.Builder request = httpSender.get(uriString)
+                    .withConnectTimeout(repo.getConnectTimeout())
+                    .withReadTimeout(repo.getReadTimeout());
+            return sendRequest(applyAuthenticationToRequest(repo, request).build());
         } catch (HttpSenderResponseException e) {
             if (hasCredentials(repo) && e.isClientSideException()) {
                 return retryRequestAnonymously(uriString, e);

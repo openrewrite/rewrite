@@ -250,6 +250,8 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                                 repo.getReleases() == null ? null : repo.getReleases().getEnabled(),
                                 repo.getSnapshots() == null ? null : repo.getSnapshots().getEnabled(),
                                 null,
+                                null,
+                                null,
                                 null
                         );
                     } catch (Exception exception) {

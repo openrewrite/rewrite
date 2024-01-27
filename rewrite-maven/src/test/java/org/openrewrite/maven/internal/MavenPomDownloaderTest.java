@@ -124,7 +124,7 @@ class MavenPomDownloaderTest {
             repository.setKnownToExist(true);
         }
 
-        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, true, null, null, null);
+        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, true, null, null, null, null, null);
         List<String> attemptedUris = new ArrayList<>();
         List<MavenRepository> discoveredRepositories = new ArrayList<>();
         ctx.setResolutionListener(new ResolutionEventListener() {
@@ -159,7 +159,7 @@ class MavenPomDownloaderTest {
             repository.setKnownToExist(true);
         }
 
-        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, false, null, null, null);
+        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, false, null, null, null, null, null);
         Map<String, Throwable> attemptedUris = new HashMap<>();
         List<MavenRepository> discoveredRepositories = new ArrayList<>();
         ctx.setResolutionListener(new ResolutionEventListener() {
@@ -275,7 +275,7 @@ class MavenPomDownloaderTest {
         try (MockWebServer server = new MockWebServer()) {
             server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
             server.enqueue(new MockResponse().setResponseCode(200).setBody("body"));
-            String body = new String(downloader.sendRequest(new HttpSender.Request(server.url("/test").url(), "request".getBytes(), HttpSender.Method.GET, Map.of())));
+            String body = new String(downloader.sendRequest(new HttpSender.Request(server.url("/test").url(), "request".getBytes(), HttpSender.Method.GET, Map.of(), null, null)));
             assertThat(body).isEqualTo("body");
             assertThat(server.getRequestCount()).isEqualTo(2);
             server.shutdown();
