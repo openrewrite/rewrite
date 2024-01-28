@@ -323,7 +323,7 @@ public class GitProvenance implements Marker {
             ObjectId head = repository.readOrigHead();
             if (head == null) {
                 Ref headRef = repository.getRefDatabase().findRef("HEAD");
-                if (headRef == null) {
+                if (headRef == null || headRef.getObjectId() == null) {
                     return emptyList();
                 }
                 head = headRef.getObjectId();
