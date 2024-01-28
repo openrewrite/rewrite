@@ -321,8 +321,12 @@ public class GitProvenance implements Marker {
     private static List<Committer> getCommitters(Repository repository) {
         try (Git git = Git.open(repository.getDirectory())) {
             ObjectId head = repository.readOrigHead();
-            if(head == null) {
-                return emptyList();
+            if (head == null) {
+                Ref headRef = repository.getRefDatabase().findRef("HEAD");
+                if (headRef == null) {
+                    return emptyList();
+                }
+                head = headRef.getObjectId();
             }
 
             Map<String, Committer> committers = new TreeMap<>();
