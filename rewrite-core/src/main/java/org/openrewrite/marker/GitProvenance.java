@@ -322,15 +322,11 @@ public class GitProvenance implements Marker {
         try (Git git = Git.open(repository.getDirectory())) {
             ObjectId head = repository.readOrigHead();
             if (head == null) {
-                try {
-                    Ref headRef = repository.getRefDatabase().findRef("HEAD");
-                    if (headRef == null || headRef.getObjectId() == null) {
-                        return emptyList();
-                    }
-                    head = headRef.getObjectId();
-                } catch (Exception ignored) {
+                Ref headRef = repository.getRefDatabase().findRef("HEAD");
+                if (headRef == null || headRef.getObjectId() == null) {
                     return emptyList();
                 }
+                head = headRef.getObjectId();
             }
 
             Map<String, Committer> committers = new TreeMap<>();
