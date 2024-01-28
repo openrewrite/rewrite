@@ -102,9 +102,9 @@ public class ChangeNamespaceValue extends Recipe {
         XPathMatcher elementNameMatcher = elementName != null ? new XPathMatcher(elementName) : null;
         return new XmlIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                document = super.visitDocument(document, executionContext);
-                if (executionContext.pollMessage(MSG_TAG_UPDATED, false)) {
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                document = super.visitDocument(document, ctx);
+                if (ctx.pollMessage(MSG_TAG_UPDATED, false)) {
                     document = document.withRoot(addOrUpdateSchemaLocation(document.getRoot(), getCursor()));
                 }
                 return document;
