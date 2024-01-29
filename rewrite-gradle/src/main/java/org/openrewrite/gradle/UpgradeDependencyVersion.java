@@ -236,6 +236,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
                         if (acc.buildDependencies.containsKey(entry.getKey()) && acc.gradleProject != null) {
                             GroupArtifact groupArtifact = acc.buildDependencies.get(entry.getKey());
+                            if(groupArtifact == null || !dependencyMatcher.matches(groupArtifact.getGroupId(), groupArtifact.getArtifactId())) {
+                                return entry;
+                            }
                             if (!StringUtils.isBlank(newVersion)) {
                                 String resolvedVersion;
                                 try {
