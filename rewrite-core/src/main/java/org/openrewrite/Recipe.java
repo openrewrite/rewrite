@@ -223,10 +223,45 @@ public abstract class Recipe implements Cloneable {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
+        Set<String> allTags = new LinkedHashSet<>(getTags());
+        allTags.addAll(getTagsForPackageAndParent(getClass().getPackage()));
 
-        return new RecipeDescriptor(getName(), getDisplayName(), getDescription(), getTags(),
-                getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
-                getMaintainers(), getContributors(), getExamples(), recipeSource);
+        return new RecipeDescriptor(
+                getName(),
+                getDisplayName(),
+                getDescription(),
+                allTags,
+                getEstimatedEffortPerOccurrence(),
+                options,
+                recipeList1,
+                getDataTableDescriptors(),
+                getMaintainers(),
+                getContributors(),
+                getExamples(),
+                recipeSource
+        );
+    }
+
+    /**
+     * Finds all {@link PackageRecipeTags} annotations on the package of the given class and all parent packages.
+     *
+     * @return The set of tags found.
+     */
+    private static Set<String> getTagsForPackageAndParent(@Nullable Package p) {
+        if (p == null) {
+            return Collections.emptySet();
+        }
+        Set<String> tags = new LinkedHashSet<>();
+        PackageRecipeTags packageTags = p.getAnnotation(PackageRecipeTags.class);
+        if (packageTags != null) {
+            tags.addAll(Arrays.asList(packageTags.value()));
+        }
+        int lastDot = p.getName().lastIndexOf('.');
+        if (lastDot > 0) {
+            String parentPackage = p.getName().substring(0, lastDot);
+            tags.addAll(getTagsForPackageAndParent(Package.getPackage(parentPackage)));
+        }
+        return tags;
     }
 
     private List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
