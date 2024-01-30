@@ -31,7 +31,7 @@ public class FindCommittersTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindCommitters(""));
+        spec.recipe(new FindCommitters(null));
     }
 
     @Test
