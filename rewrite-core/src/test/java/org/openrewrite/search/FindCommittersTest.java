@@ -21,7 +21,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.List;
 import java.util.TreeMap;
 
@@ -60,13 +59,13 @@ public class FindCommittersTest implements RewriteTest {
         GitProvenance git = new GitProvenance(
           randomId(), "github.com", "main", "123", null, null,
           List.of(new GitProvenance.Committer("Jon", "jkschneider@gmail.com",
-            new TreeMap<>() {{
-                put(LocalDate.of(2023,1,9), 5);
-                put(LocalDate.of(2023,1,1), 5);
-            }}),
+              new TreeMap<>() {{
+                  put(LocalDate.of(2023, 1, 9), 5);
+                  put(LocalDate.of(2023, 1, 1), 5);
+              }}),
             new GitProvenance.Committer("Peter", "p.streef@gmail.com",
               new TreeMap<>() {{
-                  put(LocalDate.of(2023,1,10), 5);
+                  put(LocalDate.of(2023, 1, 10), 5);
               }}))
         );
 
