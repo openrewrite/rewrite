@@ -31,7 +31,7 @@ public class FindCommittersTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindCommitters());
+        spec.recipe(new FindCommitters(null));
     }
 
     @Test
@@ -53,4 +53,31 @@ public class FindCommittersTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findCommittersFromDate() {
+        GitProvenance git = new GitProvenance(
+          randomId(), "github.com", "main", "123", null, null,
+          List.of(new GitProvenance.Committer("Jon", "jkschneider@gmail.com",
+              new TreeMap<>() {{
+                  put(LocalDate.of(2023, 1, 9), 5);
+                  put(LocalDate.of(2023, 1, 1), 5);
+              }}),
+            new GitProvenance.Committer("Peter", "p.streef@gmail.com",
+              new TreeMap<>() {{
+                  put(LocalDate.of(2023, 1, 10), 5);
+              }}))
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(new FindCommitters("2023-01-10")),
+          text(
+            "hi",
+            "~~(p.streef@gmail.com)~~>hi",
+            spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))
+          )
+        );
+    }
+
+
 }
