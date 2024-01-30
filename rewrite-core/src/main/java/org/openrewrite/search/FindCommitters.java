@@ -18,6 +18,7 @@ package org.openrewrite.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.marker.SearchResult;
@@ -60,7 +61,7 @@ public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Com
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Map<String, GitProvenance.Committer> acc) {
-        LocalDate from = this.fromDate == null ? null : LocalDate.parse(this.fromDate).minusDays(1);
+        LocalDate from = StringUtils.isBlank(this.fromDate) ? null : LocalDate.parse(this.fromDate).minusDays(1);
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
