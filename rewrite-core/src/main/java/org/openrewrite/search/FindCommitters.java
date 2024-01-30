@@ -38,7 +38,7 @@ public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Com
 
     @Option(displayName = "From date",
             required = false,
-            description = "Optional. Take into account only commits after this date. Default will be the entire history.",
+            description = "Optional. Take into account only commits since this date (inclusive). Default will be the entire history.",
             example = "2023-01-01")
     @Nullable
     String fromDate;
