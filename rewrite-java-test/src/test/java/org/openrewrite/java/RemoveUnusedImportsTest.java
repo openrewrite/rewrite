@@ -1013,7 +1013,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1698")
     @Test
     void correctlyRemoveImportsFromNestedInternalClasses() {
-            rewriteRun(
+        rewriteRun(
           java(
             """
               package com.Source.A;
