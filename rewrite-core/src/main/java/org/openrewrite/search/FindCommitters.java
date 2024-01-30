@@ -15,6 +15,8 @@
  */
 package org.openrewrite.search;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.GitProvenance;
@@ -28,6 +30,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
 
+@Value
+@EqualsAndHashCode(callSuper = true)
 public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Committer>> {
     private transient final DistinctCommitters committers = new DistinctCommitters(this);
     private transient final CommitsByDay commitsByDay = new CommitsByDay(this);
