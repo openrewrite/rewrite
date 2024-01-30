@@ -28,7 +28,6 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -122,10 +121,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private static final String UPDATE_VERSION_ERROR_KEY = "UPDATE_VERSION_ERROR_KEY";
 
 
+    @Value
     public static class DependencyVersionState {
-        @Nullable
-        GradleProject gradleProject;
-        Map<String, GroupArtifact> buildDependencies = new HashMap<>();
+        Map<String, GroupArtifact> versionPropNameToGA = new HashMap<>();
+        Map<GroupArtifact, String> gaToNewVersion = new HashMap<>();
     }
 
     @Override
@@ -137,6 +136,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
         MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         return new GroovyVisitor<ExecutionContext>() {
+            GradleProject gradleProject;
+            final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+            @Override
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
+                gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
+                if (gradleProject == null) {
+                    return cu;
+                }
+                return super.visitCompilationUnit(cu, executionContext);
+            }
+
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
@@ -186,7 +196,32 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 version = valueValue;
                             }
                         }
-                        acc.buildDependencies.put(version, new GroupArtifact(groupId, artifactId));
+                        if(groupId == null || artifactId == null) {
+                            return m;
+                        }
+
+                        if(!dependencyMatcher.matches(groupId, artifactId)) {
+                            return m;
+                        }
+                        String versionVariableName = version;
+                        GroupArtifact ga = new GroupArtifact(groupId, artifactId);
+                        if(acc.gaToNewVersion.containsKey(ga)) {
+                            return m;
+                        }
+                        String oldVersion = findCurrentResolvedVersion(groupId, artifactId, m.getSimpleName(), gradleProject);
+                        if(oldVersion == null) {
+                            return m;
+                        }
+                        try {
+                            String newVersion = findNewerProjectDependencyVersion(groupId, artifactId, oldVersion, gradleProject, ctx);
+                            if(oldVersion.equals(newVersion)) {
+                                return m;
+                            }
+                            acc.versionPropNameToGA.put(versionVariableName, ga);
+                            acc.gaToNewVersion.put(ga, newVersion);
+                        } catch (MavenDownloadingException e) {
+                            return m;
+                        }
                     } else {
                         for (Expression depArg : m.getArguments()) {
                             if (depArg instanceof G.GString) {
@@ -201,24 +236,59 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     continue;
                                 }
                                 Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                                if(!dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
+                                    continue;
+                                }
                                 String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
-                                acc.buildDependencies.put(versionVariableName, new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                                GroupArtifact ga = new GroupArtifact(dep.getGroupId(), dep.getArtifactId());
+                                if(acc.gaToNewVersion.containsKey(ga)) {
+                                    continue;
+                                }
+                                String oldVersion = findCurrentResolvedVersion(dep.getGroupId(), dep.getArtifactId(), m.getSimpleName(), gradleProject);
+                                if(oldVersion == null) {
+                                    continue;
+                                }
+                                try {
+                                    String newVersion = findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), oldVersion, gradleProject, ctx);
+                                    if(oldVersion.equals(newVersion)) {
+                                        continue;
+                                    }
+                                    acc.versionPropNameToGA.put(versionVariableName, ga);
+                                    acc.gaToNewVersion.put(ga, newVersion);
+                                } catch (MavenDownloadingException e) {
+                                    //noinspection UnnecessaryContinue
+                                    continue;
+                                }
                             }
                         }
                     }
                 }
                 return m;
             }
-
-            @Override
-            public J postVisit(J tree, ExecutionContext ctx) {
-                if (tree instanceof JavaSourceFile) {
-                    tree.getMarkers().findFirst(GradleProject.class)
-                            .ifPresent(gradleProject -> acc.gradleProject = gradleProject);
-                }
-                return tree;
-            }
         };
+    }
+
+    @Nullable
+    private static String findCurrentResolvedVersion(String groupId, String artifactId, String configurationName, GradleProject gp) {
+        GradleDependencyConfiguration configuration = gp.getConfiguration(configurationName);
+        if(configuration == null) {
+            return null;
+        }
+
+        ResolvedDependency resolvedDependency = configuration.findResolvedDependency(groupId, artifactId);
+        if(resolvedDependency != null) {
+            return resolvedDependency.getVersion();
+        }
+        // Dependencies are commonly added to configurations, like implementation, which are unresolvable.
+        // In this case a resolved version can be found in one or more configurations extending from it.
+        // If there is no sub-configuration with a resolved version, then it isn't really a dependency, is it?
+        for (GradleDependencyConfiguration extendingConfiguration : gp.configurationsExtendingFrom(configuration, true)) {
+            resolvedDependency = extendingConfiguration.findResolvedDependency(groupId, artifactId);
+            if(resolvedDependency != null) {
+                return resolvedDependency.getVersion();
+            }
+        }
+        return null;
     }
 
     @Override
@@ -234,23 +304,20 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                     @Override
                     public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                        if (acc.buildDependencies.containsKey(entry.getKey()) && acc.gradleProject != null) {
-                            GroupArtifact groupArtifact = acc.buildDependencies.get(entry.getKey());
+                        if (acc.versionPropNameToGA.containsKey(entry.getKey())) {
+                            GroupArtifact groupArtifact = acc.versionPropNameToGA.get(entry.getKey());
                             if(groupArtifact == null || !dependencyMatcher.matches(groupArtifact.getGroupId(), groupArtifact.getArtifactId())) {
                                 return entry;
                             }
-                            if (!StringUtils.isBlank(newVersion)) {
-                                String resolvedVersion;
-                                try {
-                                    resolvedVersion = findNewerProjectDependencyVersion(groupArtifact.getGroupId(), groupArtifact.getArtifactId(), newVersion, acc.gradleProject, ctx);
-                                } catch (MavenDownloadingException e) {
-                                    return e.warn(entry);
-                                }
-                                if (resolvedVersion != null) {
-                                    return entry.withValue(entry.getValue().withText(resolvedVersion));
-                                }
-                                return entry.withValue(entry.getValue().withText(newVersion));
+                            GroupArtifact ga = acc.versionPropNameToGA.get(entry.getKey());
+                            if(ga == null) {
+                                return entry;
                             }
+                            String newResolvedVersion = acc.gaToNewVersion.get(ga);
+                            if(newResolvedVersion == null) {
+                                return entry;
+                            }
+                            return entry.withValue(entry.getValue().withText(newResolvedVersion));
                         }
                         return entry;
                     }
@@ -261,10 +328,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                             @Override
                             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                                gradleProject = acc.gradleProject != null ?
-                                        acc.gradleProject :
-                                        cu.getMarkers().findFirst(GradleProject.class)
-                                                .orElseThrow(() -> new IllegalStateException("Unable to find Gradle project."));
+                                gradleProject = cu.getMarkers().findFirst(GradleProject.class)
+                                                .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
                                 return super.visitCompilationUnit(cu, ctx);
                             }
 
