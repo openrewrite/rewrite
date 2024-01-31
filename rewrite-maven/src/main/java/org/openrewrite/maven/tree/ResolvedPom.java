@@ -681,6 +681,8 @@ public class ResolvedPom {
                             incomingRepository.isKnownToExist(),
                             incomingRepository.getUsername(),
                             incomingRepository.getPassword(),
+                            incomingRepository.getConnectTimeout(),
+                            incomingRepository.getReadTimeout(),
                             incomingRepository.getDeriveMetadataIfMissing()
                     );
 

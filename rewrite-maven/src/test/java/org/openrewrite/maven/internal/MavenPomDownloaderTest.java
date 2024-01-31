@@ -77,7 +77,7 @@ class MavenPomDownloaderTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3908")
     @Test
     void centralIdOverridesDefaultRepository() {
-        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var ctx = MavenExecutionContextView.view(this.ctx);
         ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
           //language=xml
           """
@@ -118,7 +118,7 @@ class MavenPomDownloaderTest {
 
     @Test
     void listenerRecordsRepository() {
-        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var ctx = MavenExecutionContextView.view(this.ctx);
         // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
         for (MavenRepository repository : ctx.getRepositories()) {
             repository.setKnownToExist(true);
@@ -153,7 +153,7 @@ class MavenPomDownloaderTest {
 
     @Test
     void listenerRecordsFailedRepositoryAccess() {
-        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var ctx = MavenExecutionContextView.view(this.ctx);
         // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
         for (MavenRepository repository : ctx.getRepositories()) {
             repository.setKnownToExist(true);
@@ -184,7 +184,7 @@ class MavenPomDownloaderTest {
 
     @Test
     void mirrorsOverrideRepositoriesInPom() {
-        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var ctx = MavenExecutionContextView.view(this.ctx);
         ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
           //language=xml
           """
@@ -586,7 +586,7 @@ class MavenPomDownloaderTest {
           .knownToExist(true)
           .deriveMetadataIfMissing(true)
           .build();
-        MavenMetadata metaData = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+        MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
           .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
         assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(Arrays.asList("1.0.0", "1.1.0", "2.0.0"));
     }
@@ -646,7 +646,7 @@ class MavenPomDownloaderTest {
         var m1 = MavenMetadata.parse(metadata1.getBytes());
         var m2 = MavenMetadata.parse(metadata2.getBytes());
 
-        var merged = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext()).mergeMetadata(m1, m2);
+        var merged = new MavenPomDownloader(emptyMap(), ctx).mergeMetadata(m1, m2);
 
         assertThat(merged.getVersioning().getSnapshot().getTimestamp()).isEqualTo("20220927.033510");
         assertThat(merged.getVersioning().getSnapshot().getBuildNumber()).isEqualTo("223");
@@ -684,7 +684,7 @@ class MavenPomDownloaderTest {
 
         // Does not return invalid dependency.
         assertThrows(MavenDownloadingException.class, () ->
-          new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+          new MavenPomDownloader(emptyMap(), ctx)
             .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
     }
 
@@ -717,7 +717,7 @@ class MavenPomDownloaderTest {
 
         // Does not return invalid dependency.
         assertThrows(MavenDownloadingException.class, () ->
-          new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+          new MavenPomDownloader(emptyMap(), ctx)
             .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
     }
 

@@ -90,7 +90,7 @@ public class MavenWrapper {
                 .findAny()
                 .orElse(DistributionType.Bin);
 
-        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, null, null);
+        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, null);
 
         VersionComparator wrapperVersionComparator = StringUtils.isBlank(wrapperVersion) ?
                 new LatestRelease(null) :
