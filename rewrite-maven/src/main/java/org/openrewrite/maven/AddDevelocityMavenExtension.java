@@ -344,7 +344,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     }
 
     private String getLatestVersion(ExecutionContext ctx) {
-        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, null);
+        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, null, null);
         VersionComparator versionComparator = new LatestRelease(null);
         GroupArtifact gradleEnterpriseExtension = new GroupArtifact("com.gradle", "gradle-enterprise-maven-extension");
         try {

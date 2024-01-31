@@ -132,6 +132,7 @@ public class MavenPomDownloader {
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
         this.ctx = MavenExecutionContextView.view(ctx);
+        this.mavenSettings = this.ctx.getSettings();
         this.mavenCache = this.ctx.getPomCache();
     }
 
