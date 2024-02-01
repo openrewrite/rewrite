@@ -90,14 +90,7 @@ public class AddProperty extends Recipe {
                 Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value);
                 Properties.Entry.Delimiter delimitedBy = StringUtils.isNotEmpty(delimiter) ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
                 String beforeEquals = delimitedBy == Properties.Entry.Delimiter.NONE ? delimiter : "";
-                boolean addingComment = StringUtils.isNotEmpty(comment);
-                String entryPrefix;
-                if (p.getContent().isEmpty() || addingComment) {
-                    entryPrefix = "";
-                } else {
-                    entryPrefix = "\n";
-                }
-                Properties.Entry entry = new Properties.Entry(Tree.randomId(), entryPrefix, Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
+                Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
                 List<Properties.Content> contentList = ListUtils.insertInOrder(p.getContent(), entry, (o1, o2) -> {
                     if (o1 instanceof Properties.Entry && o2 instanceof Properties.Entry) {
                         return ((Properties.Entry) o1).getKey().compareTo(((Properties.Entry) o2).getKey());
@@ -105,22 +98,24 @@ public class AddProperty extends Recipe {
                     return -1;
                 });
                 int insertionIndex = contentList.indexOf(entry);
-                // When inserting at the very beginning the next element might not have a newline in its prefix
-                if (insertionIndex == 0 && contentList.size() > 1) {
-                    contentList = ListUtils.map(contentList, (i, it) -> {
-                        if (i == 1 && !it.getPrefix().contains("\n")) {
-                            return (Properties.Content) it.withPrefix(it.getPrefix() + "\n");
-                        }
-                        return it;
-                    });
-                }
+                boolean addingComment = StringUtils.isNotEmpty(comment);
+                contentList = ListUtils.map(contentList, (i, it) -> {
+                    if ((i == 0 || addingComment) && it == entry) {
+                        // The very first entry in the properties file doesn't need a newline in its prefix
+                        return (Properties.Content) it.withPrefix("");
+                    } else if (insertionIndex == 0 && i == 1 && !it.getPrefix().contains("\n")) {
+                        // The previous first element might not already have had a newline in its prefix
+                        return (Properties.Content) it.withPrefix(it.getPrefix() + "\n");
+                    }
+                    return it;
+                });
                 if (addingComment) {
                     String commentPrefix = "\n";
                     if (insertionIndex == 0) {
                         commentPrefix = "";
                     }
                     Properties.Comment comment = new Properties.Comment(Tree.randomId(), commentPrefix, Markers.EMPTY, Properties.Comment.Delimiter.HASH_TAG, ' ' + AddProperty.this.comment + '\n');
-                    contentList = ListUtils.insert(contentList, comment, contentList.indexOf(entry));
+                    contentList = ListUtils.insert(contentList, comment, insertionIndex);
                 }
 
                 p = p.withContent(contentList);
