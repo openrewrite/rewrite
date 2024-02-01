@@ -25,10 +25,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -57,13 +54,6 @@ public class AddProperty extends Recipe {
     @Nullable
     String delimiter;
 
-    public AddProperty(String property, String value, @Nullable String comment, @Nullable String delimiter) {
-        this.property = property;
-        this.value = value;
-        this.comment = comment;
-        this.delimiter = delimiter;
-    }
-
     @Override
     public String getDisplayName() {
         return "Add a new property";
@@ -85,30 +75,56 @@ public class AddProperty extends Recipe {
     public PropertiesIsoVisitor<ExecutionContext> getVisitor() {
         return new PropertiesIsoVisitor<ExecutionContext>() {
             @Override
-            public Properties.File visitFile(Properties.File file, ExecutionContext executionContext) {
-                Properties.File p = super.visitFile(file, executionContext);
-                if (!StringUtils.isBlank(property) && !StringUtils.isBlank(value)) {
-                    Set<Properties.Entry> properties = FindProperties.find(p, property, false);
-                    if (properties.isEmpty()) {
-                        Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value);
-                        Properties.Entry.Delimiter delimitedBy = StringUtils.isNotEmpty(delimiter) ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
-                        String beforeEquals = delimitedBy == Properties.Entry.Delimiter.NONE ? delimiter : "";
-                        String prefix = "";
-                        if (!p.getContent().isEmpty()) {
-                            prefix = "\n";
-                        }
-                        List<Properties.Content> newContent = StringUtils.isNotEmpty(comment)
-                                ? Arrays.asList(
-                                        new Properties.Comment(Tree.randomId(), prefix, Markers.EMPTY, Properties.Comment.Delimiter.HASH_TAG, String.format(" %s%n", comment)),
-                                        new Properties.Entry(Tree.randomId(), "", Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue)
-                                )
-                                : Collections.singletonList(new Properties.Entry(Tree.randomId(), prefix, Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue));
-                        List<Properties.Content> contentList = ListUtils.concatAll(p.getContent(), newContent);
-                        p = p.withContent(contentList);
-                    }
+            public Properties.File visitFile(Properties.File file, ExecutionContext ctx) {
+                Properties.File p = super.visitFile(file, ctx);
+                if (StringUtils.isBlank(property) || StringUtils.isBlank(value)) {
+                    return p;
                 }
+                Set<Properties.Entry> properties = FindProperties.find(p, property, false);
+                if (!properties.isEmpty()) {
+                    return p;
+                }
+
+                Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value);
+                Properties.Entry.Delimiter delimitedBy = StringUtils.isNotEmpty(delimiter) ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
+                String beforeEquals = delimitedBy == Properties.Entry.Delimiter.NONE ? delimiter : "";
+                boolean addingComment = StringUtils.isNotEmpty(comment);
+                String entryPrefix;
+                if (p.getContent().isEmpty() || addingComment) {
+                    entryPrefix = "";
+                } else {
+                    entryPrefix = "\n";
+                }
+                Properties.Entry entry = new Properties.Entry(Tree.randomId(), entryPrefix, Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
+                List<Properties.Content> contentList = ListUtils.insertInOrder(p.getContent(), entry, (o1, o2) -> {
+                    if (o1 instanceof Properties.Entry && o2 instanceof Properties.Entry) {
+                        return ((Properties.Entry) o1).getKey().compareTo(((Properties.Entry) o2).getKey());
+                    }
+                    return -1;
+                });
+                int insertionIndex = contentList.indexOf(entry);
+                // When inserting at the very beginning the next element might not have a newline in its prefix
+                if (insertionIndex == 0 && contentList.size() > 1) {
+                    contentList = ListUtils.map(contentList, (i, it) -> {
+                        if (i == 1 && !it.getPrefix().contains("\n")) {
+                            return (Properties.Content) it.withPrefix(it.getPrefix() + "\n");
+                        }
+                        return it;
+                    });
+                }
+                if (addingComment) {
+                    String commentPrefix = "\n";
+                    if (insertionIndex == 0) {
+                        commentPrefix = "";
+                    }
+                    Properties.Comment comment = new Properties.Comment(Tree.randomId(), commentPrefix, Markers.EMPTY, Properties.Comment.Delimiter.HASH_TAG, ' ' + AddProperty.this.comment + '\n');
+                    contentList = ListUtils.insert(contentList, comment, contentList.indexOf(entry));
+                }
+
+                p = p.withContent(contentList);
                 return p;
             }
         };
+
     }
 }
