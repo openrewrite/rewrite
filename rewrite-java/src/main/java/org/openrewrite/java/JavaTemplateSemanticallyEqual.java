@@ -96,7 +96,8 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                         }
                     } else {
                         TypedPatternContext typedPattern = ctx.typedPattern();
-                        s = typedParameter(key, typedPattern);
+                        JavaType type = typedParameter(key, typedPattern);
+                        s = TypeUtils.toString(type);
 
                         String name = null;
                         if (typedPattern.parameterName() != null) {
@@ -104,7 +105,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                             typedPatternByName.put(name, s);
                         }
 
-                        Markers markers = Markers.build(Collections.singleton(new TemplateParameter(randomId(), s, name)));
+                        Markers markers = Markers.build(Collections.singleton(new TemplateParameter(randomId(), type, name)));
                         parameters.add(new J.Empty(randomId(), Space.EMPTY, markers));
                     }
                 } else {
@@ -122,10 +123,10 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         return parameters.toArray(new J[0]);
     }
 
-    private static String typedParameter(String key, TypedPatternContext typedPattern) {
+    private static JavaType typedParameter(String key, TypedPatternContext typedPattern) {
         String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
         if ("any".equals(matcherName)) {
-            return ((JavaType.FullyQualified) TypeParameter.toFullyQualifiedName(typedPattern.patternType().type())).getFullyQualifiedName();
+            return TypeParameter.toFullyQualifiedName(typedPattern.patternType().type());
         } else {
             throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
         }
@@ -147,7 +148,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     @With
     private static class TemplateParameter implements Marker {
         UUID id;
-        String typeName;
+        JavaType type;
 
         @Nullable
         String name;
@@ -175,8 +176,8 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                     }
                 }
 
-                if ("java.lang.Object".equals(marker.typeName) ||
-                    TypeUtils.isAssignableTo(marker.typeName, ((TypedTree) j).getType())) {
+                if (TypeUtils.isObject(marker.type) ||
+                    TypeUtils.isAssignableTo(marker.type, ((TypedTree) j).getType())) {
                     registerMatch(j, marker.name);
                     return true;
                 }

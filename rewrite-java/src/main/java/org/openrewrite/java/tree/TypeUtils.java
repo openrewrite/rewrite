@@ -31,6 +31,11 @@ public class TypeUtils {
     private TypeUtils() {
     }
 
+    public static boolean isObject(@Nullable JavaType type) {
+        return type instanceof JavaType.FullyQualified &&
+               "java.lang.Object".equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
+    }
+
     public static boolean isString(@Nullable JavaType type) {
         return type == JavaType.Primitive.String ||
                (type instanceof JavaType.FullyQualified &&
@@ -629,19 +634,39 @@ public class TypeUtils {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
             StringBuilder builder = new StringBuilder();
             builder.append(toString(parameterized.getType()));
-            StringJoiner joiner = new StringJoiner(", ", "<", ">");
-            for (JavaType parameter : parameterized.getTypeParameters()) {
-                joiner.add(toString(parameter));
+            builder.append('<');
+            List<JavaType> typeParameters = parameterized.getTypeParameters();
+            for (int i = 0, typeParametersSize = typeParameters.size(); i < typeParametersSize; i++) {
+                JavaType parameter = typeParameters.get(i);
+                builder.append(toString(parameter));
+                if (i < typeParametersSize - 1) {
+                    builder.append(", ");
+                }
             }
-            builder.append(joiner);
+            builder.append('>');
             return builder.toString();
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericTypeVariable = (JavaType.GenericTypeVariable) type;
-            StringJoiner joiner = new StringJoiner(" & ");
-            for (JavaType bound : genericTypeVariable.getBounds()) {
-                joiner.add(toString(bound));
+            StringBuilder builder = new StringBuilder();
+            builder.append(genericTypeVariable.getName());
+            builder.append(' ');
+            builder.append(toString(genericTypeVariable.getVariance()));
+            builder.append(' ');
+
+            List<JavaType> bounds = genericTypeVariable.getBounds();
+            int boundsSize = bounds.size();
+            if (boundsSize == 1) {
+                builder.append(toString(bounds.get(0)));
+            } else {
+                for (int i = 0; i < boundsSize; i++) {
+                    JavaType bound = bounds.get(i);
+                    builder.append(toString(bound));
+                    if (i < boundsSize - 1) {
+                        builder.append(" & ");
+                    }
+                }
             }
-            return genericTypeVariable.getName() + ' ' + toString(genericTypeVariable.getVariance()) + ' ' + joiner;
+            return builder.toString();
         }
         return type.toString();
     }
