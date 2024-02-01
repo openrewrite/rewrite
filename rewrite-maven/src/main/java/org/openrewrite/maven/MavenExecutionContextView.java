@@ -241,19 +241,37 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     private List<MavenRepository> mapRepositories(MavenSettings settings, List<String> activeProfiles) {
+        Map<String, MavenRepository> repositories = this.getRepositories().stream()
+                .collect(Collectors.toMap(MavenRepository::getId, r -> r, (a, b) -> a));
         return settings.getActiveRepositories(activeProfiles).stream()
                 .map(repo -> {
                     try {
-                        return new MavenRepository(
-                                repo.getId(),
-                                repo.getUrl(),
-                                repo.getReleases() == null ? null : repo.getReleases().getEnabled(),
-                                repo.getSnapshots() == null ? null : repo.getSnapshots().getEnabled(),
-                                null,
-                                null,
-                                null,
-                                null
-                        );
+                        MavenRepository knownRepo = repositories.get(repo.getId());
+                        if (knownRepo != null) {
+                            return new MavenRepository(
+                                    repo.getId(),
+                                    repo.getUrl(),
+                                    repo.getReleases() != null ? repo.getReleases().getEnabled() : knownRepo.getReleases(),
+                                    repo.getSnapshots() != null ? repo.getSnapshots().getEnabled() : knownRepo.getSnapshots(),
+                                    knownRepo.isKnownToExist() && knownRepo.getUri().equals(repo.getUrl()),
+                                    knownRepo.getUsername(),
+                                    knownRepo.getPassword(),
+                                    knownRepo.getConnectTimeout(),
+                                    knownRepo.getReadTimeout(),
+                                    knownRepo.getDeriveMetadataIfMissing()
+                            );
+                        } else {
+                            return new MavenRepository(
+                                    repo.getId(),
+                                    repo.getUrl(),
+                                    repo.getReleases() == null ? null : repo.getReleases().getEnabled(),
+                                    repo.getSnapshots() == null ? null : repo.getSnapshots().getEnabled(),
+                                    null,
+                                    null,
+                                    null,
+                                    null
+                            );
+                        }
                     } catch (Exception exception) {
                         this.getOnError().accept(new MavenParsingException(
                                 "Unable to parse URL %s for Maven settings repository id %s",
