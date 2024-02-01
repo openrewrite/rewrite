@@ -17,14 +17,72 @@ package org.openrewrite.java.internal.template;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
+import org.openrewrite.java.internal.grammar.TemplateParameterParserBaseVisitor;
+import org.openrewrite.java.tree.JavaType;
+
+import java.util.*;
 
 public class TypeParameter {
 
-    public static String toFullyQualifiedName(@Nullable TemplateParameterParser.TypeContext type) {
+    private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
+
+    public static JavaType toFullyQualifiedName(@Nullable TemplateParameterParser.TypeContext type) {
         if (type == null) {
-            return "java.lang.Object";
+            return TYPE_OBJECT;
         }
 
+        JavaType result = type.accept(new TemplateParameterParserBaseVisitor<JavaType>() {
+            final Deque<List<JavaType>> typeParameterStack = new ArrayDeque<>();
+
+            @Override
+            public JavaType visitType(TemplateParameterParser.TypeContext ctx) {
+                JavaType type = ctx.typeName().accept(this);
+                if (!ctx.typeParameter().isEmpty()) {
+                    List<JavaType> typeParameters = new ArrayList<>();
+                    for (TemplateParameterParser.TypeParameterContext param : ctx.typeParameter()) {
+                        typeParameters.add(param.accept(this));
+                    }
+                    type = new JavaType.Parameterized(null, (JavaType.FullyQualified) type, typeParameters);
+                }
+                return type;
+            }
+
+            @Override
+            public JavaType visitTypeName(TemplateParameterParser.TypeNameContext ctx) {
+                String fqn = ctx.FullyQualifiedName().getText();
+                if (fqn.contains(".")) {
+                    return JavaType.ShallowClass.build(fqn);
+                } else if (fqn.equals("String")) {
+                    return JavaType.ShallowClass.build("java.lang.String");
+                } else if (fqn.equals("Object")) {
+                    return TYPE_OBJECT;
+                } else {
+                    return JavaType.Primitive.fromKeyword(fqn);
+                }
+            }
+
+            @Override
+            public JavaType visitTypeParameter(TemplateParameterParser.TypeParameterContext ctx) {
+                JavaType type = super.visitTypeParameter(ctx);
+                if (ctx.variance() != null) {
+                    JavaType.GenericTypeVariable.Variance variance = ctx.variance().Variance().getSymbol().getText().equals("extends") ?
+                            JavaType.GenericTypeVariable.Variance.COVARIANT : JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
+                    type = new JavaType.GenericTypeVariable(null, ctx.variance().WILDCARD().getText(), variance, Collections.singletonList(type));
+                }
+                return type;
+            }
+
+            //            @Override
+//            public JavaType visitTerminal(TerminalNode node) {
+//                if (node.getSymbol().getType() == TemplateParameterLexer.LBRACK) {
+//                    return JavaType.ShallowClass.build("java.lang.String");
+//                }
+//                return super.visitTerminal(node);
+//            }
+        });
+        if (result != null) {
+            return result;
+        }
         String fqn = "";
         TemplateParameterParser.TypeNameContext typeName = type.typeName();
 
@@ -34,16 +92,6 @@ public class TypeParameter {
             fqn = typeName.FullyQualifiedName().getText();
         }
 
-        TemplateParameterParser.TypeParameterContext typeParam = type.typeParameter();
-        if (typeParam != null) {
-            fqn += "<";
-            if (typeParam.variance() != null) {
-                fqn += "? " + typeParam.variance().getText();
-            }
-            fqn += toFullyQualifiedName(typeParam.type());
-            fqn += ">";
-        }
-
-        return fqn.replace("$", ".");
+        return TYPE_OBJECT;
     }
 }

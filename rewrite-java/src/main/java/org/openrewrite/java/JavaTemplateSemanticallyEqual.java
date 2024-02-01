@@ -125,7 +125,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     private static String typedParameter(String key, TypedPatternContext typedPattern) {
         String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
         if ("any".equals(matcherName)) {
-            return TypeParameter.toFullyQualifiedName(typedPattern.patternType().type());
+            return ((JavaType.FullyQualified) TypeParameter.toFullyQualifiedName(typedPattern.patternType().type())).getFullyQualifiedName();
         } else {
             throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
         }

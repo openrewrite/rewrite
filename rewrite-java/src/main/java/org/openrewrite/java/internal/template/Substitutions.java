@@ -134,7 +134,7 @@ public class Substitutions {
         } else if ("any".equals(matcherName)) {
             String fqn;
             if (param != null) {
-                fqn = TypeParameter.toFullyQualifiedName(param);
+                fqn = ((JavaType.FullyQualified) TypeParameter.toFullyQualifiedName(param)).getFullyQualifiedName();
             } else {
                 if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null
                     && ((J.NewClass) parameter).getClazz() != null) {

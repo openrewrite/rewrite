@@ -16,11 +16,11 @@ patternType
     ;
 
 type
-    :   typeName typeParameter?
+    : typeName (LBRACK (typeParameter COMMA)* typeParameter RBRACK)?
     ;
 
 typeParameter
-    : LBRACK variance? type RBRACK
+    : variance? type
     ;
 
 variance

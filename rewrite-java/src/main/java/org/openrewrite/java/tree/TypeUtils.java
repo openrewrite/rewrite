@@ -619,4 +619,41 @@ public class TypeUtils {
     static boolean deepEquals(@Nullable JavaType t, @Nullable JavaType t2) {
         return t == null ? t2 == null : t == t2 || t.equals(t2);
     }
+
+    public static String toString(JavaType type) {
+        if (type instanceof JavaType.Primitive) {
+            return ((JavaType.Primitive) type).getKeyword();
+        } else if (type instanceof JavaType.Class) {
+            return ((JavaType.Class) type).getFullyQualifiedName();
+        } else if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            StringBuilder builder = new StringBuilder();
+            builder.append(toString(parameterized.getType()));
+            StringJoiner joiner = new StringJoiner(", ", "<", ">");
+            for (JavaType parameter : parameterized.getTypeParameters()) {
+                joiner.add(toString(parameter));
+            }
+            builder.append(joiner);
+            return builder.toString();
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable genericTypeVariable = (JavaType.GenericTypeVariable) type;
+            StringJoiner joiner = new StringJoiner(" & ");
+            for (JavaType bound : genericTypeVariable.getBounds()) {
+                joiner.add(toString(bound));
+            }
+            return genericTypeVariable.getName() + ' ' + toString(genericTypeVariable.getVariance()) + ' ' + joiner;
+        }
+        return type.toString();
+    }
+
+    private static String toString(JavaType.GenericTypeVariable.Variance variance) {
+        switch (variance) {
+            case COVARIANT:
+                return "extends";
+            case CONTRAVARIANT:
+                return "super";
+            default:
+                return "";
+        }
+    }
 }
