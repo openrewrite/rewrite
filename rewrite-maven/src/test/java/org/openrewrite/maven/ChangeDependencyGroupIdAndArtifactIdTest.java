@@ -25,7 +25,6 @@ import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
-
     @DocumentExample
     @Test
     void changeDependencyGroupIdAndArtifactId() {
@@ -100,6 +99,55 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void changeManagedDependencyGroupIdAndArtifactId() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.x",
+            null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.2</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     void requireNewGroupIdOrNewArtifactId() {
         assertThatExceptionOfType(AssertionError.class)
@@ -107,7 +155,6 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
               "javax.activation",
               "javax.activation-api",
-              null,
               null,
               null,
               null,
@@ -127,7 +174,6 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               "javax.activation",
               null,
               null,
-              null,
               null
             ))
           )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
@@ -143,7 +189,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation-api",
             "1.2.2",
             null,
-            true
+            true,
+            false
           )),
           pomXml(
             """
@@ -216,7 +263,70 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             "1.2.2",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.2</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void managedToUnmanagedWithoutChangeManagedDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.2",
             null,
+            false,
             false
           )),
           pomXml(
@@ -280,8 +390,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             "1.2.2",
-            null,
-            false
+            null
           )),
           pomXml(
             """
@@ -345,7 +454,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation-api",
             "1.2.2",
             null,
-            true
+            true,
+            null
           )),
           pomXml(
             """
@@ -409,7 +519,6 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             "1.2.2",
-            null,
             null
           )),
           pomXml(
