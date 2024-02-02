@@ -25,7 +25,6 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Iterator;
 import java.util.Objects;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Value
@@ -77,8 +76,8 @@ public class ChangePropertyValue extends Recipe {
     @Override
     public Validated validate() {
         return super.validate()
-                    .and(Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
-                                        value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
+                .and(Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
+                        value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
     }
 
     @Override
@@ -124,9 +123,9 @@ public class ChangePropertyValue extends Recipe {
         }
         Yaml.Scalar scalar = (Yaml.Scalar) value;
         return StringUtils.isNullOrEmpty(oldValue) ||
-                (Boolean.TRUE.equals(regex)
-                        ? Pattern.compile(oldValue).matcher(scalar.getValue()).find()
-                        : scalar.getValue().equals(oldValue));
+               (Boolean.TRUE.equals(regex)
+                       ? Pattern.compile(oldValue).matcher(scalar.getValue()).find()
+                       : scalar.getValue().equals(oldValue));
     }
 
     private static String getProperty(Cursor cursor) {

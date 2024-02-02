@@ -23,7 +23,6 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
-import java.util.Objects;
 import java.util.regex.Pattern;
 
 @Value
@@ -53,7 +52,7 @@ public class ChangePropertyValue extends Recipe {
 
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
-                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+                          "rules. Default is `true`. Set to `false`  to use exact matching.",
             required = false)
     @Nullable
     Boolean relaxedBinding;
@@ -71,8 +70,8 @@ public class ChangePropertyValue extends Recipe {
     @Override
     public Validated validate() {
         return super.validate()
-                    .and(Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
-                                        value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
+                .and(Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
+                        value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
     }
 
     @Override
@@ -99,8 +98,8 @@ public class ChangePropertyValue extends Recipe {
         @Nullable // returns null if value should not change
         private Properties.Value updateValue(Properties.Value value) {
             Properties.Value updatedValue = value.withText(StringUtils.isNullOrEmpty(oldValue)
-                                                                   ? newValue
-                                                                   : value.getText().replaceAll(oldValue, newValue));
+                    ? newValue
+                    : value.getText().replaceAll(oldValue, newValue));
             return updatedValue.getText().equals(value.getText()) ? null : updatedValue;
         }
 
@@ -112,9 +111,9 @@ public class ChangePropertyValue extends Recipe {
 
         private boolean matchesOldValue(Properties.Value value) {
             return StringUtils.isNullOrEmpty(oldValue) ||
-                    (Boolean.TRUE.equals(regex)
-                            ? Pattern.compile(oldValue).matcher(value.getText()).find()
-                            : value.getText().equals(oldValue));
+                   (Boolean.TRUE.equals(regex)
+                           ? Pattern.compile(oldValue).matcher(value.getText()).find()
+                           : value.getText().equals(oldValue));
         }
     }
 
