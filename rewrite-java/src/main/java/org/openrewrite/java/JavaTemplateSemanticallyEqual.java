@@ -23,6 +23,8 @@ import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
+import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypedPatternContext;
+import org.openrewrite.java.internal.template.TypeParameter;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -93,8 +95,9 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                             throw new IllegalArgumentException("The parameter " + paramName + " must be defined before it is referenced.");
                         }
                     } else {
-                        TemplateParameterParser.TypedPatternContext typedPattern = ctx.typedPattern();
-                        s = typedParameter(key, typedPattern);
+                        TypedPatternContext typedPattern = ctx.typedPattern();
+                        JavaType type = typedParameter(key, typedPattern);
+                        s = TypeUtils.toString(type);
 
                         String name = null;
                         if (typedPattern.parameterName() != null) {
@@ -102,7 +105,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                             typedPatternByName.put(name, s);
                         }
 
-                        Markers markers = Markers.build(Collections.singleton(new TemplateParameter(randomId(), s, name)));
+                        Markers markers = Markers.build(Collections.singleton(new TemplateParameter(randomId(), type, name)));
                         parameters.add(new J.Empty(randomId(), Space.EMPTY, markers));
                     }
                 } else {
@@ -120,24 +123,10 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         return parameters.toArray(new J[0]);
     }
 
-    private static String typedParameter(String key, TemplateParameterParser.TypedPatternContext typedPattern) {
+    private static JavaType typedParameter(String key, TypedPatternContext typedPattern) {
         String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
-        List<TemplateParameterParser.MatcherParameterContext> params = typedPattern.patternType().matcherParameter();
-
         if ("any".equals(matcherName)) {
-            String fqn;
-
-            if (params.size() == 1) {
-                if (params.get(0).Identifier() != null) {
-                    fqn = params.get(0).Identifier().getText();
-                } else {
-                    fqn = params.get(0).FullyQualifiedName().getText();
-                }
-            } else {
-                fqn = "java.lang.Object";
-            }
-
-            return fqn.replace("$", ".");
+            return TypeParameter.toFullyQualifiedName(typedPattern.patternType().type());
         } else {
             throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
         }
@@ -159,7 +148,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     @With
     private static class TemplateParameter implements Marker {
         UUID id;
-        String typeName;
+        JavaType type;
 
         @Nullable
         String name;
@@ -174,21 +163,25 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         }
 
         private boolean matchTemplateParameterPlaceholder(J.Empty empty, J j) {
-            if (j instanceof TypedTree && !(j instanceof J.Primitive)) {
+            if (j instanceof TypedTree) {
+                if (j instanceof J.Primitive || j instanceof J.Identifier && ((J.Identifier) j).getFieldType() == null) {
+                    // don't match types, only expressions
+                    return false;
+                }
                 TemplateParameter marker = (TemplateParameter) empty.getMarkers().getMarkers().get(0);
 
                 if (marker.name != null) {
                     for (Map.Entry<J, String> matchedParameter : matchedParameters.entrySet()) {
                         if (matchedParameter.getValue().equals(marker.name)) {
-                            if(!SemanticallyEqual.areEqual(matchedParameter.getKey(), j)) {
+                            if (!SemanticallyEqual.areEqual(matchedParameter.getKey(), j)) {
                                 return false;
                             }
                         }
                     }
                 }
 
-                if ("java.lang.Object".equals(marker.typeName) ||
-                    TypeUtils.isAssignableTo(marker.typeName, ((TypedTree) j).getType())) {
+                if (TypeUtils.isObject(marker.type) ||
+                    TypeUtils.isAssignableTo(marker.type, ((TypedTree) j).getType())) {
                     registerMatch(j, marker.name);
                     return true;
                 }
