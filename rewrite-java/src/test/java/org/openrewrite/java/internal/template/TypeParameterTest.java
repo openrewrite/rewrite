@@ -88,4 +88,16 @@ class TypeParameterTest {
         assertThat(type).isInstanceOf(JavaType.Parameterized.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "java.util.List<?>",
+    })
+    void unbounded(String name) {
+        TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
+          CharStreams.fromString(name))));
+        JavaType type = TypeParameter.toFullyQualifiedName(parser.type());
+        assertThat(type).isInstanceOf(JavaType.Parameterized.class);
+        assertThat(TypeUtils.toString(type)).isEqualTo(name);
+    }
 }

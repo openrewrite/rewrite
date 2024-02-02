@@ -22,6 +22,9 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+
 public class TypeParameter {
 
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
@@ -70,7 +73,9 @@ public class TypeParameter {
                 if (ctx.variance() != null) {
                     JavaType.GenericTypeVariable.Variance variance = ctx.variance().Variance().getSymbol().getText().equals("extends") ?
                             JavaType.GenericTypeVariable.Variance.COVARIANT : JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
-                    type1 = new JavaType.GenericTypeVariable(null, ctx.variance().WILDCARD().getText(), variance, Collections.singletonList(type1));
+                    type1 = new JavaType.GenericTypeVariable(null, ctx.variance().WILDCARD().getText(), variance, singletonList(type1));
+                } else if (ctx.WILDCARD() != null) {
+                    type1 = new JavaType.GenericTypeVariable(null, ctx.WILDCARD().getText(), JavaType.GenericTypeVariable.Variance.INVARIANT, emptyList());
                 }
                 return type1;
             }

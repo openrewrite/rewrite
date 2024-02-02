@@ -21,6 +21,7 @@ type
 
 typeParameter
     : variance? type
+    | WILDCARD
     ;
 
 variance
