@@ -45,7 +45,8 @@ public class ChangePropertyValue extends Recipe {
     String oldValue;
 
     @Option(displayName = "Regex",
-            description = "Default false. If enabled, `oldValue` will be interpreted as a Regular Expression, and capture group contents will be available in `newValue`",
+            description = "Default `false`. If enabled, `oldValue` will be interpreted as a Regular Expression, " +
+                          "to replace only all parts that match the regex. Capturing group can be used in `newValue`.",
             required = false)
     @Nullable
     Boolean regex;
@@ -69,8 +70,8 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public Validated validate() {
-        return super.validate()
-                .and(Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
+        return super.validate().and(
+                Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
                         value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
     }
 
@@ -97,9 +98,9 @@ public class ChangePropertyValue extends Recipe {
 
         @Nullable // returns null if value should not change
         private Properties.Value updateValue(Properties.Value value) {
-            Properties.Value updatedValue = value.withText(StringUtils.isNullOrEmpty(oldValue)
-                    ? newValue
-                    : value.getText().replaceAll(oldValue, newValue));
+            Properties.Value updatedValue = value.withText(Boolean.TRUE.equals(regex)
+                    ? value.getText().replaceAll(oldValue, newValue)
+                    : newValue);
             return updatedValue.getText().equals(value.getText()) ? null : updatedValue;
         }
 

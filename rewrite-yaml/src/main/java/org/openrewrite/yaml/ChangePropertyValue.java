@@ -46,7 +46,8 @@ public class ChangePropertyValue extends Recipe {
     String oldValue;
 
     @Option(displayName = "Regex",
-            description = "Defaults to `false`. If enabled, `oldValue` will be interpreted as a regular expression, and the capture group contents will be available in `newValue`",
+            description = "Default `false`. If enabled, `oldValue` will be interpreted as a Regular Expression, " +
+                          "to replace only all parts that match the regex. Capturing group can be used in `newValue`.",
             required = false)
     @Nullable
     Boolean regex;
@@ -75,8 +76,8 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public Validated validate() {
-        return super.validate()
-                .and(Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
+        return super.validate().and(
+                Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
                         value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
     }
 
@@ -104,10 +105,9 @@ public class ChangePropertyValue extends Recipe {
             return null;
         }
         Yaml.Scalar scalar = (Yaml.Scalar) value;
-        Yaml.Scalar newScalar = scalar.withValue(
-                StringUtils.isNullOrEmpty(oldValue)
-                        ? newValue
-                        : scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue));
+        Yaml.Scalar newScalar = scalar.withValue(Boolean.TRUE.equals(regex)
+                ? scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue)
+                : newValue);
         return scalar.getValue().equals(newScalar.getValue()) ? null : newScalar;
     }
 
