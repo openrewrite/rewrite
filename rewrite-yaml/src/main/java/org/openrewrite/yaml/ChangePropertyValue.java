@@ -52,12 +52,6 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     Boolean regex;
 
-    @Option(displayName = "Partial match",
-            description = "Defaults to `false`. If enabled, `oldValue` will be match if it is a partial match of the value. The replacement will be done only on the part that matches. This can trigger multiple changes in the same value",
-            required = false)
-    @Nullable
-    Boolean partialMatch;
-
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
                           "rules. Default is `true`. Set to `false`  to use exact matching.",
@@ -84,9 +78,7 @@ public class ChangePropertyValue extends Recipe {
     public Validated validate() {
         return super.validate()
                     .and(Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
-                                        value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))))
-                    .and(Validated.test("oldValue", "is required if `partialMatch` is enabled", oldValue,
-                                        value -> !(Boolean.TRUE.equals(partialMatch) && StringUtils.isNullOrEmpty(value))));
+                                        value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
     }
 
     @Override
@@ -131,18 +123,10 @@ public class ChangePropertyValue extends Recipe {
             return false;
         }
         Yaml.Scalar scalar = (Yaml.Scalar) value;
-        if (Boolean.TRUE.equals(partialMatch)) {
-            if (Boolean.TRUE.equals(regex)) {
-                return Pattern.compile(oldValue).matcher(scalar.getValue()).find();
-            } else {
-                return scalar.getValue().contains(oldValue);
-            }
-        } else {
-            return StringUtils.isNullOrEmpty(oldValue) ||
-                   (Boolean.TRUE.equals(regex)
-                           ? scalar.getValue().matches(oldValue)
-                           : scalar.getValue().equals(oldValue));
-        }
+        return StringUtils.isNullOrEmpty(oldValue) ||
+                (Boolean.TRUE.equals(regex)
+                        ? Pattern.compile(oldValue).matcher(scalar.getValue()).find()
+                        : scalar.getValue().equals(oldValue));
     }
 
     private static String getProperty(Cursor cursor) {

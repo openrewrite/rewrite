@@ -27,7 +27,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void simpleDotSeparated() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", null, null, null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", null, null, null)),
           yaml("""
             my.prop: foo
             """, """
@@ -39,7 +39,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void simpleIndented() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", null, null, null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", null, null, null)),
           yaml("""
             my:
               prop: foo
@@ -53,7 +53,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void oldValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", "foo", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", "foo", null, null)),
           yaml("""
             my:
               prop: foo
@@ -67,7 +67,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void badOldValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", "fooz", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", "fooz", null, null)),
           yaml("""
             my:
               prop: foo
@@ -78,7 +78,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void regex() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", "f(o+)", true, null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", "f(o+)", true, null)),
           yaml("""
             my:
               prop: foooo
@@ -92,7 +92,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void regexDefaultOff() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", ".+", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", ".+", null, null)),
           yaml("""
             my:
               prop: foo
@@ -103,7 +103,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void partialMatchRegex() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("*", "[replaced:$1]", "\\[replaceme:(.*?)]", true, true,null)),
+          spec -> spec.recipe(new ChangePropertyValue("*", "[replaced:$1]", "\\[replaceme:(.*?)]", true, null)),
           yaml("""
             multiple: "[replaceme:1][replaceme:2]"
             multiple-prefixed: "test[replaceme:1]test[replaceme:2]"
@@ -121,28 +121,18 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void partialMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("*", "replaced", "replaceme", null, true,null)),
+          spec -> spec.recipe(new ChangePropertyValue("*", "replaced", "replaceme", null, null)),
           yaml("""
             multiple: "[replaceme:1][replaceme:2]"
             multiple-prefixed: "test[replaceme:1]test[replaceme:2]"
             multiple-suffixed: "[replaceme:1]test[replaceme:2]test"
             multiple-both: "test[replaceme:1]test[replaceme:2]test"
-            """, """
-            multiple: "[replaced:1][replaced:2]"
-            multiple-prefixed: "test[replaced:1]test[replaced:2]"
-            multiple-suffixed: "[replaced:1]test[replaced:2]test"
-            multiple-both: "test[replaced:1]test[replaced:2]test"
             """)
         );
     }
 
     @Test
-    void validatesThatOldValueIsRequiredIfPartialMatchEnabled() {
-        assertTrue(new ChangePropertyValue("my.prop", "bar", null, null, true,null).validate().isInvalid());
-    }
-
-    @Test
     void validatesThatOldValueIsRequiredIfRegexEnabled() {
-        assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null,null).validate().isInvalid());
+        assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null).validate().isInvalid());
     }
 }

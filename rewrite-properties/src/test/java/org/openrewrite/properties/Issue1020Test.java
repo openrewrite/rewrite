@@ -41,7 +41,7 @@ class Issue1020Test implements RewriteTest {
     @Test
     void removalOfSlashPound() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("server.tomcat.accesslog.enabled", "true", null, false, null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("server.tomcat.accesslog.enabled", "true", null, false, null)),
           properties(
             """
               boot.features=https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle**/#**boot-features-jersey
