@@ -163,7 +163,11 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         }
 
         private boolean matchTemplateParameterPlaceholder(J.Empty empty, J j) {
-            if (j instanceof TypedTree && !(j instanceof J.Primitive)) {
+            if (j instanceof TypedTree) {
+                if (j instanceof J.Primitive || j instanceof J.Identifier && ((J.Identifier) j).getFieldType() == null) {
+                    // don't match types, only expressions
+                    return false;
+                }
                 TemplateParameter marker = (TemplateParameter) empty.getMarkers().getMarkers().get(0);
 
                 if (marker.name != null) {

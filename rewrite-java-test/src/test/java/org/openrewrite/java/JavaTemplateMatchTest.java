@@ -370,7 +370,10 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitExpression(Expression expression, ExecutionContext ctx) {
-                  return template.matches(getCursor()) ? SearchResult.found(expression) : super.visitExpression(expression, ctx);
+                  if (template.matches(getCursor())) {
+                      return SearchResult.found(expression);
+                  }
+                  return super.visitExpression(expression, ctx);
               }
           }).withMaxCycles(1)),
           java(
