@@ -48,16 +48,20 @@ public class TypeParameter {
 
             @Override
             public JavaType visitTypeName(TemplateParameterParser.TypeNameContext ctx) {
-                String fqn = ctx.FullyQualifiedName().getText();
+                String fqn = ctx.FullyQualifiedName() != null ? ctx.FullyQualifiedName().getText() : ctx.Identifier().getText();
+                JavaType type;
                 if (fqn.contains(".")) {
-                    return JavaType.ShallowClass.build(fqn);
+                    type = JavaType.ShallowClass.build(fqn);
                 } else if (fqn.equals("String")) {
-                    return JavaType.ShallowClass.build("java.lang.String");
+                    type = JavaType.ShallowClass.build("java.lang.String");
                 } else if (fqn.equals("Object")) {
-                    return TYPE_OBJECT;
+                    type = TYPE_OBJECT;
+                } else if ((type = JavaType.Primitive.fromKeyword(fqn)) != null) {
+                    // empty
                 } else {
-                    return JavaType.Primitive.fromKeyword(fqn);
+                    type = JavaType.Unknown.getInstance();
                 }
+                return type;
             }
 
             @Override
