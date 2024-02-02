@@ -21,7 +21,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class RecipeAcceptingParameters extends Recipe {
 
     @Option(displayName = "foo")

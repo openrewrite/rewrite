@@ -60,7 +60,7 @@ public interface Yaml extends Tree {
     Yaml withPrefix(String prefix);
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Documents implements Yaml, SourceFile {
         @EqualsAndHashCode.Include
@@ -129,7 +129,7 @@ public interface Yaml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Document implements Yaml {
         @EqualsAndHashCode.Include
@@ -162,7 +162,7 @@ public interface Yaml extends Tree {
          * <a href="https://yaml.org/spec/1.1/#c-document-end">Document end</a> specification.
          */
         @Value
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @With
         public static class End implements Yaml {
             @EqualsAndHashCode.Include
@@ -187,7 +187,7 @@ public interface Yaml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Scalar implements Block, YamlKey {
         @EqualsAndHashCode.Include
@@ -226,7 +226,7 @@ public interface Yaml extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     @With
     class Mapping implements Block {
@@ -276,7 +276,7 @@ public interface Yaml extends Tree {
         }
 
         @Value
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @With
         public static class Entry implements Yaml {
             @EqualsAndHashCode.Include
@@ -305,7 +305,7 @@ public interface Yaml extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     @With
     class Sequence implements Block {
@@ -356,7 +356,7 @@ public interface Yaml extends Tree {
         }
 
         @Value
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @With
         public static class Entry implements Yaml {
             @EqualsAndHashCode.Include
@@ -405,7 +405,7 @@ public interface Yaml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Alias implements Block, YamlKey {
         @EqualsAndHashCode.Include
@@ -441,7 +441,7 @@ public interface Yaml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Anchor implements Yaml {
         @EqualsAndHashCode.Include

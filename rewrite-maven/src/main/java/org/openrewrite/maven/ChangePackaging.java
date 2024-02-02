@@ -34,7 +34,7 @@ import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ChangePackaging extends Recipe {
     private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
 

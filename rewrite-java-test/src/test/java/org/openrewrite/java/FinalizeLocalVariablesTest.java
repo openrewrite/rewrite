@@ -178,7 +178,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         }
 
         @Value
-        @EqualsAndHashCode(callSuper = false)
+        @EqualsAndHashCode(callSuper = true)
         private static class FindAssignmentReferencesToVariable extends JavaIsoVisitor<AtomicBoolean> {
 
             J.VariableDeclarations.NamedVariable variable;

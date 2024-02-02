@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class AddSettingsPluginRepository extends Recipe {
 
     @Option(displayName = "Type",

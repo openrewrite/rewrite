@@ -35,7 +35,7 @@ import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 @RequiredArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Getter
 public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     @EqualsAndHashCode.Include

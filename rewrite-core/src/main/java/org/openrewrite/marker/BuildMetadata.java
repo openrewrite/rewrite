@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
 public class BuildMetadata implements Marker {
     @EqualsAndHashCode.Include

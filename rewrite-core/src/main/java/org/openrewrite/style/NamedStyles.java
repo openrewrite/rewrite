@@ -33,7 +33,7 @@ import static java.util.stream.Collectors.toSet;
  * A collection of styles by name, e.g., IntelliJ IDEA or Google Java Format.
  */
 @Data
-@EqualsAndHashCode(onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @AllArgsConstructor
 @With
 public class NamedStyles implements Marker {

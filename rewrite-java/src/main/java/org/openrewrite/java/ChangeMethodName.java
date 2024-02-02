@@ -24,7 +24,7 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ChangeMethodName extends Recipe {
 
     @Option(displayName = "Method pattern",

@@ -30,7 +30,7 @@ import org.openrewrite.marker.SearchResult;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class FindDependency extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",

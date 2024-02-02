@@ -42,7 +42,7 @@ import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
  * drop below the configured values.
  */
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class RemoveUnusedImports extends Recipe {
 
     @Override

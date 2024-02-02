@@ -74,7 +74,7 @@ public interface Xml extends Tree {
     Xml withPrefixUnsafe(String prefix);
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     class Document implements Xml, SourceFile {
         @Getter
@@ -159,7 +159,7 @@ public interface Xml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Prolog implements Xml {
         @EqualsAndHashCode.Include
@@ -189,7 +189,7 @@ public interface Xml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class XmlDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
@@ -220,7 +220,7 @@ public interface Xml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class ProcessingInstruction implements Xml, Content, Misc {
         @EqualsAndHashCode.Include
@@ -252,7 +252,7 @@ public interface Xml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     class Tag implements Xml, Content {
         @EqualsAndHashCode.Include
         @With
@@ -441,7 +441,7 @@ public interface Xml extends Tree {
         }
 
         @Value
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @With
         public static class Closing implements Xml {
             @EqualsAndHashCode.Include
@@ -473,7 +473,7 @@ public interface Xml extends Tree {
     }
 
     @lombok.Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Attribute implements Xml {
         @EqualsAndHashCode.Include
@@ -500,7 +500,7 @@ public interface Xml extends Tree {
         }
 
         @lombok.Value
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @With
         public static class Value implements Xml {
             public enum Quote {
@@ -540,7 +540,7 @@ public interface Xml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class CharData implements Xml, Content {
         @EqualsAndHashCode.Include
@@ -578,7 +578,7 @@ public interface Xml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Comment implements Xml, Content, Misc {
         @EqualsAndHashCode.Include
@@ -609,7 +609,7 @@ public interface Xml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class DocTypeDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
@@ -640,7 +640,7 @@ public interface Xml extends Tree {
         String beforeTagDelimiterPrefix;
 
         @Value
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @With
         public static class ExternalSubsets implements Xml {
             @EqualsAndHashCode.Include
@@ -667,7 +667,7 @@ public interface Xml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Element implements Xml {
         @EqualsAndHashCode.Include
@@ -698,7 +698,7 @@ public interface Xml extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Ident implements Xml {
         @EqualsAndHashCode.Include

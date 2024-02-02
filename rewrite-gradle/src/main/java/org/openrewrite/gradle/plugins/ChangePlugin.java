@@ -51,7 +51,7 @@ import static java.util.Objects.requireNonNull;
  * If you are using either of these plugin styles, you should ensure that the plugin's version is appropriately updated.
  */
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ChangePlugin extends Recipe {
     @Option(displayName = "Plugin ID",
             description = "The current Gradle plugin id.",

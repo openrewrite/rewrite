@@ -85,7 +85,7 @@ public interface Markup extends Marker {
     }
 
     @Value
-    @EqualsAndHashCode(onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
     class Error implements Markup {
         UUID id;
@@ -112,7 +112,7 @@ public interface Markup extends Marker {
     }
 
     @Value
-    @EqualsAndHashCode(onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
     class Warn implements Markup {
         UUID id;
@@ -139,7 +139,7 @@ public interface Markup extends Marker {
     }
 
     @Value
-    @EqualsAndHashCode(onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
     class Info implements Markup {
         UUID id;
@@ -164,7 +164,7 @@ public interface Markup extends Marker {
     }
 
     @Value
-    @EqualsAndHashCode(onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
     class Debug implements Markup {
         UUID id;

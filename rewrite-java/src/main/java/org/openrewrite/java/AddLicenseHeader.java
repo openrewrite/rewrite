@@ -31,7 +31,7 @@ import java.util.Collections;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class AddLicenseHeader extends Recipe {
     /**
      * A method pattern that is used to find matching method declarations/invocations.

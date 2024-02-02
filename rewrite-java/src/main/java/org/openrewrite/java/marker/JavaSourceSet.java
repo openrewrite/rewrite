@@ -36,7 +36,7 @@ import java.util.UUID;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
 public class JavaSourceSet implements SourceSet {
     @EqualsAndHashCode.Include

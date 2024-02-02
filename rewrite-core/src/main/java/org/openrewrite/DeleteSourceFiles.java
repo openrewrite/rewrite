@@ -23,7 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class DeleteSourceFiles extends Recipe {
 
     @Option(displayName = "File pattern",

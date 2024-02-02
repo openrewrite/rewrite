@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
  * @param <T>
  */
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Data
 public class JsonRightPadded<T> {
     @With

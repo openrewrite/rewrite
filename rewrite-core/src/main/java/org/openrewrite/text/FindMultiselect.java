@@ -37,7 +37,7 @@ import static java.util.stream.Collectors.toSet;
 
 @Incubating(since = "8.2.0")
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class FindMultiselect extends Recipe {
 
     @Override

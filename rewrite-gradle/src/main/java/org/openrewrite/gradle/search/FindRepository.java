@@ -31,7 +31,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class FindRepository extends Recipe {
     @Option(displayName = "Type",
             description = "The type of the artifact repository",

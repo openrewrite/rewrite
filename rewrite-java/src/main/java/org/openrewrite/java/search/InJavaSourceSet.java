@@ -28,7 +28,7 @@ import org.openrewrite.marker.SearchResult;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class InJavaSourceSet<P> extends JavaIsoVisitor<P> {
     String sourceSet;
 

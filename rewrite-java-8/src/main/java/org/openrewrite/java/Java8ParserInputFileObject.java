@@ -32,7 +32,7 @@ import java.nio.file.Path;
  * So that {@link JavaParser} can ingest source files from {@link InputStream} sources
  * other than a file on disk.
  */
-@EqualsAndHashCode(onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Java8ParserInputFileObject implements JavaFileObject {
     @EqualsAndHashCode.Include
     @Nullable

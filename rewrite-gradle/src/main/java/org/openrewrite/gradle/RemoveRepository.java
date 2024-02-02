@@ -23,7 +23,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class RemoveRepository extends Recipe {
     @Override
     public String getDisplayName() {

@@ -27,7 +27,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class AddProfile extends Recipe {
     private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
 

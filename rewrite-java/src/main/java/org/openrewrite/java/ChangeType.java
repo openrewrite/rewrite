@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ChangeType extends Recipe {
 
     @Option(displayName = "Old fully-qualified type name",

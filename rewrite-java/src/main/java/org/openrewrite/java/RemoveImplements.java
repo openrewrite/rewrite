@@ -29,7 +29,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class RemoveImplements extends Recipe {
 
     private static final AnnotationMatcher OVERRIDE_MATCHER = new AnnotationMatcher("java.lang.Override");

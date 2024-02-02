@@ -35,7 +35,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class FindPlugins extends Recipe {
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`.",

@@ -124,7 +124,7 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false)
+    @EqualsAndHashCode(callSuper = true)
     @RequiredArgsConstructor
     static class PreconditionBellwether extends Recipe {
 
@@ -162,7 +162,7 @@ public class DeclarativeRecipe extends Recipe {
         }
     }
 
-    @EqualsAndHashCode(callSuper = false)
+    @EqualsAndHashCode(callSuper = true)
     @Value
     static class BellwetherDecoratedRecipe extends Recipe {
 
@@ -196,7 +196,7 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false)
+    @EqualsAndHashCode(callSuper = true)
     static class BellwetherDecoratedScanningRecipe<T>  extends ScanningRecipe<T> {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
@@ -318,7 +318,7 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false)
+    @EqualsAndHashCode(callSuper = true)
     private static class LazyLoadedRecipe extends Recipe {
         String recipeFqn;
 

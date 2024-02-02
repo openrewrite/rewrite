@@ -25,7 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class IsInRepository extends Recipe {
     @Override
     public String getDisplayName() {

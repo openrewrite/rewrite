@@ -42,7 +42,7 @@ import java.util.*;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.DependencyVersionState> {
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";

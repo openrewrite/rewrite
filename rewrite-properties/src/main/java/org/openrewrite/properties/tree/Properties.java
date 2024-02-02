@@ -57,7 +57,7 @@ public interface Properties extends Tree {
     Properties withPrefix(String prefix);
 
     @lombok.Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     class File implements Properties, SourceFile {
         @With
         @EqualsAndHashCode.Include
@@ -137,7 +137,7 @@ public interface Properties extends Tree {
     }
 
     @lombok.Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Entry implements Content {
         @EqualsAndHashCode.Include
@@ -203,7 +203,7 @@ public interface Properties extends Tree {
      * reference to deserialize into the type.
      */
     @lombok.Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Value {
         @EqualsAndHashCode.Include
@@ -230,7 +230,7 @@ public interface Properties extends Tree {
     }
 
     @lombok.Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Comment implements Content {
         @EqualsAndHashCode.Include

@@ -33,7 +33,7 @@ import static org.openrewrite.Tree.randomId;
  * which argument is removed.
  */
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class DeleteMethodArgument extends Recipe {
 
     /**

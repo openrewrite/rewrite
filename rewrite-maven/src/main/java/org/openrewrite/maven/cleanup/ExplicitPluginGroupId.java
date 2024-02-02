@@ -26,7 +26,7 @@ import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ExplicitPluginGroupId extends Recipe {
     @Override
     public String getDisplayName() {

@@ -43,7 +43,7 @@ import static org.openrewrite.Tree.randomId;
  * interprets application.yml files.
  */
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ChangePropertyKey extends Recipe {
 
     @Option(displayName = "Old property key",

@@ -23,7 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class RenameFile extends Recipe {
     @Option(displayName = "File matcher",
             description = "Matching files will be renamed. This is a glob expression.",

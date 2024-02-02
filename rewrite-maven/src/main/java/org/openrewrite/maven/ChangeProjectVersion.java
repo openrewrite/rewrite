@@ -35,7 +35,7 @@ import java.util.Optional;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ChangeProjectVersion extends Recipe {
     // there are several implicitly defined version properties that we should never attempt to update
     private static final Collection<String> implicitlyDefinedVersionProperties = Arrays.asList(

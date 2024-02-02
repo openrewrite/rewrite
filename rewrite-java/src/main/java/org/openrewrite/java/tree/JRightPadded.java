@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  * @param <T>
  */
 @Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
 public class JRightPadded<T> {
     T element;

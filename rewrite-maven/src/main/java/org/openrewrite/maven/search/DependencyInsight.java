@@ -39,7 +39,7 @@ import java.util.Optional;
  * either match or transitively include a dependency matching {@link #groupIdPattern} and
  * {@link #artifactIdPattern}.
  */
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 @Value
 public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);

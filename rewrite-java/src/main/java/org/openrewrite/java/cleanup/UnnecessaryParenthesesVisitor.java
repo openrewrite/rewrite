@@ -23,7 +23,7 @@ import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.*;
 
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P executionContext) {

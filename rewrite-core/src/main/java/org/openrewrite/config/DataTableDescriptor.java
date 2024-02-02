@@ -21,7 +21,7 @@ import lombok.Value;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class DataTableDescriptor {
 
     @EqualsAndHashCode.Include

@@ -28,7 +28,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.regex.Pattern;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ChangeTagAttribute extends Recipe {
 
     @Override

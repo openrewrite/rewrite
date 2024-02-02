@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 /**
  * Finds matching method invocations.
  */
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 @Value
 public class FindMethods extends Recipe {
     transient MethodCalls methodCalls = new MethodCalls(this);

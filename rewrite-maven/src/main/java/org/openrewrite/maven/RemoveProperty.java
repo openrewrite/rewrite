@@ -24,7 +24,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class RemoveProperty extends Recipe {
 
     @Option(displayName = "Property name",

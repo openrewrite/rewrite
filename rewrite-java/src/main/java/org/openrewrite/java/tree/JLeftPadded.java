@@ -47,7 +47,7 @@ import java.util.function.UnaryOperator;
  * @param <T>
  */
 @Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
 public class JLeftPadded<T> {
     Space before;

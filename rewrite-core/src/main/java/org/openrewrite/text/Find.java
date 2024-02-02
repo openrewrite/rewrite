@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class Find extends Recipe {
 
     @Override

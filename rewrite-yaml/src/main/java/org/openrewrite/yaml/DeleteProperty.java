@@ -36,7 +36,7 @@ import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class DeleteProperty extends Recipe {
     @Option(displayName = "Property key",
             description = "The key to be deleted.",

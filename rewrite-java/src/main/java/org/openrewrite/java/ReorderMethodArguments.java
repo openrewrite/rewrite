@@ -35,7 +35,7 @@ import static java.util.Objects.requireNonNull;
  * array of parameter names.
  */
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ReorderMethodArguments extends Recipe {
 
     /**

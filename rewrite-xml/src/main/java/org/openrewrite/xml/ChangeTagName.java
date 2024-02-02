@@ -24,7 +24,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ChangeTagName extends Recipe {
     @Option(displayName = "Element name",
             description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath expression.",

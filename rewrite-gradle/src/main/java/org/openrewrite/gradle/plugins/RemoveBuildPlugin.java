@@ -21,7 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class RemoveBuildPlugin extends Recipe {
     @Option(displayName = "Plugin id",
             description = "The plugin id to remove.",

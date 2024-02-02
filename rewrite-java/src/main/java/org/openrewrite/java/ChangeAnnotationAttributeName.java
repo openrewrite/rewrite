@@ -30,7 +30,7 @@ import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.SINGLE_SPACE;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ChangeAnnotationAttributeName extends Recipe {
 
     @Option(displayName = "Annotation Type",

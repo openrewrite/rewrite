@@ -31,7 +31,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class FindKey extends Recipe {
     @Option(displayName = "Key path",
             description = "A JsonPath expression used to find matching keys.",

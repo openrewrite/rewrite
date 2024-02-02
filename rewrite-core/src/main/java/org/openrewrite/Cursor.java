@@ -26,7 +26,7 @@ import java.util.stream.Stream;
 
 import static java.util.stream.StreamSupport.stream;
 
-@EqualsAndHashCode(exclude = false)
+@EqualsAndHashCode(exclude = "messages")
 public class Cursor {
     public static final String ROOT_VALUE = "root";
 

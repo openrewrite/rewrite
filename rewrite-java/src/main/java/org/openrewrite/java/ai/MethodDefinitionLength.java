@@ -25,7 +25,7 @@ import org.openrewrite.java.table.TokenCount;
 import org.openrewrite.java.tree.J;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class MethodDefinitionLength extends Recipe {
     transient TokenCount tokens = new TokenCount(this);
 

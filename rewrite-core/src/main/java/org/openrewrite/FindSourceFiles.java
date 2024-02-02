@@ -26,7 +26,7 @@ import java.nio.file.Path;
 
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class FindSourceFiles extends Recipe {
     transient SourcesFiles results = new SourcesFiles(this);
 

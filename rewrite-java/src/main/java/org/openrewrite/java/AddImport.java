@@ -54,7 +54,7 @@ import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
  * The {@link AddImport#onlyIfReferenced} is a flag (defaulted to true) to indicate if the import should only be added
  * if there is a reference to the imported class/method.
  */
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport<P> extends JavaIsoVisitor<P> {
 
     @Nullable

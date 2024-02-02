@@ -77,7 +77,7 @@ class RecipePrinterTest implements RewriteTest {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false)
+    @EqualsAndHashCode(callSuper = true)
     private static class TestRecipe extends Recipe {
 
         @Option(displayName = "An option",

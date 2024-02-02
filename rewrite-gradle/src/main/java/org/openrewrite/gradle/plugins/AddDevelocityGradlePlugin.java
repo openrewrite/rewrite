@@ -48,7 +48,7 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.gradle.plugins.AddPluginVisitor.resolvePluginVersion;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class AddDevelocityGradlePlugin extends Recipe {
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 

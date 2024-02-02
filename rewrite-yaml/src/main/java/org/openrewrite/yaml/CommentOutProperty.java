@@ -30,7 +30,7 @@ import static java.util.stream.StreamSupport.stream;
 
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class CommentOutProperty extends Recipe {
     @Option(displayName = "Property key",
             description = "The key to be commented out.",

@@ -23,7 +23,7 @@ import org.openrewrite.maven.tree.Scope;
 
 import static org.openrewrite.Validated.notBlank;
 
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 @Value
 public class DoesNotIncludeDependency extends Recipe {
 

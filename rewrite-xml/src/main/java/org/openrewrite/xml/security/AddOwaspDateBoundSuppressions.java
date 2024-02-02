@@ -30,7 +30,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class AddOwaspDateBoundSuppressions extends Recipe {
 
     @Option(displayName = "Until date",

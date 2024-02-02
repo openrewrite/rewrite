@@ -21,7 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.IsSettingsGradle;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class RemoveSettingsPlugin extends Recipe {
     @Option(displayName = "Plugin id",
             description = "The plugin id to remove.",

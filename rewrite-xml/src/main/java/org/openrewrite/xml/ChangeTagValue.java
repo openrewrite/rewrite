@@ -25,7 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ChangeTagValue extends Recipe {
 
     @Option(displayName = "Element name",

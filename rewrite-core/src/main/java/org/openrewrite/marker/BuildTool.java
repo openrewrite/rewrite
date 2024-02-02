@@ -22,7 +22,7 @@ import lombok.With;
 import java.util.UUID;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
 public class BuildTool implements Marker {
     @EqualsAndHashCode.Include

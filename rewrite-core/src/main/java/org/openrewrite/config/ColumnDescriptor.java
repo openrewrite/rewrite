@@ -20,7 +20,7 @@ import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = false)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ColumnDescriptor {
 
     @EqualsAndHashCode.Include

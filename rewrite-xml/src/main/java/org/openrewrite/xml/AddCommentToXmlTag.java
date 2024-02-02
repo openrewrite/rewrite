@@ -29,7 +29,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Incubating(since = "7.24.0")
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class AddCommentToXmlTag extends Recipe {
 
     @Option(displayName = "XPath",

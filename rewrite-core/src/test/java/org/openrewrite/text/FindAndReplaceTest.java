@@ -128,7 +128,7 @@ class FindAndReplaceTest implements RewriteTest {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false)
+    @EqualsAndHashCode(callSuper = true)
     static class MultiFindAndReplace extends Recipe {
 
         @Override

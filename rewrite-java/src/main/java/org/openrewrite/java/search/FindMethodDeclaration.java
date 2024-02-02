@@ -25,7 +25,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class FindMethodDeclaration extends Recipe {
 
     @Option(displayName = "Method pattern",

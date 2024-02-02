@@ -34,7 +34,7 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class FindAndReplace extends Recipe {
 
     @Option(displayName = "Find",

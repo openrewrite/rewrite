@@ -26,7 +26,7 @@ import java.util.Set;
 import static java.time.ZoneOffset.UTC;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class FindLstProvenance extends ScanningRecipe<FindLstProvenance.Accumulator> {
 
     @Override
