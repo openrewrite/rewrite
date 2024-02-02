@@ -23,6 +23,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("UnusedProperty")
@@ -35,6 +36,7 @@ class ChangePropertyValueTest implements RewriteTest {
           "false",
           null,
           false,
+          null,
           null
         ));
     }
@@ -70,7 +72,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void conditionallyChangeValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "db", false, null)),
+          spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "db", false, null, null)),
           properties(
             "quarkus.quartz.store-type=db",
             "quarkus.quartz.store-type=jdbc-cmt"
@@ -81,7 +83,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void conditionallyChangeValueNoChange() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "cache", false, null)),
+          spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "cache", false, null, null)),
           properties(
             "quarkus.quartz.store-type=db"
           )
@@ -97,7 +99,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue(propertyKey, "updated", "example", false, null)),
+          spec -> spec.recipe(new ChangePropertyValue(propertyKey, "updated", "example", false, null, null)),
           properties(
             """
               acme.my-project.person.first-name=example
@@ -122,6 +124,7 @@ class ChangePropertyValueTest implements RewriteTest {
             "updated",
             "example",
             false,
+            null,
             false
           )),
           properties(
@@ -142,7 +145,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void regex() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", "f(o+)", true, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", "f(o+)", true, null, null)),
           properties(
             "my.prop=foooo",
             "my.prop=baroooo"
@@ -153,10 +156,56 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void regexDefaultOff() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", ".+", null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", ".+", null, null, null)),
           properties(
             "my.prop=foo"
           )
         );
+    }
+
+    @Test
+    void partialMatchRegex() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("*", "[replaced:$1]", "\\[replaceme:(.*?)]", true, true,null)),
+          properties("""
+            multiple=[replaceme:1][replaceme:2]
+            multiple-prefixed=test[replaceme:1]test[replaceme:2]
+            multiple-suffixed=[replaceme:1]test[replaceme:2]test
+            multiple-both=test[replaceme:1]test[replaceme:2]test
+            """, """
+            multiple=[replaced:1][replaced:2]
+            multiple-prefixed=test[replaced:1]test[replaced:2]
+            multiple-suffixed=[replaced:1]test[replaced:2]test
+            multiple-both=test[replaced:1]test[replaced:2]test
+            """)
+        );
+    }
+
+    @Test
+    void partialMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("*", "replaced", "replaceme", null, true,null)),
+          properties("""
+            multiple=[replaceme:1][replaceme:2]
+            multiple-prefixed=test[replaceme:1]test[replaceme:2]
+            multiple-suffixed=[replaceme:1]test[replaceme:2]test
+            multiple-both=test[replaceme:1]test[replaceme:2]test
+            """, """
+            multiple=[replaced:1][replaced:2]
+            multiple-prefixed=test[replaced:1]test[replaced:2]
+            multiple-suffixed=[replaced:1]test[replaced:2]test
+            multiple-both=test[replaced:1]test[replaced:2]test
+            """)
+        );
+    }
+
+    @Test
+    void validatesThatOldValueIsRequiredIfPartialMatchEnabled() {
+        assertTrue(new ChangePropertyValue("my.prop", "bar", null, null, true,null).validate().isInvalid());
+    }
+
+    @Test
+    void validatesThatOldValueIsRequiredIfRegexEnabled() {
+        assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null,null).validate().isInvalid());
     }
 }

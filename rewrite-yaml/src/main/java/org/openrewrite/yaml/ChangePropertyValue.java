@@ -25,6 +25,8 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -50,6 +52,12 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     Boolean regex;
 
+    @Option(displayName = "Partial match",
+            description = "Defaults to `false`. If enabled, `oldValue` will be match if it is a partial match of the value. The replacement will be done only on the part that matches. This can trigger multiple changes in the same value",
+            required = false)
+    @Nullable
+    Boolean partialMatch;
+
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
                           "rules. Default is `true`. Set to `false`  to use exact matching.",
@@ -74,9 +82,11 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public Validated validate() {
-        return super.validate().and(
-                Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
-                        value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
+        return super.validate()
+                    .and(Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
+                                        value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))))
+                    .and(Validated.test("oldValue", "is required if `partialMatch` is enabled", oldValue,
+                                        value -> !(Boolean.TRUE.equals(partialMatch) && StringUtils.isNullOrEmpty(value))));
     }
 
     @Override
@@ -103,9 +113,10 @@ public class ChangePropertyValue extends Recipe {
             return null;
         }
         Yaml.Scalar scalar = (Yaml.Scalar) value;
-        Yaml.Scalar newScalar = scalar.withValue(Boolean.TRUE.equals(regex)
-                ? scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue)
-                : newValue);
+        Yaml.Scalar newScalar = scalar.withValue(
+                StringUtils.isNullOrEmpty(oldValue)
+                        ? newValue
+                        : scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue));
         return scalar.getValue().equals(newScalar.getValue()) ? null : newScalar;
     }
 
@@ -120,10 +131,18 @@ public class ChangePropertyValue extends Recipe {
             return false;
         }
         Yaml.Scalar scalar = (Yaml.Scalar) value;
-        return StringUtils.isNullOrEmpty(oldValue) ||
-               (Boolean.TRUE.equals(regex)
-                       ? scalar.getValue().matches(oldValue)
-                       : scalar.getValue().equals(oldValue));
+        if (Boolean.TRUE.equals(partialMatch)) {
+            if (Boolean.TRUE.equals(regex)) {
+                return Pattern.compile(oldValue).matcher(scalar.getValue()).find();
+            } else {
+                return scalar.getValue().contains(oldValue);
+            }
+        } else {
+            return StringUtils.isNullOrEmpty(oldValue) ||
+                   (Boolean.TRUE.equals(regex)
+                           ? scalar.getValue().matches(oldValue)
+                           : scalar.getValue().equals(oldValue));
+        }
     }
 
     private static String getProperty(Cursor cursor) {
