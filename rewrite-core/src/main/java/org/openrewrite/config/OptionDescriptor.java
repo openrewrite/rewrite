@@ -22,7 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = false)
 public class OptionDescriptor {
 
     @EqualsAndHashCode.Include

@@ -25,7 +25,7 @@ import org.openrewrite.marker.Markers;
 
 import static java.util.Collections.emptyList;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Data
 public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
 

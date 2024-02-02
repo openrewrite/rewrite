@@ -30,7 +30,7 @@ import static org.openrewrite.Tree.randomId;
 
 @RequiredArgsConstructor
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = false)
 @Getter
 @With
 public final class SearchResult implements Marker {

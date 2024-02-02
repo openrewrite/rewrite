@@ -279,7 +279,7 @@ public abstract class OperatingSystemProvenance implements Marker {
     }
 
     @AllArgsConstructor
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     static class Windows extends OperatingSystemProvenance {
         String nativePrefix;
 
@@ -378,7 +378,7 @@ public abstract class OperatingSystemProvenance implements Marker {
     }
 
     @AllArgsConstructor
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     static class Unix extends OperatingSystemProvenance {
         String nativePrefix;
 

@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     @Option(displayName = "Relative File Name",
             description = "File name, using a relative path. If a non-plaintext file already exists at this location, then this recipe will do nothing.",

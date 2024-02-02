@@ -24,7 +24,7 @@ import org.openrewrite.Tree;
 import java.util.*;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = false)
 @With
 public class RecipesThatMadeChanges implements Marker {
     @EqualsAndHashCode.Include

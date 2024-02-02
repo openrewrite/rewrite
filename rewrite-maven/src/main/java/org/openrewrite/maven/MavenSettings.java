@@ -43,7 +43,7 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @ToString(onlyExplicitlyIncluded = true)
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = false)
 @Data
 @AllArgsConstructor
 public class MavenSettings {

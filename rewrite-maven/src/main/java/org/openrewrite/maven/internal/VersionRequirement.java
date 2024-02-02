@@ -141,7 +141,7 @@ public class VersionRequirement {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     private static class DirectRequirement extends SoftRequirement {
         private DirectRequirement(String version) {
             super(version);

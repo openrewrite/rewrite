@@ -30,7 +30,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpdateOwaspSuppressionDate extends Recipe {
 
     @Override

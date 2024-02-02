@@ -62,7 +62,7 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  * <li>layout - An ordered list of import groupings which define exactly how imports should be organized within a compilation unit.</li>
  * <li>packagesToFold - An ordered list of packages which are folded when 1 or more types are in use.</li>
  */
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = false)
 @Getter
 @JsonDeserialize(using = Deserializer.class)
 @JsonSerialize(using = Serializer.class)

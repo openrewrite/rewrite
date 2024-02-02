@@ -23,7 +23,7 @@ import org.openrewrite.marker.Marker;
 import java.util.UUID;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = false)
 @With
 public class JavaVersion implements Marker {
     @EqualsAndHashCode.Include

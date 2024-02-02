@@ -37,7 +37,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 @Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
 @With
 public class RemoteFile implements Remote {
     @EqualsAndHashCode.Include

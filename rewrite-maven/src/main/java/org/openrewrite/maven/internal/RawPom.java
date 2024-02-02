@@ -45,7 +45,7 @@ import static java.util.Collections.emptyMap;
  */
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @ToString(onlyExplicitlyIncluded = true)
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = false)
 @Data
 @XmlRootElement(name = "project")
 public class RawPom {

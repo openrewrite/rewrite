@@ -23,7 +23,7 @@ import org.openrewrite.internal.ExceptionUtils;
 import java.util.UUID;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
 @With
 @Getter
 @ToString

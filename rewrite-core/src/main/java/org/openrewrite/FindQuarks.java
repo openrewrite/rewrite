@@ -24,7 +24,7 @@ import org.openrewrite.quark.Quark;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindQuarks extends Recipe {
     @Override
     public String getDisplayName() {

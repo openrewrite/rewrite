@@ -59,7 +59,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMavenExtension.Accumulator> {
     private static final String GRADLE_ENTERPRISE_MAVEN_EXTENSION_ARTIFACT_ID = "gradle-enterprise-maven-extension";
     private static final String EXTENSIONS_XML_PATH = ".mvn/extensions.xml";

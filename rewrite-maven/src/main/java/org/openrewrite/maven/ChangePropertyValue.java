@@ -24,7 +24,7 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePropertyValue extends Recipe {
 
     @Option(displayName = "Key",

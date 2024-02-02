@@ -55,7 +55,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Attribute implements Javadoc {
         @EqualsAndHashCode.Include
@@ -77,7 +77,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Author implements Javadoc {
         @EqualsAndHashCode.Include
@@ -93,7 +93,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Deprecated implements Javadoc {
         @EqualsAndHashCode.Include
@@ -109,7 +109,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class EndElement implements Javadoc {
         @EqualsAndHashCode.Include
@@ -126,7 +126,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     class DocComment implements Javadoc, Comment {
         @With
         @EqualsAndHashCode.Include
@@ -165,7 +165,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class DocRoot implements Javadoc {
         @EqualsAndHashCode.Include
@@ -181,7 +181,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class DocType implements Javadoc {
         @EqualsAndHashCode.Include
@@ -197,7 +197,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Erroneous implements Javadoc {
         @EqualsAndHashCode.Include
@@ -213,7 +213,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class InheritDoc implements Javadoc {
         @EqualsAndHashCode.Include
@@ -229,7 +229,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Hidden implements Javadoc {
         @EqualsAndHashCode.Include
@@ -245,7 +245,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Index implements Javadoc {
         @EqualsAndHashCode.Include
@@ -263,7 +263,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class InlinedValue implements Javadoc {
         @EqualsAndHashCode.Include
@@ -288,7 +288,7 @@ public interface Javadoc extends Tree {
      * ends in a '*'.
      */
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     class LineBreak implements Javadoc {
         @EqualsAndHashCode.Include
         @With
@@ -319,7 +319,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Link implements Javadoc {
         @EqualsAndHashCode.Include
@@ -356,7 +356,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Literal implements Javadoc {
         @EqualsAndHashCode.Include
@@ -374,7 +374,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Parameter implements Javadoc {
         @EqualsAndHashCode.Include
@@ -408,7 +408,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Provides implements Javadoc {
         @EqualsAndHashCode.Include
@@ -426,7 +426,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Return implements Javadoc {
         @EqualsAndHashCode.Include
@@ -442,7 +442,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class See implements Javadoc {
         @EqualsAndHashCode.Include
@@ -476,7 +476,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Serial implements Javadoc {
         @EqualsAndHashCode.Include
@@ -492,7 +492,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class SerialData implements Javadoc {
         @EqualsAndHashCode.Include
@@ -508,7 +508,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class SerialField implements Javadoc {
         @EqualsAndHashCode.Include
@@ -526,7 +526,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Since implements Javadoc {
         @EqualsAndHashCode.Include
@@ -542,7 +542,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class StartElement implements Javadoc {
         @EqualsAndHashCode.Include
@@ -561,7 +561,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Summary implements Javadoc {
         @EqualsAndHashCode.Include
@@ -578,7 +578,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Text implements Javadoc {
         @EqualsAndHashCode.Include
@@ -594,7 +594,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Throws implements Javadoc {
         @EqualsAndHashCode.Include
@@ -618,7 +618,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class UnknownBlock implements Javadoc {
         @EqualsAndHashCode.Include
@@ -635,7 +635,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class UnknownInline implements Javadoc {
         @EqualsAndHashCode.Include
@@ -653,7 +653,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Uses implements Javadoc {
         @EqualsAndHashCode.Include
@@ -671,7 +671,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Version implements Javadoc {
         @EqualsAndHashCode.Include
@@ -687,7 +687,7 @@ public interface Javadoc extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Reference implements Javadoc {
         @EqualsAndHashCode.Include

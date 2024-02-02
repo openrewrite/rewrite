@@ -28,7 +28,7 @@ import org.openrewrite.properties.tree.Properties;
 import java.util.*;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddProperty extends Recipe {
 
     @Option(displayName = "Property key",

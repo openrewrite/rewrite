@@ -61,7 +61,7 @@ public interface Hcl extends Tree {
     <H extends Hcl> H withPrefix(Space prefix);
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Attribute implements BodyContent, Expression {
@@ -163,7 +163,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class AttributeAccess implements Expression, Label {
@@ -238,7 +238,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Binary implements Expression {
@@ -333,7 +333,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class Block implements BodyContent, Expression {
         @With
@@ -452,7 +452,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Conditional implements Expression {
@@ -545,7 +545,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class ConfigFile implements Hcl, SourceFile {
         @With
@@ -615,7 +615,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class Empty implements Expression {
         @With
@@ -640,7 +640,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class ForIntro implements Hcl {
@@ -715,7 +715,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class ForObject implements Expression {
@@ -838,7 +838,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class ForTuple implements Expression {
@@ -938,7 +938,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class FunctionCall implements Expression {
@@ -1013,7 +1013,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class HeredocTemplate implements Expression {
         @With
@@ -1057,7 +1057,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class Identifier implements Expression, Label {
         @With
@@ -1085,7 +1085,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class Index implements Expression {
         @With
@@ -1115,7 +1115,7 @@ public interface Hcl extends Tree {
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
         @RequiredArgsConstructor
         @AllArgsConstructor(access = AccessLevel.PRIVATE)
         public static class Position implements Hcl {
@@ -1187,7 +1187,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class Literal implements Hcl, Expression, Label {
         @With
@@ -1218,7 +1218,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class ObjectValue implements Expression {
@@ -1293,7 +1293,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Parentheses implements Expression {
@@ -1364,7 +1364,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class QuotedTemplate implements Expression {
         @With
@@ -1392,7 +1392,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class Splat implements Expression {
         @With
@@ -1422,7 +1422,7 @@ public interface Hcl extends Tree {
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
         @Data
         public static class Operator implements Hcl {
             @With
@@ -1467,7 +1467,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class TemplateInterpolation implements Hcl, Expression {
         @With
@@ -1495,7 +1495,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Tuple implements CollectionValue {
@@ -1566,7 +1566,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class Unary implements Expression {
         @With
@@ -1602,7 +1602,7 @@ public interface Hcl extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @Data
     class VariableExpression implements Expression {
         @With

@@ -31,7 +31,7 @@ import java.util.*;
 import static java.util.Collections.emptyList;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
     private static final Collection<J.Modifier.Type> EXPLICIT_ACCESS_LEVELS = Arrays.asList(J.Modifier.Type.Public,
             J.Modifier.Type.Private, J.Modifier.Type.Protected);

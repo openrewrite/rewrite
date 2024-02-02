@@ -24,7 +24,7 @@ import org.openrewrite.marker.Markers;
 import java.util.function.UnaryOperator;
 
 @Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
 @With
 public class HclLeftPadded<T> {
     Space before;

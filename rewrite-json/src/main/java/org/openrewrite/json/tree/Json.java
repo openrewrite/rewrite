@@ -54,7 +54,7 @@ public interface Json extends Tree {
     <J extends Json> J withPrefix(Space prefix);
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Array implements JsonValue {
@@ -120,7 +120,7 @@ public interface Json extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     class Document implements Json, SourceFile {
         @Getter
@@ -188,7 +188,7 @@ public interface Json extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Empty implements JsonValue {
         @EqualsAndHashCode.Include
@@ -210,7 +210,7 @@ public interface Json extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Identifier implements JsonKey {
         @EqualsAndHashCode.Include
@@ -234,7 +234,7 @@ public interface Json extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Literal implements JsonValue, JsonKey {
         @EqualsAndHashCode.Include
@@ -260,7 +260,7 @@ public interface Json extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Member implements Json {
@@ -335,7 +335,7 @@ public interface Json extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class JsonObject implements JsonValue {

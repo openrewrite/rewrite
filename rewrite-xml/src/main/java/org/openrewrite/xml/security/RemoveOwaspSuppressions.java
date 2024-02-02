@@ -32,7 +32,7 @@ import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveOwaspSuppressions extends Recipe {
 
     @Override

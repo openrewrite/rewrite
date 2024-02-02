@@ -27,7 +27,7 @@ import java.util.function.Predicate;
  * Filter the children to only those matching the supplied predicate.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FilterTagChildrenVisitor<T> extends XmlVisitor<T> {
     public Xml.Tag scope;
     public Predicate<Content> childTest;

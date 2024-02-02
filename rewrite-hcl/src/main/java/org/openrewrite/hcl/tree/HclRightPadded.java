@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
  * @param <T> The type of instance that is being padded.
  */
 @Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
 @With
 public class HclRightPadded<T> {
     T element;

@@ -50,7 +50,7 @@ import java.util.zip.ZipInputStream;
  * Post-processing of Recipe results by a build plugin or other caller of OpenRewrite is responsible for this.
  */
 @Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
 @With
 public class RemoteArchive implements Remote {
     @EqualsAndHashCode.Include

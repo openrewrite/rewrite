@@ -30,7 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
     AnnotationMatcher annotationMatcher;
 

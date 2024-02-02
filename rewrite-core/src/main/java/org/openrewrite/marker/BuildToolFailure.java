@@ -27,7 +27,7 @@ import java.util.UUID;
  */
 @Deprecated
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = false)
 @With
 public class BuildToolFailure implements Marker {
     @EqualsAndHashCode.Include

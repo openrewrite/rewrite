@@ -28,7 +28,7 @@ import java.util.function.UnaryOperator;
  * Applies a transformation to the children of the specified tag.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class MapTagChildrenVisitor<T> extends XmlVisitor<T> {
     public Xml.Tag scope;
     public UnaryOperator<Content> map;

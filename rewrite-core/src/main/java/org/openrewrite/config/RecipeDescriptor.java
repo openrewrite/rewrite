@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = false)
 public class RecipeDescriptor {
     @EqualsAndHashCode.Include
     String name;

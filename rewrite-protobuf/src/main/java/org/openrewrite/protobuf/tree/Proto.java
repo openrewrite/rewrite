@@ -54,7 +54,7 @@ public interface Proto extends Tree {
     <P extends Proto> P withPrefix(Space prefix);
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Block implements Proto {
@@ -125,7 +125,7 @@ public interface Proto extends Tree {
 
     @Value
     @With
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     class Constant implements Proto {
         @EqualsAndHashCode.Include
         UUID id;
@@ -142,7 +142,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Document implements Proto, SourceFile {
@@ -252,7 +252,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Empty implements Proto {
         @EqualsAndHashCode.Include
@@ -268,7 +268,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Enum implements Proto {
         @EqualsAndHashCode.Include
@@ -286,7 +286,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Extend implements Proto {
         @EqualsAndHashCode.Include
@@ -304,7 +304,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Field implements FullName {
@@ -407,7 +407,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class ExtensionName implements FullName {
@@ -473,7 +473,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class EnumField implements Proto {
@@ -564,7 +564,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class FullIdentifier implements FullName, TypeTree {
@@ -643,7 +643,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Identifier implements Proto {
         @EqualsAndHashCode.Include
@@ -660,7 +660,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Import implements Proto {
@@ -731,7 +731,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Keyword implements Proto {
         @EqualsAndHashCode.Include
@@ -748,7 +748,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class MapField implements Proto {
@@ -885,7 +885,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Message implements Proto {
         @EqualsAndHashCode.Include
@@ -903,7 +903,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class OneOf implements Proto {
         @EqualsAndHashCode.Include
@@ -921,7 +921,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Option implements Proto {
@@ -991,7 +991,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class OptionDeclaration implements Proto {
@@ -1061,7 +1061,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Package implements Proto {
         @EqualsAndHashCode.Include
@@ -1078,7 +1078,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Primitive implements TypeTree {
         @EqualsAndHashCode.Include
@@ -1099,7 +1099,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Range implements Proto {
@@ -1169,7 +1169,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Reserved implements Proto {
@@ -1241,7 +1241,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class RpcInOut implements Proto {
@@ -1313,7 +1313,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Rpc implements Proto {
         @EqualsAndHashCode.Include
@@ -1336,7 +1336,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class Service implements Proto {
         @EqualsAndHashCode.Include
@@ -1354,7 +1354,7 @@ public interface Proto extends Tree {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @With
     class StringLiteral implements Proto {
         @EqualsAndHashCode.Include
@@ -1372,7 +1372,7 @@ public interface Proto extends Tree {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = false)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Syntax implements Proto {
