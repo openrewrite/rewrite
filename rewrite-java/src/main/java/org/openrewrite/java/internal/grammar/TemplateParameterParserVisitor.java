@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,17 +44,35 @@ public interface TemplateParameterParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitPatternType(TemplateParameterParser.PatternTypeContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link TemplateParameterParser#matcherParameter}.
+	 * Visit a parse tree produced by {@link TemplateParameterParser#type}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx);
+	T visitType(TemplateParameterParser.TypeContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#typeParameter}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTypeParameter(TemplateParameterParser.TypeParameterContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#variance}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitVariance(TemplateParameterParser.VarianceContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link TemplateParameterParser#parameterName}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitParameterName(TemplateParameterParser.ParameterNameContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#typeName}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTypeName(TemplateParameterParser.TypeNameContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link TemplateParameterParser#matcherName}.
 	 * @param ctx the parse tree

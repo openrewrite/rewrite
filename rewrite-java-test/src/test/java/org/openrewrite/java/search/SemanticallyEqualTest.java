@@ -60,6 +60,30 @@ public class SemanticallyEqualTest {
     }
 
     @Test
+    void staticMethods() {
+        assertEqual(
+          """
+            import static java.lang.String.valueOf;
+            
+            class T {
+                Object o1 = String.valueOf("1");
+                Object o2 = String.valueOf("1");
+                Object o3 = String.valueOf("1");
+            }
+            """,
+          """
+            import static java.lang.String.valueOf;
+            
+            class T {
+                Object o1 = String.valueOf("1");
+                Object o2 = "1".valueOf("1");
+                Object o3 = valueOf("1");
+            }
+            """
+        );
+    }
+
+    @Test
     void literals() {
         assertEqual(
           """

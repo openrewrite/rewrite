@@ -42,7 +42,6 @@ import org.openrewrite.semver.*;
 import org.openrewrite.tree.ParseError;
 
 import java.util.*;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -71,9 +70,6 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
     @Nullable
     private final String extension;
-
-    @Nullable
-    private final Pattern familyRegex;
 
     @Nullable
     private final MavenMetadataFailures metadataFailures;

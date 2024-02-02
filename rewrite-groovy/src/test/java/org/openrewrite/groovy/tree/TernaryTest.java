@@ -16,11 +16,11 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.groovy.GroovyParserTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-class TernaryTest implements RewriteTest {
+class TernaryTest implements GroovyParserTest {
 
     @SuppressWarnings("GroovyConstantConditional")
     @Test
@@ -54,4 +54,15 @@ class TernaryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void complex() {
+        rewriteRun(
+          groovy("""
+            (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+            (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+            """)
+        );
+    }
+
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,13 +68,37 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx) { }
+	@Override public void enterType(TemplateParameterParser.TypeContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx) { }
+	@Override public void exitType(TemplateParameterParser.TypeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTypeParameter(TemplateParameterParser.TypeParameterContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTypeParameter(TemplateParameterParser.TypeParameterContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterVariance(TemplateParameterParser.VarianceContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitVariance(TemplateParameterParser.VarianceContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -87,6 +111,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitParameterName(TemplateParameterParser.ParameterNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTypeName(TemplateParameterParser.TypeNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTypeName(TemplateParameterParser.TypeNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

@@ -16,13 +16,13 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.groovy.GroovyParserTest;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-class ImportTest implements RewriteTest {
+class ImportTest implements GroovyParserTest {
     @Test
     void classImport() {
         rewriteRun(
@@ -74,9 +74,7 @@ class ImportTest implements RewriteTest {
             """
               import java.util.List as L
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getEof()).isEqualTo(Space.EMPTY);
-            })
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getEof()).isEqualTo(Space.EMPTY))
           )
         );
     }
@@ -88,9 +86,7 @@ class ImportTest implements RewriteTest {
             """
               import static java.util.Collections.singletonList as listOf
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getEof()).isEqualTo(Space.EMPTY);
-            })
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getEof()).isEqualTo(Space.EMPTY))
           )
         );
     }

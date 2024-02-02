@@ -15,21 +15,34 @@
  */
 package org.openrewrite.search;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.CommitsByDay;
 import org.openrewrite.table.DistinctCommitters;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
 
+@Value
+@EqualsAndHashCode(callSuper = true)
 public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Committer>> {
     private transient final DistinctCommitters committers = new DistinctCommitters(this);
     private transient final CommitsByDay commitsByDay = new CommitsByDay(this);
+
+    @Option(displayName = "From date",
+            required = false,
+            description = "Optional. Take into account only commits since this date (inclusive). Default will be the entire history.",
+            example = "2023-01-01")
+    @Nullable
+    String fromDate;
 
     @Override
     public String getDisplayName() {
@@ -48,6 +61,7 @@ public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Com
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Map<String, GitProvenance.Committer> acc) {
+        LocalDate from = StringUtils.isBlank(this.fromDate) ? null : LocalDate.parse(this.fromDate).minusDays(1);
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -56,7 +70,9 @@ public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Com
                     sourceFile.getMarkers().findFirst(GitProvenance.class).ifPresent(provenance -> {
                         if (provenance.getCommitters() != null) {
                             for (GitProvenance.Committer committer : provenance.getCommitters()) {
-                                acc.put(committer.getEmail(), committer);
+                                if (from == null || committer.getCommitsByDay().keySet().stream().anyMatch(day -> day.isAfter(from))) {
+                                    acc.put(committer.getEmail(), committer);
+                                }
                             }
                         }
                     });
