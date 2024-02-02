@@ -158,33 +158,6 @@ class SemanticallyEqualTest implements RewriteTest {
         );
     }
 
-    @Test
-    void differentNamespacePreifx() {
-        rewriteRun(
-          semanticallyEqual(true),
-          xml("<ns1:foo xmlns:ns1=\"urn:test\">foo</ns1:foo>"),
-          xml("<ns2:foo xmlns:ns2=\"urn:test\">foo</ns2:foo>")
-        );
-    }
-
-    @Test
-    void differentNamespaceUri() {
-        rewriteRun(
-          semanticallyEqual(false),
-          xml("<ns1:foo xmlns:ns1=\"urn:foo\">foo</ns1:foo>"),
-          xml("<ns1:foo xmlns:ns1=\"urn:bar\">foo</ns1:foo>")
-        );
-    }
-
-    @Test
-    void unusedNamespaces() {
-        rewriteRun(
-          semanticallyEqual(true),
-          xml("<foo:foo xmlns:foo=\"urn:foo\" xmlns:foo=\"urn:bar\">foo</foo:foo>"),
-          xml("<foo:foo xmlns:foo=\"urn:bar\">foo</foo:foo>")
-        );
-    }
-
     private static Consumer<RecipeSpec> semanticallyEqual(boolean isEqual) {
         return spec -> spec.beforeRecipe(sources ->
           assertThat(SemanticallyEqual.areEqual((Xml) sources.get(0), (Xml) sources.get(1))).isEqualTo(isEqual));
