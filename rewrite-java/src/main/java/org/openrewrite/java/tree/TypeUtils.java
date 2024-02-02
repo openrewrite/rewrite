@@ -667,6 +667,8 @@ public class TypeUtils {
                 }
             }
             return builder.toString();
+        } else if (type instanceof JavaType.Array) {
+            return toString(((JavaType.Array) type).getElemType()) + "[]";
         }
         return type.toString();
     }
