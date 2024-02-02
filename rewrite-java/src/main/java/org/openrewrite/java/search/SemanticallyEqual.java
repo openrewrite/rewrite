@@ -908,6 +908,16 @@ public class SemanticallyEqual {
                     }
 
                     visit(method.getSelect(), compareTo.getSelect());
+                } else {
+                    JavaType.FullyQualified methodDeclaringType = method.getMethodType().getDeclaringType();
+                    JavaType.FullyQualified compareToDeclaringType = compareTo.getMethodType().getDeclaringType();
+                    if (!TypeUtils.isAssignableTo(methodDeclaringType instanceof JavaType.Parameterized ?
+                            ((JavaType.Parameterized) methodDeclaringType).getType() : methodDeclaringType,
+                            compareToDeclaringType instanceof JavaType.Parameterized ?
+                                    ((JavaType.Parameterized) compareToDeclaringType).getType() : compareToDeclaringType)) {
+                        isEqual.set(false);
+                        return method;
+                    }
                 }
                 boolean containsLiteral = false;
                 if (!compareMethodArguments) {
