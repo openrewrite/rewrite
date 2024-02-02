@@ -31,20 +31,19 @@ public class TypeParameter {
             return TYPE_OBJECT;
         }
 
-        JavaType result = type.accept(new TemplateParameterParserBaseVisitor<JavaType>() {
-            final Deque<List<JavaType>> typeParameterStack = new ArrayDeque<>();
-
+        // FIXME handle `$` separator
+        return type.accept(new TemplateParameterParserBaseVisitor<JavaType>() {
             @Override
             public JavaType visitType(TemplateParameterParser.TypeContext ctx) {
-                JavaType type = ctx.typeName().accept(this);
+                JavaType type1 = ctx.typeName().accept(this);
                 if (!ctx.typeParameter().isEmpty()) {
                     List<JavaType> typeParameters = new ArrayList<>();
                     for (TemplateParameterParser.TypeParameterContext param : ctx.typeParameter()) {
                         typeParameters.add(param.accept(this));
                     }
-                    type = new JavaType.Parameterized(null, (JavaType.FullyQualified) type, typeParameters);
+                    type1 = new JavaType.Parameterized(null, (JavaType.FullyQualified) type1, typeParameters);
                 }
-                return type;
+                return type1;
             }
 
             @Override
@@ -63,35 +62,14 @@ public class TypeParameter {
 
             @Override
             public JavaType visitTypeParameter(TemplateParameterParser.TypeParameterContext ctx) {
-                JavaType type = super.visitTypeParameter(ctx);
+                JavaType type1 = super.visitTypeParameter(ctx);
                 if (ctx.variance() != null) {
                     JavaType.GenericTypeVariable.Variance variance = ctx.variance().Variance().getSymbol().getText().equals("extends") ?
                             JavaType.GenericTypeVariable.Variance.COVARIANT : JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
-                    type = new JavaType.GenericTypeVariable(null, ctx.variance().WILDCARD().getText(), variance, Collections.singletonList(type));
+                    type1 = new JavaType.GenericTypeVariable(null, ctx.variance().WILDCARD().getText(), variance, Collections.singletonList(type1));
                 }
-                return type;
+                return type1;
             }
-
-            //            @Override
-//            public JavaType visitTerminal(TerminalNode node) {
-//                if (node.getSymbol().getType() == TemplateParameterLexer.LBRACK) {
-//                    return JavaType.ShallowClass.build("java.lang.String");
-//                }
-//                return super.visitTerminal(node);
-//            }
         });
-        if (result != null) {
-            return result;
-        }
-        String fqn = "";
-        TemplateParameterParser.TypeNameContext typeName = type.typeName();
-
-        if (typeName.Identifier() != null) {
-            fqn = typeName.Identifier().getText();
-        } else {
-            fqn = typeName.FullyQualifiedName().getText();
-        }
-
-        return TYPE_OBJECT;
     }
 }
