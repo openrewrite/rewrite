@@ -599,14 +599,22 @@ public class GroovyParserVisitor {
         }
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
-            AtomicInteger insideParenthesesLevel = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
+            Integer insideParenthesesLevel;
+            Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
+            if(rawIpl instanceof AtomicInteger) {
+                // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
+                insideParenthesesLevel = ((AtomicInteger) rawIpl).get();
+            } else {
+                // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
+                insideParenthesesLevel = (Integer) rawIpl;
+            }
             if (insideParenthesesLevel != null) {
                 Stack<Space> openingParens = new Stack<>();
-                for (int i = 0; i < insideParenthesesLevel.get(); i++) {
+                for (int i = 0; i < insideParenthesesLevel; i++) {
                     openingParens.push(sourceBefore("("));
                 }
                 Expression parenthesized = parenthesizedTree.apply(whitespace());
-                for (int i = 0; i < insideParenthesesLevel.get(); i++) {
+                for (int i = 0; i < insideParenthesesLevel; i++) {
                     parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
                             padRight(parenthesized, sourceBefore(")")));
                 }
