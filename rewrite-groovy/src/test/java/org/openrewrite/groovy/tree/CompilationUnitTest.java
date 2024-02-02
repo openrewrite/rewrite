@@ -19,12 +19,12 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.groovy.GroovyParser;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.groovy.GroovyParserTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings("GroovyUnusedAssignment")
-class CompilationUnitTest implements RewriteTest {
+class CompilationUnitTest implements GroovyParserTest {
 
     @SuppressWarnings("GrPackage")
     @Test

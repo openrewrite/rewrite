@@ -45,6 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import static java.util.Collections.*;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -72,6 +73,16 @@ class MavenPomDownloaderTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    void ossSonatype() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        MavenRepository ossSonatype = new MavenRepository("oss", "https://oss.sonatype.org/content/repositories/snapshots",
+          null, "true", false, null, null, null);
+        MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
+          MavenExecutionContextView.view(ctx), null);
+        assertThat(requireNonNull(repo).getUri()).isEqualTo(ossSonatype.getUri());
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/3908")

@@ -141,7 +141,8 @@ public class MavenPomDownloader {
             return Failsafe.with(retryPolicy).get(() -> {
                 try (HttpSender.Response response = httpSender.send(request)) {
                     if (!response.isSuccessful()) {
-                        throw new HttpSenderResponseException(null, response.getCode());
+                        throw new HttpSenderResponseException(null, response.getCode(),
+                                new String(response.getBodyAsBytes()));
                     }
                     return response.getBodyAsBytes();
                 }
@@ -733,13 +734,17 @@ public class MavenPomDownloader {
                     sendRequest(request.build());
                     normalized = repository.withUri(httpsUri).withKnownToExist(true);
                 } catch (Throwable t) {
-                    ctx.getResolutionListener().repositoryAccessFailed(httpsUri, t);
                     if (t instanceof HttpSenderResponseException) {
                         HttpSenderResponseException e = (HttpSenderResponseException) t;
                         // response was returned from the server, but it was not a 200 OK. The server therefore exists.
                         if (e.getResponseCode() != null) {
                             normalized = repository.withUri(httpsUri);
                         }
+                        if (!"Directory listing forbidden".equals(e.getBody())) {
+                            ctx.getResolutionListener().repositoryAccessFailed(httpsUri, t);
+                        }
+                    } else {
+                        ctx.getResolutionListener().repositoryAccessFailed(httpsUri, t);
                     }
                     if (normalized == null) {
                         if (!httpsUri.equals(originalUrl)) {
@@ -857,9 +862,13 @@ public class MavenPomDownloader {
         @Nullable
         private final Integer responseCode;
 
-        public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode) {
+        private final String body;
+
+        public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode,
+                                           String body) {
             super(cause);
             this.responseCode = responseCode;
+            this.body = body;
         }
 
         /**

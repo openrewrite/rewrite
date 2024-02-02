@@ -18,12 +18,12 @@ package org.openrewrite.groovy.tree;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.groovy.GroovyParserTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"GroovyUnusedCatchParameter", "GroovyUnusedAssignment"})
-class TryTest implements RewriteTest {
+class TryTest implements GroovyParserTest {
 
     @Test
     void severalCatchBlocks() {
