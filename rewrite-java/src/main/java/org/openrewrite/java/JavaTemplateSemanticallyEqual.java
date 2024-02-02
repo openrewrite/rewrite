@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import lombok.Value;
-import lombok.With;
 import org.antlr.v4.runtime.*;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
@@ -24,10 +23,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypedPatternContext;
+import org.openrewrite.java.internal.template.TemplateParameter;
 import org.openrewrite.java.internal.template.TypeParameter;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -127,8 +126,10 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
         if ("any".equals(matcherName)) {
             return TypeParameter.toFullyQualifiedName(typedPattern.patternType().type());
+        } else if ("anyArray".equals(matcherName)) {
+            return new JavaType.Array(null, TypeParameter.toFullyQualifiedName(typedPattern.patternType().type()), null);
         } else {
-            throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
+            throw new IllegalArgumentException("Unsupported template matcher '" + key + "'");
         }
     }
 
@@ -142,16 +143,6 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         semanticallyEqualVisitor.visit(templateTree, cursor.getValue(), cursor.getParentOrThrow());
         return new TemplateMatchResult(semanticallyEqualVisitor.isEqual(), new ArrayList<>(
                 semanticallyEqualVisitor.matchedParameters.keySet()));
-    }
-
-    @Value
-    @With
-    private static class TemplateParameter implements Marker {
-        UUID id;
-        JavaType type;
-
-        @Nullable
-        String name;
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -170,9 +161,9 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 }
                 TemplateParameter marker = (TemplateParameter) empty.getMarkers().getMarkers().get(0);
 
-                if (marker.name != null) {
+                if (marker.getName() != null) {
                     for (Map.Entry<J, String> matchedParameter : matchedParameters.entrySet()) {
-                        if (matchedParameter.getValue().equals(marker.name)) {
+                        if (matchedParameter.getValue().equals(marker.getName())) {
                             if (!SemanticallyEqual.areEqual(matchedParameter.getKey(), j)) {
                                 return false;
                             }
@@ -180,9 +171,9 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                     }
                 }
 
-                if (TypeUtils.isObject(marker.type) ||
-                    TypeUtils.isAssignableTo(marker.type, ((TypedTree) j).getType())) {
-                    registerMatch(j, marker.name);
+                if (TypeUtils.isObject(marker.getType()) ||
+                    TypeUtils.isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
+                    registerMatch(j, marker.getName());
                     return true;
                 }
             }

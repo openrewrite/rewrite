@@ -108,6 +108,10 @@ public class Substitutions {
             }
 
             JavaType type = ((TypedTree) parameter).getType();
+            if (type == null && parameter instanceof J.Empty && ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).isPresent()) {
+                // this is a hack, but since we currently represent template parameters as `J.Empty`, this is the only way to get the type now
+                type = ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).get().getType();
+            }
             JavaType.Array arrayType = TypeUtils.asArray(type);
             if (arrayType == null) {
                 arrayType = TypeUtils.asArray(type);

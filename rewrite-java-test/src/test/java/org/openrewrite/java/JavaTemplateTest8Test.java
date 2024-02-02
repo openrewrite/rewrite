@@ -120,4 +120,51 @@ public class JavaTemplateTest8Test implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parameterizedArrayMatch() {
+        JavaTemplate template = JavaTemplate.builder("#{anyArray(java.util.List<String>)}")
+          .build();
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
+                  // the cursor points at the parent when `visitTypeName()` is called
+                  if (template.matches(new Cursor(getCursor(), nameTree))) {
+                      return SearchResult.found(nameTree);
+                  }
+                  return super.visitTypeName(nameTree, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              class Test {
+                  List<Object>[] o;
+                  List<String>[] s;
+                  List<Number>[] n;
+                  List<Integer>[] i;
+                  List<java.lang.Object>[] qo;
+                  List<java.lang.String>[] qs;
+                  List<java.lang.Number>[] qn;
+                  List<java.lang.Integer>[] qi;
+              }
+              """,
+            """
+              import java.util.List;
+              class Test {
+                  List<Object>[] o;
+                  /*~~>*/List<String>[] s;
+                  List<Number>[] n;
+                  List<Integer>[] i;
+                  List<java.lang.Object>[] qo;
+                  /*~~>*/List<java.lang.String>[] qs;
+                  List<java.lang.Number>[] qn;
+                  List<java.lang.Integer>[] qi;
+              }
+              """
+          )
+        );
+    }
 }

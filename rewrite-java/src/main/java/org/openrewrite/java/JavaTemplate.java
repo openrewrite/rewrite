@@ -44,7 +44,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
-        int parameterCount = StringUtils.countOccurrences(code, "#{");
         this.templateParser = new JavaTemplateParser(contextSensitive, javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
     }
 
