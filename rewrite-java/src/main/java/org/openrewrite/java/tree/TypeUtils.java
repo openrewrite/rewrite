@@ -649,20 +649,24 @@ public class TypeUtils {
             JavaType.GenericTypeVariable genericTypeVariable = (JavaType.GenericTypeVariable) type;
             StringBuilder builder = new StringBuilder();
             builder.append(genericTypeVariable.getName());
-            builder.append(' ');
-            builder.append(toString(genericTypeVariable.getVariance()));
-            builder.append(' ');
+            if (genericTypeVariable.getVariance() != JavaType.GenericTypeVariable.Variance.INVARIANT) {
+                builder.append(' ');
+                builder.append(toString(genericTypeVariable.getVariance()));
+            }
 
             List<JavaType> bounds = genericTypeVariable.getBounds();
-            int boundsSize = bounds.size();
-            if (boundsSize == 1) {
-                builder.append(toString(bounds.get(0)));
-            } else {
-                for (int i = 0; i < boundsSize; i++) {
-                    JavaType bound = bounds.get(i);
-                    builder.append(toString(bound));
-                    if (i < boundsSize - 1) {
-                        builder.append(" & ");
+            if (!bounds.isEmpty()) {
+                builder.append(' ');
+                int boundsSize = bounds.size();
+                if (boundsSize == 1) {
+                    builder.append(toString(bounds.get(0)));
+                } else {
+                    for (int i = 0; i < boundsSize; i++) {
+                        JavaType bound = bounds.get(i);
+                        builder.append(toString(bound));
+                        if (i < boundsSize - 1) {
+                            builder.append(" & ");
+                        }
                     }
                 }
             }

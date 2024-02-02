@@ -161,7 +161,17 @@ public class Substitutions {
     }
 
     private String getTypeName(@Nullable JavaType type) {
-        return type == null ? "java.lang.Object" : TypeUtils.toString(type).replace("$", ".");
+        if (type == null) {
+            return "java.lang.Object";
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable genericTypeVariable = (JavaType.GenericTypeVariable) type;
+            if (genericTypeVariable.getName().equals("?")) {
+                // wildcards cannot be used as type parameters on method invocations
+                return "java.lang.Object";
+            }
+            return TypeUtils.toString(type);
+        }
+        return TypeUtils.toString(type).replace("$", ".");
     }
 
     private String substituteUntyped(Object parameter, int index) {
