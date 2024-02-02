@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,17 +20,14 @@ import org.openrewrite.groovy.GroovyParserTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GrUnnecessarySemicolon", "GroovySynchronizationOnVariableInitializedWithLiteral"})
-class SynchronizedTest implements GroovyParserTest {
+public class ConstructorTest implements GroovyParserTest {
 
     @Test
-    void synchronizedBlock() {
+    void inParens() {
         rewriteRun(
           groovy(
             """
-              Integer n = 0;
-              synchronized(n) {
-              }
+              ( new String("foo") )
               """
           )
         );

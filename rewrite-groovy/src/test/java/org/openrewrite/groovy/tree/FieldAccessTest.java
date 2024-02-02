@@ -16,11 +16,11 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.groovy.GroovyParserTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-class FieldAccessTest implements RewriteTest {
+class FieldAccessTest implements GroovyParserTest {
 
     @Test
     void starAccess() {

@@ -17,11 +17,11 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.groovy.GroovyParserTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-class MethodInvocationTest implements RewriteTest {
+class MethodInvocationTest implements GroovyParserTest {
     @Test
     void gradle() {
         rewriteRun(
@@ -258,31 +258,6 @@ class MethodInvocationTest implements RewriteTest {
                   isEmpty("")
                 }
               }
-              """
-          )
-        );
-    }
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/3559")
-    void escapedMethodNameTest() {
-        rewriteRun(
-          groovy(
-            """
-              def 'default'() {}
-              'default'()
-              """
-          )
-        );
-    }
-
-    @Test
-    void escapedMethodNameWithSpacesTest() {
-        rewriteRun(
-          groovy(
-            """
-              def 'some test scenario description'() {}
-              'some test scenario description'()
               """
           )
         );

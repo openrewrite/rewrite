@@ -17,12 +17,12 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.groovy.GroovyParserTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyEmptyStatementBody", "GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
-class ForLoopTest implements RewriteTest {
+@SuppressWarnings({"GroovyEmptyStatementBody", "GroovyUnusedAssignment", "GrUnnecessarySemicolon", "GroovyUnnecessaryContinue"})
+class ForLoopTest implements GroovyParserTest {
 
     @Test
     void forLoopMultipleInit() {
@@ -200,7 +200,7 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              for(int i in [1, 2, 3]) {continue}
+              for(int i in [1, 2, 3]) { continue }
               """
           )
         );
@@ -211,7 +211,7 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              f: for(int i in [1, 2, 3]) {continue f}
+              f: for(int i in [1, 2, 3]) { continue f }
               """
           )
         );
