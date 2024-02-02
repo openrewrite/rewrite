@@ -18,17 +18,17 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.groovy.GroovyParserTest;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.test.RewriteTest;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings("GrUnnecessaryPublicModifier")
-class ClassDeclarationTest implements RewriteTest {
+class ClassDeclarationTest implements GroovyParserTest {
 
     @Test
     void multipleClassDeclarationsInOneCompilationUnit() {

@@ -16,12 +16,12 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.groovy.GroovyParserTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings("GrUnnecessarySemicolon")
-class BlockTest implements RewriteTest {
+class BlockTest implements GroovyParserTest {
 
     @Test
     void block() {

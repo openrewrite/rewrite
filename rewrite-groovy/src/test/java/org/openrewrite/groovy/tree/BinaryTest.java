@@ -17,12 +17,12 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.groovy.GroovyParserTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon", "UnnecessaryQualifiedReference"})
-class BinaryTest implements RewriteTest {
+class BinaryTest implements GroovyParserTest {
 
     @SuppressWarnings("GroovyConstantConditional")
     @Test
