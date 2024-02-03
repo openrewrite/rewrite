@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.xml.tree.Xml;
 
@@ -96,13 +97,21 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (!isManagedDependencyTag()) {
-                    ResolvedDependency d = findDependency(tag);
-                    if (d != null && matchesVersion(d) &&
+                if (isDependencyLikeTag() && !isManagedDependencyTag()) {
+                    if (isPluginTag()) {
+                        Plugin p = findPlugin(tag);
+                        if (p != null && matchesVersion(p) && matchesGroup(p) && matchesArtifact(p)) {
+                            Xml.Tag version = tag.getChild("version").orElse(null);
+                            return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                        }
+                    } else {
+                        ResolvedDependency d = findDependency(tag);
+                        if (d != null && matchesVersion(d) &&
                             matchesGroup(d) && matchesArtifact(d)
                             && isNotExcepted(d)) {
-                        Xml.Tag version = tag.getChild("version").orElse(null);
-                        return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                            Xml.Tag version = tag.getChild("version").orElse(null);
+                            return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                        }
                     }
                 }
                 return super.visitTag(tag, ctx);
@@ -112,8 +121,16 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 return StringUtils.isNullOrEmpty(groupPattern) || matchesGlob(d.getGroupId(), groupPattern);
             }
 
+            private boolean matchesGroup(Plugin p) {
+                return StringUtils.isNullOrEmpty(groupPattern) || matchesGlob(p.getGroupId(), groupPattern);
+            }
+
             private boolean matchesArtifact(ResolvedDependency d) {
                 return StringUtils.isNullOrEmpty(artifactPattern) || matchesGlob(d.getArtifactId(), artifactPattern);
+            }
+
+            private boolean matchesArtifact(Plugin p) {
+                return StringUtils.isNullOrEmpty(artifactPattern) || matchesGlob(p.getArtifactId(), artifactPattern);
             }
 
             private boolean matchesVersion(ResolvedDependency d) {
@@ -121,6 +138,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         d.getArtifactId(), d.getRequested().getType(), d.getRequested().getClassifier());
                 return managedVersion != null && (
                         ignoreVersionMatching() || managedVersion.equals(d.getRequested().getVersion())
+                );
+            }
+
+            private boolean matchesVersion(Plugin p) {
+                String managedVersion = getResolutionResult().getPom().getManagedPluginVersion(p.getGroupId(), p.getArtifactId());
+                return managedVersion != null && (
+                        ignoreVersionMatching() || managedVersion.equals(p.getVersion())
                 );
             }
 
