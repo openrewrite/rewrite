@@ -1315,6 +1315,24 @@ class MavenParserTest implements RewriteTest {
 					</project>
 				"""
 			)
+		  ),
+		  mavenProject("d2",
+			pomXml(
+			  """
+					<project>
+						<modelVersion>4.0.0</modelVersion>
+
+						<groupId>org.openrewrite.maven</groupId>
+						<artifactId>d</artifactId>
+						<version>0.2.0-SNAPSHOT</version>
+
+						<properties>
+							<maven.compiler.source>1.8</maven.compiler.source>
+							<maven.compiler.target>1.8</maven.compiler.target>
+						</properties>
+					</project>
+				"""
+			)
 		  )
 		);
     }

@@ -35,6 +35,8 @@ public class ResolvedManagedDependency {
     @Nullable
     String classifier;
 
+    long proximity;
+
     List<GroupArtifact> exclusions;
 
     ManagedDependency requested;
