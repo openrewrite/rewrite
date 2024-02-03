@@ -1,0 +1,24 @@
+name: Dependency Submission
+
+on:
+  workflow_run:
+    workflows: ["publish"]
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+jobs:
+  dependency-submission:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - name: Generate and submit dependency graph
+        uses: gradle/actions/dependency-submission@v3
+        env:
+          # Exclude all dependencies that originate solely in the 'buildSrc' project
+          DEPENDENCY_GRAPH_EXCLUDE_PROJECTS: ':buildSrc'
+          # Exclude dependencies that are only resolved in test classpaths
+          DEPENDENCY_GRAPH_EXCLUDE_CONFIGURATIONS: '.*[Tt]est(Compile|Runtime)Classpath'
