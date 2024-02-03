@@ -29,6 +29,8 @@ import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Optional;
+
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
@@ -54,6 +56,13 @@ public class ChangePackaging extends Recipe {
     @Nullable
     String packaging;
 
+    @Option(displayName = "Old Packaging",
+            description = "The old packaging type. If provided, will only change if the current packaging matches",
+            required = false,
+            example = "jar")
+    @Nullable
+    String oldPackaging;
+
     @Override
     public String getDisplayName() {
         return "Set Maven project packaging";
@@ -70,30 +79,36 @@ public class ChangePackaging extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new MavenVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 ResolvedPom pom = getResolutionResult().getPom();
-                if (!(matchesGlob(pom.getGroupId(), groupId) && matchesGlob(pom.getArtifactId(), artifactId))) {
+                if (!matchesGlob(pom.getGroupId(), groupId) || !matchesGlob(pom.getArtifactId(), artifactId)) {
                     return document;
                 }
-                document = document.withMarkers(document.getMarkers().withMarkers(ListUtils.map(document.getMarkers().getMarkers(), m -> {
-                    if (m instanceof MavenResolutionResult) {
-                        return getResolutionResult().withPom(pom.withRequested(pom.getRequested().withPackaging(packaging)));
-                    }
-                    return m;
-                })));
-                return super.visitDocument(document, ctx);
+                Xml.Document xml = super.visitDocument(document, ctx);
+                if (xml != document) {
+                    return xml.withMarkers(xml.getMarkers().withMarkers(ListUtils.map(xml.getMarkers().getMarkers(), m -> {
+                        if (m instanceof MavenResolutionResult) {
+                            return getResolutionResult().withPom(pom.withRequested(pom.getRequested().withPackaging(packaging)));
+                        }
+                        return m;
+                    })));
+                }
+                return xml;
             }
 
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
                 if (PROJECT_MATCHER.matches(getCursor())) {
-                    if (packaging == null || "jar".equals(packaging)) {
-                        t = filterTagChildren(t, it -> !"packaging".equals(it.getName()));
-                    } else {
-                        t = addOrUpdateChild(t, Xml.Tag.build("\n<packaging>" + packaging + "</packaging>"), getCursor().getParentOrThrow());
+                    Optional<Xml.Tag> maybePackaging = t.getChild("packaging");
+                    if (!maybePackaging.isPresent() || oldPackaging == null || oldPackaging.equals(maybePackaging.get().getValue().orElse(null))) {
+                        if (packaging == null || "jar".equals(packaging)) {
+                            t = filterTagChildren(t, it -> !"packaging".equals(it.getName()));
+                        } else {
+                            t = addOrUpdateChild(t, Xml.Tag.build("\n<packaging>" + packaging + "</packaging>"), getCursor().getParentOrThrow());
+                        }
                     }
                 }
                 return t;
