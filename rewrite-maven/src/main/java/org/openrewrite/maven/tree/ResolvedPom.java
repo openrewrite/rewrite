@@ -324,23 +324,21 @@ public class ResolvedPom {
         return entry == null ? null : entry.getValue().get(0);
     }
 
+    @Nullable
+    private ResolvedManagedDependency getFirstMatchingDependency(String groupId, String artifactId, String type, String classifier) {
+        return dependencyManagement.stream().filter(dm -> dm.matches(groupId, artifactId, type, classifier))
+                .findFirst().orElse(null);
+    }
+
     public List<GroupArtifact> getManagedExclusions(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
-        for (ResolvedManagedDependency dm : dependencyManagement) {
-            if (dm.matches(groupId, artifactId, type, classifier)) {
-                return dm.getExclusions() == null ? emptyList() : dm.getExclusions();
-            }
-        }
-        return emptyList();
+        ResolvedManagedDependency dependency = getFirstMatchingDependency(groupId, artifactId, type, classifier);
+        return dependency == null || dependency.getExclusions() == null ? emptyList() : dependency.getExclusions();
     }
 
     @Nullable
     public Scope getManagedScope(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
-        for (ResolvedManagedDependency dm : dependencyManagement) {
-            if (dm.matches(groupId, artifactId, type, classifier)) {
-                return dm.getScope();
-            }
-        }
-        return null;
+        ResolvedManagedDependency dependency = getFirstMatchingDependency(groupId, artifactId, type, classifier);
+        return dependency == null ? null : dependency.getScope();
     }
 
     public GroupArtifactVersion getValues(GroupArtifactVersion gav) {
