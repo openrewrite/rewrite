@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.tree;
+@NonNullApi
+package org.openrewrite.groovy.internal;
 
-import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
-
-import static org.openrewrite.groovy.Assertions.groovy;
-
-class ClassExpressionTest implements RewriteTest {
-
-    @Test
-    void classExpressions() {
-        rewriteRun(
-          groovy(
-            """
-              maven( List , List ) {
-                  from(components.java)
-              }
-              """
-          )
-        );
-    }
-}
+import org.openrewrite.internal.lang.NonNullApi;

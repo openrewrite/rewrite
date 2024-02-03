@@ -16,11 +16,11 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.groovy.GroovyParserTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-class ThrowTest implements GroovyParserTest {
+class ThrowTest implements RewriteTest {
 
     @Test
     void throwException() {

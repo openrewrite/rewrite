@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.groovy.GroovyParserTest;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings("GroovyUnusedAssignment")
-class VariableDeclarationsTest implements GroovyParserTest {
+class VariableDeclarationsTest implements RewriteTest {
 
     @Test
     void varKeyword() {

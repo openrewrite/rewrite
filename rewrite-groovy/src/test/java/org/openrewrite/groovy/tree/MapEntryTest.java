@@ -18,12 +18,12 @@ package org.openrewrite.groovy.tree;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.groovy.GroovyParserTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings("GroovyUnusedAssignment")
-class MapEntryTest implements GroovyParserTest {
+class MapEntryTest implements RewriteTest {
 
     @Test
     void mapEntryMethodArguments() {

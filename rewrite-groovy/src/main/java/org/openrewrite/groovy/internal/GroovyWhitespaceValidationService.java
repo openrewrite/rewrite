@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,45 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy;
+package org.openrewrite.groovy.internal;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.GSpace;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
 
-public interface GroovyParserTest extends RewriteTest {
-    @Override
-    default void defaults(RecipeSpec spec) {
-        spec.recipe(new SpaceContainsOnlyWhitespace());
-    }
-}
-
-@Value
-@EqualsAndHashCode(callSuper = false)
-class SpaceContainsOnlyWhitespace extends Recipe {
-
-    @Override
-    public String getDisplayName() {
-        return "Space contains only whitespace";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Spaces containing non-whitespace characters is a common parser failure mode not otherwise detected.";
-    }
-
+public class GroovyWhitespaceValidationService implements WhitespaceValidationService {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new GroovyVisitor<>() {
+        return new GroovyVisitor<ExecutionContext>() {
             @Override
             public Space visitSpace(Space space, GSpace.Location loc, ExecutionContext executionContext) {
-                if(!space.getWhitespace().isBlank()) {
+                if(!StringUtils.isBlank(space.getWhitespace())) {
                     return space.withWhitespace("~~(non-whitespace)~~>" + space.getWhitespace() + "<~~");
                 }
                 return space;
@@ -59,12 +37,11 @@ class SpaceContainsOnlyWhitespace extends Recipe {
 
             @Override
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext executionContext) {
-                if(!space.getWhitespace().isBlank()) {
+                if(!StringUtils.isBlank(space.getWhitespace())) {
                     return space.withWhitespace("~~(non-whitespace)~~>" + space.getWhitespace() + "<~~");
                 }
                 return space;
             }
         };
-
     }
 }
