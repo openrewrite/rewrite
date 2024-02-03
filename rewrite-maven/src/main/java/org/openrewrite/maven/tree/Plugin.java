@@ -49,6 +49,10 @@ public class Plugin {
     List<Dependency> dependencies;
     List<Execution> executions;
 
+    public boolean matches(String groupId, String artifactId) {
+        return groupId.equals(this.groupId) && artifactId.equals(this.artifactId);
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     public static class Execution {
