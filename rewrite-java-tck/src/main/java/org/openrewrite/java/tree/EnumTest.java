@@ -150,13 +150,10 @@ class EnumTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("""
-      java.lang.AssertionError: Source file was parsed into an LST that contains non-whitespace characters in its whitespace. This is indicative of a bug in the parser.\s
-      public enum A { ONE~~(non-whitespace)~~>, <~~}
-      """)
+    @Disabled("enum A { ONE~~(non-whitespace)~~>, <~~}")
     void enumValuesTerminatedWithComma() {
         rewriteRun(
-          java("public enum A { ONE, }")
+          java("enum A { ONE, }")
         );
     }
 
