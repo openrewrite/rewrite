@@ -57,6 +57,12 @@ public class UpdateJavaCompatibility extends Recipe {
     @Nullable
     DeclarationStyle declarationStyle;
 
+    @Option(displayName = "Allow Downgrade",
+            description = "Allow downgrading the Java version.",
+            required = false)
+    @Nullable
+    Boolean allowDowngrade;
+
     @Override
     public String getDisplayName() {
         return "Update Gradle project Java compatibility";
@@ -108,12 +114,20 @@ public class UpdateJavaCompatibility extends Recipe {
 
                 DeclarationStyle currentStyle = getCurrentStyle(a.getAssignment());
                 int currentMajor = getMajorVersion(a.getAssignment());
-                if (currentMajor != version || (declarationStyle != null && declarationStyle != currentStyle)) {
+                if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(currentStyle)) {
                     DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
                     return a.withAssignment(changeExpression(a.getAssignment(), actualStyle));
                 }
 
                 return a;
+            }
+
+            private boolean shouldUpdateVersion(int currentMajor) {
+                return currentMajor < version || currentMajor > version && Boolean.TRUE.equals(allowDowngrade);
+            }
+
+            private boolean shouldUpdateStyle(@Nullable DeclarationStyle currentStyle) {
+                return declarationStyle != null && declarationStyle != currentStyle;
             }
 
             @Override
@@ -126,7 +140,7 @@ public class UpdateJavaCompatibility extends Recipe {
                         J.Literal versionArg = (J.Literal) args.get(0);
                         if (versionArg.getValue() instanceof Integer) {
                             Integer versionNumber = (Integer) versionArg.getValue();
-                            if (!version.equals(versionNumber)) {
+                            if (shouldUpdateVersion(versionNumber)) {
                                 return m.withArguments(
                                         Collections.singletonList(versionArg.withValue(version)
                                                 .withValueSource(version.toString())));
@@ -150,7 +164,7 @@ public class UpdateJavaCompatibility extends Recipe {
                     if (m.getArguments().size() == 1 && (m.getArguments().get(0) instanceof J.Literal || m.getArguments().get(0) instanceof J.FieldAccess)) {
                         DeclarationStyle currentStyle = getCurrentStyle(m.getArguments().get(0));
                         int currentMajor = getMajorVersion(m.getArguments().get(0));
-                        if (currentMajor != version || (declarationStyle != null && declarationStyle != currentStyle)) {
+                        if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
                             DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
                             return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeExpression(arg, actualStyle)));
                         } else {

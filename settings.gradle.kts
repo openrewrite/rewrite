@@ -31,7 +31,7 @@ val allProjects = listOf(
 )
 
 val includedProjects = file("IDE.properties").let {
-    if (it.exists()) {
+    if (it.exists() && (System.getProperty("idea.active") != null || System.getProperty("idea.sync.active") != null)) {
         val props = java.util.Properties()
         it.reader().use { reader ->
             props.load(reader)

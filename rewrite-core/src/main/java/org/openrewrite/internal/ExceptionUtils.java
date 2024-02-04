@@ -35,7 +35,7 @@ public class ExceptionUtils {
             if (stackTraceElement.getClassName().equals(until.getName())) {
                 break;
             }
-            if (i++ >= 8) {
+            if (i++ >= 16) {
                 sanitized.add("  ...");
                 break;
             }

@@ -50,6 +50,7 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void method() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class A {
@@ -67,6 +68,7 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void returnExpression() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class A {
@@ -85,6 +87,7 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarationsInClass() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class A {
@@ -105,6 +108,7 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarationsInMethod() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class A {
@@ -127,6 +131,7 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarationsInForLoops() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class Test {
@@ -153,6 +158,7 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void spacesBetweenModifiers() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               public final class A {

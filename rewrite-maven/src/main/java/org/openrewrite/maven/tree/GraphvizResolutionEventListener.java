@@ -121,11 +121,13 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
     }
 
     @Override
-    public void downloadError(GroupArtifactVersion gav, Pom containing) {
+    public void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
         Link link = to(gavNode(gav).add(Style.FILLED, Color.rgb("ff1947")))
                 .with(Label.of("error"));
-        gavNode(containing.getGav())
-                .addLink(link);
+        if(containing != null) {
+            gavNode(containing.getGav())
+                    .addLink(link);
+        }
     }
 
     @Override
@@ -142,6 +144,7 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
         gavNode(containing.getGav()).addLink(link);
     }
 
+    @SuppressWarnings("unused")
     public Graphviz graphviz() {
         return Graphviz.fromGraph(g);
     }

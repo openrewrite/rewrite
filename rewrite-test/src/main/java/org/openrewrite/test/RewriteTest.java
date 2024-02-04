@@ -25,6 +25,7 @@ import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -206,19 +207,19 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        ExecutionContext executionContext;
+        ExecutionContext ctx;
         if (testMethodSpec.getExecutionContext() != null) {
-            executionContext = testMethodSpec.getExecutionContext();
+            ctx = testMethodSpec.getExecutionContext();
         } else if (testClassSpec.getExecutionContext() != null) {
-            executionContext = testClassSpec.getExecutionContext();
+            ctx = testClassSpec.getExecutionContext();
         } else {
-            executionContext = defaultExecutionContext(sourceSpecs);
+            ctx = defaultExecutionContext(sourceSpecs);
         }
         for (SourceSpec<?> s : sourceSpecs) {
-            s.customizeExecutionContext.accept(executionContext);
+            s.customizeExecutionContext.accept(ctx);
         }
         List<Validated<Object>> validations = new ArrayList<>();
-        recipe.validateAll(executionContext, validations);
+        recipe.validateAll(ctx, validations);
         assertThat(validations)
                 .as("Recipe validation must have no failures")
                 .noneMatch(Validated::isInvalid);
@@ -267,18 +268,28 @@ public interface RewriteTest extends SourceSpecs {
                 for (UncheckedConsumer<SourceSpec<?>> consumer : testClassSpec.allSources) {
                     consumer.accept(sourceSpec);
                 }
-                inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(parser.getCharset(executionContext)))));
+                inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(parser.getCharset(ctx)))));
             }
 
             Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
 
             Iterator<SourceSpec<?>> sourceSpecIter = inputs.keySet().iterator();
 
-            List<SourceFile> sourceFiles = parser.parseInputs(inputs.values(), relativeTo, executionContext)
+            boolean requirePrintEqualsInput = ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true);
+            if (requirePrintEqualsInput) {
+                // this gets checked by the test framework itself a few statements further down
+                ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+            }
+
+            List<SourceFile> sourceFiles = parser.parseInputs(inputs.values(), relativeTo, ctx)
                     .collect(Collectors.toList());
             assertThat(sourceFiles.size())
                     .as("Every input should be parsed into a SourceFile.")
                     .isEqualTo(inputs.size());
+
+            if (requirePrintEqualsInput) {
+                ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true);
+            }
 
             for (int i = 0; i < sourceFiles.size(); i++) {
                 SourceFile sourceFile = sourceFiles.get(i);
@@ -293,16 +304,30 @@ public interface RewriteTest extends SourceSpecs {
                 // Validate before source
                 nextSpec.validateSource.accept(sourceFile, TypeValidation.before(testMethodSpec, testClassSpec));
 
-                // Validate that printing a parsed AST yields the same source text
+                // Validate that printing the LST yields the same source text
+                // Validate that the LST whitespace do not contain any non-whitespace characters
                 int j = 0;
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
-                        assertThat(sourceFile.printAll(out.clone()))
-                                .as("When parsing and printing the source code back to text without modifications, " +
-                                        "the printed source didn't match the original source code. This means there is a bug in the " +
-                                        "parser implementation itself. Please open an issue to report this, providing a sample of the " +
-                                        "code that generated this error!")
-                                .isEqualTo(StringUtils.readFully(input.getSource(executionContext), parser.getCharset(executionContext)));
+                        assertContentEquals(
+                                sourceFile,
+                                StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx)),
+                                sourceFile.printAll(out.clone()),
+                                "When parsing and printing the source code back to text without modifications, " +
+                                "the printed source didn't match the original source code. This means there is a bug in the " +
+                                "parser implementation itself. Please open an issue to report this, providing a sample of the " +
+                                "code that generated this error for"
+                        );
+                        try {
+                            WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
+                            SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
+                            if(whitespaceValidated != null && whitespaceValidated != sourceFile) {
+                                fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
+                                     "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                            }
+                        } catch (UnsupportedOperationException e) {
+                            // Language/parser does not provide whitespace validation and that's OK for now
+                        }
                     }
                 }
 
@@ -331,11 +356,11 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        ExecutionContext recipeExecutionContext = executionContext;
+        ExecutionContext recipeCtx = ctx;
         if (testMethodSpec.getRecipeExecutionContext() != null) {
-            recipeExecutionContext = testMethodSpec.getRecipeExecutionContext();
+            recipeCtx = testMethodSpec.getRecipeExecutionContext();
         } else if (testClassSpec.getRecipeExecutionContext() != null) {
-            recipeExecutionContext = testClassSpec.getRecipeExecutionContext();
+            recipeCtx = testClassSpec.getRecipeExecutionContext();
         }
 
         LargeSourceSet lss;
@@ -349,7 +374,7 @@ public interface RewriteTest extends SourceSpecs {
 
         RecipeRun recipeRun = recipe.run(
                 lss,
-                recipeExecutionContext,
+                recipeCtx,
                 cycles,
                 expectedCyclesThatMakeChanges + 1
         );
@@ -400,7 +425,15 @@ public interface RewriteTest extends SourceSpecs {
                         continue nextSourceSpec;
                     }
                 }
-                fail("Expected a new source file with the source path " + sourceSpec.getSourcePath());
+                String paths = allResults.stream()
+                        .map(it -> {
+                            String beforePath = (it.getBefore() == null) ? "null" : it.getBefore().getSourcePath().toString();
+                            String afterPath = (it.getAfter() == null) ? "null" : it.getAfter().getSourcePath().toString();
+                            return "    " + beforePath + " -> " + afterPath;
+                        })
+                        .collect(Collectors.joining("\n"));
+                fail("Expected a new source file with the source path: " + sourceSpec.getSourcePath()
+                     +"\nAll source file paths, before and after recipe run:\n" + paths);
             }
 
             // If the source spec has not defined a source path, look for a result with the exact contents. This logic
@@ -549,17 +582,23 @@ public interface RewriteTest extends SourceSpecs {
         }
         newFilesGenerated.assertAll();
 
-        for (Result result : allResults) {
-            if (result.getBefore() == null
-                    && !(result.getAfter() instanceof Remote)
-                    && !expectedNewResults.contains(result)
-                    && testMethodSpec.afterRecipes.isEmpty()
-            ) {
-                assertThat(result.getAfter()).isNotNull();
-                // falsely added files detected.
-                fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
-                        + "\" that was not expected.");
-            }
+        Map<Result, Boolean> resultToUnexpected = allResults.stream()
+                .collect(Collectors.toMap(result -> result, result -> result.getBefore() == null
+                                                                      && !(result.getAfter() instanceof Remote)
+                                                                      && !expectedNewResults.contains(result)
+                                                                      && testMethodSpec.afterRecipes.isEmpty()));
+        if(resultToUnexpected.values().stream().anyMatch(it -> it)) {
+            String paths = resultToUnexpected.entrySet().stream()
+                    .map(it -> {
+                        Result result = it.getKey();
+                        assert result.getAfter() != null;
+                        String beforePath = (result.getBefore() == null) ? "null" : result.getAfter().getSourcePath().toString();
+                        String afterPath = (result.getAfter() == null) ? "null" : result.getAfter().getSourcePath().toString();
+                        String status = it.getValue() ? "❌️" : "✔";
+                        return "    " + beforePath + " -> " + afterPath + " " + status;
+                    })
+                    .collect(Collectors.joining("\n"));
+            fail("The recipe added a source file that was not expected. All source file paths, before and after recipe run:\n" + paths);
         }
     }
 

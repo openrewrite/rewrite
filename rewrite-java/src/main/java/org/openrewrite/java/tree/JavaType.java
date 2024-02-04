@@ -609,22 +609,21 @@ public interface JavaType {
             ShallowClass owningClass = null;
 
             int firstClassNameIndex = 0;
-            int lastDot = 0;
-            char[] fullyQualifiedNameChars = fullyQualifiedName.replace('$', '.').toCharArray();
+            int lastDelimiter = 0;
             char prev = ' ';
-            for (int i = 0; i < fullyQualifiedNameChars.length; i++) {
-                char c = fullyQualifiedNameChars[i];
+            for (int i = 0; i < fullyQualifiedName.length(); i++) {
+                char c = fullyQualifiedName.charAt(i);
 
-                if (firstClassNameIndex == 0 && prev == '.' && Character.isUpperCase(c)) {
+                if (firstClassNameIndex == 0 && (prev == '.' || prev == '$') && Character.isUpperCase(c)) {
                     firstClassNameIndex = i;
-                } else if (c == '.') {
-                    lastDot = i;
+                } else if (c == '.' || c == '$') {
+                    lastDelimiter = i;
                 }
                 prev = c;
             }
 
-            if (lastDot > firstClassNameIndex) {
-                owningClass = build(fullyQualifiedName.substring(0, lastDot));
+            if (lastDelimiter > firstClassNameIndex) {
+                owningClass = build(fullyQualifiedName.substring(0, lastDelimiter));
             }
 
             return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, emptyList(), null, owningClass,
@@ -879,9 +878,14 @@ public interface JavaType {
         @NonFinal
         JavaType elemType;
 
-        public Array(@Nullable Integer managedReference, @Nullable JavaType elemType) {
+        @Nullable
+        @NonFinal
+        FullyQualified[] annotations;
+
+        public Array(@Nullable Integer managedReference, @Nullable JavaType elemType, @Nullable FullyQualified[] annotations) {
             this.managedReference = managedReference;
             this.elemType = unknownIfNull(elemType);
+            this.annotations = ListUtils.nullIfEmpty(annotations);
         }
 
         @JsonCreator
@@ -892,14 +896,27 @@ public interface JavaType {
             return elemType;
         }
 
+        public List<FullyQualified> getAnnotations() {
+            return annotations == null ? emptyList() : Arrays.asList(annotations);
+        }
+
+        public Array withAnnotations(@Nullable List<FullyQualified> annotations) {
+            FullyQualified[] annotationsArray = arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY);
+            if (Arrays.equals(annotationsArray, this.annotations)) {
+                return this;
+            }
+            return new Array(this.managedReference, this.elemType, this.annotations);
+        }
+
         @Override
         public Array unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
             return this;
         }
 
-        public Array unsafeSet(JavaType elemType) {
+        public Array unsafeSet(JavaType elemType, @Nullable FullyQualified[] annotations) {
             this.elemType = unknownIfNull(elemType);
+            this.annotations = ListUtils.nullIfEmpty(annotations);
             return this;
         }
 

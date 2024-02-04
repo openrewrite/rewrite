@@ -110,6 +110,7 @@ public class JavaTypeVisitor<P> {
     public JavaType visitArray(JavaType.Array array, P p) {
         JavaType.Array a = array;
         a = a.withElemType(visit(a.getElemType(), p));
+        a = a.withAnnotations(visit(a.getAnnotations(), p));
         return a;
     }
 

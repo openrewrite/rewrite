@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
 import lombok.Value;
 import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
@@ -33,8 +34,9 @@ import java.util.function.Consumer;
 
 @SuppressWarnings("unused")
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
+    @Getter
     private final String code;
-    private final int parameterCount;
+
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
@@ -42,12 +44,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
-        this.parameterCount = StringUtils.countOccurrences(code, "#{");
         this.templateParser = new JavaTemplateParser(contextSensitive, javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
-    }
-
-    public String getCode() {
-        return code;
     }
 
     @Override

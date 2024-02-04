@@ -53,6 +53,12 @@ public class NoWhitespaceAfter extends Recipe {
         EmptyForIteratorPadStyle emptyForIteratorPadStyle;
 
         @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            // This visitor causes problems for Groovy sources as method invocations without parentheses get squashed
+            return sourceFile instanceof J.CompilationUnit;
+        }
+
+        @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
@@ -113,8 +119,10 @@ public class NoWhitespaceAfter extends Recipe {
         public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
             J.ArrayType a = super.visitArrayType(arrayType, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getArrayDeclarator())) {
-                if (a.getDimension().getBefore().getWhitespace().contains(" ")) {
-                    a = a.withDimension(a.getDimension().withBefore(a.getDimension().getBefore().withWhitespace("")));
+                if (a.getDimension() != null && a.getDimension().getBefore().getWhitespace().contains(" ")) {
+                    if (a.getAnnotations() == null || a.getAnnotations().isEmpty()) {
+                        a = a.withDimension(a.getDimension().withBefore(a.getDimension().getBefore().withWhitespace("")));
+                    }
                 }
             }
             return a;

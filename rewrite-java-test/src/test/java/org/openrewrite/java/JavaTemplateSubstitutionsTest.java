@@ -45,7 +45,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   }
                   return method;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {
@@ -89,7 +89,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   }
                   return method;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {
@@ -131,7 +131,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   }
                   return method;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               class Test {
@@ -165,7 +165,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                     .apply(getCursor(), s.getCoordinates().replace(), s,
                       ((J.VariableDeclarations) method.getParameters().get(1)).getVariables().get(0).getName());
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               import java.util.*;
@@ -200,7 +200,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                     .build()
                     .apply(getCursor(), s.getCoordinates().replace(), method.getBody());
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {
@@ -244,7 +244,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                     .build()
                     .apply(getCursor(), arrayAccess.getCoordinates().replace());
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               public class Test {
@@ -399,7 +399,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                     .build()
                     .apply(getCursor(), ternary.getCoordinates().replace(), ternary);
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               abstract class Test {
@@ -436,7 +436,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                     .build()
                     .apply(getCursor(), method.getCoordinates().replace(), method);
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               import java.util.Map;

@@ -479,6 +479,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
             "org.openrewrite.maven.MultipleWrapperUpdates"
             )
             .cycles(1)
+            .expectedCyclesThatMakeChanges(1)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.5.0")))
             .afterRecipe(run -> {
                 var mvnw = result(run, PlainText.class, "mvnw");
