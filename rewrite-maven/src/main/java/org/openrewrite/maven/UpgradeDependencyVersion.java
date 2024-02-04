@@ -22,7 +22,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.utilities.RetainVersions;
-import org.openrewrite.semver.LatestPatch;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -31,6 +30,7 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -334,18 +334,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
 
                 // in the case of "latest.patch", a new version can only be derived if the
                 // current version is a semantic version
-                if (versionComparator instanceof LatestPatch && !versionComparator.isValid(finalVersion, finalVersion)) {
+                if (!versionComparator.canDeriveNewVersion(finalVersion)) {
                     return null;
                 }
 
                 try {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    List<String> versions = new ArrayList<>();
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(finalVersion, v)) {
-                            versions.add(v);
-                        }
-                    }
+                    List<String> versions = mavenMetadata.getVersioning().getVersions().stream()
+                            .filter(v -> versionComparator.isValid(finalVersion, v))
+                            .collect(Collectors.toList());
                     // handle upgrades from non semver versions like "org.springframework.cloud:spring-cloud-dependencies:Camden.SR5"
                     if (!Semver.isVersion(finalVersion) && !versions.isEmpty()) {
                         versions.sort(versionComparator);

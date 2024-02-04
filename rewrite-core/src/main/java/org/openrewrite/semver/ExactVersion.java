@@ -31,6 +31,9 @@ public class ExactVersion extends LatestRelease {
         return this.version.equals(version);
     }
 
+    @Override
+    public boolean isExactVersion() {return true;}
+
     public static Validated<ExactVersion> build(String pattern) {
         String versionOnly;
         int hyphenIndex = pattern.indexOf('-');

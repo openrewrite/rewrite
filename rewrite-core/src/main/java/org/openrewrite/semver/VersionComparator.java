@@ -53,4 +53,8 @@ public interface VersionComparator extends Comparator<String> {
         return (seen ? Optional.of(best) : Optional.<String>empty())
                 .filter(v -> !v.equals(currentVersion));
     }
+
+    default boolean canDeriveNewVersion(String version) {return true;}
+
+    default boolean isExactVersion(){return false;}
 }
