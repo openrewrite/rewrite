@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Value;
@@ -42,6 +44,7 @@ import org.openrewrite.maven.tree.ManagedDependency.Defined;
 import org.openrewrite.maven.tree.ManagedDependency.Imported;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
@@ -92,6 +95,7 @@ public class ResolvedPom {
 
     @NonFinal
     @Builder.Default
+    @Getter(AccessLevel.PRIVATE)
     List<ResolvedManagedDependency> dependencyManagement = emptyList();
 
     @NonFinal
@@ -338,6 +342,10 @@ public class ResolvedPom {
                 .collect(Collectors.groupingBy(ResolvedManagedDependency::getProximity))
                 .entrySet().stream().min(Comparator.comparingLong(Map.Entry::getKey)).orElse(null);
         return entry == null ? null : entry.getValue().get(0);
+    }
+
+    public void forEachInDependencyManagement(Consumer<? super ResolvedManagedDependency> consumer) {
+        dependencyManagement.forEach(Objects.requireNonNull(consumer));
     }
 
     @Nullable

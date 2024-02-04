@@ -23,7 +23,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.table.ManagedDependencyGraph;
 import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.ResolvedManagedDependency;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
@@ -55,18 +55,18 @@ public class EffectiveManagedDependencies extends Recipe {
 
     private void emitParent(MavenResolutionResult mrr, ExecutionContext ctx) {
         if (mrr.getParent() != null) {
+            ResolvedPom pom = mrr.getPom();
+            ResolvedPom parentPom = mrr.getParent().getPom();
+            String pomFrom = String.format("%s:%s:%s", pom.getGroupId(), pom.getArtifactId(), pom.getVersion());
             dependencyGraph.insertRow(ctx, new ManagedDependencyGraph.Row(
-                    String.format("%s:%s:%s", mrr.getPom().getGroupId(), mrr.getPom().getArtifactId(), mrr.getPom().getVersion()),
-                    String.format("%s:%s:%s", mrr.getParent().getPom().getGroupId(),
-                            mrr.getParent().getPom().getArtifactId(), mrr.getParent().getPom().getVersion())
+                    pomFrom,
+                    String.format("%s:%s:%s", parentPom.getGroupId(), parentPom.getArtifactId(), parentPom.getVersion())
             ));
 
-            for (ResolvedManagedDependency managed : mrr.getPom().getDependencyManagement()) {
-                dependencyGraph.insertRow(ctx, new ManagedDependencyGraph.Row(
-                        String.format("%s:%s:%s", mrr.getPom().getGroupId(), mrr.getPom().getArtifactId(), mrr.getPom().getVersion()),
-                        String.format("%s:%s:%s", managed.getGroupId(), managed.getArtifactId(), managed.getVersion())
-                ));
-            }
+            pom.forEachInDependencyManagement(managed -> dependencyGraph.insertRow(ctx, new ManagedDependencyGraph.Row(
+					pomFrom,
+					String.format("%s:%s:%s", managed.getGroupId(), managed.getArtifactId(), managed.getVersion())
+			)));
         }
     }
 }

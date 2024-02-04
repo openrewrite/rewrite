@@ -15,14 +15,25 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import org.openrewrite.*;
+import static org.openrewrite.Validated.required;
+import static org.openrewrite.Validated.test;
+import static org.openrewrite.internal.StringUtils.isBlank;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
@@ -32,11 +43,10 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import com.fasterxml.jackson.annotation.JsonCreator;
 
-import static org.openrewrite.Validated.required;
-import static org.openrewrite.Validated.test;
-import static org.openrewrite.internal.StringUtils.isBlank;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -232,13 +242,10 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
 
-                MavenResolutionResult result = getResolutionResult();
-                for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
-                    if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
-                        return scope.isInClasspathOf(managedDependency.getScope());
-                    }
-                }
-                return false;
+				@Nullable
+                ResolvedManagedDependency dependency = getResolutionResult().getPom().getResolvedManagedDependencyWithMinimumProximity(dm ->
+                        groupId.equals(dm.getGroupId()) && artifactId.equals(dm.getArtifactId()));
+                return dependency != null && scope.isInClasspathOf(dependency.getScope());
             }
 
             @SuppressWarnings("ConstantConditions")

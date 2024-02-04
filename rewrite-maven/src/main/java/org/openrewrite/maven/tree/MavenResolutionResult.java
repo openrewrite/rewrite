@@ -152,16 +152,6 @@ public class MavenResolutionResult implements Marker {
         this.modules = modules == null ? emptyList() : new ArrayList<>(modules);
     }
 
-    @Nullable
-    public ResolvedManagedDependency getResolvedManagedDependency(ManagedDependency dependency) {
-        for (ResolvedManagedDependency dm : pom.getDependencyManagement()) {
-            if (dm.getRequested() == dependency || dm.getRequestedBom() == dependency) {
-                return dm;
-            }
-        }
-        return null;
-    }
-
     private static final Scope[] RESOLVE_SCOPES = new Scope[]{Scope.Compile, Scope.Runtime, Scope.Test, Scope.Provided};
 
     public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
