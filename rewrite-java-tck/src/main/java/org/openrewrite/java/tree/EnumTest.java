@@ -16,6 +16,7 @@
 
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -145,6 +146,17 @@ class EnumTest implements RewriteTest {
     void enumUnnecessarilyTerminatedWithSemicolon() {
         rewriteRun(
           java("public enum A { ONE ; }")
+        );
+    }
+
+    @Test
+    @Disabled("""
+      java.lang.AssertionError: Source file was parsed into an LST that contains non-whitespace characters in its whitespace. This is indicative of a bug in the parser.\s
+      public enum A { ONE~~(non-whitespace)~~>, <~~}
+      """)
+    void enumValuesTerminatedWithComma() {
+        rewriteRun(
+          java("public enum A { ONE, }")
         );
     }
 

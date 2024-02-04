@@ -250,6 +250,7 @@ class AddPropertyTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void orderedInsertionMiddle() {
         rewriteRun(
@@ -273,6 +274,7 @@ class AddPropertyTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void orderedInsertionEnd() {
         rewriteRun(

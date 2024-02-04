@@ -42,7 +42,7 @@ public class RecipeEqualsAndHashCodeCallSuper extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
-                new UsesType<>("org.openrewrite.Recipe", false),
+                new UsesType<>("org.openrewrite.Recipe", true),
                 new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
