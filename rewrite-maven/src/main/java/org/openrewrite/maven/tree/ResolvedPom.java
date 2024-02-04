@@ -323,8 +323,13 @@ public class ResolvedPom {
         return dependency == null ? null : getValue(versionFunction.apply(dependency));
     }
 
+    /**
+     * Get the resolved managed dependency with the minimum proximity that matches the given predicate.
+     * @param resolvedManagedDependencyPredicate Predicate for filter to match the resolved managed dependency.
+     * @return Resolved managed dependency with the minimum proximity that matches the given predicate.
+     */
     @Nullable
-    private ResolvedManagedDependency getResolvedManagedDependencyWithMinimumProximity(
+    public ResolvedManagedDependency getResolvedManagedDependencyWithMinimumProximity(
             Predicate<ResolvedManagedDependency> resolvedManagedDependencyPredicate) {
         // Group dependencies by proximity, choose the list with lowest proximity
         // and return the first dependency in the list, if any found

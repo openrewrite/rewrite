@@ -146,30 +146,30 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         if (!isManagedDependencyTag()) {
             return false;
         }
+
         Xml.Tag tag = getCursor().getValue();
-        for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
-            if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
-                ManagedDependency req = dm.getRequested();
-                String reqGroup = req.getGroupId();
-                if (reqGroup.equals(tag.getChildValue("groupId").orElse(null)) &&
-                    req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                    dm.getScope() == tag.getChildValue("scope").map(Scope::fromName).orElse(null)) {
-                    return true;
-                }
-            }
-            if (dm.getBomGav() != null) {
-                if (matchesGlob(dm.getBomGav().getGroupId(), groupId) && matchesGlob(dm.getBomGav().getArtifactId(), artifactId)) {
-                    ManagedDependency requestedBom = dm.getRequestedBom();
-                    //noinspection ConstantConditions
-                    if (requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
-                        requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null))) {
-                        return true;
-                    }
-                }
-            }
+        String groupIdFromTag = tag.getChildValue("groupId").orElse(null);
+        String artifactIdFromTag = tag.getChildValue("artifactId").orElse(null);
+        Scope scope = tag.getChildValue("scope").map(Scope::fromName).orElse(null);
+
+		if (getResolutionResult().getPom().getResolvedManagedDependencyWithMinimumProximity(
+				dm -> matchesGlob(dm.getGroupId(), groupId) &&
+						matchesGlob(dm.getArtifactId(), artifactId) &&
+						dm.getRequested() != null &&
+						dm.getRequested().getGroupId().equals(groupIdFromTag) &&
+						dm.getRequested().getArtifactId().equals(artifactIdFromTag) &&
+						dm.getScope() == scope) != null) {
+            return true;
         }
-        return false;
-    }
+
+		return getResolutionResult().getPom().getResolvedManagedDependencyWithMinimumProximity(
+				dm -> dm.getBomGav() != null &&
+						matchesGlob(dm.getBomGav().getGroupId(), groupId) &&
+						matchesGlob(dm.getBomGav().getArtifactId(), artifactId) &&
+						dm.getRequestedBom() != null &&
+						dm.getRequestedBom().getGroupId().equals(groupIdFromTag) &&
+						dm.getRequestedBom().getArtifactId().equals(artifactIdFromTag)) != null;
+	}
 
     public boolean isManagedDependencyImportTag(String groupId, String artifactId) {
         if (!isManagedDependencyTag(groupId, artifactId)) {
@@ -252,13 +252,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     @Nullable
     public ResolvedManagedDependency findManagedDependency(Xml.Tag tag) {
-        String groupId = getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()));
-        String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
-        String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
-        if (groupId != null && artifactId != null) {
-            return findManagedDependency(groupId, artifactId, classifier);
-        }
-        return null;
+        ResolvedPom pom = getResolutionResult().getPom();
+        String groupId = pom.getValue(tag.getChildValue("groupId").orElse(pom.getGroupId()));
+        String artifactId = pom.getValue(tag.getChildValue("artifactId").orElse(""));
+        String classifier = pom.getValue(tag.getChildValue("classifier").orElse(null));
+        return (groupId != null && artifactId != null) ? findManagedDependency(groupId, artifactId, classifier) : null;
     }
 
     @Nullable
@@ -268,14 +266,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     @Nullable
     private ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier) {
-        for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
-            if (groupId.equals(d.getGroupId()) &&
-                artifactId.equals(d.getArtifactId()) &&
-                (classifier == null || classifier.equals(d.getClassifier()))) {
-                return d;
-            }
-        }
-        return null;
+        return getResolutionResult().getPom().getResolvedManagedDependencyWithMinimumProximity(dm ->
+                groupId.equals(dm.getGroupId()) &&
+                artifactId.equals(dm.getArtifactId()) &&
+                (classifier == null || classifier.equals(dm.getClassifier())));
     }
 
     @Nullable
