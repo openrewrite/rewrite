@@ -62,22 +62,22 @@ public class UseTreeRandomId extends Recipe {
                         return n.withArguments(ListUtils.mapFirst(n.getArguments(), this::maybeReplace));
                     }
 
-                    private Expression maybeReplace(Expression a) {
-                        if (!randomUUIDMatcher.matches((J.MethodInvocation) a)) {
-                            return a;
+                    private Expression maybeReplace(Expression expression) {
+                        if (!randomUUIDMatcher.matches(expression)) {
+                            return expression;
                         }
                         maybeAddImport("org.openrewrite.Tree");
                         maybeRemoveImport("java.util.UUID");
 
-                        J.MethodInvocation m = (J.MethodInvocation) a;
+                        J.MethodInvocation mi = (J.MethodInvocation) expression;
                         JavaType.Class classType = JavaType.ShallowClass.build("org.openrewrite.Tree");
-                        JavaType.Method methodType = m.getMethodType().withName("randomId").withDeclaringType(classType);
-                        m = m.withName(m.getName().withSimpleName("randomId").withType(methodType));
-                        if (m.getSelect() instanceof J.Identifier) {
-                            return m.withSelect(((J.Identifier) m.getSelect()).withSimpleName("Tree").withType(classType));
+                        JavaType.Method methodType = mi.getMethodType().withName("randomId").withDeclaringType(classType);
+                        mi = mi.withName(mi.getName().withSimpleName("randomId").withType(methodType));
+                        if (mi.getSelect() instanceof J.Identifier) {
+                            return mi.withSelect(((J.Identifier) mi.getSelect()).withSimpleName("Tree").withType(classType));
                         }
-                        return m.withSelect(new J.Identifier(
-                                Tree.randomId(), m.getPrefix(), m.getMarkers(), Collections.emptyList(), "Tree", classType, null));
+                        return mi.withSelect(new J.Identifier(
+                                Tree.randomId(), mi.getPrefix(), mi.getMarkers(), Collections.emptyList(), "Tree", classType, null));
                     }
                 });
     }
