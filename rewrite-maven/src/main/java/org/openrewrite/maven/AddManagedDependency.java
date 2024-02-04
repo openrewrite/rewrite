@@ -219,19 +219,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
 
             @Nullable
             private String existingManagedDependencyVersion() {
-                return getResolutionResult().getPom().getDependencyManagement().stream()
-                        .map(resolvedManagedDep -> {
-                            if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
-                                return resolvedManagedDep.getGav().getVersion();
-                            } else if (resolvedManagedDep.getRequestedBom() != null
-                                       && resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId)
-                                       && resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
-                                return resolvedManagedDep.getRequestedBom().getVersion();
-                            }
-                            return null;
-                        })
-                        .filter(Objects::nonNull)
-                        .findFirst().orElse(null);
+				return getResolutionResult().getPom().getManagedVersionAlsoFromBom(groupId, artifactId, type, classifier);
             }
 
             @Nullable

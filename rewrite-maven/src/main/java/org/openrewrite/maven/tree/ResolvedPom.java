@@ -306,6 +306,17 @@ public class ResolvedPom {
     }
 
     @Nullable
+    public String getManagedVersionAlsoFromBom(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
+		return getVersionOfResolvedManagedDependencyWithMinimumProximity(
+				dm -> dm.matches(groupId, artifactId, type, classifier) ||
+                        (dm.getRequestedBom() != null
+                        && dm.getRequestedBom().getGroupId().equals(groupId)
+                        && dm.getRequestedBom().getArtifactId().equals(artifactId)),
+                dm1 -> dm1.matches(groupId, artifactId, type, classifier) ? dm1.getVersion() :
+                        dm1.getRequestedBom() == null ? null : dm1.getRequestedBom().getVersion());
+    }
+
+    @Nullable
     private String getVersionOfResolvedManagedDependencyWithMinimumProximity(
             Predicate<ResolvedManagedDependency> resolvedManagedDependencyPredicate, Function<ResolvedManagedDependency, String> versionFunction) {
         ResolvedManagedDependency dependency = getResolvedManagedDependencyWithMinimumProximity(resolvedManagedDependencyPredicate);
