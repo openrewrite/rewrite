@@ -16,10 +16,11 @@
 package org.openrewrite.java.recipes;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.search.FindAnnotations;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -40,21 +41,28 @@ public class RecipeEqualsAndHashCodeCallSuper extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-
-            @Override
-            public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-                if (TypeUtils.isOfClassType(annotation.getType(), "lombok.EqualsAndHashCode") &&
-                    getCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration) {
-                    return (J.Annotation) new JavaIsoVisitor<ExecutionContext>() {
-                        @Override
-                        public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
-                            return literal.withValue(false).withValueSource("false");
+        return Preconditions.check(
+                new UsesType<>("org.openrewrite.Recipe", false),
+                new JavaIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                        if (TypeUtils.isOfClassType(annotation.getType(), "lombok.EqualsAndHashCode") &&
+                            getCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration) {
+                            return (J.Annotation) new JavaIsoVisitor<ExecutionContext>() {
+                                @Override
+                                public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+                                    if (assignment.getVariable() instanceof J.Identifier &&
+                                        "callSuper".equals(((J.Identifier) assignment.getVariable()).getSimpleName()) &&
+                                        J.Literal.isLiteralValue(assignment.getAssignment(), true)) {
+                                        return assignment.withAssignment(((J.Literal) assignment.getAssignment())
+                                                .withValue(false).withValueSource("false"));
+                                    }
+                                    return super.visitAssignment(assignment, ctx);
+                                }
+                            }.visitNonNull(annotation, ctx, getCursor().getParentOrThrow());
                         }
-                    }.visitNonNull(annotation, ctx, getCursor().getParentOrThrow());
-                }
-                return super.visitAnnotation(annotation, ctx);
-            }
-        };
+                        return super.visitAnnotation(annotation, ctx);
+                    }
+                });
     }
 }
