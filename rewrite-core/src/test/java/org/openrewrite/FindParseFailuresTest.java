@@ -25,7 +25,7 @@ import org.openrewrite.text.PlainTextParser;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
 public class FindParseFailuresTest implements RewriteTest {

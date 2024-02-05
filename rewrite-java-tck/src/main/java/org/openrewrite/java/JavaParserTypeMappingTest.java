@@ -35,7 +35,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.tree.TypeUtils.*;
+import static org.openrewrite.java.tree.TypeUtils.asClass;
+import static org.openrewrite.java.tree.TypeUtils.asGeneric;
+import static org.openrewrite.java.tree.TypeUtils.asParameterized;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "StatementWithEmptyBody"})

@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class JenkinsFileTest implements RewriteTest {
+class JenkinsFileTest implements RewriteTest {
 
     @Test
     void jenkinsfile() {

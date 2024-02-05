@@ -576,7 +576,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   REQUIRES_NEW,
                   SUPPORTS,
                   NOT_SUPPORTED,
-                  NEVER,
+                  NEVER
               }
               """
           ),

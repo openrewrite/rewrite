@@ -27,7 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class JavaTemplateMatchTest implements RewriteTest {
+class JavaTemplateMatchTest implements RewriteTest {
 
     @Test
     void nonJavaCode() {

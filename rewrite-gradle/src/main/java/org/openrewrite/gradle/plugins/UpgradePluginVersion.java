@@ -37,9 +37,10 @@ import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.Semver;
 
-import java.util.*;
-
-import static java.util.Objects.requireNonNull;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)

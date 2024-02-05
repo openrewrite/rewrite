@@ -40,9 +40,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.util.GradleWrapper.*;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
 import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.SourceSpecs.*;
+import static org.openrewrite.test.SourceSpecs.dir;
+import static org.openrewrite.test.SourceSpecs.other;
+import static org.openrewrite.test.SourceSpecs.text;
 
 @SuppressWarnings("UnusedProperty")
 class UpdateGradleWrapperTest implements RewriteTest {
@@ -52,8 +57,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
     };
 
     // Gradle wrapper script text for 7.4.2
-    private static final String GRADLEW_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("/gradlew"));
-    private static final String GRADLEW_BAT_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("/gradlew.bat"));
+    private static final String GRADLEW_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-7.4.2"));
+    private static final String GRADLEW_BAT_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-7.4.2.bat"));
 
     private final SourceSpecs gradlew = text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty));
     private final SourceSpecs gradlewBat = text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty));
