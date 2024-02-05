@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.utilities.MavenMetadataWrapper;
 import org.openrewrite.maven.utilities.RetainVersions;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -30,7 +31,6 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -339,10 +339,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                 }
 
                 try {
-                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    List<String> versions = mavenMetadata.getVersioning().getVersions().stream()
-                            .filter(v -> versionComparator.isValid(finalVersion, v))
-                            .collect(Collectors.toList());
+                    List<String> versions = new MavenMetadataWrapper(
+                            metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx)))
+                            .filterWithVersionComparator(versionComparator, finalVersion);
                     // handle upgrades from non semver versions like "org.springframework.cloud:spring-cloud-dependencies:Camden.SR5"
                     if (!Semver.isVersion(finalVersion) && !versions.isEmpty()) {
                         versions.sort(versionComparator);

@@ -20,101 +20,21 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
-import static org.openrewrite.Validated.test;
-import static org.openrewrite.internal.StringUtils.isBlank;
-
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
-    @EqualsAndHashCode.Exclude
-    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
-
-    // there are several implicitly defined version properties that we should never attempt to update
-    private static final Set<String> implicitlyDefinedVersionProperties = new HashSet<>(Arrays.asList(
-            "${version}", "${project.version}", "${pom.version}", "${project.parent.version}"
-    ));
-
-    @Option(displayName = "Old groupId",
-            description = "The old groupId to replace. The groupId is the first part of a managed dependency coordinate `com.google.guava:guava:VERSION`.",
-            example = "org.openrewrite.recipe")
-    String oldGroupId;
-
-    @Option(displayName = "Old artifactId",
-            description = "The old artifactId to replace. The artifactId is the second part of a managed dependency coordinate `com.google.guava:guava:VERSION`.",
-            example = "rewrite-testing-frameworks")
-    String oldArtifactId;
-
-    @Option(displayName = "New groupId",
-            description = "The new groupId to use.",
-            example = "corp.internal.openrewrite.recipe")
-    String newGroupId;
-
-    @Option(displayName = "New artifactId",
-            description = "The new artifactId to use.",
-            example = "rewrite-testing-frameworks")
-    String newArtifactId;
-
-    @Option(displayName = "New version",
-            description = "The new version to use.",
-            example = "2.0.0",
-            required = false)
-    @Nullable
-    String newVersion;
-
-    @Option(displayName = "Version pattern",
-            description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
-            example = "-jre",
-            required = false)
-    @Nullable
-    String versionPattern;
-
+public class ChangeManagedDependencyGroupIdAndArtifactId extends AbstractChangeDependencyGroupIdAndArtifactId {
     public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion) {
-        this.oldGroupId = oldGroupId;
-        this.oldArtifactId = oldArtifactId;
-        this.newGroupId = newGroupId;
-        this.newArtifactId = newArtifactId;
-        this.newVersion = newVersion;
-        this.versionPattern = null;
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, null);
     }
 
     @JsonCreator
     public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
-        this.oldGroupId = oldGroupId;
-        this.oldArtifactId = oldArtifactId;
-        this.newGroupId = newGroupId;
-        this.newArtifactId = newArtifactId;
-        this.newVersion = newVersion;
-        this.versionPattern = versionPattern;
-    }
-
-    @Override
-    public Validated<Object> validate() {
-        Validated<Object> validated = super.validate();
-        if (newVersion != null) {
-            validated = validated.and(Semver.validate(newVersion, versionPattern));
-        }
-        validated =
-            validated.and(test(
-                "coordinates",
-                "newGroupId OR newArtifactId must be different from before",
-                this,
-                r -> {
-                    boolean sameGroupId = isBlank(r.newGroupId) || Objects.equals(r.oldGroupId, r.newGroupId);
-                    boolean sameArtifactId = isBlank(r.newArtifactId) || Objects.equals(r.oldArtifactId, r.newArtifactId);
-                    return !(sameGroupId && sameArtifactId);
-                }
-            ));
-        return validated;
+        super(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern);
     }
 
     @Override
@@ -129,15 +49,11 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new MavenIsoVisitor<ExecutionContext>() {
-            @Nullable
-            final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
-            @Nullable
-            private Collection<String> availableVersions;
+        return new AbstractChangeDependencyGroupIdAndArtifactIdVisitor() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
 
-                Xml.Tag t = super.visitTag(tag, ctx);
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
 
                 if (isManagedDependencyTag(oldGroupId, oldArtifactId)) {
                     Optional<Xml.Tag> groupIdTag = t.getChild("groupId");
@@ -170,24 +86,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                 }
                 return t;
-            }
-
-            @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId) throws MavenDownloadingException {
-                if (versionComparator == null) {
-                    return newVersion;
-                }
-                if (availableVersions == null) {
-                    availableVersions = new ArrayList<>();
-                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(newVersion, v)) {
-                            availableVersions.add(v);
-                        }
-                    }
-
-                }
-                return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
             }
         };
     }
