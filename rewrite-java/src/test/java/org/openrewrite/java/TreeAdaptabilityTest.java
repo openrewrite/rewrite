@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
