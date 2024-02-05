@@ -29,7 +29,7 @@ import java.nio.file.Paths;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class FindRepositoryOrderTest implements RewriteTest {
+class FindRepositoryOrderTest implements RewriteTest {
 
     @Test
     void findRepositoryOrder() {

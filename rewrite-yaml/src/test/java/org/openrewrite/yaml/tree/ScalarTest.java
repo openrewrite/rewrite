@@ -23,7 +23,7 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
 
-public class ScalarTest implements RewriteTest {
+class ScalarTest implements RewriteTest {
 
     @Test
     void multilineScalar() {

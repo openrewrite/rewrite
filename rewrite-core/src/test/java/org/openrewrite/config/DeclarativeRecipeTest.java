@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class DeclarativeRecipeTest implements RewriteTest {
+class DeclarativeRecipeTest implements RewriteTest {
 
     @Test
     void precondition() {

@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class ConstructorTest implements RewriteTest {
+class ConstructorTest implements RewriteTest {
 
     @Test
     void inParens() {

@@ -30,7 +30,7 @@ import java.util.Objects;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class SemanticallyEqualTest {
+class SemanticallyEqualTest {
 
     private final JavaParser javaParser = JavaParser.fromJavaVersion().build();
 
