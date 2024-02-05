@@ -18,6 +18,8 @@ package org.openrewrite.gradle;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -35,7 +37,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       """, quoteCharacter = '`')
     void sourceAndTarget(String beforeSourceCompatibility, String beforeTargetCompatibility, String afterSourceCompatibility, String afterTargetCompatibility) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -60,7 +62,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void sourceOnly() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -85,7 +87,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void targetOnly() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.target, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.target, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -123,7 +125,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       """, quoteCharacter = '`')
     void styleChange(String declarationStyle, String beforeCompatibility, String afterCompatibility) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(8, null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(8, null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, null, null)),
           buildGradle(
             """
               plugins {
@@ -148,7 +150,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void handlesJavaExtension() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -177,7 +179,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void handlesJavaToolchains() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -214,7 +216,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       """)
     void handlesJavaVersionMethodInvocation(int version, String before, String after) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(version, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(version, null, null, null, null, null)),
           buildGradle(
             """
               java {
@@ -243,7 +245,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       """, quoteCharacter = '`')
     void allOptions(String compatibilityType, String declarationStyle, String expectedSourceCompatibility, String expectedTargetCompatibility) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.valueOf(compatibilityType), UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.valueOf(compatibilityType), UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, null, null)),
           buildGradle(
             """
               plugins {
@@ -269,7 +271,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void onlyModifyCompatibilityAssignments() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
           buildGradle(
             """
               version = "0.1.0-SNAPSHOT"
@@ -294,7 +296,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void doNotDowngradeByDefault() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -316,7 +318,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void doDowngradeWhenRequested() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, true)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, true, null, null)),
           buildGradle(
             """
               plugins {
@@ -345,6 +347,96 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      8,Enum,JavaVersion.VERSION_1_8
+      8,Number,1.8
+      8,String,'1.8'
+      11,Enum,JavaVersion.VERSION_11
+      11,Number,11
+      11,String,'11'
+      """, quoteCharacter = '`')
+    void addSourceCompatibilityIfMissing(String version, String declarationStyle, String sourceCompatibility) {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(Integer.valueOf(version), null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, true, false)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              sourceCompatibility = %s
+              
+              """.formatted(sourceCompatibility)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      8,Enum,JavaVersion.VERSION_1_8
+      8,Number,1.8
+      8,String,'1.8'
+      11,Enum,JavaVersion.VERSION_11
+      11,Number,11
+      11,String,'11'
+      """, quoteCharacter = '`')
+    void addTargetCompatibilityIfMissing(String version, String declarationStyle, String targetCompatibility) {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(Integer.valueOf(version), null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, false, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              targetCompatibility = %s
+              
+              """.formatted(targetCompatibility)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      8,Enum,JavaVersion.VERSION_1_8,JavaVersion.VERSION_1_8
+      8,Number,1.8,1.8
+      8,String,'1.8','1.8'
+      11,Enum,JavaVersion.VERSION_11,JavaVersion.VERSION_11
+      11,Number,11,11
+      11,String,'11','11'
+      """, quoteCharacter = '`')
+    void addSourceAndTargetCompatibilityIfMissing(String version, String declarationStyle, String sourceCompatibility, String targetCompatibility) {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(Integer.valueOf(version), null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, true, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              sourceCompatibility = %s
+              targetCompatibility = %s
+              
+              """.formatted(sourceCompatibility, targetCompatibility)
           )
         );
     }
