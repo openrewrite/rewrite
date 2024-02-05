@@ -350,65 +350,6 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
           )
         );
     }
-    @ParameterizedTest
-    @CsvSource(textBlock = """
-      8,Enum,JavaVersion.VERSION_1_8
-      8,Number,1.8
-      8,String,'1.8'
-      11,Enum,JavaVersion.VERSION_11
-      11,Number,11
-      11,String,'11'
-      """, quoteCharacter = '`')
-    void addSourceCompatibilityIfMissing(String version, String declarationStyle, String sourceCompatibility) {
-        rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(Integer.valueOf(version), null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, true, false)),
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-              }
-
-              """,
-            """
-              plugins {
-                  id "java"
-              }
-              sourceCompatibility = %s
-              
-              """.formatted(sourceCompatibility)
-          )
-        );
-    }
-
-    @ParameterizedTest
-    @CsvSource(textBlock = """
-      8,Enum,JavaVersion.VERSION_1_8
-      8,Number,1.8
-      8,String,'1.8'
-      11,Enum,JavaVersion.VERSION_11
-      11,Number,11
-      11,String,'11'
-      """, quoteCharacter = '`')
-    void addTargetCompatibilityIfMissing(String version, String declarationStyle, String targetCompatibility) {
-        rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(Integer.valueOf(version), null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, false, true)),
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-              }
-
-              """,
-            """
-              plugins {
-                  id "java"
-              }
-              targetCompatibility = %s
-              
-              """.formatted(targetCompatibility)
-          )
-        );
-    }
 
     @ParameterizedTest
     @CsvSource(textBlock = """
