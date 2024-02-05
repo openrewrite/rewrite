@@ -112,7 +112,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndTestSourceSet() {
+        void standardMainAndTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
               srcTestJava(assertTestIsFound())
@@ -121,7 +121,7 @@ public class IsOrIsNotLikelyTestTest {
 
         @Test
         @SuppressWarnings("SpellCheckingInspection")
-        void testStandardMainAndIntegTestSourceSet() {
+        void standardMainAndIntegTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
               srcIntegTestJava(assertTestIsFound())
@@ -129,7 +129,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndCompatibilityTestSourceSet() {
+        void standardMainAndCompatibilityTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
               srcCompatibilityTestJava(assertTestIsFound())
@@ -153,7 +153,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndTestSourceSet() {
+        void standardMainAndTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),
               srcTestJava(assertTestNoChanges())
@@ -162,7 +162,7 @@ public class IsOrIsNotLikelyTestTest {
 
         @Test
         @SuppressWarnings("SpellCheckingInspection")
-        void testStandardMainAndIntegTestSourceSet() {
+        void standardMainAndIntegTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),
               srcIntegTestJava(assertTestNoChanges())
@@ -170,7 +170,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndCompatibilityTestSourceSet() {
+        void standardMainAndCompatibilityTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),
               srcCompatibilityTestJava(assertTestNoChanges())
