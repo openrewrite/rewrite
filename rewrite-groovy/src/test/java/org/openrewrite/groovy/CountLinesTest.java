@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class CountLinesTest implements RewriteTest {
+class CountLinesTest implements RewriteTest {
 
     @Test
     void countsLines() {

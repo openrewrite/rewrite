@@ -18,7 +18,6 @@ package org.openrewrite.yaml;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.io.StringReader;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

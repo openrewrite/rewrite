@@ -16,7 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.groovy.GroovyParserTest;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings("GroovyUnusedAssignment")
-class LiteralTest implements GroovyParserTest {
+class LiteralTest implements RewriteTest {
 
     @SuppressWarnings("GroovyConstantConditional")
     @Test

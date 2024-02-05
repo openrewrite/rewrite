@@ -170,10 +170,20 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     return entry;
                 });
 
-                return s1.withEntries(ListUtils.concatAll(
+                List<Yaml.Sequence.Entry> entries = ListUtils.concatAll(
                         s1.getEntries().stream().filter(entry -> !mutatedEntries.contains(entry))
                                 .collect(Collectors.toList()),
-                        ListUtils.map(mutatedEntries, entry -> autoFormat(entry, p, cursor))));
+                        ListUtils.map(mutatedEntries, entry -> autoFormat(entry, p, cursor)));
+
+                if (entries.size() != s1.getEntries().size()) {
+                    return s1.withEntries(entries);
+                }
+                for (int i = 0; i < s1.getEntries().size(); i++) {
+                    if (entries.get(i) != s1.getEntries().get(i)) {
+                        return s1.withEntries(entries);
+                    }
+                }
+                return s1;
             }
         }
     }

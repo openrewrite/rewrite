@@ -20,12 +20,14 @@ import lombok.experimental.FieldDefaults;
 import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
+import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -155,6 +157,15 @@ public interface Xml extends Tree {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new XmlPrinter<>();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            if(WhitespaceValidationService.class.getName().equals(service.getName())) {
+                return (T) new XmlWhitespaceValidationService();
+            }
+            return SourceFile.super.service(service);
         }
     }
 
