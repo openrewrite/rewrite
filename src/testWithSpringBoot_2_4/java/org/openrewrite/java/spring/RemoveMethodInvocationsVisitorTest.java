@@ -26,7 +26,7 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"ResultOfMethodCallIgnored", "CodeBlock2Expr", "RedundantThrows", "Convert2MethodRef", "EmptyTryBlock", "CatchMayIgnoreException", "EmptyFinallyBlock", "StringBufferReplaceableByString", "UnnecessaryLocalVariable"})
-public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
+class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     private Recipe createRemoveMethodsRecipe(String... methods) {
         return toRecipe(() -> new RemoveMethodInvocationsVisitor(List.of(methods)));
