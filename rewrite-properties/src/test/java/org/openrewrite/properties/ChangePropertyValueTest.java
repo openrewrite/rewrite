@@ -23,6 +23,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("UnusedProperty")
@@ -158,5 +159,41 @@ class ChangePropertyValueTest implements RewriteTest {
             "my.prop=foo"
           )
         );
+    }
+
+    @Test
+    void partialMatchRegex() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("*", "[replaced:$1]", "\\[replaceme:(.*?)]", true, null)),
+          properties("""
+            multiple=[replaceme:1][replaceme:2]
+            multiple-prefixed=test[replaceme:1]test[replaceme:2]
+            multiple-suffixed=[replaceme:1]test[replaceme:2]test
+            multiple-both=test[replaceme:1]test[replaceme:2]test
+            """, """
+            multiple=[replaced:1][replaced:2]
+            multiple-prefixed=test[replaced:1]test[replaced:2]
+            multiple-suffixed=[replaced:1]test[replaced:2]test
+            multiple-both=test[replaced:1]test[replaced:2]test
+            """)
+        );
+    }
+
+    @Test
+    void partialMatchNonRegex() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("*", "replaced", "replaceme", null, null)),
+          properties("""
+            multiple=[replaceme:1][replaceme:2]
+            multiple-prefixed=test[replaceme:1]test[replaceme:2]
+            multiple-suffixed=[replaceme:1]test[replaceme:2]test
+            multiple-both=test[replaceme:1]test[replaceme:2]test
+            """)
+        );
+    }
+
+    @Test
+    void validatesThatOldValueIsRequiredIfRegexEnabled() {
+        assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null).validate().isInvalid());
     }
 }

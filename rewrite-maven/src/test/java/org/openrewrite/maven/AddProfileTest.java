@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.xml.Assertions.xml;
 
-public class AddProfileTest implements RewriteTest {
+class AddProfileTest implements RewriteTest {
 
 
     @DocumentExample

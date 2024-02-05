@@ -43,6 +43,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
+    static final XPathMatcher PROFILE_PLUGIN_MATCHER = new XPathMatcher("/project/profiles/*/build/plugins/plugin");
 
     private transient MavenResolutionResult resolutionResult;
 
@@ -189,7 +190,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isPluginTag() {
-        return PLUGIN_MATCHER.matches(getCursor());
+        return PLUGIN_MATCHER.matches(getCursor()) || PROFILE_PLUGIN_MATCHER.matches(getCursor());
     }
 
     public boolean isPluginTag(String groupId, @Nullable String artifactId) {

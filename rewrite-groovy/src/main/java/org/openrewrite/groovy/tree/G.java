@@ -21,6 +21,8 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
@@ -134,6 +136,15 @@ public interface G extends J {
 
         public G.CompilationUnit withPackageDeclaration(Package packageDeclaration) {
             return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            if(WhitespaceValidationService.class.getName().equals(service.getName())) {
+                return (T) new GroovyWhitespaceValidationService();
+            }
+            return JavaSourceFile.super.service(service);
         }
 
         List<JRightPadded<Statement>> statements;

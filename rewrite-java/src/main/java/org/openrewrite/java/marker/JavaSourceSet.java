@@ -22,19 +22,16 @@ import io.github.classgraph.ScanResult;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SourceSet;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -56,45 +53,51 @@ public class JavaSourceSet implements SourceSet {
      *                            when true a much more memory-intensive, time-consuming approach will extract full type information
      */
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath,
-                                      JavaTypeCache typeCache, boolean fullTypeInformation) {
-        List<JavaType.FullyQualified> types;
-        // Load JRE-provided types
-        try (ScanResult scanResult = new ClassGraph()
-                .enableClassInfo()
-                .enableSystemJarsAndModules()
-                .acceptPackages("java")
-                .ignoreClassVisibility()
-                .scan()) {
-            Map<String, List<String>> packagesToTypes = packagesToTypeDeclarations(scanResult);
-            // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
-            packagesToTypes.computeIfAbsent("java.lang", p -> new ArrayList<>())
-                    .add("java.lang.Object");
-            types = typesFrom(packagesToTypes, typeCache, Collections.emptyList(), fullTypeInformation);
+                                      JavaTypeCache ignore, boolean fullTypeInformation) {
+        if (fullTypeInformation) {
+            throw new UnsupportedOperationException();
         }
-        if (classpath.iterator().hasNext()) {
+
+        List<String> typeNames;
+        if (!classpath.iterator().hasNext()) {
+            // Only load JRE-provided types
+            try (ScanResult scanResult = new ClassGraph()
+                    .enableClassInfo()
+                    .enableSystemJarsAndModules()
+                    .acceptPackages("java")
+                    .ignoreClassVisibility()
+                    .scan()) {
+                typeNames = packagesToTypeDeclarations(scanResult);
+            }
+        } else {
             // Load types from the classpath
             try (ScanResult scanResult = new ClassGraph()
                     .overrideClasspath(classpath)
-                    .enableMemoryMapping()
+                    .enableSystemJarsAndModules()
                     .enableClassInfo()
                     .ignoreClassVisibility()
                     .scan()) {
-                types.addAll(typesFrom(packagesToTypeDeclarations(scanResult), typeCache, classpath, fullTypeInformation));
+                typeNames = packagesToTypeDeclarations(scanResult);
             }
         }
 
-        return new JavaSourceSet(randomId(), sourceSetName, types);
+        // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
+        typeNames.add("java.lang.Object");
+        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames));
     }
 
     /*
      * Create a map of package names to types contained within that package. Type names are not fully qualified, except for type parameter bounds.
      * e.g.: "java.util" -> [List, Date]
      */
-    private static Map<String, List<String>> packagesToTypeDeclarations(ScanResult scanResult) {
-        Map<String, List<String>> result = new HashMap<>();
+    private static List<String> packagesToTypeDeclarations(ScanResult scanResult) {
+        List<String> result = new ArrayList<>();
         for (ClassInfo classInfo : scanResult.getAllClasses()) {
             // Skip private classes, allowing package-private
             if (classInfo.isAnonymousInnerClass() || classInfo.isPrivate() || classInfo.isSynthetic() || classInfo.getName().contains(".enum.")) {
+                continue;
+            }
+            if (classInfo.isStandardClass() && !classInfo.getName().startsWith("java.")) {
                 continue;
             }
             // Although the classfile says its bytecode version is 50 (within the range Java 8 supports),
@@ -107,83 +110,17 @@ public class JavaSourceSet implements SourceSet {
             if (typeDeclaration == null) {
                 continue;
             }
-            result.computeIfAbsent(classInfo.getPackageName(), p -> new ArrayList<>())
-                    .add(typeDeclaration);
+            result.add(typeDeclaration);
         }
         return result;
     }
 
-    private static List<JavaType.FullyQualified> typesFrom(
-            Map<String, List<String>> packagesToTypes,
-            JavaTypeCache typeCache,
-            Collection<Path> classpath,
-            boolean fullTypeInformation
-    ) {
-        List<JavaType.FullyQualified> types = new ArrayList<>();
-        if (fullTypeInformation) {
-            @Language("java")
-            String[] typeStubs = typeStubsFor(packagesToTypes);
-
-            ExecutionContext noRecursiveJavaSourceSet = new InMemoryExecutionContext();
-            noRecursiveJavaSourceSet.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
-
-            JavaParser jp = JavaParser.fromJavaVersion()
-                    .typeCache(typeCache)
-                    .classpath(classpath)
-                    .build();
-
-            jp.parse(noRecursiveJavaSourceSet, typeStubs).forEach(sourceFile -> {
-                J.CompilationUnit cu = (J.CompilationUnit) sourceFile;
-                if (!cu.getClasses().isEmpty()) {
-                    J.Block body = cu.getClasses().get(0).getBody();
-                    for (Statement s : body.getStatements()) {
-                        JavaType type = ((J.MethodDeclaration) s).getType();
-                        if (type instanceof JavaType.FullyQualified) {
-                            types.add((JavaType.FullyQualified) type);
-                        }
-                    }
-                }
-            });
-        } else {
-            for (Map.Entry<String, List<String>> packageToTypes : packagesToTypes.entrySet()) {
-                for (String className : packageToTypes.getValue()) {
-                    types.add(JavaType.ShallowClass.build(className));
-                }
-            }
+    private static List<JavaType.FullyQualified> typesFrom(List<String> typeNames) {
+        List<JavaType.FullyQualified> types = new ArrayList<>(typeNames.size());
+        for (String typeName : typeNames) {
+            types.add(JavaType.ShallowClass.build(typeName));
         }
         return types;
-    }
-
-    /**
-     * Produce Java source code that, when compiled, contains all the types represented in packagesToTypeNames.
-     */
-    private static String[] typeStubsFor(Map<String, List<String>> packagesToTypeNames) {
-        String[] result = new String[packagesToTypeNames.size()];
-        int i = 0;
-        for (Map.Entry<String, List<String>> packageToTypes : packagesToTypeNames.entrySet()) {
-            boolean isJreType = packageToTypes.getKey().startsWith("java.");
-            StringBuilder sb = new StringBuilder("package ");
-            if (isJreType) {
-                // Avoid java compiler complaints that we're redefining java.lang, etc.
-                // Only apply to java provided types because this limits our ability to get type information from package-private classes
-                sb.append("rewrite.");
-            }
-            sb.append(packageToTypes.getKey()).append(";\n")
-                    .append("abstract class $RewriteTypeStub {\n");
-
-            List<String> value = packageToTypes.getValue();
-            for (int j = 0; j < value.size(); j++) {
-                String type = value.get(j);
-                if (type == null) {
-                    continue;
-                }
-                sb.append("    abstract ").append(type).append(" t").append(j).append("();\n");
-            }
-            sb.append("}");
-            result[i] = sb.toString();
-            i++;
-        }
-        return result;
     }
 
     /**

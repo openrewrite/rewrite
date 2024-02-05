@@ -67,4 +67,26 @@ class CastTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void groovyCastAndInvokeMethod() {
+        rewriteRun(
+          groovy(
+            """
+              ( "" as String ).toString()
+              """
+          )
+        );
+    }
+
+    @Test
+    void javaCastAndInvokeMethod() {
+        rewriteRun(
+          groovy(
+            """
+              ( (String) "" ).toString()
+              """
+          )
+        );
+    }
 }

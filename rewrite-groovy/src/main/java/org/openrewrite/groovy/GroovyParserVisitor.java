@@ -47,6 +47,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -460,11 +461,21 @@ public class GroovyParserVisitor {
 
             TypeTree returnType = visitTypeTree(method.getReturnType());
 
+            // Method name might be in quotes
+            Space namePrefix = whitespace();
+            String methodName;
+            if(source.startsWith(method.getName(), cursor)) {
+                methodName = method.getName();
+            } else {
+                char openingQuote = source.charAt(cursor);
+                methodName = openingQuote + method.getName() + openingQuote;
+            }
+            cursor += methodName.length();
             J.Identifier name = new J.Identifier(randomId(),
-                    sourceBefore(method.getName()),
+                    namePrefix,
                     Markers.EMPTY,
                     emptyList(),
-                    method.getName(),
+                    methodName,
                     null, null);
 
             RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(method, this);
@@ -588,20 +599,48 @@ public class GroovyParserVisitor {
         }
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
-            AtomicInteger insideParenthesesLevel = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
+            Integer insideParenthesesLevel;
+            Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
+            if(rawIpl instanceof AtomicInteger) {
+                // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
+                insideParenthesesLevel = ((AtomicInteger) rawIpl).get();
+            } else {
+                // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
+                insideParenthesesLevel = (Integer) rawIpl;
+            }
             if (insideParenthesesLevel != null) {
                 Stack<Space> openingParens = new Stack<>();
-                for (int i = 0; i < insideParenthesesLevel.get(); i++) {
+                for (int i = 0; i < insideParenthesesLevel; i++) {
                     openingParens.push(sourceBefore("("));
                 }
                 Expression parenthesized = parenthesizedTree.apply(whitespace());
-                for (int i = 0; i < insideParenthesesLevel.get(); i++) {
+                for (int i = 0; i < insideParenthesesLevel; i++) {
                     parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
                             padRight(parenthesized, sourceBefore(")")));
                 }
                 return parenthesized;
             }
             return parenthesizedTree.apply(whitespace());
+        }
+
+        private Statement labeled(org.codehaus.groovy.ast.stmt.Statement statement, Supplier<Statement> labeledTree) {
+            List<J.Label> labels = null;
+            if (statement.getStatementLabels() != null && !statement.getStatementLabels().isEmpty()) {
+                labels = new ArrayList<>(statement.getStatementLabels().size());
+                // Labels appear in statement.getStatementLabels() in reverse order of their appearance in source code
+                // Could iterate over those in reverse order, but feels safer to just take the count and go off source code alone
+                for (int i = 0; i < statement.getStatementLabels().size(); i++) {
+                    labels.add(new J.Label(randomId(), whitespace(), Markers.EMPTY, JRightPadded.build(
+                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), name(), null, null)).withAfter(sourceBefore(":")),
+                            new J.Empty(randomId(), EMPTY, Markers.EMPTY)));
+                }
+            }
+            Statement s = labeledTree.get();
+            if (labels != null) {
+                //noinspection ConstantConditions
+                return condenseLabels(labels, s);
+            }
+            return s;
         }
 
         @Override
@@ -977,8 +1016,8 @@ public class GroovyParserVisitor {
                     null,
                     JContainer.build(singletonList(JRightPadded.build(visit(statement.getExpression())))),
                     statement.getCode() instanceof EmptyStatement
-                            ? JContainer.build(sourceBefore(":"), convertStatements(emptyList(), t -> Space.EMPTY), Markers.EMPTY)
-                            : JContainer.build(sourceBefore(":"), convertStatements(((BlockStatement) statement.getCode()).getStatements(), t -> Space.EMPTY), Markers.EMPTY)
+                            ? JContainer.build(sourceBefore(":"), convertStatements(emptyList()), Markers.EMPTY)
+                            : JContainer.build(sourceBefore(":"), convertStatements(((BlockStatement) statement.getCode()).getStatements()), Markers.EMPTY)
                     , null)
             );
         }
@@ -991,31 +1030,32 @@ public class GroovyParserVisitor {
                     null,
                     JContainer.build(singletonList(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null)))),
                     JContainer.build(sourceBefore(":"),
-                            convertStatements(statement.getStatements(), t -> Space.EMPTY), Markers.EMPTY),
+                            convertStatements(statement.getStatements()), Markers.EMPTY),
                     null
             );
         }
 
         @Override
         public void visitCastExpression(CastExpression cast) {
-            // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
-            // If the CastExpression starts at the same place as the expression it contains, then it must be a groovy-style cast
-            if (cast.getLineNumber() == cast.getExpression().getLineNumber() && cast.getColumnNumber() == cast.getExpression().getColumnNumber()) {
-                Space prefix = whitespace();
-                Expression expr = visit(cast.getExpression());
-                Space asPrefix = sourceBefore("as");
+            queue.add(insideParentheses(cast, prefix -> {
+                // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
+                if (source.charAt(cursor) == '(') {
+                    cursor++; // skip '('
+                    return new J.TypeCast(randomId(), prefix, Markers.EMPTY,
+                            new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
+                                    new JRightPadded<>(visitTypeTree(cast.getType()), sourceBefore(")"), Markers.EMPTY)
+                            ),
+                            visit(cast.getExpression()));
+                } else {
+                    Expression expr = visit(cast.getExpression());
+                    Space asPrefix = sourceBefore("as");
 
-                queue.add(new J.TypeCast(randomId(), prefix, new Markers(randomId(), singletonList(new AsStyleTypeCast(randomId()))),
-                        new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
-                                new JRightPadded<>(visitTypeTree(cast.getType()), asPrefix, Markers.EMPTY)),
-                        expr));
-            } else {
-                queue.add(new J.TypeCast(randomId(), sourceBefore("("), Markers.EMPTY,
-                        new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
-                                new JRightPadded<>(visitTypeTree(cast.getType()), sourceBefore(")"), Markers.EMPTY)
-                        ),
-                        visit(cast.getExpression())));
-            }
+                    return new J.TypeCast(randomId(), prefix, new Markers(randomId(), singletonList(new AsStyleTypeCast(randomId()))),
+                            new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
+                                    new JRightPadded<>(visitTypeTree(cast.getType()), asPrefix, Markers.EMPTY)),
+                            expr);
+                }
+            }));
         }
 
         @Override
@@ -1169,7 +1209,13 @@ public class GroovyParserVisitor {
                     text = "+" + text;
                 }
                 cursor += text.length();
-
+                // Numeric literals may be followed by "L", "f", or "d" to indicate Long, float, or double respectively
+                if (jType == JavaType.Primitive.Long || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Double) {
+                    if (source.startsWith("L", cursor) || source.startsWith("f", cursor) || source.startsWith("d", cursor)) {
+                        text += source.charAt(cursor);
+                        cursor++;
+                    }
+                }
                 return new J.Literal(randomId(), fmt, Markers.EMPTY, value, text,
                         null, jType);
             }));
@@ -1177,16 +1223,18 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitConstructorCallExpression(ConstructorCallExpression ctor) {
-            Space fmt = sourceBefore("new");
-            TypeTree clazz = visitTypeTree(ctor.getType());
-            JContainer<Expression> args = visit(ctor.getArguments());
-            J.Block body = null;
-            if (ctor.isUsingAnonymousInnerClass() && ctor.getType() instanceof InnerClassNode) {
-                body = classVisitor.visitClassBlock(ctor.getType());
-            }
-            MethodNode methodNode = (MethodNode) ctor.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
-            queue.add(new J.NewClass(randomId(), fmt, Markers.EMPTY, null, EMPTY,
-                    clazz, args, body, typeMapping.methodType(methodNode)));
+            queue.add(insideParentheses(ctor, fmt -> {
+                cursor += 3; // skip "new"
+                TypeTree clazz = visitTypeTree(ctor.getType());
+                JContainer<Expression> args = visit(ctor.getArguments());
+                J.Block body = null;
+                if (ctor.isUsingAnonymousInnerClass() && ctor.getType() instanceof InnerClassNode) {
+                    body = classVisitor.visitClassBlock(ctor.getType());
+                }
+                MethodNode methodNode = (MethodNode) ctor.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
+                return new J.NewClass(randomId(), fmt, Markers.EMPTY, null, EMPTY,
+                        clazz, args, body, typeMapping.methodType(methodNode));
+            }));
         }
 
         @Override
@@ -1261,26 +1309,14 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitExpressionStatement(ExpressionStatement statement) {
-            List<J.Label> labels = null;
-            if (statement.getStatementLabels() != null && !statement.getStatementLabels().isEmpty()) {
-                labels = new ArrayList<>(statement.getStatementLabels().size());
-                // Labels appear in statement.getStatementLabels() in reverse order of their appearance in source code
-                // Could iterate over those in reverse order, but feels safer to just take the count and go off source code alone
-                for (int i = 0; i < statement.getStatementLabels().size(); i++) {
-                    labels.add(new J.Label(randomId(), whitespace(), Markers.EMPTY, JRightPadded.build(
-                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), name(), null, null)).withAfter(sourceBefore(":")),
-                            new J.Empty(randomId(), EMPTY, Markers.EMPTY)));
+            queue.add(labeled(statement, () -> {
+                super.visitExpressionStatement(statement);
+                Object e = queue.poll();
+                if(e instanceof Statement) {
+                    return (Statement) e;
                 }
-            }
-            super.visitExpressionStatement(statement);
-            if (queue.peek() instanceof Expression && !(queue.peek() instanceof Statement)) {
-                queue.add(new G.ExpressionStatement(randomId(), (Expression) queue.poll()));
-            }
-            if (labels != null) {
-                //noinspection ConstantConditions
-                Statement result = condenseLabels(labels, (Statement) queue.poll());
-                queue.add(result);
-            }
+                return new G.ExpressionStatement(randomId(), (Expression) e);
+            }));
         }
 
         Statement condenseLabels(List<J.Label> labels, Statement s) {
@@ -1293,59 +1329,60 @@ public class GroovyParserVisitor {
         @SuppressWarnings("unchecked")
         @Override
         public void visitForLoop(ForStatement forLoop) {
-            Space fmt = sourceBefore("for");
-            Space controlFmt = sourceBefore("(");
-            if (forLoop.getCollectionExpression() instanceof ClosureListExpression) {
-                List<JRightPadded<?>> controls = visit(forLoop.getCollectionExpression());
-                // There will always be exactly three elements in a for loop's ClosureListExpression
-                List<JRightPadded<Statement>> init = controls.get(0).getElement() instanceof List ?
-                        (List<JRightPadded<Statement>>) controls.get(0).getElement() :
-                        singletonList((JRightPadded<Statement>) controls.get(0));
+            queue.add(labeled(forLoop, () -> {
+                Space prefix = sourceBefore("for");
+                Space controlFmt = sourceBefore("(");
+                if (forLoop.getCollectionExpression() instanceof ClosureListExpression) {
+                    List<JRightPadded<?>> controls = visit(forLoop.getCollectionExpression());
+                    // There will always be exactly three elements in a for loop's ClosureListExpression
+                    List<JRightPadded<Statement>> init = controls.get(0).getElement() instanceof List ?
+                            (List<JRightPadded<Statement>>) controls.get(0).getElement() :
+                            singletonList((JRightPadded<Statement>) controls.get(0));
 
-                JRightPadded<Expression> condition = (JRightPadded<Expression>) controls.get(1);
+                    JRightPadded<Expression> condition = (JRightPadded<Expression>) controls.get(1);
 
-                List<JRightPadded<Statement>> update = controls.get(2).getElement() instanceof List ?
-                        (List<JRightPadded<Statement>>) controls.get(2).getElement() :
-                        singletonList((JRightPadded<Statement>) controls.get(2));
-                cursor++; // skip ')'
+                    List<JRightPadded<Statement>> update = controls.get(2).getElement() instanceof List ?
+                            (List<JRightPadded<Statement>>) controls.get(2).getElement() :
+                            singletonList((JRightPadded<Statement>) controls.get(2));
+                    cursor++; // skip ')'
 
-                queue.add(new J.ForLoop(randomId(), fmt, Markers.EMPTY,
-                        new J.ForLoop.Control(randomId(), controlFmt,
-                                Markers.EMPTY, init, condition, update),
-                        JRightPadded.build(visit(forLoop.getLoopBlock()))));
-            } else {
-                Parameter param = forLoop.getVariable();
-                Space paramFmt = whitespace();
-                TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ?
-                        visitTypeTree(param.getOriginType()) : null;
-                JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
-                        new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
-                                new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), param.getName(), null, null),
-                                emptyList(), null, null)
-                );
-                cursor += param.getName().length();
-                Space rightPad = whitespace();
-                Markers forEachMarkers = Markers.EMPTY;
-                if (source.charAt(cursor) == ':') {
-                    cursor++; // Skip ":"
+                    return new J.ForLoop(randomId(), prefix, Markers.EMPTY,
+                            new J.ForLoop.Control(randomId(), controlFmt,
+                                    Markers.EMPTY, init, condition, update),
+                            JRightPadded.build(visit(forLoop.getLoopBlock())));
                 } else {
-                    cursor += 2; // Skip "in"
-                    forEachMarkers = forEachMarkers.add(new InStyleForEachLoop(randomId()));
+                    Parameter param = forLoop.getVariable();
+                    Space paramFmt = whitespace();
+                    TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ?
+                            visitTypeTree(param.getOriginType()) : null;
+                    JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
+                            new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
+                                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), param.getName(), null, null),
+                                    emptyList(), null, null)
+                    );
+                    cursor += param.getName().length();
+                    Space rightPad = whitespace();
+                    Markers forEachMarkers = Markers.EMPTY;
+                    if (source.charAt(cursor) == ':') {
+                        cursor++; // Skip ":"
+                    } else {
+                        cursor += 2; // Skip "in"
+                        forEachMarkers = forEachMarkers.add(new InStyleForEachLoop(randomId()));
+                    }
+
+                    JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramFmt,
+                            Markers.EMPTY, emptyList(), emptyList(), paramType, null, emptyList(),
+                            singletonList(paramName))
+                    ).withAfter(rightPad);
+
+                    JRightPadded<Expression> iterable = JRightPadded.build((Expression) visit(forLoop.getCollectionExpression()))
+                            .withAfter(sourceBefore(")"));
+
+                    return new J.ForEachLoop(randomId(), prefix, forEachMarkers,
+                            new J.ForEachLoop.Control(randomId(), controlFmt, Markers.EMPTY, variable, iterable),
+                            JRightPadded.build(visit(forLoop.getLoopBlock())));
                 }
-
-                JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramFmt,
-                        Markers.EMPTY, emptyList(), emptyList(), paramType, null, emptyList(),
-                        singletonList(paramName))
-                ).withAfter(rightPad);
-
-                JRightPadded<Expression> iterable = JRightPadded.build((Expression) visit(forLoop.getCollectionExpression()))
-                        .withAfter(sourceBefore(")"));
-
-                queue.add(new J.ForEachLoop(randomId(), fmt, forEachMarkers,
-                        new J.ForEachLoop.Control(randomId(), controlFmt, Markers.EMPTY, variable, iterable),
-                        JRightPadded.build(visit(forLoop.getLoopBlock())))
-                );
-            }
+            }));
         }
 
         @Override
@@ -1967,8 +2004,7 @@ public class GroovyParserVisitor {
             return padRight(j, suffix.apply(node));
         }
 
-        private List<JRightPadded<Statement>> convertStatements(List<? extends ASTNode> nodes,
-                                                                Function<ASTNode, Space> suffix) {
+        private List<JRightPadded<Statement>> convertStatements(List<? extends ASTNode> nodes) {
             if (nodes.isEmpty()) {
                 return emptyList();
             }
@@ -1976,7 +2012,7 @@ public class GroovyParserVisitor {
             List<JRightPadded<Statement>> converted = new ArrayList<>(nodes.size());
             for (ASTNode node : nodes) {
                 Statement statement = visit(node);
-                converted.add(padRight(statement, suffix.apply(node)));
+                converted.add(maybeSemicolon(statement));
             }
 
             return converted;

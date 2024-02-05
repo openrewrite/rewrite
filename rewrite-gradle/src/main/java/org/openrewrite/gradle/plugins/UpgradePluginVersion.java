@@ -92,7 +92,9 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
     }
 
     public static class DependencyVersionState {
+        @Nullable
         GradleProject gradleProject;
+        @Nullable
         GradleSettings gradleSettings;
         Map<String, String> pluginDependencies = new HashMap<>();
     }
@@ -155,17 +157,10 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 }
 
                 G.GString.Value gStringValue = (G.GString.Value) gString.getStrings().get(0);
-                String currentVersion = (String) gStringValue.getTree().toString();
+                String currentVersion = gStringValue.getTree().toString();
 
                 acc.pluginDependencies.put(currentVersion, pluginId);
                 return m;
-            }
-
-            private List<MavenRepository> getRepositories(DependencyVersionState acc) {
-                if (acc.gradleSettings != null) {
-                    return acc.gradleSettings.getPluginRepositories();
-                }
-                return acc.gradleProject.getMavenPluginRepositories();
             }
         };
         return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), groovyVisitor);
@@ -183,12 +178,11 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
             @Override
             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-
-                if (acc.pluginDependencies.containsKey(entry.getKey())) {
+                if (acc.pluginDependencies.containsKey(entry.getKey()) && acc.gradleProject != null) {
                     String currentVersion = entry.getValue().getText();
                     String pluginId = acc.pluginDependencies.get(entry.getKey());
                     if (!StringUtils.isBlank(newVersion)) {
-                        String resolvedVersion = null;
+                        String resolvedVersion;
                         try {
                             resolvedVersion = AddPluginVisitor.resolvePluginVersion(pluginId, currentVersion, newVersion, versionPattern, getRepositories(), ctx).orElse(null);
                         } catch (MavenDownloadingException e) {
@@ -197,10 +191,8 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         if (resolvedVersion != null) {
                             return entry.withValue(entry.getValue().withText(resolvedVersion));
                         }
-                        return entry.withValue(entry.getValue().withText(newVersion));
                     }
                 }
-
                 return entry;
             }
 
@@ -212,7 +204,9 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             }
         };
         GroovyVisitor<ExecutionContext> groovyVisitor = new GroovyVisitor<ExecutionContext>() {
+            @Nullable
             private GradleProject gradleProject;
+            @Nullable
             private GradleSettings gradleSettings;
 
             @Override
@@ -220,13 +214,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 Optional<GradleProject> maybeGradleProject =  acc.gradleProject != null ?
                     Optional.of(acc.gradleProject) :
                     cu.getMarkers().findFirst(GradleProject.class);
-
                 Optional<GradleSettings> maybeGradleSettings = acc.gradleSettings != null ?
                     Optional.of(acc.gradleSettings) :
                     cu.getMarkers().findFirst(GradleSettings.class);
 
                 if (!maybeGradleProject.isPresent() && !maybeGradleSettings.isPresent()) {
-                    throw new IllegalStateException("Unable to find a gradle project or gradle settings");
+                    return cu;
                 }
 
                 gradleProject = maybeGradleProject.orElse(null);

@@ -33,7 +33,9 @@ import java.util.regex.Pattern;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.gradle.Assertions.*;
+import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.withToolingApi;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 class AddDevelocityGradlePluginTest implements RewriteTest {

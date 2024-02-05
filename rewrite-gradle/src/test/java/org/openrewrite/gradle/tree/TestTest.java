@@ -23,7 +23,7 @@ import static org.openrewrite.gradle.Assertions.buildGradle;
 class TestTest implements RewriteTest {
 
     @Test
-    void testDsl() {
+    void dsl() {
         rewriteRun(
           buildGradle(
             """

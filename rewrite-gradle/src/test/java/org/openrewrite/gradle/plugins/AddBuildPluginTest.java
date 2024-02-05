@@ -22,7 +22,8 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.gradle.Assertions.*;
+import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.withToolingApi;
 
 class AddBuildPluginTest implements RewriteTest {
     @Override

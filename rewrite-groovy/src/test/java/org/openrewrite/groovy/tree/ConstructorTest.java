@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,27 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.java.ai.ClassDefinitionLength;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.groovy.Assertions.groovy;
 
-class ClassDefinitionLengthTest implements RewriteTest {
+class ConstructorTest implements RewriteTest {
+
     @Test
-    void declares() {
-        rewriteRun( spec -> spec.recipe(new ClassDefinitionLength()),
-          java("""
-                public class Foo {
-                    public void hello(){
-                        System.out.println("hello");
-                    }
-                }
-                """)
+    void inParens() {
+        rewriteRun(
+          groovy(
+            """
+              ( new String("foo") )
+              """
+          )
         );
     }
-
-
 }

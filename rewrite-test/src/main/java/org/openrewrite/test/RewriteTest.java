@@ -25,6 +25,7 @@ import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -303,7 +304,8 @@ public interface RewriteTest extends SourceSpecs {
                 // Validate before source
                 nextSpec.validateSource.accept(sourceFile, TypeValidation.before(testMethodSpec, testClassSpec));
 
-                // Validate that printing a parsed AST yields the same source text
+                // Validate that printing the LST yields the same source text
+                // Validate that the LST whitespace do not contain any non-whitespace characters
                 int j = 0;
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
@@ -316,6 +318,16 @@ public interface RewriteTest extends SourceSpecs {
                                 "parser implementation itself. Please open an issue to report this, providing a sample of the " +
                                 "code that generated this error for"
                         );
+                        try {
+                            WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
+                            SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
+                            if(whitespaceValidated != null && whitespaceValidated != sourceFile) {
+                                fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
+                                     "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                            }
+                        } catch (UnsupportedOperationException e) {
+                            // Language/parser does not provide whitespace validation and that's OK for now
+                        }
                     }
                 }
 
