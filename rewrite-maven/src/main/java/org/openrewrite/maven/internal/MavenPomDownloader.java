@@ -261,7 +261,7 @@ public class MavenPomDownloader {
                         //If we have a 400-404, cache an empty result.
                         cacheEmptyResult = true;
                     }
-                } catch (IOException e) {
+                } catch (Exception e) {
                     repositoryResponses.put(repo, e.getMessage());
                 }
 
