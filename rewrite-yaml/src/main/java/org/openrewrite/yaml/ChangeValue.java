@@ -27,7 +27,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeValue extends Recipe {
     @Option(displayName = "Key path",
             description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML entry.",

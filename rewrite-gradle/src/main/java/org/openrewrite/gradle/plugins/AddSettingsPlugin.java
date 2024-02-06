@@ -29,7 +29,7 @@ import org.openrewrite.semver.Semver;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddSettingsPlugin extends Recipe {
     @Option(displayName = "Plugin id",
             description = "The plugin id to apply.",

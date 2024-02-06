@@ -31,7 +31,7 @@ import java.util.Iterator;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindProperty extends Recipe {
 
     @Option(displayName = "Property key",

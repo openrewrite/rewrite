@@ -25,7 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesField;
 import org.openrewrite.java.tree.*;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class ChangeStaticFieldToMethod extends Recipe {
 

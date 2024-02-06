@@ -35,7 +35,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpdateJavaCompatibility extends Recipe {
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",

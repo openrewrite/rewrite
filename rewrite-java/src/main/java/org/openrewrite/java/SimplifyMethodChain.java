@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class SimplifyMethodChain extends Recipe {
     @Option(displayName = "Method pattern chain",
             description = "A list of method patterns that are called in sequence",

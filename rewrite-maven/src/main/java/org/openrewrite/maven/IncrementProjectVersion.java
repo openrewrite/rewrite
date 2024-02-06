@@ -33,7 +33,7 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, String>> {
 
     @Option(displayName = "Group",

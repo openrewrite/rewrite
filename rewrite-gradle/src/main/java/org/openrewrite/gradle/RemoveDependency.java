@@ -39,7 +39,7 @@ import java.util.Optional;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveDependency extends Recipe {
 
     @Option(displayName = "Group",
