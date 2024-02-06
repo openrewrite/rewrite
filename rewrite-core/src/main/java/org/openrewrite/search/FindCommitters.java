@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Committer>> {
     private transient final DistinctCommitters committers = new DistinctCommitters(this);
     private transient final CommitsByDay commitsByDay = new CommitsByDay(this);

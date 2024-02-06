@@ -37,7 +37,7 @@ import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindGradleWrapper extends Recipe {
     transient GradleWrappersInUse wrappersInUse = new GradleWrappersInUse(this);
 

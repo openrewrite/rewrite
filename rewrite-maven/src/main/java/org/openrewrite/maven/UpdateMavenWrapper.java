@@ -55,7 +55,7 @@ import static org.openrewrite.maven.utilities.MavenWrapper.*;
  */
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenWrapperState> {
     private static final String DISTRIBUTION_URL_KEY = "distributionUrl";
     private static final String DISTRIBUTION_SHA_256_SUM_KEY = "distributionSha256Sum";

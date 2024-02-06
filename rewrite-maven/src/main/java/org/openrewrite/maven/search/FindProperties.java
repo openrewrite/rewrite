@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
 
 import static org.openrewrite.Tree.randomId;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class FindProperties extends Recipe {
 

@@ -37,7 +37,7 @@ import java.util.*;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @EqualsAndHashCode.Exclude

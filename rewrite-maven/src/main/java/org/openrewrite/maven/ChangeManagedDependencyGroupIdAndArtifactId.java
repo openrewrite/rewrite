@@ -33,7 +33,7 @@ import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);

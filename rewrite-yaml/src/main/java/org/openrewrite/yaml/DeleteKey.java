@@ -24,7 +24,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class DeleteKey extends Recipe {
     @Option(displayName = "Key path",
             description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML entry.",

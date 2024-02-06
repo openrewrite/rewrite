@@ -44,7 +44,7 @@ import static java.util.Objects.requireNonNull;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
 
@@ -191,7 +191,7 @@ public class DependencyInsight extends Recipe {
         };
     }
 
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     @Value
     private static class MarkIndividualDependency extends JavaIsoVisitor<ExecutionContext> {
 

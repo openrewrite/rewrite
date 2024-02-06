@@ -44,7 +44,7 @@ import static java.util.Collections.emptyList;
  * imports that are not referenced within the compilation unit.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class OrderImports extends Recipe {
 
     @Option(displayName = "Remove unused",

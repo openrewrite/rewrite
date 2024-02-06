@@ -32,7 +32,7 @@ import java.util.stream.Stream;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddProperty extends Recipe {
 
     @Option(displayName = "Property key",

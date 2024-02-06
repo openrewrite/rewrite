@@ -23,7 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class SetFilePermissions extends Recipe {
     @Option(displayName = "File matcher",
             description = "Permissions will be applied to matching files. This is a glob expression.",
