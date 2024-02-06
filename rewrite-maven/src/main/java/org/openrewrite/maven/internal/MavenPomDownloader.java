@@ -737,7 +737,7 @@ public class MavenPomDownloader {
                     if (t instanceof HttpSenderResponseException) {
                         HttpSenderResponseException e = (HttpSenderResponseException) t;
                         // response was returned from the server, but it was not a 200 OK. The server therefore exists.
-                        if (e.getResponseCode() != null) {
+                        if (e.getResponseCode() != null && e.getResponseCode() > 0) {
                             normalized = repository.withUri(httpsUri);
                         }
                         if (!"Directory listing forbidden".equals(e.getBody())) {
@@ -759,7 +759,7 @@ public class MavenPomDownloader {
                                         repository.getPassword());
                             } catch (HttpSenderResponseException e) {
                                 //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
-                                if (e.getResponseCode() != null) {
+                                if (e.getResponseCode() != null && e.getResponseCode() > 0) {
                                     normalized = new MavenRepository(
                                             repository.getId(),
                                             originalUrl,
