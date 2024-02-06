@@ -22,6 +22,8 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PathUtils {
     private PathUtils() {
@@ -77,6 +79,18 @@ public class PathUtils {
         if (relativePath.isEmpty() && globPattern.isEmpty()) {
             return true;
         }
+        List<String> excludedPatterns = getExcludedPatterns(globPattern);
+        if (!excludedPatterns.isEmpty()) {
+            if (!matchesGlob(convertNegationToWildcard(globPattern), relativePath)) {
+                return false;
+            }
+            for (String excludedPattern : excludedPatterns) {
+                if (matchesGlob(excludedPattern, relativePath)) {
+                    return false;
+                }
+            }
+            return true;
+        }
 
         return matchesGlob(globPattern, relativePath);
     }
@@ -128,7 +142,7 @@ public class PathUtils {
                 return false;
             }
             if (pattIdxEnd == (pattTokens.length - 1)
-                && (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
+                    && (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
                 return false;
             }
             pattIdxEnd--;
@@ -186,6 +200,33 @@ public class PathUtils {
             }
         }
         return true;
+    }
+
+    public static String convertNegationToWildcard(String globPattern) {
+        // Regular expression to match !(...)
+        String negationPattern = "\\!\\((.*?)\\)";
+        // Replace all negation patterns with *
+        return globPattern.replaceAll(negationPattern, "*");
+    }
+
+    public static List<String> getExcludedPatterns(String globPattern) {
+        List<String> excludedPatterns = new ArrayList<>();
+
+        // Regular expression to match !(...)
+        String negationPattern = "\\!\\((.*?)\\)";
+        Pattern pattern = Pattern.compile(negationPattern);
+        Matcher matcher = pattern.matcher(globPattern);
+
+        // Find all negation patterns and generate excluded patterns
+        while (matcher.find()) {
+            String negationContent = matcher.group(1);
+            String[] options = negationContent.split("\\|");
+            for (String option : options) {
+                excludedPatterns.add(globPattern.replace(matcher.group(), option));
+            }
+        }
+
+        return excludedPatterns;
     }
 
     private static String[] tokenize(String path) {
