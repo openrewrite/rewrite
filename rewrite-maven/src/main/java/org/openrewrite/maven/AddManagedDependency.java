@@ -22,9 +22,9 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.utilities.MavenMetadataWrapper;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -224,13 +224,12 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
 
             @Nullable
             private String findVersionToUse(VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
-                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                LatestRelease latest = new LatestRelease(versionPattern);
-                return mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(v -> versionComparator.isValid(null, v))
-                        .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
-                        .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-                        .orElse(null);
+				LatestRelease latest = new LatestRelease(versionPattern);
+                return MavenMetadataWrapper.builder()
+                        .mavenMetadata(metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx)))
+                        .versionComparator(versionComparator)
+                        .extraFilter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                        .build().max().orElse(null);
             }
         });
     }

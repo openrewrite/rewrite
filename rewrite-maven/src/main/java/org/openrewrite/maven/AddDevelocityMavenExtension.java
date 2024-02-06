@@ -37,8 +37,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.utilities.MavenMetadataWrapper;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.style.GeneralFormatStyle;
@@ -348,13 +348,12 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
         VersionComparator versionComparator = new LatestRelease(null);
         GroupArtifact gradleEnterpriseExtension = new GroupArtifact("com.gradle", "gradle-enterprise-maven-extension");
         try {
-            MavenMetadata extensionMetadata = pomDownloader.downloadMetadata(gradleEnterpriseExtension, null, Collections.singletonList(MavenRepository.MAVEN_CENTRAL));
-        return extensionMetadata.getVersioning()
-            .getVersions()
-            .stream()
-            .filter(v -> versionComparator.isValid(null, v))
-            .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-            .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle Enterprise Maven extension version to select from."));
+			return MavenMetadataWrapper.builder()
+            .mavenMetadata(
+                    pomDownloader.downloadMetadata(gradleEnterpriseExtension, null, Collections.singletonList(MavenRepository.MAVEN_CENTRAL)))
+            .versionComparator(versionComparator)
+            .build()
+            .max().orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle Enterprise Maven extension version to select from."));
         } catch (MavenDownloadingException e) {
             throw new IllegalStateException("Could not download Maven metadata", e);
         }

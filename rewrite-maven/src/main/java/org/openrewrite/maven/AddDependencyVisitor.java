@@ -21,10 +21,10 @@ import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.maven.tree.Version;
+import org.openrewrite.maven.utilities.MavenMetadataWrapper;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -191,15 +191,13 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                 if (versionComparator == null || versionComparator.isExactVersion()) {
                     resolvedVersion = version;
                 } else {
-                    MavenMetadata mavenMetadata = metadataFailures == null ?
-                            downloadMetadata(groupId, artifactId, ctx) :
-                            metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    LatestRelease latest = new LatestRelease(versionPattern);
-                    resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
-                            .filter(v -> versionComparator.isValid(null, v))
-                            .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
-                            .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-                            .orElse(version);
+					LatestRelease latest = new LatestRelease(versionPattern);
+                    resolvedVersion = MavenMetadataWrapper.builder()
+                            .mavenMetadata(metadataFailures == null ? downloadMetadata(groupId, artifactId, ctx) :
+                            metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx)))
+                            .versionComparator(versionComparator)
+                            .extraFilter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                            .build().max().orElse(version);
                 }
             }
 

@@ -91,8 +91,11 @@ abstract class AbstractChangeDependencyGroupIdAndArtifactId extends AbstractChan
                 return newVersion;
             }
             if (availableVersions == null) {
-				availableVersions = new MavenMetadataWrapper(metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx)))
-                        .filterWithVersionComparator(versionComparator, newVersion);
+				availableVersions = MavenMetadataWrapper.builder()
+                        .mavenMetadata(metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx)))
+                        .versionComparator(versionComparator)
+                        .version(newVersion)
+                        .build().filter();
             }
             return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
         }

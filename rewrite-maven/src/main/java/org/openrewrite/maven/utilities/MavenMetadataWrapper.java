@@ -16,31 +16,61 @@
 package org.openrewrite.maven.utilities;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import org.jetbrains.annotations.NotNull;
+import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.semver.VersionComparator;
 
-import lombok.AllArgsConstructor;
+import lombok.Builder;
 
 /**
  * Wrapper for MavenMetadata to provide additional functionality
  */
-@AllArgsConstructor
+@Builder
 public class MavenMetadataWrapper {
 
-	private final MavenMetadata mavenMetadata;
+	/**
+	 * MavenMetadata to wrap and deliver the versions to filter
+	 */
+	@lombok.NonNull
+	@NonNull
+	private MavenMetadata mavenMetadata;
 
 	/**
-	 * Filter the versions of a MavenMetadata using a VersionComparator validation
-	 * @param versionComparator comparator to validate the versions
-	 * @param version version to use in validation process
-	 * @return filtered list of versions
+	 * VersionComparator comparator to validate the versions
 	 */
-	public List<String> filterWithVersionComparator(VersionComparator versionComparator, String version) {
-		return mavenMetadata.getVersioning().getVersions().stream()
-				.filter(v -> versionComparator.isValid(version, v))
-				.collect(Collectors.toList());
+	@lombok.NonNull
+	@NonNull
+	private VersionComparator versionComparator;
 
+	/**
+	 * Version to use in the validation process
+	 */
+	@Nullable
+	private String version;
+
+	/**
+	 * Extra filter to apply to the versions
+	 */
+	@Nullable
+	private Predicate<? super String> extraFilter;
+
+	public List<String> filter() {return internalFilter(versionComparator, version).collect(Collectors.toList());}
+
+	public Optional<String> max() {
+		return internalFilter(versionComparator, version).max((v1, v2) -> versionComparator.compare(null, v1, v2));
+	}
+
+	@NotNull
+	private Stream<String> internalFilter(@NotNull VersionComparator versionComparator, String version) {
+		Stream<String> stream = mavenMetadata.getVersioning().getVersions().stream()
+				.filter(v -> versionComparator.isValid(version, v));
+		return extraFilter == null ? stream : stream.filter(extraFilter);
 	}
 }

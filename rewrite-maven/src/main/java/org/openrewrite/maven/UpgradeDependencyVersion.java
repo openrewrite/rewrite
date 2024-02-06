@@ -339,9 +339,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                 }
 
                 try {
-                    List<String> versions = new MavenMetadataWrapper(
-                            metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx)))
-                            .filterWithVersionComparator(versionComparator, finalVersion);
+                    List<String> versions = MavenMetadataWrapper.builder()
+                            .mavenMetadata(metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx)))
+                            .versionComparator(versionComparator)
+                            .version(finalVersion)
+                            .build().filter();
                     // handle upgrades from non semver versions like "org.springframework.cloud:spring-cloud-dependencies:Camden.SR5"
                     if (!Semver.isVersion(finalVersion) && !versions.isEmpty()) {
                         versions.sort(versionComparator);

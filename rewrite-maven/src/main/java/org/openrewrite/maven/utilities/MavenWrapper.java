@@ -23,7 +23,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.semver.LatestRelease;
@@ -110,24 +109,20 @@ public class MavenWrapper {
         List<MavenRepository> repositories = Collections.singletonList(repository);
         try {
             GroupArtifact wrapperDistributionGroupArtifact = new GroupArtifact("org.apache.maven.wrapper", "maven-wrapper-distribution");
-            MavenMetadata wrapperMetadata = pomDownloader.downloadMetadata(wrapperDistributionGroupArtifact, null, repositories);
-            String resolvedWrapperVersion = wrapperMetadata.getVersioning()
-                    .getVersions()
-                    .stream()
-                    .filter(v -> wrapperVersionComparator.isValid(null, v))
-                    .max((v1, v2) -> wrapperVersionComparator.compare(null, v1, v2))
-                    .orElseThrow(() -> new IllegalStateException("Expected to find at least one Maven wrapper version to select from."));
-            String resolvedWrapperUri = getDownloadUriFor(repository, new GroupArtifact("org.apache.maven.wrapper", "maven-wrapper"), resolvedWrapperVersion, null, "jar");
-            String resolvedWrapperDistributionUri = getDownloadUriFor(repository, wrapperDistributionGroupArtifact, resolvedWrapperVersion, wrapperDistributionType.classifier, "zip");
+			String resolvedWrapperVersion =
+                    getResolvedWrapperVersion(pomDownloader, wrapperDistributionGroupArtifact, repositories, wrapperVersionComparator,
+                            "Expected to find at least one Maven wrapper version to select from.");
+            String resolvedWrapperUri =
+                    getDownloadUriFor(repository, new GroupArtifact("org.apache.maven.wrapper", "maven-wrapper"), resolvedWrapperVersion, null,
+                            "jar");
+            String resolvedWrapperDistributionUri =
+                    getDownloadUriFor(repository, wrapperDistributionGroupArtifact, resolvedWrapperVersion, wrapperDistributionType.classifier,
+                            "zip");
 
             GroupArtifact distributionGroupArtifact = new GroupArtifact("org.apache.maven", "apache-maven");
-            MavenMetadata distributionMetadata = pomDownloader.downloadMetadata(distributionGroupArtifact, null, repositories);
-            String resolvedDistributionVersion = distributionMetadata.getVersioning()
-                    .getVersions()
-                    .stream()
-                    .filter(v -> distributionVersionComparator.isValid(null, v))
-                    .max((v1, v2) -> distributionVersionComparator.compare(null, v1, v2))
-                    .orElseThrow(() -> new IllegalStateException("Expected to find at least one Maven distribution version to select from."));
+			String resolvedDistributionVersion =
+                    getResolvedWrapperVersion(pomDownloader, distributionGroupArtifact, repositories, distributionVersionComparator,
+                            "Expected to find at least one Maven distribution version to select from.");
             String resolvedDistributionUri = getDownloadUriFor(repository, distributionGroupArtifact, resolvedDistributionVersion, "bin", "zip");
 
             Remote wrapperJar = (Remote) Checksum.sha256(Remote.builder(
@@ -153,6 +148,14 @@ public class MavenWrapper {
         } catch (MavenDownloadingException e) {
             throw new RuntimeException("Could not get Maven versions at: " + repository.getUri(), e);
         }
+    }
+
+    private static String getResolvedWrapperVersion(MavenPomDownloader pomDownloader, GroupArtifact groupArtifact,
+            List<MavenRepository> repositories, VersionComparator versionComparator, String exceptionMessage) throws MavenDownloadingException {
+        return MavenMetadataWrapper.builder()
+                .mavenMetadata(pomDownloader.downloadMetadata(groupArtifact, null, repositories))
+                .versionComparator(versionComparator)
+                .build().max().orElseThrow(() -> new IllegalStateException(exceptionMessage));
     }
 
     public String getPropertiesFormattedWrapperUrl() {
