@@ -112,7 +112,48 @@ class MavenSettingsTest {
         assertThat(ctx.getRepositories().stream().map(MavenRepository::getUri)).containsExactly("https://activebydefault.com");
     }
 
-    @Disabled
+    @Test
+    void idCollisionLastRepositoryWins() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+          //language=xml
+          """
+                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                    <activeProfiles>
+                        <activeProfile>
+                            repo
+                        </activeProfile>
+                    </activeProfiles>
+                    <profiles>
+                        <profile>
+                            <id>repo</id>
+                            <repositories>
+                                <repository>
+                                    <id>repo</id>
+                                    <url>https://firstloses.com</url>
+                                </repository>
+                                <repository>
+                                    <id>repo</id>
+                                    <url>https://secondloses.com</url>
+                                </repository>
+                                <repository>
+                                    <id>repo</id>
+                                    <url>https://lastwins.com</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                </settings>
+            """.getBytes()
+        )), ctx));
+
+        assertThat(ctx.getRepositories())
+          .as("When multiple repositories have the same id in a maven settings file the last one wins. In a pom.xml an error would be thrown.")
+          .containsExactly(new MavenRepository("repo", "https://lastwins.com", null, null, null, null));
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
     @Test
     void defaultOnlyActiveIfNoOthersAreActive() {
@@ -156,6 +197,10 @@ class MavenSettingsTest {
                 </settings>
             """.getBytes()
         )), ctx));
+
+
+        assertThat(ctx.getActiveProfiles())
+          .containsExactly("repo");
 
         assertThat(ctx.getRepositories().stream().map(MavenRepository::getUri))
           .containsExactly("https://activebyactivationlist.com");

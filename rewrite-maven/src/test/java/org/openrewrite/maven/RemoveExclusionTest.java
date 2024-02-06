@@ -369,7 +369,8 @@ class RemoveExclusionTest implements RewriteTest {
     @Test
     void removeUnusedExclusionsFromDependencyManagement() {
         rewriteRun(
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -421,7 +422,8 @@ class RemoveExclusionTest implements RewriteTest {
             "*",
             true
           )),
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -495,7 +497,8 @@ class RemoveExclusionTest implements RewriteTest {
             "*",
             true
           )),
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -536,7 +539,8 @@ class RemoveExclusionTest implements RewriteTest {
             "*",
             true
           )),
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>

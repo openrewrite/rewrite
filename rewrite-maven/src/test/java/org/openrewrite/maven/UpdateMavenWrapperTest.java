@@ -43,9 +43,15 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.openrewrite.maven.utilities.MavenWrapper.*;
+import static org.openrewrite.maven.utilities.MavenWrapper.ASF_LICENSE_HEADER;
+import static org.openrewrite.maven.utilities.MavenWrapper.WRAPPER_BATCH_LOCATION;
+import static org.openrewrite.maven.utilities.MavenWrapper.WRAPPER_DOWNLOADER_LOCATION;
+import static org.openrewrite.maven.utilities.MavenWrapper.WRAPPER_JAR_LOCATION;
+import static org.openrewrite.maven.utilities.MavenWrapper.WRAPPER_SCRIPT_LOCATION;
 import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.SourceSpecs.*;
+import static org.openrewrite.test.SourceSpecs.dir;
+import static org.openrewrite.test.SourceSpecs.other;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class UpdateMavenWrapperTest implements RewriteTest {
     private final UnaryOperator<@Nullable String> notEmpty = actual -> {
@@ -479,6 +485,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
             "org.openrewrite.maven.MultipleWrapperUpdates"
             )
             .cycles(1)
+            .expectedCyclesThatMakeChanges(1)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.5.0")))
             .afterRecipe(run -> {
                 var mvnw = result(run, PlainText.class, "mvnw");

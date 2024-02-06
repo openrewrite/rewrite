@@ -26,6 +26,7 @@ import org.openrewrite.maven.tree.*;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
@@ -195,11 +196,12 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         }
 
         putMessage(MAVEN_SETTINGS, settings);
-        setActiveProfiles(Arrays.asList(activeProfiles));
+        List<String> effectiveActiveProfiles = mapActiveProfiles(settings, activeProfiles);
+        setActiveProfiles(effectiveActiveProfiles);
         setCredentials(mapCredentials(settings));
         setMirrors(mapMirrors(settings));
         setLocalRepository(settings.getMavenLocal());
-        setRepositories(mapRepositories(settings, Arrays.asList(activeProfiles)));
+        setRepositories(mapRepositories(settings, effectiveActiveProfiles));
 
         return this;
     }
@@ -207,6 +209,17 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     @Nullable
     public MavenSettings getSettings() {
         return getMessage(MAVEN_SETTINGS, null);
+    }
+
+    private static List<String> mapActiveProfiles(MavenSettings settings, String... activeProfiles) {
+        if(settings.getActiveProfiles() == null) {
+            return Arrays.asList(activeProfiles);
+        }
+        return Stream.concat(
+                        settings.getActiveProfiles().getActiveProfiles().stream(),
+                        Arrays.stream(activeProfiles))
+                .distinct()
+                .collect(Collectors.toList());
     }
 
     private static List<MavenRepositoryCredentials> mapCredentials(MavenSettings settings) {

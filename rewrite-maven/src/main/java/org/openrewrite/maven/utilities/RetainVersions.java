@@ -48,7 +48,7 @@ public class RetainVersions {
             // optimization for glob GAVs: more efficient to use one CDGIAAI recipe if they all will have the same version anyway
             if (requestedRetainedVersion != null && noneMatch(existingDependencies, it -> it.getChild("version").isPresent())) {
                 recipes.add(new ChangeDependencyGroupIdAndArtifactId(requestedRetainedGroupId, requestedRetainedArtifactId, null, null,
-                        requestedRetainedVersion, null, true));
+                        requestedRetainedVersion, null, true, true));
                 continue;
             }
 
@@ -72,7 +72,7 @@ public class RetainVersions {
                     }
                 }
                 recipes.add(new ChangeDependencyGroupIdAndArtifactId(retainedGroupId, retainedArtifactId, null, null,
-                        retainedVersion, null, true));
+                        retainedVersion, null, true, true));
             }
         }
         return recipes;

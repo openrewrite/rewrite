@@ -59,6 +59,11 @@ public class FindPlugin extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "Finds a Maven plugin within a pom.xml.";
     }

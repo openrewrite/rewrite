@@ -53,6 +53,12 @@ public class NoWhitespaceAfter extends Recipe {
         EmptyForIteratorPadStyle emptyForIteratorPadStyle;
 
         @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            // This visitor causes problems for Groovy sources as method invocations without parentheses get squashed
+            return sourceFile instanceof J.CompilationUnit;
+        }
+
+        @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
@@ -82,10 +88,12 @@ public class NoWhitespaceAfter extends Recipe {
             return m;
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
             J.VariableDeclarations vd = super.visitVariableDeclarations(multiVariable, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getArrayDeclarator())) {
+                // For backwards compatibility.
                 if (vd.getDimensionsBeforeName().stream().anyMatch(d -> d.getBefore().getWhitespace().contains(" "))) {
                     vd = vd.withDimensionsBeforeName(ListUtils.map(vd.getDimensionsBeforeName(), d -> {
                         d = d.withBefore(d.getBefore().withWhitespace(""));
@@ -111,11 +119,10 @@ public class NoWhitespaceAfter extends Recipe {
         public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
             J.ArrayType a = super.visitArrayType(arrayType, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getArrayDeclarator())) {
-                if (a.getDimensions().stream().anyMatch(d -> d.getElement().getWhitespace().contains(" "))) {
-                    a = a.withDimensions(ListUtils.map(a.getDimensions(), d -> {
-                        d = d.withElement(d.getElement().withWhitespace(""));
-                        return d;
-                    }));
+                if (a.getDimension() != null && a.getDimension().getBefore().getWhitespace().contains(" ")) {
+                    if (a.getAnnotations() == null || a.getAnnotations().isEmpty()) {
+                        a = a.withDimension(a.getDimension().withBefore(a.getDimension().getBefore().withWhitespace("")));
+                    }
                 }
             }
             return a;

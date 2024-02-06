@@ -33,7 +33,6 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
-import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
@@ -124,6 +123,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, version);
+    }
+
+    @Override
     public String getDescription() {
         return "Add a gradle dependency to a `build.gradle` file in the correct configuration based on where it is used.";
     }
@@ -182,7 +186,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
         return Preconditions.check(acc.usingType && !acc.configurationsByProject.isEmpty(),
                 Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
-                    final Pattern familyPatternCompiled = StringUtils.isBlank(familyPattern) ? null : Pattern.compile(familyPattern.replace("*", ".*"));
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -238,7 +241,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         G.CompilationUnit g = (G.CompilationUnit) s;
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                    classifier, extension, familyPatternCompiled, metadataFailures).visitNonNull(g, ctx);
+                                    classifier, extension, metadataFailures).visitNonNull(g, ctx);
                         }
 
                         return g;

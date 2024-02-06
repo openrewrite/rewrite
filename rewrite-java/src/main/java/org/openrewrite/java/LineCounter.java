@@ -15,9 +15,11 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.Space;
 
+@Getter
 public class LineCounter {
     private int line = 1;
 
@@ -33,7 +35,4 @@ public class LineCounter {
         line += (int) whitespace.chars().filter(c -> c == '\n').count();
     }
 
-    public int getLine() {
-        return line;
-    }
 }

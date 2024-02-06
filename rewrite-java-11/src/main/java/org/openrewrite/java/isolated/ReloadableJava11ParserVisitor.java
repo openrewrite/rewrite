@@ -48,7 +48,6 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -119,7 +118,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         NameTree name = convert(node.getAnnotationType());
 
         JContainer<Expression> args = null;
-        if (node.getArguments().size() > 0) {
+        if (!node.getArguments().isEmpty()) {
             Space argsPrefix = sourceBefore("(");
             List<JRightPadded<Expression>> expressions;
             if (node.getArguments().size() == 1) {
@@ -171,31 +170,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitArrayType(ArrayTypeTree node, Space fmt) {
-        Tree typeIdent = node.getType();
-        int dimCount = 1;
-
-        while (typeIdent instanceof ArrayTypeTree) {
-            dimCount++;
-            typeIdent = ((ArrayTypeTree) typeIdent).getType();
-        }
-
-        TypeTree elemType = convert(typeIdent);
-
-        List<JRightPadded<Space>> dimensions = emptyList();
-        if (dimCount > 0) {
-            dimensions = new ArrayList<>(dimCount);
-            for (int n = 0; n < dimCount; n++) {
-                dimensions.add(padRight(sourceBefore("["), sourceBefore("]")));
-            }
-        }
-
-        return new J.ArrayType(
-                randomId(),
-                fmt,
-                Markers.EMPTY,
-                elemType,
-                dimensions
-        );
+        return arrayTypeTree(node, new HashMap<>()).withPrefix(fmt);
     }
 
     @Override
@@ -376,12 +351,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitClass(ClassTree node, Space fmt) {
-        Map<Integer, JCAnnotation> annotationPosTable = new HashMap<>();
-        for (AnnotationTree annotationNode : node.getModifiers().getAnnotations()) {
-            JCAnnotation annotation = (JCAnnotation) annotationNode;
-            annotationPosTable.put(annotation.pos, annotation);
-        }
-
+        Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getModifiers().getAnnotations(),
+                new HashMap<>(node.getModifiers().getAnnotations().size()));
         ReloadableJava11ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> kindAnnotations = collectAnnotations(annotationPosTable);
@@ -496,11 +467,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         endPosTable = cu.endPositions;
         docCommentTable = cu.docComments;
 
-        Map<Integer, JCAnnotation> annotationPosTable = new HashMap<>();
-        for (AnnotationTree annotationNode : node.getPackageAnnotations()) {
-            JCAnnotation annotation = (JCAnnotation) annotationNode;
-            annotationPosTable.put(annotation.pos, annotation);
-        }
+        Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getPackageAnnotations(),
+                new HashMap<>(node.getPackageAnnotations().size()));
         List<J.Annotation> packageAnnotations = collectAnnotations(annotationPosTable);
 
         J.Package packageDecl = null;
@@ -687,7 +655,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         cursor += name.length();
 
         JCIdent ident = (JCIdent) node;
-        JavaType type = typeMapping.type(node);
+        // no `JavaType.Method` attribution for `super()` and `this()`
+        JavaType type = ident.sym != null && ident.sym.isConstructor() ? null : typeMapping.type(ident);
         return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), name, type, typeMapping.variableType(ident.sym));
     }
 
@@ -910,11 +879,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitMethod(MethodTree node, Space fmt) {
         JCMethodDecl jcMethod = (JCMethodDecl) node;
 
-        Map<Integer, JCAnnotation> annotationPosTable = new HashMap<>();
-        for (AnnotationTree annotationNode : node.getModifiers().getAnnotations()) {
-            JCAnnotation annotation = (JCAnnotation) annotationNode;
-            annotationPosTable.put(annotation.pos, annotation);
-        }
+        Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getModifiers().getAnnotations(),
+                new HashMap<>(node.getModifiers().getAnnotations().size()));
         ReloadableJava11ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         J.TypeParameters typeParams;
@@ -1081,6 +1047,9 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
         JCNewClass jcNewClass = (JCNewClass) node;
         JavaType.Method constructorType = typeMapping.methodInvocationType(jcNewClass.constructorType, jcNewClass.constructor);
+        if (constructorType != null && jcNewClass.clazz.type.isParameterized() && node.getClassBody() == null) {
+            constructorType = constructorType.withReturnType(typeMapping.type(jcNewClass.clazz.type));
+        }
 
         return new J.NewClass(randomId(), fmt, Markers.EMPTY, encl, whitespaceBeforeNew,
                 clazz, args, body, constructorType);
@@ -1237,15 +1206,28 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                         convert(node.getType(), t -> sourceBefore(")"))),
                 convert(node.getExpression()));
     }
+
     @Override
     public J visitAnnotatedType(AnnotatedTypeTree node, Space fmt) {
-        Map<Integer, JCAnnotation> annotationPosTable = new HashMap<>();
-        for (AnnotationTree annotationNode : node.getAnnotations()) {
+        Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getAnnotations(),
+                new HashMap<>(node.getAnnotations().size()));
+        List<J.Annotation> leadingAnnotations = leadingAnnotations(annotationPosTable);
+        if (!annotationPosTable.isEmpty()) {
+            if (node.getUnderlyingType() instanceof JCFieldAccess) {
+                return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, annotatedTypeTree(node.getUnderlyingType(), annotationPosTable));
+            } else if (node.getUnderlyingType() instanceof JCArrayTypeTree) {
+                return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, arrayTypeTree(node, annotationPosTable));
+            }
+        }
+        return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, convert(node.getUnderlyingType()));
+    }
+
+    private Map<Integer, JCAnnotation> mapAnnotations(List<? extends AnnotationTree> annotations, Map<Integer, JCAnnotation> annotationPosTable) {
+        for (AnnotationTree annotationNode : annotations) {
             JCAnnotation annotation = (JCAnnotation) annotationNode;
             annotationPosTable.put(annotation.pos, annotation);
         }
-        return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations(annotationPosTable),
-                annotationPosTable.isEmpty() ? convert(node.getUnderlyingType()) : annotatedTypeTree(node.getUnderlyingType(), annotationPosTable));
+        return annotationPosTable;
     }
 
     private List<J.Annotation> leadingAnnotations(Map<Integer, JCAnnotation> annotationPosTable) {
@@ -1266,8 +1248,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private TypeTree annotatedTypeTree(Tree node, Map<Integer, JCAnnotation> annotationPosTable) {
-        Space prefix = whitespace();
         if (node instanceof JCFieldAccess) {
+            Space prefix = whitespace();
             JCFieldAccess fieldAccess = (JCFieldAccess) node;
             JavaType type = typeMapping.type(node);
             Expression select = (Expression) annotatedTypeTree(fieldAccess.selected, annotationPosTable);
@@ -1282,6 +1264,64 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
         return convert(node);
+    }
+
+    private TypeTree arrayTypeTree(Tree tree, Map<Integer, JCAnnotation> annotationPosTable) {
+        Tree typeIdent = tree;
+        int count = 0;
+        JCArrayTypeTree arrayTypeTree = null;
+        while (typeIdent instanceof JCAnnotatedType || typeIdent instanceof JCArrayTypeTree) {
+            if (typeIdent instanceof JCAnnotatedType) {
+                typeIdent = ((JCAnnotatedType) typeIdent).getUnderlyingType();
+            }
+            if (typeIdent instanceof JCArrayTypeTree) {
+                if (count == 0) {
+                    arrayTypeTree = (JCArrayTypeTree) typeIdent;
+                }
+                count++;
+                typeIdent = ((JCArrayTypeTree) typeIdent).getType();
+            }
+        }
+
+        Space prefix = whitespace();
+        TypeTree elemType = convert(typeIdent);
+        List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
+        JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+        assert arrayTypeTree != null;
+        return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
+                count == 1 ? elemType : mapDimensions(elemType, arrayTypeTree.getType(), annotationPosTable),
+                annotations,
+                dimension,
+                typeMapping.type(tree));
+    }
+
+    private TypeTree mapDimensions(TypeTree baseType, Tree tree, Map<Integer, JCAnnotation> annotationPosTable) {
+        Tree typeIdent = tree;
+        if (typeIdent instanceof JCAnnotatedType) {
+            mapAnnotations(((JCAnnotatedType) typeIdent).getAnnotations(), annotationPosTable);
+            typeIdent = ((JCAnnotatedType) typeIdent).getUnderlyingType();
+        }
+
+        if (typeIdent instanceof JCArrayTypeTree) {
+            List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
+            int saveCursor = cursor;
+            whitespace();
+            if (source.startsWith("[", cursor)) {
+                cursor = saveCursor;
+                JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+                return new J.ArrayType(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
+                        annotations,
+                        dimension,
+                        typeMapping.type(tree)
+                );
+            }
+            cursor = saveCursor;
+        }
+        return baseType;
     }
 
     @Override
@@ -1408,16 +1448,14 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
         JCExpression vartype = node.vartype;
 
-        Map<Integer, JCAnnotation> annotationPosTable = new HashMap<>();
-        for (JCAnnotation annotationNode : node.getModifiers().getAnnotations()) {
-            annotationPosTable.put(annotationNode.pos, annotationNode);
-        }
+        Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getModifiers().getAnnotations(),
+                new HashMap<>(node.getModifiers().getAnnotations().size()));
         ReloadableJava11ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
         TypeTree typeExpr;
-        if (vartype == null || vartype instanceof JCErroneous) {
+        if (vartype == null) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
             if ((node.sym.flags() & Flags.PARAMETER) > 0) {
@@ -1428,12 +1466,19 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 typeExpr = typeExpr.withMarkers(typeExpr.getMarkers().add(JavaVarKeyword.build()));
             }
         } else if (vartype instanceof JCArrayTypeTree) {
-            // we'll capture the array dimensions in a bit, just convert the element type
-            JCExpression elementType = ((JCArrayTypeTree) vartype).elemtype;
-            while (elementType instanceof JCArrayTypeTree) {
-                elementType = ((JCArrayTypeTree) elementType).elemtype;
+            JCExpression elementType = vartype;
+            while (elementType instanceof JCArrayTypeTree || elementType instanceof JCAnnotatedType) {
+                if (elementType instanceof JCAnnotatedType) {
+                    elementType = ((JCAnnotatedType) elementType).underlyingType;
+                }
+                if (elementType instanceof JCArrayTypeTree) {
+                    elementType = ((JCArrayTypeTree) elementType).elemtype;
+                }
             }
-            typeExpr = convert(elementType);
+            String check = source.substring(elementType.getEndPosition(endPosTable)).trim();
+            typeExpr = check.startsWith("@") || check.startsWith("[") ? convert(vartype) :
+                    // we'll capture the array dimensions in a bit, just convert the element type
+                    convert(elementType);
         } else {
             typeExpr = convert(vartype);
         }
@@ -1442,18 +1487,14 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = new J.AnnotatedType(randomId(), Space.EMPTY, Markers.EMPTY, typeExprAnnotations, typeExpr);
         }
 
-        List<JLeftPadded<Space>> beforeDimensions = arrayDimensions();
+        List<JLeftPadded<Space>> beforeDimensions = emptyList();
 
         Space varargs = null;
-        if (typeExpr == null || typeExpr.getMarkers().findFirst(JavaVarKeyword.class).isEmpty()) {
-            String vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
-            Matcher varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
-            if (varargMatcher.find()) {
-                Matcher matcher = Pattern.compile("\\G(\\s*)\\.{3}").matcher(source);
-                if (matcher.find(cursor)) {
-                    cursor(matcher.end());
-                }
-                varargs = format(varargMatcher.group(1));
+        if (typeExpr != null && typeExpr.getMarkers().findFirst(JavaVarKeyword.class).isEmpty()) {
+            int varargStart = indexOfNextNonWhitespace(cursor, source);
+            if (source.startsWith("...", varargStart)) {
+                varargs = format(source, cursor, varargStart);
+                cursor = varargStart + 3;
             }
         }
 

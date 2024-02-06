@@ -177,6 +177,34 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    void arrayIsFullyQualifiedOfType() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  Integer[][] integer1;
+                  Integer[] integer2;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
+                    assertThat(multiVariable.getTypeExpression().getType()).isInstanceOf(JavaType.Array.class);
+                    assertThat(TypeUtils.isOfClassType(multiVariable.getTypeExpression().getType(), "java.lang.Integer")).isTrue();
+                    return super.visitVariableDeclarations(multiVariable, o);
+                }
+
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                    assertThat(variable.getVariableType().getType()).isInstanceOf(JavaType.Array.class);
+                    return super.visitVariable(variable, o);
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
     void isFullyQualifiedOfType() {
         rewriteRun(
           java(
@@ -214,6 +242,30 @@ class TypeUtilsTest implements RewriteTest {
                     assertThat(TypeUtils.isAssignableTo("java.util.List", type)).isTrue();
                     assertThat(TypeUtils.isAssignableTo("java.util.List<java.lang.Integer>", type)).isTrue();
                     assertThat(TypeUtils.isAssignableTo("java.util.List<java.lang.String>", type)).isFalse();
+                    return super.visitVariable(variable, o);
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    void isAssignableToWildcard() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  java.util.List<?> l = new java.util.ArrayList<String>();
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                    JavaType type = variable.getVariableType().getType();
+                    JavaType exprType = variable.getInitializer().getType();
+                    assertThat(type).isInstanceOf(JavaType.Parameterized.class);
+                    assertThat(exprType).isInstanceOf(JavaType.Parameterized.class);
+                    assertThat(TypeUtils.isAssignableTo(type, exprType)).isTrue();
                     return super.visitVariable(variable, o);
                 }
             }.visit(cu, new InMemoryExecutionContext()))

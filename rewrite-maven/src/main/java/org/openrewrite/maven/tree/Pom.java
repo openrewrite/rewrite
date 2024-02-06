@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven.tree;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.ExecutionContext;
@@ -38,6 +40,8 @@ import static java.util.Collections.emptyMap;
  */
 @Value
 @With
+@Builder
+@AllArgsConstructor
 public class Pom {
 
     /**
@@ -68,14 +72,22 @@ public class Pom {
     @Nullable
     String packaging;
 
-    Map<String, String> properties;
-    List<ManagedDependency> dependencyManagement;
-    List<Dependency> dependencies;
-    List<MavenRepository> repositories;
-    List<License> licenses;
-    List<Profile> profiles;
-    List<Plugin> plugins;
-    List<Plugin> pluginManagement;
+    @Builder.Default
+    Map<String, String> properties = emptyMap();
+    @Builder.Default
+    List<ManagedDependency> dependencyManagement = emptyList();
+    @Builder.Default
+    List<Dependency> dependencies = emptyList();
+    @Builder.Default
+    List<MavenRepository> repositories = emptyList();
+    @Builder.Default
+    List<License> licenses = emptyList();
+    @Builder.Default
+    List<Profile> profiles = emptyList();
+    @Builder.Default
+    List<Plugin> plugins = emptyList();
+    @Builder.Default
+    List<Plugin> pluginManagement = emptyList();
 
     public String getGroupId() {
         return gav.getGroupId();
@@ -105,7 +117,7 @@ public class Pom {
     }
 
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, List<MavenRepository> initialRepositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList(), emptyList()).resolve(ctx, downloader);
+        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList()).resolve(ctx, downloader);
     }
 
     @Nullable

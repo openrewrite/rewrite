@@ -15,13 +15,10 @@
  */
 package org.openrewrite.remote;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.Markup;
-import org.openrewrite.marker.SearchResult;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -30,7 +27,6 @@ import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
 
 class RemoteVisitorTest {
 

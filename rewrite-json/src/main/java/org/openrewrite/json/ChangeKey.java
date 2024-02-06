@@ -39,6 +39,11 @@ public class ChangeKey extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKeyPath, newKey);
+    }
+
+    @Override
     public String getDescription() {
         return "Change a JSON mapping entry key, while leaving the value intact.";
     }

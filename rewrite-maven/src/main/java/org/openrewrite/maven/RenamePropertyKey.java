@@ -17,8 +17,10 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -41,6 +43,11 @@ public class RenamePropertyKey extends Recipe {
     @Override
     public String getDisplayName() {
         return "Rename Maven property key";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKey, newKey);
     }
 
     @Override

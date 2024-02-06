@@ -35,7 +35,10 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
+import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,11 +74,11 @@ class RecipeLifecycleTest implements RewriteTest {
             .recipe(toRecipe()
               .withGenerator(() -> List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build()))
               .withName("test.GeneratingRecipe")
+              .withMaxCycles(1)
             )
             .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
               .map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
-              .containsOnly("test.GeneratingRecipe"))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+              .containsOnly("test.GeneratingRecipe")),
           text(null, "test", spec -> spec.path("test.txt"))
         );
     }
@@ -250,8 +253,7 @@ class RecipeLifecycleTest implements RewriteTest {
                 assertThat(changes).hasSize(1);
                 assertThat(changes.get(0).getRecipeDescriptorsThatMadeChanges().stream().map(RecipeDescriptor::getName))
                   .containsExactlyInAnyOrder("Change1", "Change2");
-            })
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            }),
           text(
             "Hello",
             "Change2Change1Hello"

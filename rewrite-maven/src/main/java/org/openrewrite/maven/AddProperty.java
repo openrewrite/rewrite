@@ -60,6 +60,11 @@ public class AddProperty extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s=%s`", key, value);
+    }
+
+    @Override
     public String getDescription() {
         return "Add a new property to the Maven project property.";
     }

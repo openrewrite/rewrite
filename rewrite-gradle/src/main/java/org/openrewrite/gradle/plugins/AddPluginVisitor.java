@@ -18,7 +18,6 @@ package org.openrewrite.gradle.plugins;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Incubating;
 import org.openrewrite.Parser;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.search.FindPlugins;
@@ -48,7 +47,6 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
-@Incubating(since = "7.33.0")
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {

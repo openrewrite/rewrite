@@ -18,6 +18,7 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.Getter;
+import lombok.Setter;
 import org.intellij.lang.annotations.Language;
 
 import java.lang.reflect.ParameterizedType;
@@ -41,6 +42,7 @@ public class DataTable<Row> {
     @Language("markdown")
     private final String description;
 
+    @Setter
     private boolean enabled = true;
 
     /**
@@ -72,13 +74,10 @@ public class DataTable<Row> {
         recipe.addDataTable(this);
     }
 
+    @SuppressWarnings("unused")
     public TypeReference<List<Row>> getRowsTypeReference() {
         return new TypeReference<List<Row>>() {
         };
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 
     public void insertRow(ExecutionContext ctx, Row row) {

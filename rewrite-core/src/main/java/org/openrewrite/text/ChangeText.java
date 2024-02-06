@@ -46,6 +46,11 @@ public class ChangeText extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return "to `" + toText + "`";
+    }
+
+    @Override
     public String getDescription() {
         return "Completely replaces the contents of the text file with other text. " +
                "Use together with a `FindSourceFiles` precondition to limit which files are changed.";

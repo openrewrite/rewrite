@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
@@ -57,6 +58,27 @@ public class UpdateJavaCompatibility extends Recipe {
     @Nullable
     DeclarationStyle declarationStyle;
 
+    @Option(displayName = "Allow Downgrade",
+            description = "Allow downgrading the Java version.",
+            required = false)
+    @Nullable
+    Boolean allowDowngrade;
+
+    @Option(displayName = "Add Source Compatibility if missing",
+            description = "Adds Source Compatibility if one is not found.",
+            required = false)
+    @Nullable
+    Boolean addSourceCompatibilityIfMissing;
+
+    @Option(displayName = "Add Target Compatibility if missing",
+            description = "Adds Target Compatibility if one is not found.",
+            required = false)
+    @Nullable
+    Boolean addTargetCompatibilityIfMissing;
+
+    private static final String SOURCE_COMPATIBILITY_FOUND = "SOURCE_COMPATIBILITY_FOUND";
+    private static final String TARGET_COMPATIBILITY_FOUND = "TARGET_COMPATIBILITY_FOUND";
+
     @Override
     public String getDisplayName() {
         return "Update Gradle project Java compatibility";
@@ -81,11 +103,42 @@ public class UpdateJavaCompatibility extends Recipe {
             final MethodMatcher javaVersionToVersionMatcher = new MethodMatcher("org.gradle.api.JavaVersion toVersion(..)");
 
             @Override
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
+                G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, executionContext);
+                if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
+                    if (Boolean.TRUE.equals(addSourceCompatibilityIfMissing)) {
+                        G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse("\nsourceCompatibility = " + styleMissingCompatibilityVersion())
+                                .findFirst()
+                                .get();
+                        sourceFile.getStatements();
+                        c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+                    }
+                }
+                if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
+                    if (Boolean.TRUE.equals(addTargetCompatibilityIfMissing)) {
+                        G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse("\ntargetCompatibility = " + styleMissingCompatibilityVersion())
+                                .findFirst()
+                                .get();
+                        sourceFile.getStatements();
+                        c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+                    }
+                }
+                return c;
+            }
+
+            @Override
             public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                 J.Assignment a = (J.Assignment) super.visitAssignment(assignment, ctx);
 
                 if (a.getVariable() instanceof J.Identifier) {
                     J.Identifier variable = (J.Identifier) a.getVariable();
+                    if ("sourceCompatibility".equals(variable.getSimpleName())) {
+                        getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, a.getAssignment());
+                    }
+                    if ("targetCompatibility".equals(variable.getSimpleName())) {
+                        getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, TARGET_COMPATIBILITY_FOUND, a.getAssignment());
+                    }
+
                     if (compatibilityType == null) {
                         if (!("sourceCompatibility".equals(variable.getSimpleName()) || "targetCompatibility".equals(variable.getSimpleName()))) {
                             return a;
@@ -108,7 +161,7 @@ public class UpdateJavaCompatibility extends Recipe {
 
                 DeclarationStyle currentStyle = getCurrentStyle(a.getAssignment());
                 int currentMajor = getMajorVersion(a.getAssignment());
-                if (currentMajor != version || (declarationStyle != null && declarationStyle != currentStyle)) {
+                if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(currentStyle)) {
                     DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
                     return a.withAssignment(changeExpression(a.getAssignment(), actualStyle));
                 }
@@ -116,9 +169,23 @@ public class UpdateJavaCompatibility extends Recipe {
                 return a;
             }
 
+            private boolean shouldUpdateVersion(int currentMajor) {
+                return currentMajor < version || currentMajor > version && Boolean.TRUE.equals(allowDowngrade);
+            }
+
+            private boolean shouldUpdateStyle(@Nullable DeclarationStyle currentStyle) {
+                return declarationStyle != null && declarationStyle != currentStyle;
+            }
+
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if ("sourceCompatibility".equals(m.getSimpleName())) {
+                    getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, true);
+                }
+                if ("targetCompatibility".equals(m.getSimpleName())) {
+                    getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, TARGET_COMPATIBILITY_FOUND, true);
+                }
                 if (javaLanguageVersionMatcher.matches(m)) {
                     List<Expression> args = m.getArguments();
 
@@ -126,7 +193,7 @@ public class UpdateJavaCompatibility extends Recipe {
                         J.Literal versionArg = (J.Literal) args.get(0);
                         if (versionArg.getValue() instanceof Integer) {
                             Integer versionNumber = (Integer) versionArg.getValue();
-                            if (!version.equals(versionNumber)) {
+                            if (shouldUpdateVersion(versionNumber)) {
                                 return m.withArguments(
                                         Collections.singletonList(versionArg.withValue(version)
                                                 .withValueSource(version.toString())));
@@ -150,7 +217,7 @@ public class UpdateJavaCompatibility extends Recipe {
                     if (m.getArguments().size() == 1 && (m.getArguments().get(0) instanceof J.Literal || m.getArguments().get(0) instanceof J.FieldAccess)) {
                         DeclarationStyle currentStyle = getCurrentStyle(m.getArguments().get(0));
                         int currentMajor = getMajorVersion(m.getArguments().get(0));
-                        if (currentMajor != version || (declarationStyle != null && declarationStyle != currentStyle)) {
+                        if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
                             DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
                             return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeExpression(arg, actualStyle)));
                         } else {
@@ -328,6 +395,17 @@ public class UpdateJavaCompatibility extends Recipe {
                 return expression;
             }
         });
+    }
+
+    private String styleMissingCompatibilityVersion() {
+        if (declarationStyle == DeclarationStyle.String) {
+            return version <= 8 ? "'1." + version + "'" : "'" + version + "'";
+        } else if (declarationStyle == DeclarationStyle.Enum) {
+            return version <= 8 ? "JavaVersion.VERSION_1_" + version : "JavaVersion.VERSION_" + version;
+        } else if (version <= 8) {
+            return "1." + version;
+        }
+        return String.valueOf(version);
     }
 
     public enum CompatibilityType {

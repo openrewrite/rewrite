@@ -214,12 +214,12 @@ public class BlockStatementTemplateGenerator {
         if (contextSensitive) {
             contextTemplate(cursor, prior, before, after, insertionPoint, mode);
         } else {
-            contextFreeTemplate(cursor, prior, before, after, insertionPoint, mode);
+            contextFreeTemplate(cursor, prior, before, after);
         }
     }
 
     @SuppressWarnings("DataFlowIssue")
-    private void contextFreeTemplate(Cursor cursor, J j, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+    private void contextFreeTemplate(Cursor cursor, J j, StringBuilder before, StringBuilder after) {
         if (j instanceof J.Lambda) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +

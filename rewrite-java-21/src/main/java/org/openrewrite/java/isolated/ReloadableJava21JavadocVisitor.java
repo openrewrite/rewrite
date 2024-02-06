@@ -35,6 +35,7 @@ import com.sun.tools.javac.util.Context;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -44,6 +45,9 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
+import static org.openrewrite.java.tree.Space.EMPTY;
+import static org.openrewrite.java.tree.Space.format;
 
 public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private final Attr attr;
@@ -753,8 +757,16 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     @Override
     public Tree visitReturn(ReturnTree node, List<Javadoc> body) {
-        body.addAll(sourceBefore("@return"));
-        return new Javadoc.Return(randomId(), Markers.EMPTY, convertMultiline(node.getDescription()));
+        List<Javadoc> before;
+        Markers markers = Markers.EMPTY;
+        if (source.startsWith("{", cursor)) {
+            markers = markers.addIfAbsent(new LeadingBrace(Tree.randomId()));
+            before = sourceBefore("{@return");
+        } else {
+            before = sourceBefore("@return");
+        }
+        body.addAll(before);
+        return new Javadoc.Return(randomId(), markers, convertMultiline(node.getDescription()));
     }
 
     @Override
@@ -1141,26 +1153,17 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
         @Override
         public J visitArrayType(ArrayTypeTree node, Space fmt) {
-            com.sun.source.tree.Tree typeIdent = node.getType();
-            int dimCount = 1;
+            TypeTree elemType = (TypeTree) scan(node.getType(), Space.EMPTY);
 
-            while (typeIdent instanceof ArrayTypeTree) {
-                dimCount++;
-                typeIdent = ((ArrayTypeTree) typeIdent).getType();
-            }
-
-            TypeTree elemType = (TypeTree) scan(typeIdent, Space.EMPTY);
-
-            List<JRightPadded<Space>> dimensions = emptyList();
-            if (dimCount > 0) {
-                dimensions = new ArrayList<>(dimCount);
-                for (int n = 0; n < dimCount; n++) {
-                    if (!source.substring(cursor).startsWith("...")) {
-                        dimensions.add(padRight(
-                                Space.build(sourceBeforeAsString("["), emptyList()),
-                                Space.build(sourceBeforeAsString("]"), emptyList())));
-                    }
-                }
+            int saveCursor = cursor;
+            Space before = whitespace();
+            JLeftPadded<Space> dimension;
+            if (source.startsWith("[", cursor)) {
+                cursor++;
+                dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
+            } else {
+                cursor = saveCursor;
+                return elemType.withPrefix(fmt);
             }
 
             return new J.ArrayType(
@@ -1168,12 +1171,20 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     fmt,
                     Markers.EMPTY,
                     elemType,
-                    dimensions
+                    null,
+                    dimension,
+                    typeMapping.type(node)
             );
         }
 
-        private <T> JRightPadded<T> padRight(T tree, Space right) {
-            return new JRightPadded<>(tree, right, Markers.EMPTY);
+        private Space whitespace() {
+            int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
+            if (nextNonWhitespace == cursor) {
+                return EMPTY;
+            }
+            Space space = format(source, cursor, nextNonWhitespace);
+            cursor = nextNonWhitespace;
+            return space;
         }
 
         @Override

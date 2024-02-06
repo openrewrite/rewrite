@@ -67,7 +67,7 @@ class CreateXmlFileTest implements RewriteTest {
             "test/test.xml",
             fileContents,
             true
-          )),
+          )).cycles(1).expectedCyclesThatMakeChanges(1),
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>

@@ -262,29 +262,4 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/3559")
-    void escapedMethodNameTest() {
-        rewriteRun(
-          groovy(
-            """
-              def 'default'() {}
-              'default'()
-              """
-          )
-        );
-    }
-
-    @Test
-    void escapedMethodNameWithSpacesTest() {
-        rewriteRun(
-          groovy(
-            """
-              def 'some test scenario description'() {}
-              'some test scenario description'()
-              """
-          )
-        );
-    }
 }

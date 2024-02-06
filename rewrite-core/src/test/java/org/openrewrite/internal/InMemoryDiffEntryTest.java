@@ -18,8 +18,6 @@ package org.openrewrite.internal;
 import org.eclipse.jgit.lib.FileMode;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.internal.InMemoryDiffEntry;
-import org.openrewrite.internal.StringUtils;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;

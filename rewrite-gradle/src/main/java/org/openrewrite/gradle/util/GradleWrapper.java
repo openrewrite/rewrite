@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 
 @Value
 public class GradleWrapper {
@@ -91,7 +92,7 @@ public class GradleWrapper {
     }
 
     public String getPropertiesFormattedUrl() {
-        return getDistributionUrl().replaceAll("(?<!\\\\)://", "\\\\://");
+        return formatUriForPropertiesFile(getDistributionUrl());
     }
 
     public Checksum getDistributionChecksum() {

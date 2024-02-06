@@ -26,7 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.Collections;
 import java.util.List;
 
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeParentPomTest implements RewriteTest {

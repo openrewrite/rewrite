@@ -53,6 +53,11 @@ public class FindFieldsOfType extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return "on types `" + fullyQualifiedTypeName + "`";
+    }
+
+    @Override
     public String getDescription() {
         return "Finds declared fields matching a particular class name.";
     }
