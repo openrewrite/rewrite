@@ -217,7 +217,7 @@ public class ChangeParentPom extends Recipe {
                                     maybeUpdateModel();
                                 }
 
-                                if (changeParentTagVisitors.size() > 0) {
+                                if (!changeParentTagVisitors.isEmpty()) {
                                     retainVersions();
                                     doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions).getVisitor());
                                     for (XmlVisitor<ExecutionContext> visitor : changeParentTagVisitors) {
@@ -244,7 +244,7 @@ public class ChangeParentPom extends Recipe {
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
                                                                 ExecutionContext ctx) throws MavenDownloadingException {
-                String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
+                String finalCurrentVersion = Semver.isVersion(currentVersion) ? currentVersion : "0.0.0";
 
                 if (availableVersions == null) {
 					availableVersions = MavenMetadataWrapper.builder()
@@ -254,7 +254,9 @@ public class ChangeParentPom extends Recipe {
                             .extraFilter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(finalCurrentVersion, finalCurrentVersion, v) < 0)
                             .build().filter();
                 }
-                return Boolean.TRUE.equals(allowVersionDowngrades) ? availableVersions.stream().max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2)) : versionComparator.upgrade(finalCurrentVersion, availableVersions);
+                return Boolean.TRUE.equals(allowVersionDowngrades) ?
+                        availableVersions.stream().max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2)) :
+                        versionComparator.upgrade(finalCurrentVersion, availableVersions);
             }
         });
     }
