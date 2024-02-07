@@ -24,34 +24,16 @@ import java.util.Objects;
 
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.utilities.MavenMetadataWrapper;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
-abstract class AbstractChangeDependencyGroupIdAndArtifactId extends AbstractChangeGroupIdAndArtifactId {
-    @Option(displayName = "New version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "29.X",
-            required = false)
-    @Nullable
-    String newVersion;
-
-    @Option(displayName = "Version pattern",
-            description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
-            example = "-jre",
-            required = false)
-    @Nullable
-    String versionPattern;
-
+abstract class AbstractChangeDependencyGroupIdAndArtifactId extends AbstractChangeGroupIdArtifactIdAndVersion {
     protected AbstractChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId,
             @Nullable String newVersion, @Nullable String versionPattern) {
-        super(oldGroupId, oldArtifactId, newGroupId, newArtifactId);
-        this.newVersion = newVersion;
-        this.versionPattern = versionPattern;
+        super(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern);
     }
 
     @Override
