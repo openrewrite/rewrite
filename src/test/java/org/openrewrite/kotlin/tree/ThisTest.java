@@ -47,4 +47,18 @@ class ThisTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void innerClass() {
+        rewriteRun(
+          kotlin(
+            """
+              class Foo {
+                  fun bar() = this.Bar()
+                  inner class Bar
+              }
+              """
+          )
+        );
+    }
 }

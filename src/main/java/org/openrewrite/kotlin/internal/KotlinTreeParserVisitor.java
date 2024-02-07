@@ -2490,7 +2490,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         .withPrefix(prefix);
             } else if (j instanceof J.NewClass) {
                 J.NewClass n = (J.NewClass) j;
-                if (receiver instanceof J.FieldAccess || receiver instanceof J.Identifier || receiver instanceof J.NewClass) {
+                if (receiver instanceof J.FieldAccess || receiver instanceof J.Identifier || receiver instanceof J.NewClass || receiver instanceof K.This) {
                     n = n.withPrefix(prefix);
                     if (n.getClazz() instanceof J.ParameterizedType) {
                         J.ParameterizedType pt = (J.ParameterizedType) n.getClazz();
