@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
@@ -30,6 +31,8 @@ import java.util.*;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @AllArgsConstructor
@@ -165,6 +168,10 @@ public class MavenResolutionResult implements Marker {
     private static final Scope[] RESOLVE_SCOPES = new Scope[]{Scope.Compile, Scope.Runtime, Scope.Test, Scope.Provided};
 
     public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        if (MavenExecutionContextView.view(ctx).getSkipDependencyResolution()) {
+            return this;
+        }
+
         Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
         MavenDownloadingExceptions exceptions = null;
 
