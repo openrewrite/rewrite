@@ -2,7 +2,6 @@ import nl.javadude.gradle.plugins.license.LicenseExtension
 
 plugins {
     id("org.openrewrite.build.language-library")
-    id("org.jetbrains.kotlin.jvm") version "1.9.21"
 }
 
 dependencies {
@@ -39,7 +38,6 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
-    testImplementation("org.jetbrains:kotlin.jvm:1.9.21")
     testImplementation("com.squareup.okio:okio-jvm:3.0.0")
     testImplementation("org.mapdb:mapdb:latest.release")
     testImplementation("guru.nidi:graphviz-java:latest.release")
