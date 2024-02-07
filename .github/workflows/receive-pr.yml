@@ -1,0 +1,11 @@
+name: receive-pr
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
+# https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+# Since this pull request receives untrusted code, we should **NOT** have any secrets in the environment.
+jobs:
+  upload-patch:
+    uses: openrewrite/gh-automation/.github/workflows/receive-pr.yml@main

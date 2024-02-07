@@ -1,0 +1,15 @@
+name: comment-pr
+# https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#using-data-from-the-triggering-workflow
+on:
+  workflow_run:
+    workflows: ["receive-pr"]
+    types:
+      - completed
+# https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+# Since this pull request has write permissions on the target repo, we should **NOT** execute any untrusted code.
+jobs:
+  post-suggestions:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: openrewrite/gh-automation/.github/workflows/comment-pr.yml@main
+    secrets:
+      GH_PAT_ACTIONS_READ: ${{ secrets.GH_PAT_ACTIONS_READ }}
