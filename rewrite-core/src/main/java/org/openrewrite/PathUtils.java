@@ -79,6 +79,15 @@ public class PathUtils {
         if (relativePath.isEmpty() && globPattern.isEmpty()) {
             return true;
         }
+        List<String> eitherOrPatterns = getEitherOrPatterns(globPattern);
+        if (!eitherOrPatterns.isEmpty()) {
+            for (String eitherOrPattern : eitherOrPatterns) {
+                if (matchesGlob(eitherOrPattern, relativePath)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         List<String> excludedPatterns = getExcludedPatterns(globPattern);
         if (!excludedPatterns.isEmpty()) {
             if (!matchesGlob(convertNegationToWildcard(globPattern), relativePath)) {
@@ -227,6 +236,26 @@ public class PathUtils {
         }
 
         return excludedPatterns;
+    }
+
+    public static List<String> getEitherOrPatterns(String globPattern) {
+        List<String> eitherOrPatterns = new ArrayList<>();
+
+        // Regular expression to match {...}
+        String eitherOrPattern = "\\{(.*?)\\}";
+        Pattern pattern = Pattern.compile(eitherOrPattern);
+        Matcher matcher = pattern.matcher(globPattern);
+
+        // Find all possible patterns and generate patterns
+        while (matcher.find()) {
+            String eitherOrContent = matcher.group(1);
+            String[] options = eitherOrContent.split("\\,");
+            for (String option : options) {
+                eitherOrPatterns.add(globPattern.replace(matcher.group(), option));
+            }
+        }
+
+        return eitherOrPatterns;
     }
 
     private static String[] tokenize(String path) {
