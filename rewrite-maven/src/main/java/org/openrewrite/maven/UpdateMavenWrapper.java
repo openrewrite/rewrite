@@ -389,7 +389,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                 }
                 if (mavenWrapper.getWrapperDistributionType() == DistributionType.Bin) {
                     if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
-                        return mavenWrapper.wrapperJar().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
+                        return mavenWrapper.wrapperJar(sourceFile);
                     }
 
                     if (PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_DOWNLOADER_LOCATION_RELATIVE_PATH)) {
@@ -397,7 +397,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     }
                 } else if (mavenWrapper.getWrapperDistributionType() == DistributionType.Source) {
                     if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_DOWNLOADER_LOCATION_RELATIVE_PATH)) {
-                        return mavenWrapper.wrapperDownloader().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
+                        return mavenWrapper.wrapperDownloader(sourceFile);
                     }
 
                     if (PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
