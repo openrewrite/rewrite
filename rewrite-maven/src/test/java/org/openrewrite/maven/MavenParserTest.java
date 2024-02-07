@@ -39,8 +39,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.stream.StreamSupport;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -55,7 +54,7 @@ class MavenParserTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+                            
                 <dependencies>
                   <dependency>
                     <groupId>junit</groupId>
@@ -72,14 +71,34 @@ class MavenParserTest implements RewriteTest {
     @Test
     void skipDependencyResolution() {
         rewriteRun(
-          spec -> spec.parser(MavenParser.builder().skipDependencyResolution(true)),
+          spec -> spec
+            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setSkipDependencyResolution(true)
+              .setResolutionListener(new ResolutionEventListener() {
+                  @Override
+                  public void parent(Pom parent, Pom containing) {
+                      fail("Parent resolution should have been skipped");
+                  }
+
+                  @Override
+                  public void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing) {
+                      fail("Dependency resolution should have been skipped");
+                  }
+              })),
           pomXml(
             """
               <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.2.2</version>
+                    <relativePath/> <!-- lookup parent from repository -->
+                </parent>
+                  
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+                            
                 <dependencies>
                   <dependency>
                     <groupId>foo</groupId>
@@ -128,7 +147,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-                
+                                
                   <dependencies>
                     <dependency>
                       <groupId>junit</groupId>
@@ -517,7 +536,7 @@ class MavenParserTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+                            
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
@@ -527,7 +546,7 @@ class MavenParserTest implements RewriteTest {
                           <name>Trygve Laugst&oslash;l</name>
                       </developer>
                   </developers>
-              
+                            
                   <dependencies>
                     <dependency>
                       <groupId>org.junit.jupiter</groupId>
@@ -583,11 +602,11 @@ class MavenParserTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+                            
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>single-project</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-              
+                            
                   <dependencies>
                       <dependency>
                           <groupId>com.google.guava</groupId>
@@ -595,7 +614,7 @@ class MavenParserTest implements RewriteTest {
                           <version>29.0-jre</version>
                       </dependency>
                   </dependencies>
-              
+                            
                   <repositories>
                       <repository>
                           <id>jcenter</id>
@@ -617,15 +636,15 @@ class MavenParserTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+                            
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>single-project</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-              
+                            
                   <properties>
                       <dependency.scope>compile</dependency.scope>
                   </properties>
-              
+                            
                   <dependencies>
                       <dependency>
                           <groupId>com.google.guava</groupId>
@@ -677,7 +696,7 @@ class MavenParserTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+                            
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
@@ -701,7 +720,7 @@ class MavenParserTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+                            
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
@@ -893,11 +912,11 @@ class MavenParserTest implements RewriteTest {
                         resp.setBody("""
                           <project>
                             <modelVersion>4.0.0</modelVersion>
-                          
+                                                    
                             <groupId>com.foo</groupId>
                             <artifactId>bar</artifactId>
                             <version>1.0.0</version>
-                          
+                                                    
                           </project>
                           """
                         );
@@ -1812,11 +1831,11 @@ class MavenParserTest implements RewriteTest {
                 <artifactId>sample</artifactId>
                 <version>${revision}</version>
                 <packaging>pom</packaging>
-              
+                            
                 <modules>
                   <module>sample-rest</module>
                 </modules>
-              
+                            
               </project>
               """, spec -> spec.path("pom.xml")),
           pomXml(
@@ -1824,11 +1843,11 @@ class MavenParserTest implements RewriteTest {
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+                            
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-rest</artifactId>
                 <packaging>jar</packaging>
-              
+                            
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample</artifactId>
@@ -1854,14 +1873,14 @@ class MavenParserTest implements RewriteTest {
                 <artifactId>sample</artifactId>
                 <version>${revision}</version>
                 <packaging>pom</packaging>
-              
+                            
                 <modules>
                   <module>sample-parent</module>
                   <module>sample-app</module>
                   <module>sample-rest</module>
                   <module>sample-web</module>
                 </modules>
-              
+                            
                 <properties>
                   <revision>0.0.0-SNAPSHOT</revision>
                 </properties>
@@ -1877,11 +1896,11 @@ class MavenParserTest implements RewriteTest {
                 <groupId>net.sample</groupId>
                 <version>${revision}</version>
                 <packaging>pom</packaging>
-              
+                            
                 <properties>
                   <revision>0.0.0-SNAPSHOT</revision>
                 </properties>
-              
+                            
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -1903,24 +1922,24 @@ class MavenParserTest implements RewriteTest {
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+                            
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-app</artifactId>
                 <packaging>jar</packaging>
-              
+                            
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
                   <version>${revision}</version>
                   <relativePath>../parent/pom.xml</relativePath>
                 </parent>
-              
+                            
                 <dependencies>
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-rest</artifactId>
                   </dependency>
-              
+                            
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-web</artifactId>
@@ -1933,11 +1952,11 @@ class MavenParserTest implements RewriteTest {
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+                            
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-rest</artifactId>
                 <packaging>jar</packaging>
-              
+                            
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
@@ -1951,11 +1970,11 @@ class MavenParserTest implements RewriteTest {
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+                            
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-web</artifactId>
                 <packaging>jar</packaging>
-              
+                            
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
@@ -1982,14 +2001,14 @@ class MavenParserTest implements RewriteTest {
                 <artifactId>sample</artifactId>
                 <version>${revision}</version>
                 <packaging>pom</packaging>
-              
+                            
                 <modules>
                   <module>sample-parent</module>
                   <module>sample-app</module>
                   <module>sample-rest</module>
                   <module>sample-web</module>
                 </modules>
-              
+                            
                 <properties>
                   <revision>0.0.0-SNAPSHOT</revision>
                 </properties>
@@ -2005,11 +2024,11 @@ class MavenParserTest implements RewriteTest {
                 <groupId>net.sample</groupId>
                 <version>${revision}</version>
                 <packaging>pom</packaging>
-              
+                            
                 <properties>
                   <revision>0.0.0-SNAPSHOT</revision>
                 </properties>
-              
+                            
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -2031,24 +2050,24 @@ class MavenParserTest implements RewriteTest {
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+                            
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-app</artifactId>
                 <packaging>jar</packaging>
-              
+                            
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
                   <version>${revision}</version>
                   <relativePath>../parent/pom.xml</relativePath>
                 </parent>
-              
+                            
                 <dependencies>
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-rest</artifactId>
                   </dependency>
-              
+                            
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-web</artifactId>
@@ -2065,24 +2084,24 @@ class MavenParserTest implements RewriteTest {
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+                            
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-app</artifactId>
                 <packaging>jar</packaging>
-              
+                            
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
                   <version>${revision}</version>
                   <relativePath>../parent/pom.xml</relativePath>
                 </parent>
-              
+                            
                 <dependencies>
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-rest</artifactId>
                   </dependency>
-              
+                            
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-web</artifactId>
@@ -2101,11 +2120,11 @@ class MavenParserTest implements RewriteTest {
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+                            
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-rest</artifactId>
                 <packaging>jar</packaging>
-              
+                            
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
@@ -2119,11 +2138,11 @@ class MavenParserTest implements RewriteTest {
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+                            
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-web</artifactId>
                 <packaging>jar</packaging>
-              
+                            
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
@@ -2360,7 +2379,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>a</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-              
+                            
                   <build>
                       <plugins>
                           <plugin>
@@ -2393,7 +2412,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>a</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-              
+                            
                   <build>
                       <plugins>
                           <plugin>
@@ -2474,7 +2493,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>a</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-  
+                
                   <build>
                     <pluginManagement>
                       <plugins>

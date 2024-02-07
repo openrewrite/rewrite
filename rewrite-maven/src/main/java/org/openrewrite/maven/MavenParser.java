@@ -45,6 +45,8 @@ import static org.openrewrite.Tree.randomId;
 public class MavenParser implements Parser {
 
     private final Collection<String> activeProfiles;
+
+    @Deprecated
     private final boolean skipDependencyResolution;
 
     @Override
@@ -105,6 +107,12 @@ public class MavenParser implements Parser {
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
 
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
+
+        // TODO scheduled for removal when users of MavenParser.Builder.skipDependencyResolution are migrated
+        if (skipDependencyResolution) {
+            mavenCtx.setSkipDependencyResolution(true);
+        }
+
         MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()
                 .withServers(null);
 
@@ -112,7 +120,7 @@ public class MavenParser implements Parser {
             try {
                 ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
                 MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles());
-                if (!skipDependencyResolution) {
+                if (!mavenCtx.getSkipDependencyResolution()) {
                     model = model.resolveDependencies(downloader, ctx);
                 }
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
@@ -134,7 +142,7 @@ public class MavenParser implements Parser {
         for (int i = 0; i < parsed.size(); i++) {
             SourceFile maven = parsed.get(i);
             Optional<MavenResolutionResult> maybeResolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class);
-            if(!maybeResolutionResult.isPresent()) {
+            if (!maybeResolutionResult.isPresent()) {
                 continue;
             }
             MavenResolutionResult resolutionResult = maybeResolutionResult.get();
@@ -144,7 +152,7 @@ public class MavenParser implements Parser {
                     continue;
                 }
                 Optional<MavenResolutionResult> maybeModuleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class);
-                if(!maybeModuleResolutionResult.isPresent()) {
+                if (!maybeModuleResolutionResult.isPresent()) {
                     continue;
                 }
                 MavenResolutionResult moduleResolutionResult = maybeModuleResolutionResult.get();
@@ -177,12 +185,21 @@ public class MavenParser implements Parser {
 
     public static class Builder extends Parser.Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
+
+        @Deprecated
         private boolean skipDependencyResolution;
 
         public Builder() {
             super(Xml.Document.class);
         }
 
+        /**
+         * @param skip Whether to skip dependency resolution
+         * @return This builder
+         * @deprecated Use {@link MavenExecutionContextView#setSkipDependencyResolution(boolean)}
+         * on the execution context passed into the parser instead.
+         */
+        @Deprecated
         public Builder skipDependencyResolution(boolean skip) {
             skipDependencyResolution = skip;
             return this;

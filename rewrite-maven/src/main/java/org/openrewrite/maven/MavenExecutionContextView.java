@@ -45,6 +45,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
+    private static final String MAVEN_SKIP_DEPENDENCY_RESOLUTION = "org.openrewrite.maven.skipDependencyResolution";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -122,6 +123,15 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         }
         credentials.addAll(getMessage(MAVEN_CREDENTIALS, emptyList()));
         return credentials;
+    }
+
+    public boolean getSkipDependencyResolution() {
+        return getMessage(MAVEN_SKIP_DEPENDENCY_RESOLUTION, false);
+    }
+
+    public MavenExecutionContextView setSkipDependencyResolution(boolean skipDependencyResolution) {
+        putMessage(MAVEN_SKIP_DEPENDENCY_RESOLUTION, skipDependencyResolution);
+        return this;
     }
 
     public MavenExecutionContextView setPomCache(MavenPomCache pomCache) {
@@ -212,7 +222,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     private static List<String> mapActiveProfiles(MavenSettings settings, String... activeProfiles) {
-        if(settings.getActiveProfiles() == null) {
+        if (settings.getActiveProfiles() == null) {
             return Arrays.asList(activeProfiles);
         }
         return Stream.concat(
