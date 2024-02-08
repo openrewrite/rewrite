@@ -208,13 +208,13 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                         if ("distributionUrl".equals(entry.getKey())) {
                             // Typical example: https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
                             String currentDistributionUrl = entry.getValue().getText();
-                            if (!mavenWrapper.getPropertiesFormattedDistributionUrl().equals(currentDistributionUrl)) {
+                            if (!mavenWrapper.getDistributionUrl().equals(currentDistributionUrl)) {
                                 acc.needsWrapperUpdate = true;
                             }
                         } else if ("wrapperUrl".equals(entry.getKey())) {
                             // Typical example: https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
                             String currentWrapperUrl = entry.getValue().getText();
-                            if (!mavenWrapper.getPropertiesFormattedWrapperUrl().equals(currentWrapperUrl)) {
+                            if (!mavenWrapper.getWrapperUrl().equals(currentWrapperUrl)) {
                                 acc.needsWrapperUpdate = true;
                             }
                         }
@@ -289,11 +289,11 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         if (acc.addMavenWrapperProperties) {
             @Language("properties")
             String mavenWrapperPropertiesText = ASF_LICENSE_HEADER +
-                                                DISTRIBUTION_URL_KEY + "=" + mavenWrapper.getPropertiesFormattedDistributionUrl() + "\n" +
+                                                DISTRIBUTION_URL_KEY + "=" + mavenWrapper.getDistributionUrl() + "\n" +
                                                 DISTRIBUTION_SHA_256_SUM_KEY + "=" + mavenWrapper.getDistributionChecksum().getHexValue();
             if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript) {
                 mavenWrapperPropertiesText += "\n" +
-                                              WRAPPER_URL_KEY + "=" + mavenWrapper.getPropertiesFormattedWrapperUrl() + "\n" +
+                                              WRAPPER_URL_KEY + "=" + mavenWrapper.getWrapperUrl() + "\n" +
                                               WRAPPER_SHA_256_SUM_KEY + "=" + mavenWrapper.getWrapperChecksum().getHexValue();
             }
             //noinspection UnusedProperty
@@ -459,8 +459,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         public Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if (DISTRIBUTION_URL_KEY.equals(entry.getKey())) {
                 Properties.Value value = entry.getValue();
-                if (!mavenWrapper.getPropertiesFormattedDistributionUrl().equals(value.getText())) {
-                    return entry.withValue(value.withText(mavenWrapper.getPropertiesFormattedDistributionUrl()));
+                if (!mavenWrapper.getDistributionUrl().equals(value.getText())) {
+                    return entry.withValue(value.withText(mavenWrapper.getDistributionUrl()));
                 }
             } else if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey())) {
                 Properties.Value value = entry.getValue();
@@ -471,8 +471,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
             } else if (WRAPPER_URL_KEY.equals(entry.getKey())) {
                 if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript) {
                     Properties.Value value = entry.getValue();
-                    if (!mavenWrapper.getPropertiesFormattedWrapperUrl().equals(value.getText())) {
-                        return entry.withValue(value.withText(mavenWrapper.getPropertiesFormattedWrapperUrl()));
+                    if (!mavenWrapper.getWrapperUrl().equals(value.getText())) {
+                        return entry.withValue(value.withText(mavenWrapper.getWrapperUrl()));
                     }
                 } else {
                     //noinspection ConstantConditions

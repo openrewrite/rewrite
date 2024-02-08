@@ -156,12 +156,12 @@ public class MavenWrapper {
         }
     }
 
-    public String getPropertiesFormattedWrapperUrl() {
-        return wrapperUri.replaceAll("(?<!\\\\)://", "\\\\://");
+    public String getWrapperUrl() {
+        return wrapperUri;
     }
 
-    public String getPropertiesFormattedDistributionUrl() {
-        return distributionUri.replaceAll("(?<!\\\\)://", "\\\\://");
+    public String getDistributionUrl() {
+        return distributionUri;
     }
 
     public Remote wrapperJar() {
