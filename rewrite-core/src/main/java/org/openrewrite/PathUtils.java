@@ -20,6 +20,7 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -80,28 +81,31 @@ public class PathUtils {
             return true;
         }
         List<String> eitherOrPatterns = getEitherOrPatterns(globPattern);
+        List<String> excludedPatterns = getExcludedPatterns(globPattern);
+
+        if (eitherOrPatterns.isEmpty() && excludedPatterns.isEmpty()) {
+            return matchesGlob(globPattern, relativePath);
+        }
+
         if (!eitherOrPatterns.isEmpty()) {
             for (String eitherOrPattern : eitherOrPatterns) {
-                if (matchesGlob(eitherOrPattern, relativePath)) {
+                if (matchesGlob(Paths.get(relativePath), eitherOrPattern)) {
                     return true;
                 }
             }
             return false;
         }
-        List<String> excludedPatterns = getExcludedPatterns(globPattern);
-        if (!excludedPatterns.isEmpty()) {
-            if (!matchesGlob(convertNegationToWildcard(globPattern), relativePath)) {
+
+        // If eitherOrPatterns is empty and excludedPatterns is not
+        if (!matchesGlob(convertNegationToWildcard(globPattern), relativePath)) {
+            return false;
+        }
+        for (String excludedPattern : excludedPatterns) {
+            if (matchesGlob(excludedPattern, relativePath)) {
                 return false;
             }
-            for (String excludedPattern : excludedPatterns) {
-                if (matchesGlob(excludedPattern, relativePath)) {
-                    return false;
-                }
-            }
-            return true;
         }
-
-        return matchesGlob(globPattern, relativePath);
+        return true;
     }
 
     private static boolean matchesGlob(String pattern, String path) {
