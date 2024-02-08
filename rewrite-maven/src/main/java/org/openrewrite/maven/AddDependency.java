@@ -78,7 +78,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             description = "A scope to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
                           "is used when adding a runtime, provided, or import dependency.",
             example = "runtime",
-            valid = {"import", "runtime", "provided"},
+            valid = {"compile", "import", "provided", "runtime", "system", "test"},
             required = false)
     @Nullable
     String scope;
