@@ -576,6 +576,52 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+
+    @Test
+    void versionInParentSubprojectDefinitionWithPropertiesFiles() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                      mavenCentral()
+              }
+                  
+              subprojects {
+                  repositories {
+                      mavenCentral()
+                  }
+                  
+                  dependencies {
+                    implementation ("com.google.guava:guava:$guavaVersion")
+                  }
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          ),
+          buildGradle(
+            """
+              dependencies {
+              }
+              """,
+            spec -> spec.path("moduleA/build.gradle")
+          )
+        );
+    }
+
+
     @Test
     void versionOnlyInMultiModuleChildPropertiesFiles() {
         rewriteRun(
