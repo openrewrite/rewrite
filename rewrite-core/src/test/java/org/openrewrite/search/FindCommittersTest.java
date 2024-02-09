@@ -17,6 +17,7 @@ package org.openrewrite.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.marker.GitProvenance;
+import org.openrewrite.table.DistinctCommitters;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -24,6 +25,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.TreeMap;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -46,9 +48,13 @@ public class FindCommittersTest implements RewriteTest {
         );
 
         rewriteRun(
+          spec -> spec.dataTable(DistinctCommitters.Row.class, rows -> {
+              assertThat(rows).satisfiesExactly(
+                r -> assertThat(r.getEmail()).isEqualTo("jkschneider@gmail.com")
+              );
+          }),
           text(
             "hi",
-            "~~(jkschneider@gmail.com)~~>hi",
             spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))
           )
         );
@@ -70,10 +76,14 @@ public class FindCommittersTest implements RewriteTest {
         );
 
         rewriteRun(
-          spec -> spec.recipe(new FindCommitters("2023-01-10")),
+          spec -> spec.recipe(new FindCommitters("2023-01-10"))
+            .dataTable(DistinctCommitters.Row.class, rows -> {
+                assertThat(rows).satisfiesExactly(
+                  r -> assertThat(r.getEmail()).isEqualTo("p.streef@gmail.com")
+                );
+            }),
           text(
             "hi",
-            "~~(p.streef@gmail.com)~~>hi",
             spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))
           )
         );
@@ -95,14 +105,17 @@ public class FindCommittersTest implements RewriteTest {
         );
 
         rewriteRun(
-          spec -> spec.recipe(new FindCommitters("")),
+          spec -> spec.recipe(new FindCommitters(""))
+            .dataTable(DistinctCommitters.Row.class, rows -> {
+                assertThat(rows).satisfiesExactly(
+                  r -> assertThat(r.getEmail()).isEqualTo("jkschneider@gmail.com"),
+                  r -> assertThat(r.getEmail()).isEqualTo("p.streef@gmail.com")
+                );
+            }),
           text(
             "hi",
-            "~~(jkschneider@gmail.com\np.streef@gmail.com)~~>hi",
             spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))
           )
         );
     }
-
-
 }
