@@ -49,7 +49,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings("unused")
-interface RewriteTest extends SourceSpecs {
+public interface RewriteTest extends SourceSpecs {
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
         return new AdHocRecipe(null, null, null, visitor, null, null);
     }
