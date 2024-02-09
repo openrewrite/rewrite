@@ -53,6 +53,12 @@ public class FindCommitters extends Recipe {
     }
 
     @Override
+    public int maxCycles() {
+        // This recipe does not modify the LSTs and only requires the `GitProvenance` marker
+        return 1;
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(process.get(), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
