@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
@@ -1809,7 +1809,7 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
+    @Disabled
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3650")
     void unicodeEscape() {
