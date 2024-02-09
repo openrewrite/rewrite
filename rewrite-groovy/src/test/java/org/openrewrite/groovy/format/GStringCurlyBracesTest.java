@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class GStringCurlyBracesTest implements RewriteTest {
+class GStringCurlyBracesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

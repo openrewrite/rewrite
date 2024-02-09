@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class FindCommittersTest implements RewriteTest {
+class FindCommittersTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
