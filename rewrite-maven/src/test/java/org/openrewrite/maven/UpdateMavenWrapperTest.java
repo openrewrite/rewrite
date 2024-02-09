@@ -632,12 +632,12 @@ class UpdateMavenWrapperTest implements RewriteTest {
                       wrapperVersion: 3.2.0
                       distributionVersion: 3.8.8
                       addIfMissing: false
-                      checkMavenWrapperJarChecksum: true
+                      enforceWrapperChecksumVerification: true
                   - org.openrewrite.maven.UpdateMavenWrapper:
                       wrapperVersion: 3.1.1
                       distributionVersion: 3.6.0
                       addIfMissing: false
-                      checkMavenWrapperJarChecksum: true
+                      enforceWrapperChecksumVerification: true
                 """,
               "org.openrewrite.maven.MultipleWrapperUpdates"
             )

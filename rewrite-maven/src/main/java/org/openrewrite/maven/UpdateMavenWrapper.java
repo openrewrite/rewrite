@@ -107,20 +107,13 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     @Nullable
     final Boolean addIfMissing;
 
-    /**
-     * Due to a current limitation of the Maven wrapper, checking the maven-wrapper.jar checksum
-     * can be problematic on Windows.
-     * Since one of the use case of the maven-wrapper.jar is to be portable across platforms, it
-     * seems safer to not enforce the maven-wrapper.jar checksum check by default.
-     *
-     * See https://issues.apache.org/jira/browse/MWRAPPER-103
-     */
     @Getter
-    @Option(displayName = "Enforce checksum of maven-wrapper.jar",
-            description = "Enforce the check of the checksum of the maven-wrapper.jar. Defaults to `false` for Windows compatibility.",
+    @Option(displayName = "Enforce checksum verification for maven-wrapper.jar",
+            description = "Enforce checksum verification for the maven-wrapper.jar. Enabling this feature may sporadically " +
+                          "result in build failures, such as [MWRAPPER-103](https://issues.apache.org/jira/browse/MWRAPPER-103). Defaults to `false`.",
             required = false)
     @Nullable
-    final Boolean checkMavenWrapperJarChecksum;
+    final Boolean enforceWrapperChecksumVerification;
 
     @Override
     public String getDisplayName() {
@@ -211,7 +204,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     public Properties visitFile(Properties.File file, ExecutionContext ctx) {
                         Properties p = super.visitFile(file, ctx);
                         if (FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, null).isEmpty() ||
-                            (FindProperties.find(p, WRAPPER_SHA_256_SUM_KEY, null).isEmpty() && Boolean.TRUE.equals(checkMavenWrapperJarChecksum))) {
+                            (FindProperties.find(p, WRAPPER_SHA_256_SUM_KEY, null).isEmpty() && Boolean.TRUE.equals(enforceWrapperChecksumVerification))) {
                             acc.needsWrapperUpdate = true;
                         }
                         return p;
@@ -309,7 +302,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
             if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript) {
                 mavenWrapperPropertiesText += "\n" +
                                               WRAPPER_URL_KEY + "=" + mavenWrapper.getWrapperUrl();
-                if (Boolean.TRUE.equals(checkMavenWrapperJarChecksum)) {
+                if (Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
                     mavenWrapperPropertiesText += "\n" +
                             WRAPPER_SHA_256_SUM_KEY + "=" + mavenWrapper.getWrapperChecksum().getHexValue();
                 }
@@ -462,7 +455,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                 Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", Properties.Entry.Delimiter.EQUALS, propertyValue);
                 p = p.withContent(ListUtils.concat(p.getContent(), entry));
             }
-            if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript && Boolean.TRUE.equals(checkMavenWrapperJarChecksum)) {
+            if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript && Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
                 Checksum wrapperJarChecksum = mavenWrapper.getWrapperChecksum();
                 if (FindProperties.find(p, WRAPPER_SHA_256_SUM_KEY, null).isEmpty() && wrapperJarChecksum != null) {
                     Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, wrapperJarChecksum.getHexValue());
@@ -498,7 +491,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                 }
             } else if (WRAPPER_SHA_256_SUM_KEY.equals(entry.getKey())) {
                 if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript
-                        && Boolean.TRUE.equals(checkMavenWrapperJarChecksum)) {
+                        && Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
                     Properties.Value value = entry.getValue();
                     Checksum wrapperJarChecksum = mavenWrapper.getWrapperChecksum();
                     if (wrapperJarChecksum != null && !wrapperJarChecksum.getHexValue().equals(value.getText())) {
