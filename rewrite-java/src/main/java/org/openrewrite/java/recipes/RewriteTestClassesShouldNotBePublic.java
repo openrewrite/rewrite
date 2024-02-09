@@ -50,7 +50,9 @@ public class RewriteTestClassesShouldNotBePublic extends Recipe {
                     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                         J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
                         if (TypeUtils.isAssignableTo("org.openrewrite.test.RewriteTest", cd.getType()) &&
-                            cd.getModifiers().stream().anyMatch(mod -> mod.getType() == J.Modifier.Type.Public)) {
+                            cd.getKind() != J.ClassDeclaration.Kind.Type.Interface &&
+                            cd.getModifiers().stream().anyMatch(mod -> mod.getType() == J.Modifier.Type.Public) &&
+                            cd.getModifiers().stream().noneMatch(mod -> mod.getType() == J.Modifier.Type.Abstract)) {
 
                             // Remove public modifier and move associated comment
                             final List<Comment> modifierComments = new ArrayList<>();
