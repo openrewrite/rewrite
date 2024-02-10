@@ -123,6 +123,38 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void noReposProperties() {
+        rewriteRun(
+          properties(
+            """
+            guavaVersion=29.0-jre
+            """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              dependencies {
+                compileOnly "com.google.guava:guava:${guavaVersion}"
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              dependencies {
+                /*~~(com.google.guava:guava failed. Unable to download metadata.)~~>*/compileOnly "com.google.guava:guava:${guavaVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void updateVersionInVariable() {
         rewriteRun(
           buildGradle(
@@ -742,6 +774,58 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
                     implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
                 }
+              """
+          )
+        );
+    }
+
+    @Test
+    void disallowDowngrade() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.security", "*", "5.3.x", null)),
+          properties(
+            """
+              springBootVersion=3.0.0
+              springSecurityVersion=5.4.0
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+                plugins {
+                    id 'java'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencies {
+                    implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
+                    implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
+                }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dontDowngradeWhenExactVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "28.0", "-jre")),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation 'com.google.guava:guava:29.0-jre'
+              }
               """
           )
         );

@@ -28,6 +28,7 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -44,10 +45,12 @@ import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -124,7 +127,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Value
     public static class DependencyVersionState {
         Map<String, GroupArtifact> versionPropNameToGA = new HashMap<>();
-        Map<GroupArtifact, String> gaToNewVersion = new HashMap<>();
+        Map<GroupArtifact, Object> gaToNewVersion = new HashMap<>();
     }
 
     @Override
@@ -208,18 +211,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if(acc.gaToNewVersion.containsKey(ga)) {
                             return m;
                         }
-                        String oldVersion = findCurrentResolvedVersion(groupId, artifactId, m.getSimpleName(), gradleProject);
-                        if(oldVersion == null) {
-                            return m;
-                        }
                         try {
-                            String newVersion = findNewerProjectDependencyVersion(groupId, artifactId, oldVersion, gradleProject, ctx);
-                            if(oldVersion.equals(newVersion)) {
-                                return m;
-                            }
+                            String resolvedVersion = "classpath".equals(m.getSimpleName()) ?
+                                    findNewerPluginVersion(groupId, artifactId, "0", gradleProject, ctx) :
+                                    findNewerProjectDependencyVersion(groupId, artifactId, "0", gradleProject, ctx);
+
                             acc.versionPropNameToGA.put(versionVariableName, ga);
-                            acc.gaToNewVersion.put(ga, newVersion);
+                            acc.gaToNewVersion.put(ga, resolvedVersion);
                         } catch (MavenDownloadingException e) {
+                            acc.gaToNewVersion.put(ga, e);
                             return m;
                         }
                     } else {
@@ -244,20 +244,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 if(acc.gaToNewVersion.containsKey(ga)) {
                                     continue;
                                 }
-                                String oldVersion = findCurrentResolvedVersion(dep.getGroupId(), dep.getArtifactId(), m.getSimpleName(), gradleProject);
-                                if(oldVersion == null) {
-                                    continue;
-                                }
                                 try {
-                                    String newVersion = findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), oldVersion, gradleProject, ctx);
-                                    if(oldVersion.equals(newVersion)) {
-                                        continue;
-                                    }
+                                    String resolvedVersion = "classpath".equals(m.getSimpleName()) ?
+                                            findNewerPluginVersion(dep.getGroupId(), dep.getArtifactId(), "0", gradleProject, ctx) :
+                                            findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), "0", gradleProject, ctx);
+
                                     acc.versionPropNameToGA.put(versionVariableName, ga);
-                                    acc.gaToNewVersion.put(ga, newVersion);
+                                    acc.gaToNewVersion.put(ga, resolvedVersion);
                                 } catch (MavenDownloadingException e) {
-                                    //noinspection UnnecessaryContinue
-                                    continue;
+                                    acc.gaToNewVersion.put(ga, e);
                                 }
                             }
                         }
@@ -266,29 +261,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return m;
             }
         };
-    }
-
-    @Nullable
-    private static String findCurrentResolvedVersion(String groupId, String artifactId, String configurationName, GradleProject gp) {
-        GradleDependencyConfiguration configuration = gp.getConfiguration(configurationName);
-        if(configuration == null) {
-            return null;
-        }
-
-        ResolvedDependency resolvedDependency = configuration.findResolvedDependency(groupId, artifactId);
-        if(resolvedDependency != null) {
-            return resolvedDependency.getVersion();
-        }
-        // Dependencies are commonly added to configurations, like implementation, which are unresolvable.
-        // In this case a resolved version can be found in one or more configurations extending from it.
-        // If there is no sub-configuration with a resolved version, then it isn't really a dependency, is it?
-        for (GradleDependencyConfiguration extendingConfiguration : gp.configurationsExtendingFrom(configuration, true)) {
-            resolvedDependency = extendingConfiguration.findResolvedDependency(groupId, artifactId);
-            if(resolvedDependency != null) {
-                return resolvedDependency.getVersion();
-            }
-        }
-        return null;
     }
 
     @Override
@@ -305,19 +277,20 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     @Override
                     public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
                         if (acc.versionPropNameToGA.containsKey(entry.getKey())) {
-                            GroupArtifact groupArtifact = acc.versionPropNameToGA.get(entry.getKey());
-                            if(groupArtifact == null || !dependencyMatcher.matches(groupArtifact.getGroupId(), groupArtifact.getArtifactId())) {
-                                return entry;
-                            }
                             GroupArtifact ga = acc.versionPropNameToGA.get(entry.getKey());
-                            if(ga == null) {
+                            if (ga == null || !dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
                                 return entry;
                             }
-                            String newResolvedVersion = acc.gaToNewVersion.get(ga);
-                            if(newResolvedVersion == null) {
+                            Object result = acc.gaToNewVersion.get(ga);
+                            if (result == null || result instanceof Exception) {
                                 return entry;
                             }
-                            return entry.withValue(entry.getValue().withText(newResolvedVersion));
+                            VersionComparator versionComparator = Semver.validate(StringUtils.isBlank(newVersion) ? "latest.release" : newVersion, versionPattern).getValue();
+                            if (versionComparator == null) {
+                                return entry;
+                            }
+                            Optional<String> finalVersion = versionComparator.upgrade(entry.getValue().getText(), singletonList((String) result));
+                            return finalVersion.map(v -> entry.withValue(entry.getValue().withText(v))).orElse(entry);
                         }
                         return entry;
                     }
@@ -386,6 +359,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                         }
                                         Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
                                         if (dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
+                                            Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                                            if (scanResult instanceof Exception) {
+                                                getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, scanResult);
+                                                return arg;
+                                            }
+
                                             String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
                                             getCursor().dropParentUntil(p -> p instanceof SourceFile)
                                                     .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
@@ -404,11 +383,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                         if (dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())
                                             && dep.getVersion() != null
                                             && !dep.getVersion().startsWith("$")) {
+                                            Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                                            if (scanResult instanceof Exception) {
+                                                getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, scanResult);
+                                                return arg;
+                                            }
+
                                             String version = dep.getVersion();
                                             try {
                                                 String newVersion = "classpath".equals(method.getSimpleName()) ?
-                                                        findNewerPluginVersion(dep.getGroupId(), dep.getArtifactId(), version, gradleProject, ctx) :
-                                                        findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), version, gradleProject, ctx);
+                                                            findNewerPluginVersion(dep.getGroupId(), dep.getArtifactId(), version, gradleProject, ctx) :
+                                                            findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), version, gradleProject, ctx);
                                                 if (newVersion == null || version.equals(newVersion)) {
                                                     return arg;
                                                 }
@@ -448,6 +433,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     //noinspection DataFlowIssue
                                     if (!dependencyMatcher.matches((String) groupLiteral.getValue(), (String) artifactLiteral.getValue())) {
                                         return m;
+                                    }
+                                    Object scanResult = acc.gaToNewVersion.get(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()));
+                                    if (scanResult instanceof Exception) {
+                                        return Markup.warn(m, (Exception) scanResult);
                                     }
                                     G.MapEntry versionEntry = (G.MapEntry) depArgs.get(2);
                                     Expression versionExp = versionEntry.getValue();
