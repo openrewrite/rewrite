@@ -360,7 +360,7 @@ public class MethodMatcher {
 class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
     private static final Set<String> COMMON_JAVA_LANG_TYPES =
             new HashSet<>(Arrays.asList("Number", "Integer", "Byte", "Short", "Character", "Long", "Float", "Double",
-                    "Boolean", "Void", "Object", "Throwable", "Exception", "Class", "Enum", "Record", "Runnable"));
+                    "Boolean", "Void", "Object", "Throwable", "Exception", "Class", "Enum", "Record", "Runnable", "String"));
 
     @Override
     public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
