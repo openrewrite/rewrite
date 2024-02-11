@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest {
+class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

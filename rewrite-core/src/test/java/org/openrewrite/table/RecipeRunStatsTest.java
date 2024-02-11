@@ -27,7 +27,7 @@ import org.openrewrite.text.PlainTextVisitor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RecipeRunStatsTest implements RewriteTest {
+class RecipeRunStatsTest implements RewriteTest {
 
     @AllArgsConstructor
     static class RecipeWithApplicabilityTest extends Recipe {

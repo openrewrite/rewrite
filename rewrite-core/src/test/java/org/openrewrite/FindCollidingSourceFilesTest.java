@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class FindCollidingSourceFilesTest implements RewriteTest {
+class FindCollidingSourceFilesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

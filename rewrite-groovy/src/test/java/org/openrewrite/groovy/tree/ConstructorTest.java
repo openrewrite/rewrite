@@ -20,6 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
+@SuppressWarnings("GroovyResultOfObjectAllocationIgnored")
 class ConstructorTest implements RewriteTest {
 
     @Test
@@ -28,6 +29,22 @@ class ConstructorTest implements RewriteTest {
           groovy(
             """
               ( new String("foo") )
+              """
+          )
+        );
+    }
+
+    @Test
+    void anonymousClassDeclarationClosedOverVariable() {
+        rewriteRun(
+          groovy(
+            """
+              int i = 1
+              new Object() {
+                  int one() {
+                      return i
+                  }
+              }
               """
           )
         );

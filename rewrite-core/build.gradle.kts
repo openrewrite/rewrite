@@ -16,6 +16,7 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-databind")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
     api("com.fasterxml.jackson.module:jackson-module-parameter-names")
+    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("net.java.dev.jna:jna-platform:latest.release")
 
     // Pinning okhttp while waiting on 5.0.0
