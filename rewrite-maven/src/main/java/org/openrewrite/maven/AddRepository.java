@@ -33,7 +33,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddRepository extends Recipe {
     private static final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/repositories");
 

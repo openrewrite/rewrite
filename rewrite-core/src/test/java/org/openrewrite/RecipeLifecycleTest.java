@@ -84,7 +84,7 @@ class RecipeLifecycleTest implements RewriteTest {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     static class DeleteFirst extends Recipe {
 
         @Override

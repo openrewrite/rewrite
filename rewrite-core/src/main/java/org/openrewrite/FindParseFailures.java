@@ -24,7 +24,7 @@ import org.openrewrite.table.ParseFailures;
 import java.util.Objects;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindParseFailures extends Recipe {
 
     @Option(displayName = "Max snippet length",

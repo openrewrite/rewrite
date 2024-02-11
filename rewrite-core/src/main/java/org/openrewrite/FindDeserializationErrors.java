@@ -30,7 +30,7 @@ import java.util.Optional;
 import static java.time.ZoneOffset.UTC;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindDeserializationErrors extends Recipe {
 
     @Override

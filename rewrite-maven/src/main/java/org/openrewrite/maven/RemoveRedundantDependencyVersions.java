@@ -30,7 +30,7 @@ import java.util.List;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveRedundantDependencyVersions extends Recipe {
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +

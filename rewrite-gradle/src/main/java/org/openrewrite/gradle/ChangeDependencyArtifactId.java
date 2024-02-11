@@ -35,7 +35,7 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class ChangeDependencyArtifactId extends Recipe {
     @Option(displayName = "Group",

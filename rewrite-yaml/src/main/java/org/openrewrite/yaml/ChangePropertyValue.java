@@ -28,7 +28,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePropertyValue extends Recipe {
     @Option(displayName = "Property key",
             description = "The key to look for. Supports glob patterns.",

@@ -28,7 +28,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class FindParseFailuresTest implements RewriteTest {
+class FindParseFailuresTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

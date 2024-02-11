@@ -33,7 +33,7 @@ import java.util.Map;
 import static java.util.Collections.emptyList;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindTypeMappings extends ScanningRecipe<Map<FindTypeMappings.TypeAssociation, Integer>> {
     transient TypeMappings typeMappingsPerSource = new TypeMappings(this);
 
