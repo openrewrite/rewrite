@@ -206,8 +206,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
                         try {
                             String versionToUse = findVersionToUse(versionComparator, pom, ctx);
-                            String existingManagedDependencyVersion = existingManagedDependencyVersion();
-                            if (!Objects.equals(versionToUse, pom.getValue(existingManagedDependencyVersion))) {
+                            if (!Objects.equals(versionToUse, pom.getValue(existingManagedDependencyVersion()))) {
                                 if (ResolvedPom.placeholderHelper.hasPlaceholders(version) && Objects.equals(convertedVersion, versionToUse)) {
                                     // revert back to the original version if the version has a placeholder
                                     versionToUse = version;

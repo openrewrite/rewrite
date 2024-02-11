@@ -208,9 +208,6 @@ public class MavenPomDownloader {
     }
 
     public MavenMetadata downloadMetadata(GroupArtifact groupArtifact, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {
-        if (containingPom != null) {
-            groupArtifact = containingPom.getValues(groupArtifact);
-        }
         return downloadMetadata(new GroupArtifactVersion(groupArtifact.getGroupId(), groupArtifact.getArtifactId(), null),
                 containingPom,
                 repositories);
