@@ -231,10 +231,9 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
 
             @Nullable
             private String findVersionToUse(VersionComparator versionComparator, ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
-                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, containingPom, ctx));
                 LatestRelease latest = new LatestRelease(versionPattern);
                 return MavenMetadataWrapper.builder()
-                        .mavenMetadata(metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx)))
+                        .mavenMetadata(metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, containingPom, ctx)))
                         .versionComparator(versionComparator)
                         .extraFilter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
                         .build().max().orElse(null);
