@@ -208,6 +208,9 @@ public class MavenPomDownloader {
     }
 
     public MavenMetadata downloadMetadata(GroupArtifact groupArtifact, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {
+        if (containingPom != null) {
+            groupArtifact = containingPom.getValues(groupArtifact);
+        }
         return downloadMetadata(new GroupArtifactVersion(groupArtifact.getGroupId(), groupArtifact.getArtifactId(), null),
                 containingPom,
                 repositories);
@@ -216,6 +219,10 @@ public class MavenPomDownloader {
     public MavenMetadata downloadMetadata(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {
         if (gav.getGroupId() == null) {
             throw new MavenDownloadingException("Missing group id.", null, gav);
+        }
+
+        if (containingPom != null) {
+            gav = containingPom.getValues(gav);
         }
 
         ctx.getResolutionListener().downloadMetadata(gav);

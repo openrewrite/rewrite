@@ -25,6 +25,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -198,12 +199,19 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                 Xml maven = super.visitDocument(document, ctx);
 
                 if (!Boolean.TRUE.equals(addToRootPom) || acc.rootPoms.contains(document)) {
-                    Validated<VersionComparator> versionValidation = Semver.validate(version, versionPattern);
+                    ResolvedPom pom = getResolutionResult().getPom();
+                    String convertedVersion = pom.getValue(version);
+                    Validated<VersionComparator> versionValidation = Semver.validate(convertedVersion, versionPattern);
                     if (versionValidation.isValid()) {
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
                         try {
-                            String versionToUse = findVersionToUse(versionComparator, ctx);
-                            if (!Objects.equals(versionToUse, existingManagedDependencyVersion())) {
+                            String versionToUse = findVersionToUse(versionComparator, pom, ctx);
+                            String existingManagedDependencyVersion = existingManagedDependencyVersion();
+                            if (!Objects.equals(versionToUse, pom.getValue(existingManagedDependencyVersion))) {
+                                if (ResolvedPom.placeholderHelper.hasPlaceholders(version) && Objects.equals(convertedVersion, versionToUse)) {
+                                    // revert back to the original version if the version has a placeholder
+                                    versionToUse = version;
+                                }
                                 doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
                                         versionToUse, scope, type, classifier));
                                 maybeUpdateModel();
@@ -235,8 +243,8 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
             }
 
             @Nullable
-            private String findVersionToUse(VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
-                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+            private String findVersionToUse(VersionComparator versionComparator, ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
+                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, containingPom, ctx));
                 LatestRelease latest = new LatestRelease(versionPattern);
                 return mavenMetadata.getVersioning().getVersions().stream()
                         .filter(v -> versionComparator.isValid(null, v))
