@@ -25,7 +25,7 @@ import org.openrewrite.test.SourceSpec;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class RemoveTrailingWhitespaceTest implements RewriteTest {
+class RemoveTrailingWhitespaceTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

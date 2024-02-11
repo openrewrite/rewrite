@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.kotlin.KotlinParser;
@@ -77,6 +78,7 @@ class WrappingAndBracesTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @SuppressWarnings({"ClassInitializerMayBeStatic", "ReassignedVariable", "UnusedAssignment"})
     @Test
     void blockLevelStatements() {

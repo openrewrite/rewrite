@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveTrailingSemicolon extends Recipe {
     @Override
     public String getDisplayName() {
@@ -72,7 +72,7 @@ public class RemoveTrailingSemicolon extends Recipe {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     private static class CollectSemicolonRemovableElements extends KotlinPrinter<Set<Marker>> {
         Pattern WS = Pattern.compile("^\\s+");
 

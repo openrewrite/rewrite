@@ -16,13 +16,15 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.UseStaticImport;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class UseStaticImportTest implements RewriteTest {
+class UseStaticImportTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void noPriorImports() {
         rewriteRun(

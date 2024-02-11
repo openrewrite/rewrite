@@ -25,7 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class KotlinTypeGoatTest implements RewriteTest {
+class KotlinTypeGoatTest implements RewriteTest {
     @Language("kotlin")
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 

@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
@@ -70,6 +71,7 @@ public class AddImportTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void jvmStaticMember() {
         rewriteRun(

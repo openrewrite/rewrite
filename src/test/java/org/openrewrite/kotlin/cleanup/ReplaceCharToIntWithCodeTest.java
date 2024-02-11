@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 
-public class ReplaceCharToIntWithCodeTest implements RewriteTest {
+class ReplaceCharToIntWithCodeTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ReplaceCharToIntWithCode());

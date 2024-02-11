@@ -26,7 +26,7 @@ import org.openrewrite.quark.Quark;
 import org.openrewrite.text.PlainText;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindKotlinSources extends Recipe {
     transient KotlinSourceFile kotlinSourceFile = new KotlinSourceFile(this);
 

@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.kotlin.tree.K;
@@ -25,8 +26,9 @@ import org.openrewrite.test.TypeValidation;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class RemoveImportTest implements RewriteTest {
+class RemoveImportTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void jvmStaticMember() {
         rewriteRun(

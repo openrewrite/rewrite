@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
@@ -40,6 +41,7 @@ class AutoFormatVisitorTest implements RewriteTest {
         spec.recipe(new AutoFormat());
     }
 
+    @DocumentExample
     @Test
     void keepMaximumBetweenHeaderAndPackage() {
         rewriteRun(

@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.ChangeAnnotationAttributeName;
 import org.openrewrite.test.RewriteTest;
 
@@ -23,8 +24,9 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ChangeAnnotationAttributeNameTest implements RewriteTest {
 
+    @DocumentExample
     @Test
-    public void changeAnnotationAttributes() {
+    void changeAnnotationAttributes() {
         rewriteRun(
           spec -> spec.recipe(new ChangeAnnotationAttributeName(
               "org.junit.jupiter.api.Tag",

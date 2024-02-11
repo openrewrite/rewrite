@@ -23,7 +23,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.kotlin.format.TrailingCommaVisitor;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveTrailingComma extends Recipe {
     @Override
     public String getDisplayName() {

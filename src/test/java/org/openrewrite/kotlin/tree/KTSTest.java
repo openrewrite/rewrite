@@ -31,7 +31,8 @@ class KTSTest implements RewriteTest {
     @Test
     void topLevelAssignmentExpression() {
         rewriteRun(
-          kotlinScript("""
+          kotlinScript(
+                """
             var x = 5
             x += 1 /*C1*/
             """)
@@ -41,7 +42,8 @@ class KTSTest implements RewriteTest {
     @Test
     void topLevelFunctionCall() {
         rewriteRun(
-          kotlinScript("""
+          kotlinScript(
+                """
             println("foo")
             """)
         );
@@ -50,7 +52,8 @@ class KTSTest implements RewriteTest {
     @Test
     void topLevelForLoop() {
         rewriteRun(
-          kotlinScript("""
+          kotlinScript(
+                """
             val items = listOf("foo", "bar", "buz")
             for (item in items) {
                 println(item)

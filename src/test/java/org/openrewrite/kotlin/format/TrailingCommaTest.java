@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.kotlin.style.IntelliJ;
 import org.openrewrite.kotlin.style.OtherStyle;
 import org.openrewrite.test.RecipeSpec;
@@ -38,6 +39,7 @@ class TrailingCommaTest implements RewriteTest {
         return spec -> spec.recipe(toRecipe(() -> new TrailingCommaVisitor<>(with.apply(IntelliJ.other()).getUseTrailingComma())));
     }
 
+    @DocumentExample
     @Test
     void classPropertiesWithTrailingCommaOff() {
         rewriteRun(

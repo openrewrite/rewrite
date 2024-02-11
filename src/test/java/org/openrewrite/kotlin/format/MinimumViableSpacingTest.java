@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -46,6 +47,7 @@ class MinimumViableSpacingTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void classDeclaration() {
         rewriteRun(

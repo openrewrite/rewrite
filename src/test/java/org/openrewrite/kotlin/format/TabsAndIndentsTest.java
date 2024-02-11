@@ -2114,7 +2114,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void useContinuationIndentExtendsOnNewLine() {
         rewriteRun(
-          kotlin("""
+          kotlin(
+                """
             package org.a
 
             open class A {}
@@ -2424,7 +2425,8 @@ class TabsAndIndentsTest implements RewriteTest {
                   return autoFormat(a, ctx);
               }
           })).parser(KotlinParser.builder().logCompilationWarningsAndErrors(true)),
-          kotlin("""
+          kotlin(
+                """
             package org.sample
             
             @SafeVarargs

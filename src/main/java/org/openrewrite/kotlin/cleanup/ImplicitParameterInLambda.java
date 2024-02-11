@@ -31,7 +31,7 @@ import static java.util.Collections.emptyList;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ImplicitParameterInLambda extends Recipe {
     @Override
     public String getDisplayName() {

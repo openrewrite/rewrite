@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class EqualsMethodUsage extends Recipe {
     @Nullable
     private static J.Binary equalsBinaryTemplate;

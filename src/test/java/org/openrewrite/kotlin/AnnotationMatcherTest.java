@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class AnnotationMatcherTest implements RewriteTest {
+class AnnotationMatcherTest implements RewriteTest {
 
     @Test
     void matchAnnotation() {

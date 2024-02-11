@@ -27,11 +27,11 @@ class ContinueTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class Test {
-                    fun test ( ) {
-                        while ( true ) continue
-                    }
-                }
+              class Test {
+                  fun test ( ) {
+                      while ( true ) continue
+                  }
+              }
               """
           )
         );

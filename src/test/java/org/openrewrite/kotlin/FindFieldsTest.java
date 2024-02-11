@@ -16,13 +16,15 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.search.FindFields;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class FindFieldsTest implements RewriteTest {
+class FindFieldsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void jvmStaticField() {
         rewriteRun(

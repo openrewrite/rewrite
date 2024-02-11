@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.kotlin.KotlinParser;
@@ -47,6 +48,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
           )));
     }
 
+    @DocumentExample
     @Test
     void mixedToTabs() {
         rewriteRun(

@@ -23,7 +23,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.tree.K;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RenameTypeAlias extends Recipe {
 
     @Option(displayName = "Old alias name",
@@ -56,7 +56,7 @@ public class RenameTypeAlias extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new KotlinIsoVisitor<ExecutionContext>() {
             @Override
-            public K.TypeAlias visitTypeAlias(K.TypeAlias typeAlias, ExecutionContext executionContext) {
+            public K.TypeAlias visitTypeAlias(K.TypeAlias typeAlias, ExecutionContext ctx) {
                 if (!aliasName.equals(typeAlias.getSimpleName()) || !TypeUtils.isOfClassType(typeAlias.getType(), fullyQualifiedAliasedType)) {
                     return typeAlias;
                 }
