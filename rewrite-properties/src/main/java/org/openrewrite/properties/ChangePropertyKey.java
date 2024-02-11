@@ -26,7 +26,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePropertyKey extends Recipe {
 
     @Option(displayName = "Old property key",

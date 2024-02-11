@@ -496,7 +496,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     private class UpdateVariable extends GroovyIsoVisitor<ExecutionContext> {
         Map<String, Map<GroupArtifact, Set<String>>> versionVariableNames;
         GradleProject gradleProject;

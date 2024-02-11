@@ -225,7 +225,7 @@ public class RecipeSpec {
     }
 
     @Incubating(since = "7.35.0")
-    public <E, V> RecipeSpec dataTableAsCsv(Class<DataTable<?>> dataTableClass, String expect) {
+    public <E, V> RecipeSpec dataTableAsCsv(Class<? extends DataTable<?>> dataTableClass, String expect) {
         return dataTableAsCsv(dataTableClass.getName(), expect);
     }
 

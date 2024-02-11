@@ -38,6 +38,24 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void acceptsRecipeWithDescriptionListOfLinks() {
+        validateRecipeNameAndDescription(new RecipeWithDescriptionListOfLinks());
+    }
+
+    @Test
+    void acceptsRecipeWithDescriptionListOfDescribedLinks() {
+        validateRecipeNameAndDescription(new RecipeWithDescriptionListOfDescribedLinks());
+    }
+
+    @Test
+    void rejectsRecipeWithDescriptionNotEndingWithPeriod() {
+        assertThrows(
+          AssertionError.class,
+          () -> validateRecipeNameAndDescription(new RecipeWithDescriptionNotEndingWithPeriod())
+        );
+    }
+
+    @Test
     void verifyAll() {
         assertThrows(AssertionError.class, this::assertRecipesConfigure);
     }
@@ -64,3 +82,52 @@ class RecipeWithNameOption extends Recipe {
         return "A fancy description.";
     }
 }
+
+@NonNullApi
+class RecipeWithDescriptionListOfLinks extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Recipe with name option";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A fancy description.\n" +
+                "For more information, see:\n" +
+                "  - [link 1](https://example.com/link1)\n" +
+                "  - [link 2](https://example.com/link2)";
+    }
+}
+
+@NonNullApi
+class RecipeWithDescriptionListOfDescribedLinks extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Recipe with name option";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A fancy description.\n" +
+               "For more information, see:\n" +
+               "  - First Resource [link 1](https://example.com/link1).\n" +
+               "  - Second Resource [link 2](https://example.com/link2).";
+    }
+}
+
+@NonNullApi
+class RecipeWithDescriptionNotEndingWithPeriod extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Recipe with name option";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A fancy description";
+    }
+}
+

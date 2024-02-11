@@ -29,7 +29,7 @@ import org.openrewrite.java.tree.Javadoc;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
 @RequiredArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UseStaticImport extends Recipe {
 
     /**

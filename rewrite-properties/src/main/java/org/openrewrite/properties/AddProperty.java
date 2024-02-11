@@ -26,9 +26,13 @@ import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddProperty extends Recipe {
 
     @Option(displayName = "Property key",
@@ -87,41 +91,64 @@ public class AddProperty extends Recipe {
                     return p;
                 }
 
-                Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value);
+                Properties.Value propertyValue = new Properties.Value(randomId(), "", Markers.EMPTY, value);
                 Properties.Entry.Delimiter delimitedBy = StringUtils.isNotEmpty(delimiter) ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
                 String beforeEquals = delimitedBy == Properties.Entry.Delimiter.NONE ? delimiter : "";
-                Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
-                List<Properties.Content> contentList = ListUtils.insertInOrder(p.getContent(), entry, (o1, o2) -> {
-                    if (o1 instanceof Properties.Entry && o2 instanceof Properties.Entry) {
-                        return ((Properties.Entry) o1).getKey().compareTo(((Properties.Entry) o2).getKey());
-                    }
-                    return -1;
-                });
-                int insertionIndex = contentList.indexOf(entry);
-                boolean addingComment = StringUtils.isNotEmpty(comment);
-                contentList = ListUtils.map(contentList, (i, it) -> {
-                    if ((i == 0 || addingComment) && it == entry) {
-                        // The very first entry in the properties file doesn't need a newline in its prefix
-                        return (Properties.Content) it.withPrefix("");
-                    } else if (insertionIndex == 0 && i == 1 && !it.getPrefix().contains("\n")) {
-                        // The previous first element might not already have had a newline in its prefix
-                        return (Properties.Content) it.withPrefix(it.getPrefix() + "\n");
-                    }
-                    return it;
-                });
-                if (addingComment) {
-                    String commentPrefix = "\n";
-                    if (insertionIndex == 0) {
-                        commentPrefix = "";
-                    }
-                    Properties.Comment comment = new Properties.Comment(Tree.randomId(), commentPrefix, Markers.EMPTY, Properties.Comment.Delimiter.HASH_TAG, ' ' + AddProperty.this.comment + '\n');
-                    contentList = ListUtils.insert(contentList, comment, insertionIndex);
+                Properties.Entry entry = new Properties.Entry(randomId(), "\n", Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
+                int insertionIndex = sortedInsertionIndex(entry, p.getContent());
+
+                List<Properties.Content> newContents;
+                if(StringUtils.isBlank(comment)) {
+                    newContents = Collections.singletonList(entry);
+                } else {
+                    newContents = Arrays.asList(
+                            new Properties.Comment(
+                                    randomId(),
+                                    "\n",
+                                    Markers.EMPTY,
+                                    Properties.Comment.Delimiter.HASH_TAG,
+                                " " + comment.trim()),
+                            entry);
                 }
+
+                List<Properties.Content> contentList = new ArrayList<>(p.getContent().size() + 1);
+                contentList.addAll(p.getContent().subList(0, insertionIndex));
+                contentList.addAll(newContents);
+                contentList.addAll(p.getContent().subList(insertionIndex, p.getContent().size()));
+
+                // First entry in the file does not need a newline, but every other entry does
+                contentList = ListUtils.map(contentList, (i, c) -> {
+                    if(i == 0) {
+                        return (Properties.Content) c.withPrefix("");
+                    } else if(!c.getPrefix().contains("\n")) {
+                        return (Properties.Content) c.withPrefix("\n" + c.getPrefix());
+                    }
+                    return c;
+                });
 
                 p = p.withContent(contentList);
                 return p;
             }
         };
+    }
 
+    private static int sortedInsertionIndex(Properties.Entry entry, List<Properties.Content> contentsList) {
+        if (contentsList.isEmpty()) {
+            return 0;
+        }
+        List<Properties.Entry> sorted =
+                Stream.concat(
+                                Stream.of(entry),
+                                contentsList.stream()
+                                        .filter(Properties.Entry.class::isInstance)
+                                        .map(Properties.Entry.class::cast))
+                        .sorted(Comparator.comparing(Properties.Entry::getKey))
+                        .collect(Collectors.toList());
+        int indexInSorted = sorted.indexOf(entry);
+        if (indexInSorted == 0) {
+            return 0;
+        }
+        Properties.Entry previous = sorted.get(indexInSorted - 1);
+        return contentsList.indexOf(previous) + 1;
     }
 }

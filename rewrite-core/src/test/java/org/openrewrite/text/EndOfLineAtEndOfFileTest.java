@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class EndOfLineAtEndOfFileTest implements RewriteTest {
+class EndOfLineAtEndOfFileTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

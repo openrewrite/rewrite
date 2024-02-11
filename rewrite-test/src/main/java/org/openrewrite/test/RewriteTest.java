@@ -656,8 +656,14 @@ public interface RewriteTest extends SourceSpecs {
             }
         } else {
             assertThat(recipe.getDisplayName()).as("%s display name should not end with a period.", recipe.getName()).doesNotEndWith(".");
-            assertThat(recipe.getDescription()).as("%s description should not be null or empty", recipe.getName()).isNotEmpty();
-            assertThat(recipe.getDescription()).as("%s description should end with a period.", recipe.getName()).endsWith(".");
+            String description = recipe.getDescription();
+            assertThat(description).as("%s description should not be null or empty", recipe.getName()).isNotEmpty();
+            if (description.endsWith(")")) {
+                String lastLine = description.substring(description.lastIndexOf('\n') + 1).trim();
+                assertThat(lastLine).as("%s description not ending with a period should be because the description ends with a markdown list of pure links", recipe.getName()).startsWith("- [");
+            } else {
+                assertThat(description).as("%s description should end with a period.", recipe.getName()).endsWith(".");
+            }
         }
     }
 

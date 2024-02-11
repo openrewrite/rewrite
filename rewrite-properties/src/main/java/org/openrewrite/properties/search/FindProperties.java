@@ -34,7 +34,7 @@ import java.util.Set;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindProperties extends Recipe {
     @Override
     public String getDisplayName() {

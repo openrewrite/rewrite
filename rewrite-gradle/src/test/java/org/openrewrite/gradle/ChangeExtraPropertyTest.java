@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
-public class ChangeExtraPropertyTest implements RewriteTest {
+class ChangeExtraPropertyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

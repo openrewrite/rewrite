@@ -40,7 +40,7 @@ import static java.util.Objects.requireNonNull;
  * is defined on the super class.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePackage extends Recipe {
     @Option(displayName = "Old package name",
             description = "The package name to replace.",

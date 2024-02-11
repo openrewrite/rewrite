@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.PathUtils.separatorsToSystem;
 import static org.openrewrite.java.Assertions.java;
 
-public class FindClassHierarchyTest implements RewriteTest {
+class FindClassHierarchyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

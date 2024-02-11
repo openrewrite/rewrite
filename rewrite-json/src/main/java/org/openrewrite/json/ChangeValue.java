@@ -27,7 +27,7 @@ import org.openrewrite.marker.Markers;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeValue extends Recipe {
     @Option(displayName = "Key path",
             description = "A JsonPath expression to locate a JSON entry.",
