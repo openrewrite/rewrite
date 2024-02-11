@@ -52,7 +52,8 @@ public class RewriteTestClassesShouldNotBePublic extends Recipe {
                         if (TypeUtils.isAssignableTo("org.openrewrite.test.RewriteTest", cd.getType()) &&
                             cd.getKind() != J.ClassDeclaration.Kind.Type.Interface &&
                             cd.getModifiers().stream().anyMatch(mod -> mod.getType() == J.Modifier.Type.Public) &&
-                            cd.getModifiers().stream().noneMatch(mod -> mod.getType() == J.Modifier.Type.Abstract)) {
+                            cd.getModifiers().stream().noneMatch(mod -> mod.getType() == J.Modifier.Type.Abstract) &&
+                            !hasPublicStaticFieldOrMethod(cd)) {
 
                             // Remove public modifier and move associated comment
                             final List<Comment> modifierComments = new ArrayList<>();
@@ -76,6 +77,20 @@ public class RewriteTestClassesShouldNotBePublic extends Recipe {
                             cd = maybeAutoFormat(cd, cd.withModifiers(modifiers), cd.getName(), ctx, getCursor().getParentTreeCursor());
                         }
                         return cd;
+                    }
+
+                    private boolean hasPublicStaticFieldOrMethod(J.ClassDeclaration cd) {
+                        if (cd.getBody().getStatements().stream()
+                                .filter(J.MethodDeclaration.class::isInstance)
+                                .map(J.MethodDeclaration.class::cast)
+                                .anyMatch(method -> method.hasModifier(J.Modifier.Type.Public) && method.hasModifier(J.Modifier.Type.Static))) {
+                            return true;
+                        }
+                        return cd.getBody().getStatements().stream()
+                                .filter(J.VariableDeclarations.class::isInstance)
+                                .map(J.VariableDeclarations.class::cast)
+                                .anyMatch(field -> field.hasModifier(J.Modifier.Type.Public) && field.hasModifier(J.Modifier.Type.Static));
+
                     }
                 }
         );
