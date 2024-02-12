@@ -127,6 +127,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Value
     public static class DependencyVersionState {
         Map<String, GroupArtifact> versionPropNameToGA = new HashMap<>();
+        // The value is either a String representing the resolved version or a MavenDownloadingException representing an error during resolution.
         Map<GroupArtifact, Object> gaToNewVersion = new HashMap<>();
     }
 
