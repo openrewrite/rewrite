@@ -229,6 +229,12 @@ public class PathUtils {
         return excludedPatterns;
     }
 
+    public static String getExtension(Path path) {
+        String pathString = path.toString();
+        final int extensionIndex = pathString.lastIndexOf('.');
+        return extensionIndex < 0 ? "" : pathString.substring(extensionIndex);
+    }
+
     private static String[] tokenize(String path) {
         List<String> tokens = new ArrayList<>();
         int pathIdxStart = 0;

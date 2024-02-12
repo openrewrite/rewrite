@@ -188,7 +188,7 @@ public class ReloadableJava17Parser implements JavaParser {
         }
 
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
-        acceptedInputs(sourceFiles).forEach(input1 -> {
+        acceptedInputs(sourceFiles, ctx).forEach(input1 -> {
             try {
                 JCTree.JCCompilationUnit jcCompilationUnit = compiler.parse(new ReloadableJava17ParserInputFileObject(input1, ctx));
                 cus.put(input1, jcCompilationUnit);

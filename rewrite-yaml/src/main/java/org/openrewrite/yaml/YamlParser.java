@@ -61,7 +61,7 @@ public class YamlParser implements org.openrewrite.Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles)
+        return acceptedInputs(sourceFiles, ctx)
                 .map(input -> {
                     parsingListener.startedParsing(input);
                     Path path = input.getRelativePath(relativeTo);

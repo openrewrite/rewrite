@@ -46,7 +46,7 @@ public class HclParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).map(input -> {
+        return acceptedInputs(sourceFiles, ctx).map(input -> {
             try {
                 parsingListener.startedParsing(input);
                 EncodingDetectingInputStream is = input.getSource(ctx);

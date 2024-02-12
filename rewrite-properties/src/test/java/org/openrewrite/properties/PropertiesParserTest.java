@@ -18,13 +18,16 @@ package org.openrewrite.properties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junitpioneer.jupiter.SetSystemProperty;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -229,6 +232,31 @@ class PropertiesParserTest implements RewriteTest {
             spec -> spec.afterRecipe(file -> {
                 assertThat(file).isInstanceOf(Properties.File.class);
             })
+          )
+        );
+    }
+
+    @Test
+    @SetSystemProperty(key = "org.openrewrite.properties.PropertiesParser.additionalExtensions", value = ".cfg")
+    void parseAnAdditionalExtensionFromSystemProperty() {
+        rewriteRun(
+          properties(
+            "key=value",
+            spec -> spec.path("file.cfg")
+          )
+        );
+    }
+
+    @Test
+    void parseAnAdditionalExtensionFromContext() {
+        ParsingExecutionContextView ctx = ParsingExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.addAdditionalExtension(PropertiesParser.class, ".cfg");
+
+        rewriteRun(
+          spec -> spec.executionContext(ctx),
+          properties(
+            "key=value",
+            spec -> spec.path("file.cfg")
           )
         );
     }

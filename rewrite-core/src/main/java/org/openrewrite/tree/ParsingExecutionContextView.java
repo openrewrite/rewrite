@@ -17,12 +17,19 @@ package org.openrewrite.tree;
 
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.charset.Charset;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 public class ParsingExecutionContextView extends DelegatingExecutionContext {
     private static final String PARSING_LISTENER = "org.openrewrite.core.parsingListener";
+    private static final String ADDITIONAL_EXTENSIONS = "%s.additionalExtensions";
 
     private static final String CHARSET = "org.openrewrite.parser.charset";
 
@@ -54,5 +61,30 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
     @Nullable
     public Charset getCharset() {
         return getMessage(CHARSET);
+    }
+
+    public ParsingExecutionContextView addAdditionalExtension(Class<? extends Parser> parserClass, String extension) {
+        putMessageInSet(String.format(ADDITIONAL_EXTENSIONS, parserClass.getName()), extension);
+        return this;
+    }
+
+    public Set<String> getAdditionalExtensions(Class<? extends Parser> parserClass) {
+        String key = String.format(ADDITIONAL_EXTENSIONS, parserClass.getName());
+
+        Set<String> additionalExtensions = getMessage(key, Collections.emptySet());
+        if (additionalExtensions == Collections.EMPTY_SET) {
+            String property = System.getProperty(key, null);
+            if (StringUtils.isNotEmpty(property)) {
+                additionalExtensions = new HashSet<>(Arrays.asList(property.split(",")));
+                putMessage(key, additionalExtensions);
+            }
+        }
+
+        return additionalExtensions;
+    }
+
+    public ParsingExecutionContextView setAdditionalExtensions(Class<? extends Parser> parserClass, @Nullable Set<String> additionalExtensions) {
+        putMessage(String.format(ADDITIONAL_EXTENSIONS, parserClass.getName()), additionalExtensions);
+        return this;
     }
 }
