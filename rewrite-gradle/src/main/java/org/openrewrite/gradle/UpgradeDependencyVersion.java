@@ -141,6 +141,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new GroovyVisitor<ExecutionContext>() {
             GradleProject gradleProject;
             final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+
             @Override
             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
                 gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
@@ -199,16 +200,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 version = valueValue;
                             }
                         }
-                        if(groupId == null || artifactId == null) {
+                        if (groupId == null || artifactId == null) {
                             return m;
                         }
 
-                        if(!dependencyMatcher.matches(groupId, artifactId)) {
+                        if (!dependencyMatcher.matches(groupId, artifactId)) {
                             return m;
                         }
                         String versionVariableName = version;
                         GroupArtifact ga = new GroupArtifact(groupId, artifactId);
-                        if(acc.gaToNewVersion.containsKey(ga)) {
+                        if (acc.gaToNewVersion.containsKey(ga)) {
                             return m;
                         }
                         try {
@@ -236,12 +237,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     continue;
                                 }
                                 Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                                if(!dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
+                                if (!dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
                                     continue;
                                 }
                                 String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
                                 GroupArtifact ga = new GroupArtifact(dep.getGroupId(), dep.getArtifactId());
-                                if(acc.gaToNewVersion.containsKey(ga)) {
+                                if (acc.gaToNewVersion.containsKey(ga)) {
                                     continue;
                                 }
                                 try {
@@ -302,7 +303,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             @Override
                             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
                                 gradleProject = cu.getMarkers().findFirst(GradleProject.class)
-                                                .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
+                                        .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
                                 return super.visitCompilationUnit(cu, ctx);
                             }
 
@@ -392,8 +393,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                             String version = dep.getVersion();
                                             try {
                                                 String newVersion = "classpath".equals(method.getSimpleName()) ?
-                                                            findNewerPluginVersion(dep.getGroupId(), dep.getArtifactId(), version, gradleProject, ctx) :
-                                                            findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), version, gradleProject, ctx);
+                                                        findNewerPluginVersion(dep.getGroupId(), dep.getArtifactId(), version, gradleProject, ctx) :
+                                                        findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), version, gradleProject, ctx);
                                                 if (newVersion == null || version.equals(newVersion)) {
                                                     return arg;
                                                 }
