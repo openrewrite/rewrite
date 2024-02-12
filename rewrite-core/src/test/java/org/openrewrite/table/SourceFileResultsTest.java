@@ -49,8 +49,12 @@ class SourceFileResultsTest implements RewriteTest {
                 assertThat(rows).hasSize(2);
                 assertThat(rows.stream().map(SourcesFileResults.Row::getParentRecipe))
                   .containsExactly("test.ChangeTextToHello", "");
+                assertThat(rows.stream().map(SourcesFileResults.Row::getParentRecipePosition))
+                  .containsExactly(1, 0);
                 assertThat(rows.stream().map(SourcesFileResults.Row::getRecipe))
                   .containsExactly("org.openrewrite.text.ChangeText", "test.ChangeTextToHello");
+                assertThat(rows.stream().map(SourcesFileResults.Row::getRecipePosition))
+                  .containsExactly(2, 1);
             }),
           text(
             "Hi",

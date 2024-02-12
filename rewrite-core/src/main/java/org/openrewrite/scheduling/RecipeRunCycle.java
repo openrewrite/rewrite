@@ -206,7 +206,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 beforePath,
                 afterPath,
                 parentName,
+                hierarchical ? allRecipeStack.getRecipePosition(recipeStack.get(recipeStack.size() - 2)) : null,
                 recipeName,
+                allRecipeStack.getRecipePosition(recipe),
                 effortSeconds,
                 cycle));
         if (hierarchical) {
@@ -231,7 +233,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 beforePath,
                 afterPath,
                 parentName,
+                recipeStack.size() > 1 ? allRecipeStack.getRecipePosition(recipeStack.get(recipeStack.size() - 2)) : null,
                 recipe.getName(),
+                allRecipeStack.getRecipePosition(recipe),
                 effortSeconds,
                 cycle));
         recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);

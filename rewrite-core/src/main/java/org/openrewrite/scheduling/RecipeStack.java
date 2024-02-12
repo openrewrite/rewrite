@@ -25,13 +25,13 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
 import static org.openrewrite.Recipe.PANIC;
 
 class RecipeStack {
     private final Map<Recipe, List<Recipe>> recipeLists = new IdentityHashMap<>();
+    private final Map<Recipe, Integer> recipePositions = new IdentityHashMap<>();
     private Stack<Stack<Recipe>> allRecipesStack;
 
     /**
@@ -44,23 +44,24 @@ class RecipeStack {
     public <T> T reduce(LargeSourceSet sourceSet, Recipe recipe, ExecutionContext ctx,
                         BiFunction<T, Stack<Recipe>, T> consumer, T acc) {
         init(recipe);
-        AtomicInteger recipePosition = new AtomicInteger(0);
         while (!allRecipesStack.isEmpty()) {
             if (ctx.getMessage(PANIC) != null) {
                 break;
             }
 
-            this.recipePosition = recipePosition.getAndIncrement();
             Stack<Recipe> recipeStack = allRecipesStack.pop();
+            recipePosition = recipePositions.get(recipeStack.peek());
             if (recipeStack.peek().maxCycles() >= ctx.getCycle()) {
                 sourceSet.setRecipe(recipeStack);
                 acc = consumer.apply(acc, recipeStack);
                 recurseRecipeList(recipeStack);
-            } else {
-                this.recipePosition = recipePosition.getAndAdd(countRecipes(recipeStack.peek()));
             }
         }
         return acc;
+    }
+
+    public Integer getRecipePosition(Recipe recipe) {
+        return recipePositions.get(recipe);
     }
 
     private void init(Recipe recipe) {
@@ -68,6 +69,13 @@ class RecipeStack {
         Stack<Recipe> rootRecipeStack = new Stack<>();
         rootRecipeStack.push(recipe);
         allRecipesStack.push(rootRecipeStack);
+        recipePositions.clear();
+        initRecipePositions(recipe);
+    }
+
+    private void initRecipePositions(Recipe recipe) {
+        recipePositions.put(recipe, recipePositions.size());
+        getRecipeList(recipe).forEach(this::initRecipePositions);
     }
 
     private void recurseRecipeList(Stack<Recipe> recipeStack) {
