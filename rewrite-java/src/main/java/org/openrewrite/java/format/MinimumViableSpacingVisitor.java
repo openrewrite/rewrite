@@ -180,12 +180,11 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
          * We need at least one space between multiple modifiers, otherwise we could get a run-on like "publicstaticfinal".
          * Note, this is applicable anywhere that modifiers can exist, such as class declarations, etc.
          */
-        if (!v.getModifiers().isEmpty()) {
-            boolean needFirstSpace = !first;
+        if (first && !v.getModifiers().isEmpty()) {
             v = v.withModifiers(
                     ListUtils.map(v.getModifiers(), (index, modifier) -> {
-                        if (index != 0 || needFirstSpace) {
-                            if (modifier.getPrefix().getWhitespace().isEmpty()) {
+                        if (index != 0) {
+                            if (modifier.getPrefix().isEmpty()) {
                                 modifier = modifier.withPrefix(modifier.getPrefix().withWhitespace(" "));
                             }
                         }
@@ -196,14 +195,14 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         if (!first && v.getTypeExpression() != null) {
-            if (v.getTypeExpression().getPrefix().getWhitespace().isEmpty()) {
+            if (v.getTypeExpression().getPrefix().isEmpty()) {
                 v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace(" ")));
             }
         }
 
         J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
         if (!(firstEnclosing instanceof J.Lambda)) {
-            if (Space.firstPrefix(v.getVariables()).getWhitespace().isEmpty()) {
+            if (Space.firstPrefix(v.getVariables()).isEmpty()) {
                 v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
                         v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));
             }
