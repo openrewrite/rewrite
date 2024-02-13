@@ -76,16 +76,7 @@ public class RepositoryResults extends DataTable<RepositoryResults.Row> {
         String recipeName = recipe == null ? "" : recipe.getName();
         String options = recipe == null ? "[]" : recipe.getDescriptor().getOptions().stream()
                 .filter(option -> option.getValue() != null)
-                .map(option -> {
-                    String valueAsString = option.getValue().toString();
-                    String quotedValue;
-                    if (valueAsString.contains("\"")) {
-                        quotedValue = "`" + valueAsString + "`";
-                    } else {
-                        quotedValue = "\"" + valueAsString + "\"";
-                    }
-                    return option.getName() + "=" + quotedValue;
-                })
+                .map(option -> serializeOption(option.getName(), option.getValue()))
                 .collect(Collectors.joining(", ", "[", "]"));
 
         Counter counter = counters.computeIfAbsent(new RecipeKey(rootName, recipeName, options), k -> new Counter());
@@ -101,6 +92,17 @@ public class RepositoryResults extends DataTable<RepositoryResults.Row> {
         for (Map.Entry<RecipeKey, Counter> entry : counters.entrySet()) {
             insertRow(ctx, new Row(entry.getKey().getRootName(), entry.getKey().getRecipeName(), entry.getKey().getOptions(), entry.getValue().estimatedTimeSavings, entry.getValue().occurrences, entry.getValue().filesChanged));
         }
+    }
+
+    public static String serializeOption(String name, Object value) {
+        String valueAsString = value.toString();
+        String quotedValue;
+        if (valueAsString.contains("\"")) {
+            quotedValue = "`" + valueAsString + "`";
+        } else {
+            quotedValue = "\"" + valueAsString + "\"";
+        }
+        return name + "=" + quotedValue;
     }
 
     private static class Counter {
