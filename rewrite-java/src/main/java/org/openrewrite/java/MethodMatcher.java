@@ -389,6 +389,7 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
                     "String",
                     "StringBuffer",
                     "StringBuilder",
+                    "System",
                     "Thread",
                     "Throwable",
                     "Void"
