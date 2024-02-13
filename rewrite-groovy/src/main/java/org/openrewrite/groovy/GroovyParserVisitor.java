@@ -464,7 +464,7 @@ public class GroovyParserVisitor {
             // Method name might be in quotes
             Space namePrefix = whitespace();
             String methodName;
-            if(source.startsWith(method.getName(), cursor)) {
+            if (source.startsWith(method.getName(), cursor)) {
                 methodName = method.getName();
             } else {
                 char openingQuote = source.charAt(cursor);
@@ -601,7 +601,7 @@ public class GroovyParserVisitor {
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
             Integer insideParenthesesLevel;
             Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
-            if(rawIpl instanceof AtomicInteger) {
+            if (rawIpl instanceof AtomicInteger) {
                 // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
                 insideParenthesesLevel = ((AtomicInteger) rawIpl).get();
             } else {
@@ -697,8 +697,8 @@ public class GroovyParserVisitor {
                 }
             }
 
-            if(unparsedArgs.isEmpty()) {
-                args.add(JRightPadded.build((Expression)new J.Empty(randomId(), whitespace(), Markers.EMPTY))
+            if (unparsedArgs.isEmpty()) {
+                args.add(JRightPadded.build((Expression) new J.Empty(randomId(), whitespace(), Markers.EMPTY))
                         .withAfter(omitParentheses == null ? sourceBefore(")") : EMPTY));
             } else {
                 for (int i = 0; i < unparsedArgs.size(); i++) {
@@ -1304,7 +1304,7 @@ public class GroovyParserVisitor {
             queue.add(labeled(statement, () -> {
                 super.visitExpressionStatement(statement);
                 Object e = queue.poll();
-                if(e instanceof Statement) {
+                if (e instanceof Statement) {
                     return (Statement) e;
                 }
                 return new G.ExpressionStatement(randomId(), (Expression) e);
@@ -1362,7 +1362,7 @@ public class GroovyParserVisitor {
                         forEachMarkers = forEachMarkers.add(new InStyleForEachLoop(randomId()));
                     }
 
-                    JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramFmt,
+                    JRightPadded<TypedTree> variable = JRightPadded.<TypedTree>build(new J.VariableDeclarations(randomId(), paramFmt,
                             Markers.EMPTY, emptyList(), emptyList(), paramType, null, emptyList(),
                             singletonList(paramName))
                     ).withAfter(rightPad);

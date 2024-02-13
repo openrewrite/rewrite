@@ -2138,13 +2138,13 @@ public interface J extends Tree {
             @Getter
             Markers markers;
 
-            JRightPadded<VariableDeclarations> variable;
+            JRightPadded<TypedTree> variable; // not `J.VariableDeclarations` to allow Kotlin destructuring declarations
 
-            public VariableDeclarations getVariable() {
+            public TypedTree getVariable() {
                 return variable.getElement();
             }
 
-            public Control withVariable(VariableDeclarations variable) {
+            public Control withVariable(TypedTree variable) {
                 return getPadding().withVariable(this.variable.withElement(variable));
             }
 
@@ -2187,11 +2187,11 @@ public interface J extends Tree {
             public static class Padding {
                 private final Control t;
 
-                public JRightPadded<VariableDeclarations> getVariable() {
+                public JRightPadded<TypedTree> getVariable() {
                     return t.variable;
                 }
 
-                public Control withVariable(JRightPadded<VariableDeclarations> variable) {
+                public Control withVariable(JRightPadded<TypedTree> variable) {
                     return t.variable == variable ? t : new Control(t.id, t.prefix, t.markers, variable, t.iterable);
                 }
 
