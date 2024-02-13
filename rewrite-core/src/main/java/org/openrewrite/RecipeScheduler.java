@@ -18,6 +18,7 @@ package org.openrewrite;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.RepositoryResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
@@ -57,6 +58,7 @@ public class RecipeScheduler {
         RecipeRunStats recipeRunStats = new RecipeRunStats(Recipe.noop());
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
         SourcesFileResults sourceFileResults = new SourcesFileResults(Recipe.noop());
+        RepositoryResults repositoryResults = new RepositoryResults(Recipe.noop());
 
         LargeSourceSet after = sourceSet;
 
@@ -71,7 +73,7 @@ public class RecipeScheduler {
             Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
             try {
                 RecipeRunCycle<LargeSourceSet> cycle = new RecipeRunCycle<>(recipe, i, rootCursor, ctxWithWatch,
-                        recipeRunStats, sourceFileResults, errorsTable, LargeSourceSet::edit);
+                        recipeRunStats, sourceFileResults, repositoryResults, errorsTable, LargeSourceSet::edit);
                 ctxWithWatch.putCycle(cycle);
                 after.beforeCycle();
 
@@ -111,6 +113,7 @@ public class RecipeScheduler {
             }
         }
 
+        repositoryResults.flush(ctx);
         recipeRunStats.flush(ctx);
         return after;
     }

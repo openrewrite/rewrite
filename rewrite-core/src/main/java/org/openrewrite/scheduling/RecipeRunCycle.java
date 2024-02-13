@@ -27,6 +27,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.RepositoryResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
@@ -59,6 +60,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     WatchableExecutionContext ctx;
     RecipeRunStats recipeRunStats;
     SourcesFileResults sourcesFileResults;
+    RepositoryResults repositoryResults;
     SourcesFileErrors errorsTable;
     BiFunction<LSS, UnaryOperator<SourceFile>, LSS> sourceSetEditor;
 
@@ -209,6 +211,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 recipeName,
                 effortSeconds,
                 cycle));
+        repositoryResults.recordResult(before, recipeStack, effortSeconds);
+
         if (hierarchical) {
             recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
         }
