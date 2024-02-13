@@ -162,10 +162,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),
                             Optional.ofNullable(newArtifactId).orElse(oldArtifactId),
                             newVersion, versionPattern).getVisitor());
-                    doAfterVisit(new RemoveRedundantDependencyVersions(newGroupId,
-                            newArtifactId,
-                            null,
-                            null).getVisitor());
                 }
                 return super.visitDocument(document, ctx);
             }
