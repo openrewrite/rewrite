@@ -162,6 +162,10 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),
                             Optional.ofNullable(newArtifactId).orElse(oldArtifactId),
                             newVersion, versionPattern).getVisitor());
+                    doAfterVisit(new RemoveRedundantDependencyVersions(newGroupId,
+                            newArtifactId,
+                            null,
+                            null).getVisitor());
                 }
                 return super.visitDocument(document, ctx);
             }
@@ -203,7 +207,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                     // Otherwise, change the version to the new value.
                                     t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                                 }
-                            } else if (configuredToOverrideManageVersion || !newDependencyManaged && !(oldDependencyManaged && configuredToChangeManagedDependency)) {
+                            } else if (configuredToOverrideManageVersion || !newDependencyManaged) {
                                 //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
                                 Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
                                 //noinspection ConstantConditions
