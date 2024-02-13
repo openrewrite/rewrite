@@ -1142,6 +1142,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotRemoveWildCardImport() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               package com.Source.mine;
@@ -1744,5 +1745,27 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
             }
             """));
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3909")
+    void importUsedOnlyInReturnType() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              import javax.xml.datatype.XMLGregorianCalendar;
+              import java.time.LocalDateTime;
+              class LocalDateTimeUtil {
+                public LocalDateTime toLocalDateTime(XMLGregorianCalendar cal) {
+                    if (cal == null) {
+                        return null;
+                    }
+                    return cal.toGregorianCalendar().toZonedDateTime().toLocalDateTime();
+                }
+              }
+              """
+          )
+        );
     }
 }

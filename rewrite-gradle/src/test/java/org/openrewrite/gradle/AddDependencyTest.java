@@ -31,10 +31,17 @@ import org.openrewrite.test.TypeValidation;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.Assertions.*;
+import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.withToolingApi;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.groovy.Assertions.srcMainGroovy;
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.java.Assertions.srcMainJava;
+import static org.openrewrite.java.Assertions.srcMainResources;
+import static org.openrewrite.java.Assertions.srcSmokeTestJava;
+import static org.openrewrite.java.Assertions.srcTestJava;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("GroovyUnusedAssignment")

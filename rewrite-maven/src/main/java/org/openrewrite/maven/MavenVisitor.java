@@ -43,6 +43,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
+    static final XPathMatcher PROFILE_PLUGIN_MATCHER = new XPathMatcher("/project/profiles/*/build/plugins/plugin");
 
     private transient MavenResolutionResult resolutionResult;
 
@@ -189,7 +190,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isPluginTag() {
-        return PLUGIN_MATCHER.matches(getCursor());
+        return PLUGIN_MATCHER.matches(getCursor()) || PROFILE_PLUGIN_MATCHER.matches(getCursor());
     }
 
     public boolean isPluginTag(String groupId, @Nullable String artifactId) {
@@ -340,7 +341,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId, ExecutionContext ctx) throws MavenDownloadingException {
+        return downloadMetadata(groupId, artifactId, null, ctx);
+    }
+
+    public MavenMetadata downloadMetadata(String groupId, String artifactId, @Nullable ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
         return new MavenPomDownloader(emptyMap(), ctx, getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles())
-                .downloadMetadata(new GroupArtifact(groupId, artifactId), null, getResolutionResult().getPom().getRepositories());
+                .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getRepositories());
     }
 }

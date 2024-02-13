@@ -23,7 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeNamespaceValue extends Recipe {
     private static final String XMLNS_PREFIX = "xmlns";
     private static final String VERSION_PREFIX = "version";

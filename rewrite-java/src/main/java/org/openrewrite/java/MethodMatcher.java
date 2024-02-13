@@ -28,10 +28,7 @@ import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -361,6 +358,43 @@ public class MethodMatcher {
 }
 
 class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
+    private static final Set<String> COMMON_JAVA_LANG_TYPES =
+            new HashSet<>(Arrays.asList(
+                    "Appendable",
+                    "AutoCloseable",
+                    "Boolean",
+                    "Byte",
+                    "Character",
+                    "CharSequence",
+                    "Class",
+                    "ClassLoader",
+                    "Cloneable",
+                    "Comparable",
+                    "Double",
+                    "Enum",
+                    "Error",
+                    "Exception",
+                    "Float",
+                    "FunctionalInterface",
+                    "Integer",
+                    "Iterable",
+                    "Long",
+                    "Math",
+                    "Number",
+                    "Object",
+                    "Readable",
+                    "Record",
+                    "Runnable",
+                    "Short",
+                    "String",
+                    "StringBuffer",
+                    "StringBuilder",
+                    "System",
+                    "Thread",
+                    "Throwable",
+                    "Void"
+            ));
+
     @Override
     public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
         StringBuilder classNameBuilder = new StringBuilder();
@@ -370,18 +404,14 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
         String className = classNameBuilder.toString();
 
         if (!className.contains(".")) {
-            try {
-                int arrInit = className.lastIndexOf("\\[");
-                String beforeArr = arrInit == -1 ? className : className.substring(0, arrInit);
-                if (JavaType.Primitive.fromKeyword(beforeArr) != null) {
-                    if ("String".equals(beforeArr)) {
-                        return "java.lang." + className;
-                    }
-                    return className;
+            int arrInit = className.lastIndexOf("\\[");
+            String beforeArr = arrInit == -1 ? className : className.substring(0, arrInit);
+            if (Character.isLowerCase(beforeArr.charAt(0)) && JavaType.Primitive.fromKeyword(beforeArr) != null) {
+                return className;
+            } else {
+                if (COMMON_JAVA_LANG_TYPES.contains(beforeArr)) {
+                    return "java.lang." + className;
                 }
-                Class.forName("java.lang." + beforeArr, false, TypeVisitor.class.getClassLoader());
-                return "java.lang." + className;
-            } catch (ClassNotFoundException ignored) {
             }
         }
 

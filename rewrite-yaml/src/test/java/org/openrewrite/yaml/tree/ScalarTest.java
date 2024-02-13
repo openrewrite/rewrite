@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml.tree;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -23,7 +24,7 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
 
-public class ScalarTest implements RewriteTest {
+class ScalarTest implements RewriteTest {
 
     @Test
     void multilineScalar() {
@@ -57,6 +58,18 @@ public class ScalarTest implements RewriteTest {
                 }
             }.visit(doc, 0))
           )
+        );
+    }
+
+    @Test
+    void loneScalar() {
+        rewriteRun(
+          yaml("""
+            foo # look mom, no mapping
+            """, spec -> spec.afterRecipe(documents -> {
+                Yaml.Block maybeScalar = documents.getDocuments().get(0).getBlock();
+                Assertions.assertThat(maybeScalar).isInstanceOf(Yaml.Scalar.class);
+          }))
         );
     }
 }

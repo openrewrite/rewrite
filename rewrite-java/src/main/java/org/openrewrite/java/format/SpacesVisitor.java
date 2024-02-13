@@ -231,6 +231,15 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.Block visitBlock(J.Block block, P p) {
+        J.Block b = super.visitBlock(block, p);
+        b = b.getPadding().withStatements(
+                ListUtils.map(b.getPadding().getStatements(), stmt -> spaceAfter(stmt, false))
+        );
+        return b;
+    }
+
+    @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         m = m.getPadding().withParameters(
@@ -391,7 +400,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.If visitIf(J.If iff, P p) {
         J.If i = super.visitIf(iff, p);
         i = i.withIfCondition(spaceBefore(i.getIfCondition(), style.getBeforeParentheses().getIfParentheses()));
-        i = i.getPadding().withThenPart(spaceBeforeRightPaddedElement(i.getPadding().getThenPart(), style.getBeforeLeftBrace().getIfLeftBrace()));
+        i = i.getPadding().withThenPart(spaceAfter(spaceBeforeRightPaddedElement(i.getPadding().getThenPart(), style.getBeforeLeftBrace().getIfLeftBrace()), false));
         boolean useSpaceWithinIfParentheses = style.getWithin().getIfParentheses();
         i = i.withIfCondition(
                 i.getIfCondition().getPadding().withTree(

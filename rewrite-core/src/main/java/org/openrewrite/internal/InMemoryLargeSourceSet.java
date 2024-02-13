@@ -43,12 +43,16 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
         this(null, null, ls);
     }
 
-    private InMemoryLargeSourceSet(@Nullable InMemoryLargeSourceSet initialState,
+    protected InMemoryLargeSourceSet(@Nullable InMemoryLargeSourceSet initialState,
                                    @Nullable Map<SourceFile, List<Recipe>> deletions,
                                    List<SourceFile> ls) {
         this.initialState = initialState;
         this.ls = ls;
         this.deletions = deletions;
+    }
+
+    protected InMemoryLargeSourceSet withChanges(@Nullable Map<SourceFile, List<Recipe>> deletions, List<SourceFile> mapped) {
+        return new InMemoryLargeSourceSet(getInitialState(), deletions, mapped);
     }
 
     @Override
@@ -68,7 +72,7 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
             }
             return after;
         });
-        return mapped != ls ? new InMemoryLargeSourceSet(getInitialState(), deletions, mapped) : this;
+        return mapped != ls ? withChanges(deletions, mapped) : this;
     }
 
     @Override
@@ -78,15 +82,15 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
             return this;
         } else if (ls.isEmpty()) {
             //noinspection unchecked
-            return new InMemoryLargeSourceSet(getInitialState(), deletions, (List<SourceFile>) t);
+            return withChanges(deletions, (List<SourceFile>) t);
         }
 
         List<SourceFile> newLs = new ArrayList<>(ls);
         newLs.addAll(t);
-        return new InMemoryLargeSourceSet(getInitialState(), deletions, newLs);
+        return withChanges(deletions, newLs);
     }
 
-    private InMemoryLargeSourceSet getInitialState() {
+    protected InMemoryLargeSourceSet getInitialState() {
         return initialState == null ? this : initialState;
     }
 

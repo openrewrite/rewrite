@@ -33,12 +33,11 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
-import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @EqualsAndHashCode.Exclude
@@ -187,7 +186,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
         return Preconditions.check(acc.usingType && !acc.configurationsByProject.isEmpty(),
                 Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
-                    final Pattern familyPatternCompiled = StringUtils.isBlank(familyPattern) ? null : Pattern.compile(familyPattern.replace("*", ".*"));
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -243,7 +241,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         G.CompilationUnit g = (G.CompilationUnit) s;
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                    classifier, extension, familyPatternCompiled, metadataFailures).visitNonNull(g, ctx);
+                                    classifier, extension, metadataFailures).visitNonNull(g, ctx);
                         }
 
                         return g;

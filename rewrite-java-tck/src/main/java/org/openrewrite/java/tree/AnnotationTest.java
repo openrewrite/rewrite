@@ -216,7 +216,7 @@ class AnnotationTest implements RewriteTest {
               import java.lang.annotation.*;
               public class TypeAnnotationTest {
                           
-                  public @Deprecated @A TypeAnnotationTests() {
+                  public @Deprecated @A TypeAnnotationTest() {
                   }
                           
                   @Target({ ElementType.TYPE, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
@@ -228,7 +228,7 @@ class AnnotationTest implements RewriteTest {
               import java.lang.annotation.*;
               public class TypeAnnotationTest {
                           
-                  public @Deprecated TypeAnnotationTests() {
+                  public @Deprecated TypeAnnotationTest() {
                   }
                           
                   @Target({ ElementType.TYPE, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })

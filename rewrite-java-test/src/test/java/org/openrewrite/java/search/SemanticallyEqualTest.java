@@ -30,7 +30,7 @@ import java.util.Objects;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class SemanticallyEqualTest {
+class SemanticallyEqualTest {
 
     private final JavaParser javaParser = JavaParser.fromJavaVersion().build();
 
@@ -54,6 +54,30 @@ public class SemanticallyEqualTest {
             """,
           """
             abstract public class A {
+            }
+            """
+        );
+    }
+
+    @Test
+    void staticMethods() {
+        assertEqual(
+          """
+            import static java.lang.String.valueOf;
+            
+            class T {
+                Object o1 = String.valueOf("1");
+                Object o2 = String.valueOf("1");
+                Object o3 = String.valueOf("1");
+            }
+            """,
+          """
+            import static java.lang.String.valueOf;
+            
+            class T {
+                Object o1 = String.valueOf("1");
+                Object o2 = "1".valueOf("1");
+                Object o3 = valueOf("1");
             }
             """
         );

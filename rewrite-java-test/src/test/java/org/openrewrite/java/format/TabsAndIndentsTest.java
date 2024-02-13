@@ -1391,7 +1391,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               enum Scope {
                   None, // the root of a resolution tree
-                  Compile,
+                  Compile
               }
               """
           )

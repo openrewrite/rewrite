@@ -111,6 +111,17 @@ class PathUtilsTest {
         assertThat(matchesGlob(path("test/bar"), "test/{foo,bar}")).isTrue();
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3847")
+    void negation() {
+        assertThat(matchesGlob(path("test.txt"), "test.!(txt)")).isFalse();
+        assertThat(matchesGlob(path("test.java"), "test.!(txt)")).isTrue();
+        assertThat(matchesGlob(path("test/foo"), "test/!(foo|bar)")).isFalse();
+        assertThat(matchesGlob(path("test/bar"), "test/!(foo|bar)")).isFalse();
+        assertThat(matchesGlob(path("test/quz"), "test/!(foo|bar)")).isTrue();
+        assertThat(matchesGlob(path("test/bar"), "test/!(f*|b*)")).isFalse();
+    }
+
     private static Path path(String path) {
         return Paths.get(path);
     }

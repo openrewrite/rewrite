@@ -16,7 +16,6 @@
 package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
@@ -28,7 +27,6 @@ import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.OperatingSystemProvenance;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.SourceSpec;

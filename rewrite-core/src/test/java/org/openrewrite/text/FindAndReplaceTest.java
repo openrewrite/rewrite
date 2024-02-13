@@ -118,17 +118,17 @@ class FindAndReplaceTest implements RewriteTest {
     }
 
     @Test
-    void dollarsignsTolerated() {
+    void dollarSignsTolerated() {
         String find = "This is text ${dynamic}.";
         String replace = "This is text ${dynamic}. Stuff";
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(find, replace, null, null, null, null, null)).cycles(1),
+          spec -> spec.recipe(new FindAndReplace(find, replace, null, null, null, null, null)),
           text(find, replace)
         );
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     static class MultiFindAndReplace extends Recipe {
 
         @Override

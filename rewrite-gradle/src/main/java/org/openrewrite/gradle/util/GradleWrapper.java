@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 
 @Value
 public class GradleWrapper {
@@ -91,7 +92,7 @@ public class GradleWrapper {
     }
 
     public String getPropertiesFormattedUrl() {
-        return getDistributionUrl().replaceAll("(?<!\\\\)://", "\\\\://");
+        return formatUriForPropertiesFile(getDistributionUrl());
     }
 
     public Checksum getDistributionChecksum() {
@@ -103,6 +104,13 @@ public class GradleWrapper {
     public Remote wrapperJar() {
         return Remote.builder(
                 WRAPPER_JAR_LOCATION,
+                URI.create(distributionInfos.getDownloadUrl())
+        ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
+    }
+
+    public Remote wrapperJar(SourceFile before) {
+        return Remote.builder(
+                before,
                 URI.create(distributionInfos.getDownloadUrl())
         ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
     }

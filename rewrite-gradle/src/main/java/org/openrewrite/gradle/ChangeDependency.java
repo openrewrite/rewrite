@@ -16,7 +16,8 @@
 package org.openrewrite.gradle;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -37,13 +38,14 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.semver.DependencyMatcher;
+import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeDependency extends Recipe {
     @Option(displayName = "Old groupId",
             description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
@@ -127,7 +129,27 @@ public class ChangeDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change a Gradle dependency coordinates.";
+        return "Change a Gradle dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
+        if (newVersion != null) {
+            validated = validated.and(Semver.validate(newVersion, versionPattern));
+        }
+        validated = validated.and(Validated.required("newGroupId", newGroupId).or(Validated.required("newArtifactId", newArtifactId)));
+        validated = validated.and(Validated.test(
+                "coordinates",
+                "newGroupId OR newArtifactId must be different from before",
+                this,
+                r -> {
+                    boolean sameGroupId = StringUtils.isBlank(r.newGroupId) || Objects.equals(r.oldGroupId, r.newGroupId);
+                    boolean sameArtifactId = StringUtils.isBlank(r.newArtifactId) || Objects.equals(r.oldArtifactId, r.newArtifactId);
+                    return !(sameGroupId && sameArtifactId);
+                }
+        ));
+        return validated;
     }
 
     @Override

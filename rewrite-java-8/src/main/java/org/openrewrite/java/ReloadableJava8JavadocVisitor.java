@@ -1080,7 +1080,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
             } else {
                 cursor = saveCursor;
-                return elemType;
+                return elemType.withPrefix(fmt);
             }
 
             return new J.ArrayType(

@@ -17,24 +17,21 @@ package org.openrewrite.properties;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
-import java.util.Objects;
+import java.util.regex.Pattern;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePropertyValue extends Recipe {
 
     @Option(displayName = "Property key",
-            description = "The name of the property key whose value is to be changed.",
-            example = "management.metrics.binders.files.enabled")
+            description = "The name of the property key whose value is to be changed. Supports glob patterns.",
+            example = "management.metrics.binders.*.enabled")
     String propertyKey;
 
     @Option(displayName = "New value",
@@ -48,14 +45,15 @@ public class ChangePropertyValue extends Recipe {
     String oldValue;
 
     @Option(displayName = "Regex",
-            description = "Default false. If enabled, `oldValue` will be interpreted as a Regular Expression, and capture group contents will be available in `newValue`",
+            description = "Default `false`. If enabled, `oldValue` will be interpreted as a Regular Expression, " +
+                          "to replace only all parts that match the regex. Capturing group can be used in `newValue`.",
             required = false)
     @Nullable
     Boolean regex;
 
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
-                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+                          "rules. Default is `true`. Set to `false`  to use exact matching.",
             required = false)
     @Nullable
     Boolean relaxedBinding;
@@ -71,6 +69,13 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @Override
+    public Validated validate() {
+        return super.validate().and(
+                Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
+                        value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangePropertyValueVisitor<>();
     }
@@ -81,29 +86,35 @@ public class ChangePropertyValue extends Recipe {
 
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
-            if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), propertyKey) : entry.getKey().equals(propertyKey)) {
-                if (matchesOldValue(entry.getValue())) {
-                    Properties.Value updatedValue = updateValue(entry.getValue());
-                    if (updatedValue != null) {
-                        entry = entry.withValue(updatedValue);
-                    }
+            Properties.Entry e = (Properties.Entry) super.visitEntry(entry, p);
+            if (matchesPropertyKey(e.getKey()) && matchesOldValue(e.getValue())) {
+                Properties.Value updatedValue = updateValue(e.getValue());
+                if (updatedValue != null) {
+                    e = e.withValue(updatedValue);
                 }
             }
-            return super.visitEntry(entry, p);
+            return e;
         }
 
         @Nullable // returns null if value should not change
         private Properties.Value updateValue(Properties.Value value) {
             Properties.Value updatedValue = value.withText(Boolean.TRUE.equals(regex)
-                    ? value.getText().replaceAll(Objects.requireNonNull(oldValue), newValue) : newValue);
+                    ? value.getText().replaceAll(oldValue, newValue)
+                    : newValue);
             return updatedValue.getText().equals(value.getText()) ? null : updatedValue;
+        }
+
+        private boolean matchesPropertyKey(String prop) {
+            return !Boolean.FALSE.equals(relaxedBinding)
+                    ? NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey)
+                    : StringUtils.matchesGlob(prop, propertyKey);
         }
 
         private boolean matchesOldValue(Properties.Value value) {
             return StringUtils.isNullOrEmpty(oldValue) ||
-                    (Boolean.TRUE.equals(regex)
-                            ? value.getText().matches(oldValue)
-                            : value.getText().equals(oldValue));
+                   (Boolean.TRUE.equals(regex)
+                           ? Pattern.compile(oldValue).matcher(value.getText()).find()
+                           : value.getText().equals(oldValue));
         }
     }
 

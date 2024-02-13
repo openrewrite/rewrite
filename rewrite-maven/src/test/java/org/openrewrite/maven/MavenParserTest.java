@@ -70,6 +70,30 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    void skipDependencyResolution() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().skipDependencyResolution(true)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>foo</groupId>
+                    <artifactId>bar</artifactId>
+                    <version>42</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2603")
     void repositoryWithPropertyPlaceholder() {
         rewriteRun(
@@ -2350,10 +2374,41 @@ class MavenParserTest implements RewriteTest {
                   </build>
               </project>
               """,
-            spec -> spec.afterRecipe(pomXml ->
-              assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins()
-                .get(0).getArtifactId())
-                .isEqualTo("maven-compiler-plugin")
+            spec -> spec.afterRecipe(pomXml -> {
+                  Plugin plugin = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0);
+                  assertThat(plugin.getArtifactId()).isEqualTo("maven-compiler-plugin");
+                  assertThat(plugin.getConfiguration()).isNotNull();
+              }
+            )
+          )
+        );
+    }
+
+    @Test
+    void pluginWithoutConfig() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.openrewrite.maven</groupId>
+                  <artifactId>a</artifactId>
+                  <version>0.1.0-SNAPSHOT</version>
+              
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.11.0</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                  Plugin plugin = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0);
+                  assertThat(plugin.getArtifactId()).isEqualTo("maven-compiler-plugin");
+                  assertThat(plugin.getConfiguration()).isNull();
+              }
             )
           )
         );

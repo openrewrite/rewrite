@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class AddManagedDependencyVisitorTest implements RewriteTest {
+class AddManagedDependencyVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new AddManagedDependencyVisitor("org.apache.logging.log4j", "log4j-bom", "2.17.2",
@@ -59,7 +59,6 @@ public class AddManagedDependencyVisitorTest implements RewriteTest {
     @Test
     void newDependencyManagementTag() {
         rewriteRun(
-          spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1),
           pomXml(
             """
             <project>
@@ -93,7 +92,6 @@ public class AddManagedDependencyVisitorTest implements RewriteTest {
     @Test
     void dependencyManagementTagExists() {
         rewriteRun(
-          spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1),
           pomXml(
             """
             <project>

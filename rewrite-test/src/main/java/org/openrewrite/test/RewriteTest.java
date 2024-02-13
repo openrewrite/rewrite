@@ -25,6 +25,7 @@ import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -303,7 +304,8 @@ public interface RewriteTest extends SourceSpecs {
                 // Validate before source
                 nextSpec.validateSource.accept(sourceFile, TypeValidation.before(testMethodSpec, testClassSpec));
 
-                // Validate that printing a parsed AST yields the same source text
+                // Validate that printing the LST yields the same source text
+                // Validate that the LST whitespace do not contain any non-whitespace characters
                 int j = 0;
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
@@ -316,6 +318,16 @@ public interface RewriteTest extends SourceSpecs {
                                 "parser implementation itself. Please open an issue to report this, providing a sample of the " +
                                 "code that generated this error for"
                         );
+                        try {
+                            WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
+                            SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
+                            if(whitespaceValidated != null && whitespaceValidated != sourceFile) {
+                                fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
+                                     "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                            }
+                        } catch (UnsupportedOperationException e) {
+                            // Language/parser does not provide whitespace validation and that's OK for now
+                        }
                     }
                 }
 
@@ -413,7 +425,15 @@ public interface RewriteTest extends SourceSpecs {
                         continue nextSourceSpec;
                     }
                 }
-                fail("Expected a new source file with the source path " + sourceSpec.getSourcePath());
+                String paths = allResults.stream()
+                        .map(it -> {
+                            String beforePath = (it.getBefore() == null) ? "null" : it.getBefore().getSourcePath().toString();
+                            String afterPath = (it.getAfter() == null) ? "null" : it.getAfter().getSourcePath().toString();
+                            return "    " + beforePath + " -> " + afterPath;
+                        })
+                        .collect(Collectors.joining("\n"));
+                fail("Expected a new source file with the source path: " + sourceSpec.getSourcePath()
+                     +"\nAll source file paths, before and after recipe run:\n" + paths);
             }
 
             // If the source spec has not defined a source path, look for a result with the exact contents. This logic
@@ -562,17 +582,23 @@ public interface RewriteTest extends SourceSpecs {
         }
         newFilesGenerated.assertAll();
 
-        for (Result result : allResults) {
-            if (result.getBefore() == null
-                    && !(result.getAfter() instanceof Remote)
-                    && !expectedNewResults.contains(result)
-                    && testMethodSpec.afterRecipes.isEmpty()
-            ) {
-                assertThat(result.getAfter()).isNotNull();
-                // falsely added files detected.
-                fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
-                        + "\" that was not expected.");
-            }
+        Map<Result, Boolean> resultToUnexpected = allResults.stream()
+                .collect(Collectors.toMap(result -> result, result -> result.getBefore() == null
+                                                                      && !(result.getAfter() instanceof Remote)
+                                                                      && !expectedNewResults.contains(result)
+                                                                      && testMethodSpec.afterRecipes.isEmpty()));
+        if(resultToUnexpected.values().stream().anyMatch(it -> it)) {
+            String paths = resultToUnexpected.entrySet().stream()
+                    .map(it -> {
+                        Result result = it.getKey();
+                        assert result.getAfter() != null;
+                        String beforePath = (result.getBefore() == null) ? "null" : result.getAfter().getSourcePath().toString();
+                        String afterPath = (result.getAfter() == null) ? "null" : result.getAfter().getSourcePath().toString();
+                        String status = it.getValue() ? "❌️" : "✔";
+                        return "    " + beforePath + " -> " + afterPath + " " + status;
+                    })
+                    .collect(Collectors.joining("\n"));
+            fail("The recipe added a source file that was not expected. All source file paths, before and after recipe run:\n" + paths);
         }
     }
 
@@ -630,8 +656,14 @@ public interface RewriteTest extends SourceSpecs {
             }
         } else {
             assertThat(recipe.getDisplayName()).as("%s display name should not end with a period.", recipe.getName()).doesNotEndWith(".");
-            assertThat(recipe.getDescription()).as("%s description should not be null or empty", recipe.getName()).isNotEmpty();
-            assertThat(recipe.getDescription()).as("%s description should end with a period.", recipe.getName()).endsWith(".");
+            String description = recipe.getDescription();
+            assertThat(description).as("%s description should not be null or empty", recipe.getName()).isNotEmpty();
+            if (description.endsWith(")")) {
+                String lastLine = description.substring(description.lastIndexOf('\n') + 1).trim();
+                assertThat(lastLine).as("%s description not ending with a period should be because the description ends with a markdown list of pure links", recipe.getName()).startsWith("- [");
+            } else {
+                assertThat(description).as("%s description should end with a period.", recipe.getName()).endsWith(".");
+            }
         }
     }
 

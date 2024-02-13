@@ -34,7 +34,7 @@ import java.time.Duration;
 import java.util.*;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveDuplicateDependencies extends Recipe {
 
     @Override

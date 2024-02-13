@@ -21,8 +21,6 @@ import org.openrewrite.table.DistinctGitProvenance;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Collections;
-
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;

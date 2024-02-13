@@ -23,7 +23,10 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.sourceSet;
+import static org.openrewrite.java.Assertions.srcMainJava;
+import static org.openrewrite.java.Assertions.srcTestJava;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 public class IsOrIsNotLikelyTestTest {
@@ -112,7 +115,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndTestSourceSet() {
+        void standardMainAndTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
               srcTestJava(assertTestIsFound())
@@ -121,7 +124,7 @@ public class IsOrIsNotLikelyTestTest {
 
         @Test
         @SuppressWarnings("SpellCheckingInspection")
-        void testStandardMainAndIntegTestSourceSet() {
+        void standardMainAndIntegTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
               srcIntegTestJava(assertTestIsFound())
@@ -129,7 +132,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndCompatibilityTestSourceSet() {
+        void standardMainAndCompatibilityTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
               srcCompatibilityTestJava(assertTestIsFound())
@@ -153,7 +156,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndTestSourceSet() {
+        void standardMainAndTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),
               srcTestJava(assertTestNoChanges())
@@ -162,7 +165,7 @@ public class IsOrIsNotLikelyTestTest {
 
         @Test
         @SuppressWarnings("SpellCheckingInspection")
-        void testStandardMainAndIntegTestSourceSet() {
+        void standardMainAndIntegTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),
               srcIntegTestJava(assertTestNoChanges())
@@ -170,7 +173,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndCompatibilityTestSourceSet() {
+        void standardMainAndCompatibilityTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),
               srcCompatibilityTestJava(assertTestNoChanges())

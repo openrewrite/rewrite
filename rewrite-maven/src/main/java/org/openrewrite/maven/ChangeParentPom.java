@@ -43,7 +43,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeParentPom extends Recipe {
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 

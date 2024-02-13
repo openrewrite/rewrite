@@ -269,7 +269,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     @Test
     void implicitValueToExplicitValue() {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null))
-            .cycles(3),
+            .expectedCyclesThatMakeChanges(2),
           java(
             """
               package org.junit;

@@ -414,6 +414,46 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void negatedTernary() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m1(boolean a) {
+                      return !(a ? true : false);
+                  }
+                  boolean m2(boolean a) {
+                      return !(!a ? true : false);
+                  }
+                  boolean m3(boolean a) {
+                      return !a ? true : false;
+                  }
+                  boolean m4(boolean a) {
+                      return a ? true : false;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m1(boolean a) {
+                      return a ? false : true;
+                  }
+                  boolean m2(boolean a) {
+                      return a ? true : false;
+                  }
+                  boolean m3(boolean a) {
+                      return a ? false : true;
+                  }
+                  boolean m4(boolean a) {
+                      return a ? true : false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void differentFieldAccesses() {
         rewriteRun(
           java(

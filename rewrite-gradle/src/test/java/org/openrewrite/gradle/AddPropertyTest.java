@@ -39,8 +39,8 @@ class AddPropertyTest implements RewriteTest {
               project.name=helloworld
               """,
             """
-              project.name=helloworld
               org.gradle.caching=true
+              project.name=helloworld
               """,
             spec -> spec.path("gradle.properties")
           )

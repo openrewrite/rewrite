@@ -33,7 +33,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddPlugin extends Recipe {
 
     private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
