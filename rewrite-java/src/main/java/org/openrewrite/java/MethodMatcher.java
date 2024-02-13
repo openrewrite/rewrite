@@ -359,8 +359,40 @@ public class MethodMatcher {
 
 class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
     private static final Set<String> COMMON_JAVA_LANG_TYPES =
-            new HashSet<>(Arrays.asList("Number", "Integer", "Byte", "Short", "Character", "Long", "Float", "Double",
-                    "Boolean", "Void", "Object", "Throwable", "Exception", "Class", "Enum", "Record", "Runnable", "String"));
+            new HashSet<>(Arrays.asList(
+                    "Appendable",
+                    "AutoCloseable",
+                    "Boolean",
+                    "Byte",
+                    "Character",
+                    "CharSequence",
+                    "Class",
+                    "ClassLoader",
+                    "Cloneable",
+                    "Comparable",
+                    "Double",
+                    "Enum",
+                    "Error",
+                    "Exception",
+                    "Float",
+                    "FunctionalInterface",
+                    "Integer",
+                    "Iterable",
+                    "Long",
+                    "Math",
+                    "Number",
+                    "Object",
+                    "Readable",
+                    "Record",
+                    "Runnable",
+                    "Short",
+                    "String",
+                    "StringBuffer",
+                    "StringBuilder",
+                    "Thread",
+                    "Throwable",
+                    "Void"
+            ));
 
     @Override
     public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
