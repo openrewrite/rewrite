@@ -72,7 +72,8 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     public String getDescription() {
         return "Copies a YAML value from one key to another. " +
                "The existing key/value pair remains unaffected by this change. " +
-               "If either the source key path does not exist, no value will be copied.";
+               "Attempts to merge the copied value into the new key if it already exists. " +
+               "Attempts to create the new key if it does not exist.";
     }
 
     @Data
@@ -92,6 +93,15 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         TreeVisitor<?, ExecutionContext> visitor = new YamlIsoVisitor<ExecutionContext>() {
             final JsonPathMatcher oldPathMatcher = new JsonPathMatcher(oldKeyPath);
+
+            @Override
+            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
+                if(acc.snippet == null) {
+                    return super.visitDocuments(documents, executionContext);
+                }
+                return documents;
+            }
+
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry source = super.visitMappingEntry(entry, ctx);

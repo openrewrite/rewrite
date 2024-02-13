@@ -33,6 +33,26 @@ class CopyValueTest implements RewriteTest {
     }
 
     @Test
+    void changeCurrentFileWhenNull() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new CopyValue("$.source", null, "$.destination", null)
+          ),
+          yaml(
+            """
+              source: value
+              destination: original
+              """,
+            """
+              source: value
+              destination: value
+              """,
+            spec -> spec.path("a.yml")
+          )
+        );
+    }
+
+    @Test
     void changeOnlyMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(
