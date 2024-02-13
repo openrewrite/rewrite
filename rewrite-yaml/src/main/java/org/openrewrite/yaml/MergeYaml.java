@@ -97,13 +97,18 @@ public class MergeYaml extends Recipe {
                 }
                 Yaml.Document d = super.visitDocument(document, ctx);
                 if(d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
+                    // No matching element already exists, attempt to construct one
                     String valueKey = maybeKeyFromJsonPath(key);
                     if(valueKey == null) {
                         return d;
                     }
-
+                    // If there is no space between the colon and the value it will not be interpreted as a mapping
+                    @Language("yml") String snippet =
+                            valueKey + ":" +
+                            ((yaml.startsWith(" ")) ? "" : " ")
+                            + yaml;
                     // No matching element already exists, so it must be constructed
-                    return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), valueKey + ":" + yaml,
+                    return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), snippet,
                             Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(d.getBlock(),
                             ctx, getCursor()));
                 }
