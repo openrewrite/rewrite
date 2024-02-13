@@ -16,6 +16,7 @@
 package org.openrewrite.java.recipes;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -30,6 +31,7 @@ class RewriteTestClassesShouldNotBePublicTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
     void rewriteTestThatOverridesDefaults() {
         rewriteRun(
           java(
@@ -73,6 +75,36 @@ class RewriteTestClassesShouldNotBePublicTest implements RewriteTest {
               import org.openrewrite.test.RewriteTest;
 
               class ATest implements RewriteTest {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangePublicStaticMethod() {
+        rewriteRun(
+          java(
+            """
+              import org.openrewrite.test.RewriteTest;
+              
+              public class ATest implements RewriteTest {
+                  public static void helper() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangePublicStaticField() {
+        rewriteRun(
+          java(
+            """
+              import org.openrewrite.test.RewriteTest;
+              
+              public class ATest implements RewriteTest {
+                  public static String helper = "helper";
               }
               """
           )

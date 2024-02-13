@@ -218,6 +218,10 @@ public class MavenPomDownloader {
             throw new MavenDownloadingException("Missing group id.", null, gav);
         }
 
+        if (containingPom != null) {
+            gav = containingPom.getValues(gav);
+        }
+
         ctx.getResolutionListener().downloadMetadata(gav);
 
         Timer.Sample sample = Timer.start();
