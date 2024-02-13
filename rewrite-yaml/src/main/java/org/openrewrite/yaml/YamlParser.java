@@ -134,9 +134,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             ScalarBuilder builder = (ScalarBuilder) blockStack.pop();
                             lastEnd = builder.getLastEnd();
                             Yaml.Scalar scalar = builder.getScalar();
-                            document = document
-                                    .withPrefix(scalar.getPrefix())
-                                    .withBlock(scalar.withPrefix(""));
+                            document = document.withBlock(scalar);
                         }
                         String fmt = newLine + reader.prefix(lastEnd, event);
 
@@ -272,7 +270,10 @@ public class YamlParser implements org.openrewrite.Parser {
                             sequenceBuilder.push(finalScalar, commaPrefix);
 
                         } else if (builder == null) {
-                            blockStack.push(new ScalarBuilder(finalScalar, event.getEndMark().getIndex()));
+                            if(!"".equals(finalScalar.getValue())) {
+                                // If the "scalar" is just a comment, allow it to accrue to the Document.End rather than create a phantom scalar
+                                blockStack.push(new ScalarBuilder(finalScalar, event.getEndMark().getIndex()));
+                            }
                         } else {
                             builder.push(finalScalar);
                             lastEnd = event.getEndMark().getIndex();
