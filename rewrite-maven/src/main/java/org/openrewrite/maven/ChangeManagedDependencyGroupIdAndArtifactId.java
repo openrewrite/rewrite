@@ -153,11 +153,10 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (newVersion != null) {
                         try {
-                            String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, newArtifactId);
-
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
                             if (versionTag.isPresent()) {
+                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, newArtifactId, versionTag.get().getValue().orElse(null));
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                             }
                             changed = true;
@@ -174,15 +173,16 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId) throws MavenDownloadingException {
+            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
                 if (versionComparator == null) {
                     return newVersion;
                 }
+                String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
                 if (availableVersions == null) {
                     availableVersions = new ArrayList<>();
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(newVersion, v)) {
+                        if (versionComparator.isValid(finalCurrentVersion, v)) {
                             availableVersions.add(v);
                         }
                     }
