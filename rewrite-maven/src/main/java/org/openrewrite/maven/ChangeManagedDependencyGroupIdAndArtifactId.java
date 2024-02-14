@@ -167,6 +167,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (changed) {
                         maybeUpdateModel();
+                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
                     }
                 }
                 return t;

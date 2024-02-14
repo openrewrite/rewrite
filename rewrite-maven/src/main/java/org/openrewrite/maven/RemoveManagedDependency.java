@@ -78,8 +78,8 @@ public class RemoveManagedDependency extends Recipe {
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isManagedDependencyTag(groupId, artifactId)) {
                 Scope checkScope = scope != null ? Scope.fromName(scope) : null;
-                ResolvedManagedDependency managedDependency = findManagedDependency(tag, checkScope);
-                if (managedDependency != null) {
+                boolean isBomImport = tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
+                if (isBomImport || findManagedDependency(tag, checkScope) != null) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true));
                     maybeUpdateModel();
                 }

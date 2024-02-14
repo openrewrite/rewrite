@@ -75,7 +75,7 @@ public class RecipeScheduler {
                 RecipeRunCycle<LargeSourceSet> cycle = new RecipeRunCycle<>(recipe, i, rootCursor, ctxWithWatch,
                         recipeRunStats, sourceFileResults, repositoryResults, errorsTable, LargeSourceSet::edit);
                 ctxWithWatch.putCycle(cycle);
-                after.beforeCycle();
+                after.beforeCycle(i == maxCycles);
 
                 // pre-transformation scanning phase where there can only be modifications to capture exceptions
                 // occurring during the scanning phase

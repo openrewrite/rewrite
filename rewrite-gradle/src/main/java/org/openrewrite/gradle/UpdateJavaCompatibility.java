@@ -64,17 +64,11 @@ public class UpdateJavaCompatibility extends Recipe {
     @Nullable
     Boolean allowDowngrade;
 
-    @Option(displayName = "Add Source Compatibility if missing",
-            description = "Adds Source Compatibility if one is not found.",
+    @Option(displayName = "Add Compatibility Type if missing",
+            description = "Adds the specified Compatibility Type if one is not found.",
             required = false)
     @Nullable
-    Boolean addSourceCompatibilityIfMissing;
-
-    @Option(displayName = "Add Target Compatibility if missing",
-            description = "Adds Target Compatibility if one is not found.",
-            required = false)
-    @Nullable
-    Boolean addTargetCompatibilityIfMissing;
+    Boolean addIfMissing;
 
     private static final String SOURCE_COMPATIBILITY_FOUND = "SOURCE_COMPATIBILITY_FOUND";
     private static final String TARGET_COMPATIBILITY_FOUND = "TARGET_COMPATIBILITY_FOUND";
@@ -106,22 +100,10 @@ public class UpdateJavaCompatibility extends Recipe {
             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
                 G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, executionContext);
                 if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
-                    if (Boolean.TRUE.equals(addSourceCompatibilityIfMissing)) {
-                        G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse("\nsourceCompatibility = " + styleMissingCompatibilityVersion())
-                                .findFirst()
-                                .get();
-                        sourceFile.getStatements();
-                        c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
-                    }
+                    c = addCompatibilityTypeToSourceFile(c, "source");
                 }
                 if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
-                    if (Boolean.TRUE.equals(addTargetCompatibilityIfMissing)) {
-                        G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse("\ntargetCompatibility = " + styleMissingCompatibilityVersion())
-                                .findFirst()
-                                .get();
-                        sourceFile.getStatements();
-                        c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
-                    }
+                    c = addCompatibilityTypeToSourceFile(c, "target");
                 }
                 return c;
             }
@@ -395,6 +377,17 @@ public class UpdateJavaCompatibility extends Recipe {
                 return expression;
             }
         });
+    }
+
+    private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String compatibilityType) {
+        if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
+            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse("\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
+                    .findFirst()
+                    .get();
+            sourceFile.getStatements();
+            c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+        }
+        return c;
     }
 
     private String styleMissingCompatibilityVersion() {

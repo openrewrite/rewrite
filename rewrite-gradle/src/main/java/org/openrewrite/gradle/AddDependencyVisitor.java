@@ -227,11 +227,15 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             }
 
             if (version != null) {
-                try {
-                    resolvedVersion = resolveDependencyVersion(groupId, artifactId, "0", version, versionPattern, gp.getMavenRepositories(), metadataFailures, ctx)
-                            .orElse(null);
-                } catch (MavenDownloadingException e) {
-                    return e.warn(m);
+                if (version.startsWith("$")) {
+                    resolvedVersion = version;
+                } else {
+                    try {
+                        resolvedVersion = resolveDependencyVersion(groupId, artifactId, "0", version, versionPattern, gp.getMavenRepositories(), metadataFailures, ctx)
+                                .orElse(null);
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(m);
+                    }
                 }
             }
 
@@ -370,7 +374,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
         Optional<String> version;
         if (versionComparator instanceof ExactVersion) {
-            version = Optional.of(newVersion);
+            version = versionComparator.upgrade(currentVersion, singletonList(newVersion));
         } else if (versionComparator instanceof LatestPatch && !versionComparator.isValid(currentVersion, currentVersion)) {
             // in the case of "latest.patch", a new version can only be derived if the
             // current version is a semantic version

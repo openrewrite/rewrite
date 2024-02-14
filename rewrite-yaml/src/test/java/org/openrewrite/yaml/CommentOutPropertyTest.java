@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
-public class CommentOutPropertyTest implements RewriteTest {
+class CommentOutPropertyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new CommentOutProperty("management.metrics.binders.files.enabled", "some comments"));
