@@ -30,6 +30,7 @@ import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -87,7 +88,16 @@ class DeclarativeRecipeTest implements RewriteTest {
                  toText: 2
               - org.openrewrite.text.ChangeText:
                  toText: 3
-            """, "org.openrewrite.PreconditionTest"),
+              - org.openrewrite.text.CreateTextFile:
+                 relativeFileName: test.txt
+                 fileContents: "test"
+            """, "org.openrewrite.PreconditionTest")
+            .afterRecipe(run -> {
+                assertThat(run.getChangeset().getAllResults()).anySatisfy(
+                  s -> assertThat(s.getAfter().getSourcePath()).isEqualTo(Paths.get("test.txt"))
+                );
+                System.out.println(run);
+            }),
           text("1", "3"),
           text("2")
         );

@@ -144,6 +144,9 @@ public class DeclarativeRecipe extends Recipe {
         @NonFinal
         transient boolean preconditionApplicable;
 
+        @NonFinal
+        transient boolean preconditionEverApplicable;
+
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
@@ -156,6 +159,7 @@ public class DeclarativeRecipe extends Recipe {
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                     Tree t = precondition.visit(tree, ctx);
                     preconditionApplicable = t != tree;
+                    preconditionEverApplicable |= preconditionApplicable;
                     return tree;
                 }
             };
@@ -224,7 +228,16 @@ public class DeclarativeRecipe extends Recipe {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getScanner(T acc) {
-            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getScanner(acc));
+            return Preconditions.check(bellwether.getVisitor(), delegate.getScanner(acc));
+        }
+
+        @Override
+        public Collection<? extends SourceFile> generate(T acc, ExecutionContext ctx) {
+            try {
+                return bellwether.isPreconditionEverApplicable() ? delegate.generate(acc, ctx) : super.generate(acc, ctx);
+            } finally {
+                bellwether.preconditionEverApplicable = false;
+            }
         }
 
         @Override
