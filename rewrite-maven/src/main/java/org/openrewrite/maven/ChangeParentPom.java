@@ -185,18 +185,20 @@ public class ChangeParentPom extends Recipe {
                         (oldRelativePath == null || matchesGlob(resolvedPom.getValue(tag.getChildValue("relativePath").orElse(null)), oldRelativePath))) {
                         String oldVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
                         assert oldVersion != null;
-                        String targetGroupId = newGroupId == null ? tag.getChildValue("groupId").orElse(oldGroupId) : newGroupId;
-                        String targetArtifactId = newArtifactId == null ? tag.getChildValue("artifactId").orElse(oldArtifactId) : newArtifactId;
+                        String currentGroupId = tag.getChildValue("groupId").orElse(oldGroupId);
+                        String targetGroupId = newGroupId == null ? currentGroupId : newGroupId;
+                        String currentArtifactId = tag.getChildValue("artifactId").orElse(oldArtifactId);
+                        String targetArtifactId = newArtifactId == null ? currentArtifactId : newArtifactId;
                         String targetRelativePath = newRelativePath == null ? tag.getChildValue("relativePath").orElse(oldRelativePath) : newRelativePath;
                         try {
                             Optional<String> targetVersion = findAcceptableVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
                             if (targetVersion.isPresent()) {
                                 List<XmlVisitor<ExecutionContext>> changeParentTagVisitors = new ArrayList<>();
-                                if (!oldGroupId.equals(targetGroupId)) {
+                                if (!currentGroupId.equals(targetGroupId)) {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId));
                                 }
 
-                                if (!oldArtifactId.equals(targetArtifactId)) {
+                                if (!currentArtifactId.equals(targetArtifactId)) {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), targetArtifactId));
                                 }
 
