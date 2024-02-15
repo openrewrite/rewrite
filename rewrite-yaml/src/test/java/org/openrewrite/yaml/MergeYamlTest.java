@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
+@SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
 class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/support-public/issues/5")
@@ -835,4 +836,50 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mergeScalar() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.name",
+              //language=yaml
+              """
+                sam
+                """,
+              false,
+              null
+            )),
+          yaml(
+            """
+              name: jon
+              """,
+            """
+              name: sam
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertScalar() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.name",
+              //language=yaml
+              """
+                sam
+                """,
+              false,
+              null
+            )),
+          yaml(
+            """
+              """,
+            """
+              name: sam
+              """
+          )
+        );
+    }
 }

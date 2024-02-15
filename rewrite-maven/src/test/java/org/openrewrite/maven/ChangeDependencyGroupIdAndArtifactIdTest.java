@@ -382,6 +382,71 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void managedToUnmanagedExternalizedDepMgmt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.springframework.cloud",
+            "spring-cloud-starter-sleuth",
+            "io.micrometer",
+            "micrometer-tracing-bridge-brave",
+            "1.0.12",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>2021.0.0</version>
+                              <type>bom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-starter-sleuth</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>2021.0.0</version>
+                              <type>bom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.micrometer</groupId>
+                          <artifactId>micrometer-tracing-bridge-brave</artifactId>
+                          <version>1.0.12</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void unmanagedToManaged() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
@@ -567,6 +632,71 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void unmanagedToManagedExternalizedDepMgmt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "io.micrometer",
+            "micrometer-tracing-bridge-brave",
+            "org.springframework.cloud",
+            "spring-cloud-starter-sleuth",
+            "2021.0.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>2021.0.0</version>
+                              <type>bom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.micrometer</groupId>
+                          <artifactId>micrometer-tracing-bridge-brave</artifactId>
+                          <version>1.0.12</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>2021.0.0</version>
+                              <type>bom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-starter-sleuth</artifactId>
+                      </dependency>
+                  </dependencies>
               </project>
               """
           )

@@ -206,4 +206,21 @@ class MinimumViableSpacingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotatedFinalParameter() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new MinimumViableSpacingVisitor<>(null))
+          ),
+          java(
+            """
+              class A {
+                  public String method(final @Deprecated int a) {
+                      return "name";
+                  }
+              }
+              """
+          )
+        );
+    }
 }
