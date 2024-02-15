@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import lombok.Getter;
+import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -127,10 +128,17 @@ public class YamlParser implements org.openrewrite.Parser {
             for (Event event = parser.getEvent(); event != null; event = parser.getEvent()) {
                 switch (event.getEventId()) {
                     case DocumentEnd: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
-
                         assert document != null;
+                        if(blockStack.size() == 1 && blockStack.peek() instanceof ScalarBuilder) {
+                            // The yaml document consists of a single scalar value not in a mapping or sequence
+                            ScalarBuilder builder = (ScalarBuilder) blockStack.pop();
+                            lastEnd = builder.getLastEnd();
+                            Yaml.Scalar scalar = builder.getScalar();
+                            document = document.withBlock(scalar);
+                        }
+                        String fmt = newLine + reader.prefix(lastEnd, event);
+
+                        newLine = "";
                         documents.add(document.withEnd(new Yaml.Document.End(
                                 randomId(),
                                 fmt,
@@ -246,6 +254,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 }
                                 break;
                         }
+                        Yaml.Scalar finalScalar = new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue);
                         BlockBuilder builder = blockStack.isEmpty() ? null : blockStack.peek();
                         if (builder instanceof SequenceBuilder) {
                             // Inline sequences like [1, 2] need to keep track of any whitespace between the element
@@ -256,13 +265,17 @@ public class YamlParser implements org.openrewrite.Parser {
                             String commaPrefix = null;
                             if (commaIndex != -1) {
                                 commaPrefix = betweenEvents.substring(0, commaIndex);
-
                             }
                             lastEnd = event.getEndMark().getIndex() + commaIndex + 1;
-                            sequenceBuilder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue), commaPrefix);
+                            sequenceBuilder.push(finalScalar, commaPrefix);
 
-                        } else if (builder != null) {
-                            builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue));
+                        } else if (builder == null) {
+                            if(!"".equals(finalScalar.getValue())) {
+                                // If the "scalar" is just a comment, allow it to accrue to the Document.End rather than create a phantom scalar
+                                blockStack.push(new ScalarBuilder(finalScalar, event.getEndMark().getIndex()));
+                            }
+                        } else {
+                            builder.push(finalScalar);
                             lastEnd = event.getEndMark().getIndex();
                         }
                         break;
@@ -517,6 +530,21 @@ public class YamlParser implements org.openrewrite.Parser {
         @Override
         public SequenceWithPrefix build() {
             return new SequenceWithPrefix(prefix, startBracketPrefix, entries, null, anchor);
+        }
+    }
+
+    @Value
+    private static class ScalarBuilder implements BlockBuilder {
+        Yaml.Scalar scalar;
+        int lastEnd;
+        @Override
+        public void push(Yaml.Block block) {
+            throw new IllegalStateException("Unable to push on top of a scalar.");
+        }
+
+        @Override
+        public Yaml.Block build() {
+            return scalar;
         }
     }
 
