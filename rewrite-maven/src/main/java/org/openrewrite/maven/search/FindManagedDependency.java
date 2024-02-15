@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,22 +17,25 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
-import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.function.Supplier;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class FindDependency extends Recipe {
+public class FindManagedDependency extends Recipe {
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
@@ -69,8 +72,8 @@ public class FindDependency extends Recipe {
         new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependencyTag(groupId, artifactId)
-                        && versionIsValid(version, () -> findDependency(tag), versionPattern)) {
+                if (isManagedDependencyTag(groupId, artifactId)
+                        && versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
                     ds.add(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -81,7 +84,7 @@ public class FindDependency extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find Maven dependency";
+        return "Find Maven dependency management entry";
     }
 
     @Override
@@ -95,7 +98,7 @@ public class FindDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds first-order dependency uses, i.e. dependencies that are defined directly in a project.";
+        return "Finds first-order dependency management entries, i.e. dependencies that are defined directly in a project.";
     }
 
     @Override
@@ -103,8 +106,8 @@ public class FindDependency extends Recipe {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependencyTag(groupId, artifactId)
-                        && versionIsValid(version, () -> findDependency(tag), versionPattern)) {
+                if (isManagedDependencyTag(groupId, artifactId)
+                        && versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -112,17 +115,15 @@ public class FindDependency extends Recipe {
         };
     }
 
-    private static boolean versionIsValid(@Nullable String desiredVersion,
-            Supplier<ResolvedDependency> resolvedDependencySupplier, @Nullable String versionPattern) {
+    private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String actualVersion,
+            @Nullable String versionPattern) {
         if (desiredVersion == null) {
             return true;
         }
-        ResolvedDependency resolvedDependency = resolvedDependencySupplier.get();
-        if (resolvedDependency == null) {
-            // shouldn't happen, but if it does, fail the condition
+        if (actualVersion == null) {
+            // rare but technically valid for a dependencyManagement entry to have no version; bail if so
             return false;
         }
-        String actualVersion = resolvedDependency.getVersion();
         Validated<VersionComparator> validate = Semver.validate(desiredVersion, versionPattern);
         if (validate.isInvalid()) {
             return false;
