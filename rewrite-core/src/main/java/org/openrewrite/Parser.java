@@ -102,11 +102,7 @@ public interface Parser {
     boolean accept(Path path);
 
     default boolean accept(Path path, ExecutionContext ctx) {
-        if (accept(path)) {
-            return true;
-        }
-        return ParsingExecutionContextView.view(ctx).getAdditionalExtensions(this.getClass())
-                .contains(PathUtils.getExtension(path));
+        return ParsingExecutionContextView.view(ctx).accepts(this, path);
     }
 
     /**

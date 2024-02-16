@@ -15,13 +15,16 @@
  */
 package org.openrewrite.tree;
 
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.PathUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -29,7 +32,8 @@ import java.util.Set;
 
 public class ParsingExecutionContextView extends DelegatingExecutionContext {
     private static final String PARSING_LISTENER = "org.openrewrite.core.parsingListener";
-    private static final String ADDITIONAL_EXTENSIONS = "%s.additionalExtensions";
+    private static final String INCLUDE_PATTERNS = "%s.includePatterns";
+    private static final String EXCLUDE_PATTERNS = "%s.excludePatterns";
 
     private static final String CHARSET = "org.openrewrite.parser.charset";
 
@@ -63,28 +67,54 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
         return getMessage(CHARSET);
     }
 
-    public ParsingExecutionContextView addAdditionalExtension(Class<? extends Parser> parserClass, String extension) {
-        putMessageInSet(String.format(ADDITIONAL_EXTENSIONS, parserClass.getName()), extension);
+    public ParsingExecutionContextView includePattern(Class<? extends Parser> parserClass, String filePattern) {
+        putMessageInSet(String.format(INCLUDE_PATTERNS, parserClass.getName()), filePattern);
         return this;
     }
 
-    public Set<String> getAdditionalExtensions(Class<? extends Parser> parserClass) {
-        String key = String.format(ADDITIONAL_EXTENSIONS, parserClass.getName());
+    public Set<String> getIncludePattern(Class<? extends Parser> parserClass) {
+        return getPatternsFromSystemProperty(String.format(INCLUDE_PATTERNS, parserClass.getName()));
+    }
 
-        Set<String> additionalExtensions = getMessage(key, Collections.emptySet());
-        if (additionalExtensions == Collections.EMPTY_SET) {
-            String property = System.getProperty(key, null);
-            if (StringUtils.isNotEmpty(property)) {
-                additionalExtensions = new HashSet<>(Arrays.asList(property.split(",")));
-                putMessage(key, additionalExtensions);
+    public ParsingExecutionContextView setIncludePattern(Class<? extends Parser> parserClass, @Nullable Set<String> filePattern) {
+        putMessage(String.format(INCLUDE_PATTERNS, parserClass.getName()), filePattern);
+        return this;
+    }
+
+    public ParsingExecutionContextView excludePattern(Class<? extends Parser> parserClass, String filePattern) {
+        putMessageInSet(String.format(EXCLUDE_PATTERNS, parserClass.getName()), filePattern);
+        return this;
+    }
+
+    public Set<String> getExcludePattern(Class<? extends Parser> parserClass) {
+        return getPatternsFromSystemProperty(String.format(EXCLUDE_PATTERNS, parserClass.getName()));
+    }
+
+    public ParsingExecutionContextView setExcludePattern(Class<? extends Parser> parserClass, @Nullable Set<String> filePattern) {
+        putMessage(String.format(EXCLUDE_PATTERNS, parserClass.getName()), filePattern);
+        return this;
+    }
+
+    public <T extends Parser> boolean accepts(T parser, Path path) {
+        for (String pattern : getExcludePattern(parser.getClass())) {
+            if (PathUtils.matchesGlob(path, pattern)) {
+                return false;
             }
         }
 
-        return additionalExtensions;
+        return parser.accept(path) || getIncludePattern(parser.getClass()).stream().anyMatch(pattern -> PathUtils.matchesGlob(path, pattern));
     }
 
-    public ParsingExecutionContextView setAdditionalExtensions(Class<? extends Parser> parserClass, @Nullable Set<String> additionalExtensions) {
-        putMessage(String.format(ADDITIONAL_EXTENSIONS, parserClass.getName()), additionalExtensions);
-        return this;
+    @NotNull
+    private Set<String> getPatternsFromSystemProperty(String key) {
+        Set<String> included = getMessage(key, Collections.emptySet());
+        if (included == Collections.EMPTY_SET) {
+            String property = System.getProperty(key, null);
+            if (StringUtils.isNotEmpty(property)) {
+                included = new HashSet<>(Arrays.asList(property.split(",")));
+                putMessage(key, included);
+            }
+        }
+        return included;
     }
 }

@@ -22,6 +22,7 @@ import org.junitpioneer.jupiter.SetSystemProperty;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.tree.Properties;
@@ -29,7 +30,10 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.ByteArrayInputStream;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -237,7 +241,7 @@ class PropertiesParserTest implements RewriteTest {
     }
 
     @Test
-    @SetSystemProperty(key = "org.openrewrite.properties.PropertiesParser.additionalExtensions", value = ".cfg")
+    @SetSystemProperty(key = "org.openrewrite.properties.PropertiesParser.includePatterns", value = "**/*.cfg")
     void parseAnAdditionalExtensionFromSystemProperty() {
         rewriteRun(
           properties(
@@ -250,7 +254,7 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void parseAnAdditionalExtensionFromContext() {
         ParsingExecutionContextView ctx = ParsingExecutionContextView.view(new InMemoryExecutionContext());
-        ctx.addAdditionalExtension(PropertiesParser.class, ".cfg");
+        ctx.includePattern(PropertiesParser.class, "**/*.cfg");
 
         rewriteRun(
           spec -> spec.executionContext(ctx),
@@ -259,6 +263,20 @@ class PropertiesParserTest implements RewriteTest {
             spec -> spec.path("file.cfg")
           )
         );
+    }
+
+    @Test
+    void excludeFromParsing() {
+        ParsingExecutionContextView ctx = ParsingExecutionContextView.view(new InMemoryExecutionContext());
+
+        Parser.Input input = new Parser.Input(Paths.get("exclude-this.properties"), () -> new ByteArrayInputStream("key=value".getBytes()));
+        assertThat(PropertiesParser.builder().build().parseInputs(Collections.singletonList(input), null, ctx))
+          .hasSize(1)
+          .allMatch(f -> f instanceof Properties.File);
+
+        ctx.excludePattern(PropertiesParser.class, "**/exclude-this.properties");
+        assertThat(PropertiesParser.builder().build().parseInputs(Collections.singletonList(input), null, ctx))
+          .isEmpty();
     }
 
     private static Consumer<SourceSpec<Properties.File>> containsValues(String... valueAssertions) {
