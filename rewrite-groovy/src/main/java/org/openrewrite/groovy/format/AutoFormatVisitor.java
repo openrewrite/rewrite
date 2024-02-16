@@ -48,11 +48,22 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
                 (JavaSourceFile) tree :
                 cursor.firstEnclosingOrThrow(JavaSourceFile.class);
 
-        J t = new MinimumViableSpacingVisitor<>(stopAfter).visit(tree, p, cursor.fork());
+        J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
 
         t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()), stopAfter)
                 .visit(t, p, cursor.fork());
+
+        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
+                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
+                .visit(t, p, cursor.fork());
+
+        t = new SpacesVisitor<>(
+                Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                cu.getStyle(EmptyForInitializerPadStyle.class),
+                cu.getStyle(EmptyForIteratorPadStyle.class),
+                stopAfter
+        ).visit(t, p, cursor.fork());
 
         t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
