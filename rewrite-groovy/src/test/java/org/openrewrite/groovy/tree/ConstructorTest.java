@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -43,6 +44,36 @@ class ConstructorTest implements RewriteTest {
               new Object() {
                   int one() {
                       return i
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Disabled("Fails to parse")
+    void implicitPublic() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  T(int a, int b, int c) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Disabled("Fails to parse")
+    void defaultConstructorArguments() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  T(int a = 1) {
                   }
               }
               """
