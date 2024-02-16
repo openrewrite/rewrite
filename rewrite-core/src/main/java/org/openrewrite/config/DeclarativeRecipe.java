@@ -144,9 +144,6 @@ public class DeclarativeRecipe extends Recipe {
         @NonFinal
         transient boolean preconditionApplicable;
 
-        @NonFinal
-        transient boolean preconditionEverApplicable;
-
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
@@ -159,7 +156,6 @@ public class DeclarativeRecipe extends Recipe {
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                     Tree t = precondition.visit(tree, ctx);
                     preconditionApplicable = t != tree;
-                    preconditionEverApplicable |= preconditionApplicable;
                     return tree;
                 }
             };
@@ -201,7 +197,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    static class BellwetherDecoratedScanningRecipe<T>  extends ScanningRecipe<T> {
+    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         ScanningRecipe<T> delegate;
@@ -228,16 +224,12 @@ public class DeclarativeRecipe extends Recipe {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getScanner(T acc) {
-            return Preconditions.check(bellwether.getVisitor(), delegate.getScanner(acc));
+            return delegate.getScanner(acc);
         }
 
         @Override
         public Collection<? extends SourceFile> generate(T acc, ExecutionContext ctx) {
-            try {
-                return bellwether.isPreconditionEverApplicable() ? delegate.generate(acc, ctx) : super.generate(acc, ctx);
-            } finally {
-                bellwether.preconditionEverApplicable = false;
-            }
+            return delegate.generate(acc, ctx);
         }
 
         @Override
@@ -253,18 +245,18 @@ public class DeclarativeRecipe extends Recipe {
 
     @Override
     public final List<Recipe> getRecipeList() {
-        if(preconditions.isEmpty()) {
+        if (preconditions.isEmpty()) {
             return recipeList;
         }
 
         TreeVisitor<?, ExecutionContext> andPreconditions = null;
         for (Recipe precondition : preconditions) {
-            if(isScanningRecipe(precondition)) {
+            if (isScanningRecipe(precondition)) {
                 throw new IllegalArgumentException(
                         getName() + " declares the ScanningRecipe " + precondition.getName() + " as a precondition." +
                         "ScanningRecipe cannot be used as Preconditions.");
             }
-            if(andPreconditions == null) {
+            if (andPreconditions == null) {
                 andPreconditions = precondition.getVisitor();
             } else {
                 andPreconditions = Preconditions.and(andPreconditions, precondition.getVisitor());
@@ -278,11 +270,11 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     private static boolean isScanningRecipe(Recipe recipe) {
-        if(recipe instanceof ScanningRecipe) {
+        if (recipe instanceof ScanningRecipe) {
             return true;
         }
         for (Recipe r : recipe.getRecipeList()) {
-            if(isScanningRecipe(r)) {
+            if (isScanningRecipe(r)) {
                 return true;
             }
         }
@@ -292,7 +284,7 @@ public class DeclarativeRecipe extends Recipe {
     private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {
         List<Recipe> mappedRecipeList = new ArrayList<>(recipeList.size());
         for (Recipe recipe : recipeList) {
-            if(recipe instanceof ScanningRecipe) {
+            if (recipe instanceof ScanningRecipe) {
                 mappedRecipeList.add(new BellwetherDecoratedScanningRecipe<>(bellwether, (ScanningRecipe<?>) recipe));
             } else {
                 mappedRecipeList.add(new BellwetherDecoratedRecipe(bellwether, recipe));
@@ -324,8 +316,8 @@ public class DeclarativeRecipe extends Recipe {
     @Override
     public Validated<Object> validate() {
         return Validated.<Object>test("initialization",
-                "initialize(..) must be called on DeclarativeRecipe prior to use.",
-                this, r -> initValidation != null)
+                        "initialize(..) must be called on DeclarativeRecipe prior to use.",
+                        this, r -> initValidation != null)
                 .and(validation)
                 .and(initValidation);
     }

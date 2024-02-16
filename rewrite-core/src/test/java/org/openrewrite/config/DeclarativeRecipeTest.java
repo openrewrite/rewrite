@@ -88,18 +88,37 @@ class DeclarativeRecipeTest implements RewriteTest {
                  toText: 2
               - org.openrewrite.text.ChangeText:
                  toText: 3
+            """, "org.openrewrite.PreconditionTest"),
+          text("1", "3"),
+          text("2")
+        );
+    }
+
+    @Test
+    void yamlPreconditionWithScanningRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.PreconditionTest
+            preconditions:
+              - org.openrewrite.text.Find:
+                  find: 1
+            recipeList:
               - org.openrewrite.text.CreateTextFile:
                  relativeFileName: test.txt
                  fileContents: "test"
             """, "org.openrewrite.PreconditionTest")
             .afterRecipe(run -> {
                 assertThat(run.getChangeset().getAllResults()).anySatisfy(
-                  s -> assertThat(s.getAfter().getSourcePath()).isEqualTo(Paths.get("test.txt"))
+                  s -> {
+                      assertThat(s.getAfter()).isNotNull();
+                      assertThat(s.getAfter().getSourcePath()).isEqualTo(Paths.get("test.txt"));
+                  }
                 );
-                System.out.println(run);
-            }),
-          text("1", "3"),
-          text("2")
+            })
+            .expectedCyclesThatMakeChanges(1),
+          text("1")
         );
     }
 
