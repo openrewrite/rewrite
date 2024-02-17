@@ -67,7 +67,9 @@ public class Preconditions {
                 if (tree instanceof SourceFile) {
                     for (TreeVisitor<?, ExecutionContext> v : vs) {
                         if (v.isAcceptable((SourceFile) tree, ctx)) {
-                            return v.visit(tree, ctx);
+                            if (v.isAcceptable((SourceFile) tree, ctx)) {
+                                return v.visit(tree, ctx);
+                            }
                         }
                     }
                 }
@@ -94,9 +96,11 @@ public class Preconditions {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 for (TreeVisitor<?, ExecutionContext> v : vs) {
-                    Tree t2 = v.visit(tree, ctx);
-                    if (tree != t2) {
-                        return t2;
+                    if (tree instanceof SourceFile && v.isAcceptable((SourceFile) tree, ctx)) {
+                        Tree t2 = v.visit(tree, ctx);
+                        if (tree != t2) {
+                            return t2;
+                        }
                     }
                 }
                 return tree;
@@ -111,9 +115,11 @@ public class Preconditions {
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 Tree t2 = tree;
                 for (TreeVisitor<?, ExecutionContext> v : vs) {
-                    t2 = v.visit(tree, ctx);
-                    if (tree == t2) {
-                        return tree;
+                    if (tree instanceof SourceFile && v.isAcceptable((SourceFile) tree, ctx)) {
+                        t2 = v.visit(tree, ctx);
+                        if (tree == t2) {
+                            return tree;
+                        }
                     }
                 }
                 return t2;
