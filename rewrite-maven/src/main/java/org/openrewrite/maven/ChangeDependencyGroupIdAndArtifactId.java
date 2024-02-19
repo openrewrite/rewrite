@@ -118,9 +118,10 @@ public class ChangeDependencyGroupIdAndArtifactId extends AbstractChangeDependen
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }
+                    String currentVersion = t.getChildValue("version").orElse(null);
                     if (newVersion != null) {
                         try {
-                            String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId);
+                            String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId, currentVersion);
                             Optional<Xml.Tag> scopeTag = t.getChild("scope");
                             Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
                             Optional<Xml.Tag> versionTag = t.getChild("version");
@@ -139,7 +140,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends AbstractChangeDependen
                                     // Otherwise, change the version to the new value.
                                     t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                                 }
-                            } else if (configuredToOverrideManageVersion || !newDependencyManaged && !(oldDependencyManaged && configuredToChangeManagedDependency)) {
+                            } else if (configuredToOverrideManageVersion || !newDependencyManaged) {
                                 //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
                                 Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
                                 //noinspection ConstantConditions
@@ -159,11 +160,29 @@ public class ChangeDependencyGroupIdAndArtifactId extends AbstractChangeDependen
             }
 
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
-
-				@Nullable
+        				@Nullable
                 ResolvedManagedDependency dependency = getResolutionResult().getPom().getResolvedManagedDependencyWithMinimumProximity(dm ->
                         groupId.equals(dm.getGroupId()) && artifactId.equals(dm.getArtifactId()));
                 return dependency != null && scope.isInClasspathOf(dependency.getScope());
+            }
+
+            @SuppressWarnings("ConstantConditions")
+            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
+                if (versionComparator == null) {
+                    return newVersion;
+                }
+                String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
+                if (availableVersions == null) {
+                    availableVersions = new ArrayList<>();
+                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+                    for (String v : mavenMetadata.getVersioning().getVersions()) {
+                        if (versionComparator.isValid(finalCurrentVersion, v)) {
+                            availableVersions.add(v);
+                        }
+                    }
+
+                }
+                return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
             }
         };
     }

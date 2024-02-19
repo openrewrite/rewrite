@@ -22,9 +22,11 @@ import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
+import org.openrewrite.groovy.service.GroovyAutoFormatService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -141,10 +143,22 @@ public interface G extends J {
         @SuppressWarnings("unchecked")
         @Override
         public <S, T extends S> T service(Class<S> service) {
-            if(WhitespaceValidationService.class.getName().equals(service.getName())) {
-                return (T) new GroovyWhitespaceValidationService();
+            String serviceName = service.getName();
+            try {
+                Class<S> serviceClass;
+                if (GroovyAutoFormatService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (AutoFormatService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovyAutoFormatService.class.getName());
+                } else if (WhitespaceValidationService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovyWhitespaceValidationService.class.getName());
+                } else {
+                    return JavaSourceFile.super.service(service);
+                }
+                return (T) serviceClass.getConstructor().newInstance();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-            return JavaSourceFile.super.service(service);
         }
 
         List<JRightPadded<Statement>> statements;
@@ -271,7 +285,19 @@ public interface G extends J {
                         .map(i -> (JRightPadded<Statement>) (Object) i)
                         .collect(Collectors.toList()));
 
-                return t.getPadding().getClasses() == classes ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                List<JRightPadded<ClassDeclaration>> originalClasses = t.getPadding().getClasses();
+                if (originalClasses.size() != classes.size()) {
+                    return new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                } else {
+                    boolean hasChanges = false;
+                    for (int i = 0; i < originalClasses.size(); i++) {
+                        if (originalClasses.get(i) != classes.get(i)) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                    return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                }
             }
 
             @Transient
@@ -294,7 +320,19 @@ public interface G extends J {
                         .map(i -> (JRightPadded<Statement>) (Object) i)
                         .collect(Collectors.toList()));
 
-                return t.getPadding().getImports() == imports ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
+                if (originalImports.size() != imports.size()) {
+                    return new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                } else {
+                    boolean hasChanges = false;
+                    for (int i = 0; i < originalImports.size(); i++) {
+                        if (originalImports.get(i) != imports.get(i)) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                    return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                }
             }
 
             public List<JRightPadded<Statement>> getStatements() {
