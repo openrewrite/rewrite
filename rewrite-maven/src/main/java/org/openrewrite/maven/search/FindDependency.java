@@ -53,7 +53,7 @@ public class FindDependency extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -64,13 +64,13 @@ public class FindDependency extends Recipe {
     }
 
     public static Set<Xml.Tag> find(Xml.Document maven, String groupId, String artifactId,
-            @Nullable String version, @Nullable String versionPattern) {
+                                    @Nullable String version, @Nullable String versionPattern) {
         Set<Xml.Tag> ds = new HashSet<>();
         new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependencyTag(groupId, artifactId)
-                        && versionIsValid(version, () -> findDependency(tag), versionPattern)) {
+                if (isDependencyTag(groupId, artifactId) &&
+                    versionIsValid(version, versionPattern, () -> findDependency(tag))) {
                     ds.add(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -86,11 +86,8 @@ public class FindDependency extends Recipe {
 
     @Override
     public String getInstanceNameSuffix() {
-        return String.format("`%s:%s%s`", groupId, artifactId, maybeVersion(version, versionPattern));
-    }
-
-    private String maybeVersion(@Nullable String version, @Nullable String versionPattern) {
-        return version == null ? "" : String.format(":%s%s", version, versionPattern == null ? "" : versionPattern);
+        String maybeVersionSuffix = version == null ? "" : String.format(":%s%s", version, versionPattern == null ? "" : versionPattern);
+        return String.format("`%s:%s%s`", groupId, artifactId, maybeVersionSuffix);
     }
 
     @Override
@@ -103,8 +100,8 @@ public class FindDependency extends Recipe {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependencyTag(groupId, artifactId)
-                        && versionIsValid(version, () -> findDependency(tag), versionPattern)) {
+                if (isDependencyTag(groupId, artifactId) &&
+                    versionIsValid(version, versionPattern, () -> findDependency(tag))) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -112,8 +109,8 @@ public class FindDependency extends Recipe {
         };
     }
 
-    private static boolean versionIsValid(@Nullable String desiredVersion,
-            Supplier<ResolvedDependency> resolvedDependencySupplier, @Nullable String versionPattern) {
+    private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern,
+                                          Supplier<ResolvedDependency> resolvedDependencySupplier) {
         if (desiredVersion == null) {
             return true;
         }

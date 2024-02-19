@@ -25,42 +25,41 @@ class FindManagedDependencyTest implements RewriteTest {
     void simple() {
         rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", null, null)),
           pomXml("""
-          <?xml version="1.0" encoding="UTF-8"?>
-          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-            <modelVersion>4.0.0</modelVersion>
-              <groupId>org.sample</groupId>
-              <artifactId>sample</artifactId>
-              <version>1.0.0</version>
-            
-            <dependencyManagement>
-              <dependencies>
-                <dependency>
-                  <groupId>jakarta.activation</groupId>
-                  <artifactId>jakarta.activation-api</artifactId>
-                  <version>2.1.2</version>
-                </dependency>
-              </dependencies>
-            </dependencyManagement>
-          </project>
-            """, """
-          <?xml version="1.0" encoding="UTF-8"?>
-          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-            <modelVersion>4.0.0</modelVersion>
-              <groupId>org.sample</groupId>
-              <artifactId>sample</artifactId>
-              <version>1.0.0</version>
-            
-            <dependencyManagement>
-              <dependencies>
-                <!--~~>--><dependency>
-                  <groupId>jakarta.activation</groupId>
-                  <artifactId>jakarta.activation-api</artifactId>
-                  <version>2.1.2</version>
-                </dependency>
-              </dependencies>
-            </dependencyManagement>
-          </project>
-            """)
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>jakarta.activation</groupId>
+                      <artifactId>jakarta.activation-api</artifactId>
+                      <version>2.1.2</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <!--~~>--><dependency>
+                      <groupId>jakarta.activation</groupId>
+                      <artifactId>jakarta.activation-api</artifactId>
+                      <version>2.1.2</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """)
         );
     }
 
@@ -68,41 +67,40 @@ class FindManagedDependencyTest implements RewriteTest {
     void version() {
         rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "2.1.2", null)),
           pomXml("""
-          <?xml version="1.0" encoding="UTF-8"?>
-          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-            <modelVersion>4.0.0</modelVersion>
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
               <groupId>org.sample</groupId>
               <artifactId>sample</artifactId>
               <version>1.0.0</version>
-            
-            <dependencyManagement>
-              <dependencies>
-                <dependency>
-                  <groupId>jakarta.activation</groupId>
-                  <artifactId>jakarta.activation-api</artifactId>
-                  <version>2.1.2</version>
-                </dependency>
-              </dependencies>
-            </dependencyManagement>
-          </project>
-            """, """
-          <?xml version="1.0" encoding="UTF-8"?>
-          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-            <modelVersion>4.0.0</modelVersion>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+            """,
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
               <groupId>org.sample</groupId>
               <artifactId>sample</artifactId>
               <version>1.0.0</version>
-            
-            <dependencyManagement>
-              <dependencies>
-                <!--~~>--><dependency>
-                  <groupId>jakarta.activation</groupId>
-                  <artifactId>jakarta.activation-api</artifactId>
-                  <version>2.1.2</version>
-                </dependency>
-              </dependencies>
-            </dependencyManagement>
-          </project>
+              <dependencyManagement>
+                <dependencies>
+                  <!--~~>--><dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
             """)
         );
     }
@@ -111,42 +109,42 @@ class FindManagedDependencyTest implements RewriteTest {
     void versionRange() {
         rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "^2", null)),
           pomXml("""
-          <?xml version="1.0" encoding="UTF-8"?>
-          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-            <modelVersion>4.0.0</modelVersion>
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
               <groupId>org.sample</groupId>
               <artifactId>sample</artifactId>
               <version>1.0.0</version>
-            
-            <dependencyManagement>
-              <dependencies>
-                <dependency>
-                  <groupId>jakarta.activation</groupId>
-                  <artifactId>jakarta.activation-api</artifactId>
-                  <version>2.1.2</version>
-                </dependency>
-              </dependencies>
-            </dependencyManagement>
-          </project>
-            """, """
-          <?xml version="1.0" encoding="UTF-8"?>
-          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-            <modelVersion>4.0.0</modelVersion>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+            """,
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
               <groupId>org.sample</groupId>
               <artifactId>sample</artifactId>
               <version>1.0.0</version>
-            
-            <dependencyManagement>
-              <dependencies>
-                <!--~~>--><dependency>
-                  <groupId>jakarta.activation</groupId>
-                  <artifactId>jakarta.activation-api</artifactId>
-                  <version>2.1.2</version>
-                </dependency>
-              </dependencies>
-            </dependencyManagement>
-          </project>
-            """)
+              <dependencyManagement>
+                <dependencies>
+                  <!--~~>--><dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+            """
+          )
         );
     }
 
@@ -154,24 +152,24 @@ class FindManagedDependencyTest implements RewriteTest {
     void wrongVersion() {
         rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "1.0.0", null)),
           pomXml("""
-          <?xml version="1.0" encoding="UTF-8"?>
-          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-            <modelVersion>4.0.0</modelVersion>
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
               <groupId>org.sample</groupId>
               <artifactId>sample</artifactId>
               <version>1.0.0</version>
-            
-            <dependencyManagement>
-              <dependencies>
-                <dependency>
-                  <groupId>jakarta.activation</groupId>
-                  <artifactId>jakarta.activation-api</artifactId>
-                  <version>2.1.2</version>
-                </dependency>
-              </dependencies>
-            </dependencyManagement>
-          </project>
-            """)
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+            """
+          )
         );
     }
 
@@ -179,24 +177,24 @@ class FindManagedDependencyTest implements RewriteTest {
     void wrongVersionRange() {
         rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "^1", null)),
           pomXml("""
-          <?xml version="1.0" encoding="UTF-8"?>
-          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-            <modelVersion>4.0.0</modelVersion>
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
               <groupId>org.sample</groupId>
               <artifactId>sample</artifactId>
               <version>1.0.0</version>
-            
-            <dependencyManagement>
-              <dependencies>
-                <dependency>
-                  <groupId>jakarta.activation</groupId>
-                  <artifactId>jakarta.activation-api</artifactId>
-                  <version>2.1.2</version>
-                </dependency>
-              </dependencies>
-            </dependencyManagement>
-          </project>
-            """)
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+            """
+          )
         );
     }
 }

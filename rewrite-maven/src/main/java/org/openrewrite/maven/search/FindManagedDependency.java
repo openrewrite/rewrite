@@ -17,12 +17,7 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
@@ -56,7 +51,7 @@ public class FindManagedDependency extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -67,13 +62,13 @@ public class FindManagedDependency extends Recipe {
     }
 
     public static Set<Xml.Tag> find(Xml.Document maven, String groupId, String artifactId,
-            @Nullable String version, @Nullable String versionPattern) {
+                                    @Nullable String version, @Nullable String versionPattern) {
         Set<Xml.Tag> ds = new HashSet<>();
         new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isManagedDependencyTag(groupId, artifactId)
-                        && versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
+                if (isManagedDependencyTag(groupId, artifactId) &&
+                    versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
                     ds.add(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -89,11 +84,8 @@ public class FindManagedDependency extends Recipe {
 
     @Override
     public String getInstanceNameSuffix() {
-        return String.format("`%s:%s%s`", groupId, artifactId, maybeVersion(version, versionPattern));
-    }
-
-    private String maybeVersion(@Nullable String version, @Nullable String versionPattern) {
-        return version == null ? "" : String.format(":%s%s", version, versionPattern == null ? "" : versionPattern);
+        String maybeVersionSuffix = version == null ? "" : String.format(":%s%s", version, versionPattern == null ? "" : versionPattern);
+        return String.format("`%s:%s%s`", groupId, artifactId, maybeVersionSuffix);
     }
 
     @Override
@@ -106,8 +98,8 @@ public class FindManagedDependency extends Recipe {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isManagedDependencyTag(groupId, artifactId)
-                        && versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
+                if (isManagedDependencyTag(groupId, artifactId) &&
+                    versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -116,7 +108,7 @@ public class FindManagedDependency extends Recipe {
     }
 
     private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String actualVersion,
-            @Nullable String versionPattern) {
+                                          @Nullable String versionPattern) {
         if (desiredVersion == null) {
             return true;
         }
@@ -128,7 +120,7 @@ public class FindManagedDependency extends Recipe {
         if (validate.isInvalid()) {
             return false;
         }
-        assert(validate.getValue() != null);
+        assert validate.getValue() != null;
         return validate.getValue().isValid(actualVersion, actualVersion);
     }
 }
