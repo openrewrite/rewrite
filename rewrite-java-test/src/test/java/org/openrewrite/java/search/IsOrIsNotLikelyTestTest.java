@@ -18,16 +18,21 @@ package org.openrewrite.java.search;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.sourceSet;
-import static org.openrewrite.java.Assertions.srcMainJava;
-import static org.openrewrite.java.Assertions.srcTestJava;
+import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.dir;
+import static org.openrewrite.test.SourceSpecs.text;
 
 public class IsOrIsNotLikelyTestTest {
 
@@ -160,6 +165,22 @@ public class IsOrIsNotLikelyTestTest {
             rewriteRun(
               srcMainJava(assertMainIsFound()),
               srcTestJava(assertTestNoChanges())
+            );
+        }
+
+        @Test
+        void preconditionForOtherSourceType() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> Preconditions.check(
+                Preconditions.or(new IsLikelyTest().getVisitor()),
+                new TreeVisitor<>() {
+                    @Nullable
+                    @Override
+                    public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        return tree != null ? SearchResult.found(tree, "recipe") : null;
+                    }
+                }))),
+              text("foo")
             );
         }
 
