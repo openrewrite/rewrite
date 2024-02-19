@@ -129,23 +129,28 @@ public class ChangeDependencyGroupIdAndArtifactId extends AbstractChangeDependen
                             boolean configuredToOverrideManageVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
                             boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency; // True by default
 
-                            boolean versionTagPresent = versionTag.isPresent();
                             boolean oldDependencyManaged = isDependencyManaged(scope, oldGroupId, oldArtifactId);
                             boolean newDependencyManaged = isDependencyManaged(scope, groupId, artifactId);
-                            if (versionTagPresent) {
+                            Xml.Tag finalT = t;
+                            Xml.Tag newT = versionTag.map(versionTagValue -> {
                                 // If the previous dependency had a version but the new artifact is managed, removed the version tag.
                                 if (!configuredToOverrideManageVersion && newDependencyManaged || (oldDependencyManaged && configuredToChangeManagedDependency)) {
-                                    t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false).visit(t, ctx);
+                                    return  (Xml.Tag) new RemoveContentVisitor<>(versionTagValue, false).visit(finalT, ctx);
                                 } else {
                                     // Otherwise, change the version to the new value.
-                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                    return changeChildTagValue(finalT, "version", resolvedNewVersion, ctx);
                                 }
-                            } else if (configuredToOverrideManageVersion || !newDependencyManaged) {
-                                //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
-                                Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
-                                //noinspection ConstantConditions
-                                t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
-                            }
+                            }).orElseGet(() -> {
+                                if (configuredToOverrideManageVersion || !newDependencyManaged) {
+                                    //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
+                                    Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
+                                    //noinspection ConstantConditions
+                                    return  (Xml.Tag) new AddToTagVisitor<ExecutionContext>(finalT, newVersionTag,
+                                            new MavenTagInsertionComparator(finalT.getChildren())).visitNonNull(finalT, ctx, getCursor().getParent());
+                                }
+                                return null;
+                            });
+                            t= newT == null ? t : newT;
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
                         }

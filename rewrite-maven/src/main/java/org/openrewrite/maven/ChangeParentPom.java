@@ -160,8 +160,7 @@ public class ChangeParentPom extends AbstractChangeGroupIdArtifactIdAndVersion {
                         String targetArtifactId = newArtifactId == null ? currentArtifactId : newArtifactId;
                         String targetRelativePath = newRelativePath == null ? tag.getChildValue("relativePath").orElse(oldRelativePath) : newRelativePath;
                         try {
-                            Optional<String> targetVersion = findAcceptableVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
-                            if (targetVersion.isPresent()) {
+							findAcceptableVersion(targetGroupId, targetArtifactId, oldVersion, ctx).ifPresent(targetVersion -> {
                                 List<XmlVisitor<ExecutionContext>> changeParentTagVisitors = new ArrayList<>();
                                 if (!currentGroupId.equals(targetGroupId)) {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId));
@@ -171,8 +170,8 @@ public class ChangeParentPom extends AbstractChangeGroupIdArtifactIdAndVersion {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), targetArtifactId));
                                 }
 
-                                if (!oldVersion.equals(targetVersion.get())) {
-                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()));
+                                if (!oldVersion.equals(targetVersion)) {
+                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion));
                                 }
 
                                 // Update or add relativePath
@@ -198,7 +197,7 @@ public class ChangeParentPom extends AbstractChangeGroupIdArtifactIdAndVersion {
                                     maybeUpdateModel();
                                     doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null).getVisitor());
                                 }
-                            }
+                            });
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
                         }

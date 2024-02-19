@@ -24,6 +24,7 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -56,31 +57,34 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends AbstractChangeD
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
 
                 if (isManagedDependencyTag(oldGroupId, oldArtifactId)) {
-                    Optional<Xml.Tag> groupIdTag = t.getChild("groupId");
-                    boolean changed = false;
-                    if (groupIdTag.isPresent() && !newGroupId.equals(groupIdTag.get().getValue().orElse(null))) {
-                        doAfterVisit(new ChangeTagValueVisitor<>(groupIdTag.get(), newGroupId));
-                        changed = true;
-                    }
-                    Optional<Xml.Tag> artifactIdTag = t.getChild("artifactId");
-                    if (artifactIdTag.isPresent() && !newArtifactId.equals(artifactIdTag.get().getValue().orElse(null))) {
-                        doAfterVisit(new ChangeTagValueVisitor<>(artifactIdTag.get(), newArtifactId));
-                        changed = true;
-                    }
+					AtomicBoolean changed = new AtomicBoolean(false);
+                    t.getChild("groupId").ifPresent(groupId -> {
+                        if (!newGroupId.equals(groupId.getValue().orElse(null))) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(groupId, newGroupId));
+                            changed.set(true);
+                        }
+                    });
+					t.getChild("artifactId").ifPresent(artifactId -> {
+                        if (!newArtifactId.equals(artifactId.getValue().orElse(null))) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(artifactId, newArtifactId));
+                            changed.set(true);
+                        }
+                    });
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
                             if (versionTag.isPresent()) {
-                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, newArtifactId, versionTag.get().getValue().orElse(null));
-                                t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
+                                Xml.Tag versionTagValue = versionTag.get();
+                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, newArtifactId, versionTagValue.getValue().orElse(null));
+                                t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTagValue, resolvedNewVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                             }
-                            changed = true;
+                            changed.set(true);
                         } catch(MavenDownloadingException e) {
                             return e.warn(t);
                         }
                     }
-                    if (changed) {
+                    if (changed.get()) {
                         maybeUpdateModel();
                         doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
                     }

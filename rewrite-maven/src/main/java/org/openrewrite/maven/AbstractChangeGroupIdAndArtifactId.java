@@ -15,8 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import java.util.Optional;
-
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -58,12 +56,13 @@ abstract class AbstractChangeGroupIdAndArtifactId extends Recipe {
     }
 
     protected abstract static class AbstractChangeGroupIdAndArtifactIdVisitor extends MavenVisitor<ExecutionContext> {
-        protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
-            Optional<Xml.Tag> childTag = tag.getChild(childTagName);
-            if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
-                tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
-            }
-            return tag;
+        protected Xml.Tag changeChildTagValue(final Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
+            return tag.getChild(childTagName).map(childTagValue -> {
+                if (!newValue.equals(childTagValue.getValue().orElse(null))) {
+                    return  (Xml.Tag) new ChangeTagValueVisitor<>(childTagValue, newValue).visitNonNull(tag, ctx);
+                }
+                return tag;
+            }).orElse(tag);
         }
     }
 }
