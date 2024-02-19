@@ -68,15 +68,15 @@ abstract class AbstractChangeDependencyGroupIdAndArtifactId extends AbstractChan
         private Collection<String> availableVersions;
 
         @SuppressWarnings("ConstantConditions")
-        protected String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId) throws MavenDownloadingException {
+        protected String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
             if (versionComparator == null) {
                 return newVersion;
             }
-            if (availableVersions == null) {
+			if (availableVersions == null) {
 				availableVersions = MavenMetadataWrapper.builder()
                         .mavenMetadata(metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx)))
                         .versionComparator(versionComparator)
-                        .version(newVersion)
+                        .version(currentVersion != null ? currentVersion : newVersion)
                         .build().filter();
             }
             return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);

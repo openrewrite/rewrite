@@ -87,25 +87,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends AbstractChangeD
                 }
                 return t;
             }
-
-            @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
-                if (versionComparator == null) {
-                    return newVersion;
-                }
-                String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
-                if (availableVersions == null) {
-                    availableVersions = new ArrayList<>();
-                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(finalCurrentVersion, v)) {
-                            availableVersions.add(v);
-                        }
-                    }
-
-                }
-                return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
-            }
         };
     }
 }

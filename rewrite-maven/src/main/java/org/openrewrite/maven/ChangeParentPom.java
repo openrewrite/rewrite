@@ -234,7 +234,7 @@ public class ChangeParentPom extends AbstractChangeGroupIdArtifactIdAndVersion {
                             .mavenMetadata(metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx)))
                             .versionComparator(versionComparator)
                             .version(finalCurrentVersion)
-                            .extraFilter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(finalCurrentVersion, finalCurrentVersion, v) < 0)
+                            .extraFilter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(finalCurrentVersion, finalCurrentVersion, v) <= 0)
                             .build().filter();
                 }
                 if (Boolean.TRUE.equals(allowVersionDowngrades)) {
@@ -242,10 +242,7 @@ public class ChangeParentPom extends AbstractChangeGroupIdArtifactIdAndVersion {
                             .max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2));
                 }
                 Optional<String> upgradedVersion = versionComparator.upgrade(finalCurrentVersion, availableVersions);
-                if (upgradedVersion.isPresent()) {
-                    return upgradedVersion;
-                }
-                return availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
+                return upgradedVersion.isPresent() ? upgradedVersion : availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
             }
         });
     }
