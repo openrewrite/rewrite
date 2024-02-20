@@ -239,7 +239,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
     @Value
     @With
-    private static class ToBeRemoved implements Marker {
+    static class ToBeRemoved implements Marker {
         UUID id;
         static <J2 extends J> J2 withMarker(J2 j) {
             return j.withMarkers(j.getMarkers().addIfAbsent(new ToBeRemoved(randomId())));
