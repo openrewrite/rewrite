@@ -16,37 +16,18 @@
 package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.marker.GradleSettings;
-import org.openrewrite.gradle.toolingapi.OpenRewriteModel;
-import org.openrewrite.gradle.toolingapi.OpenRewriteModelBuilder;
-import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.OperatingSystemProvenance;
-import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.UncheckedConsumer;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Consumer;
-
-import static java.util.Objects.requireNonNull;
 
 public class Assertions {
 
@@ -56,90 +37,43 @@ public class Assertions {
     private static final Parser.Builder gradleParser = GradleParser.builder()
             .groovyParser(GroovyParser.builder().logCompilationWarningsAndErrors(true));
 
+    /**
+     * @param version      The Gradle version to use.
+     * @param distribution The Gradle distribution to use.
+     * @return An exception now that the method has moved.
+     * @deprecated This method has moved to org.openrewrite.gradle.toolingapi.Assertions. This
+     * has allowed us to remove the compile time dependency on the tooling model and thus save a lot
+     * of space in the distribution of rewrite-gradle recipes.
+     */
+    @Deprecated
     public static UncheckedConsumer<List<SourceFile>> withToolingApi(@Nullable String version, @Nullable String distribution) {
-        return sourceFiles -> {
-            try {
-                Path tempDirectory = Files.createTempDirectory("project");
-                // Usage of Assertions.mavenProject() might result in gradle files inside a subdirectory
-                Path projectDir = tempDirectory;
-                try {
-                    for (SourceFile sourceFile : sourceFiles) {
-                        if (sourceFile instanceof G.CompilationUnit) {
-                            G.CompilationUnit g = (G.CompilationUnit) sourceFile;
-                            if (g.getSourcePath().toString().endsWith(".gradle")) {
-                                Path groovyGradle = tempDirectory.resolve(g.getSourcePath());
-                                if (!tempDirectory.equals(groovyGradle.getParent()) && tempDirectory.equals(groovyGradle.getParent().getParent())) {
-                                    projectDir = groovyGradle.getParent();
-                                }
-                                Files.createDirectories(groovyGradle.getParent());
-                                Files.write(groovyGradle, g.printAllAsBytes());
-                            }
-                        } else if (sourceFile instanceof Properties.File) {
-                            Properties.File f = (Properties.File) sourceFile;
-                            if (f.getSourcePath().endsWith("gradle.properties")) {
-                                Path gradleProperties = tempDirectory.resolve(f.getSourcePath());
-                                if (!tempDirectory.equals(gradleProperties.getParent()) && tempDirectory.equals(gradleProperties.getParent().getParent())) {
-                                    projectDir = gradleProperties.getParent();
-                                }
-                                Files.createDirectories(gradleProperties.getParent());
-                                Files.write(gradleProperties, f.printAllAsBytes());
-                            }
-                        }
-                    }
-
-                    if (version != null) {
-                        GradleWrapper gradleWrapper = GradleWrapper.create(distribution, version, null, new InMemoryExecutionContext());
-                        Files.createDirectories(projectDir.resolve("gradle/wrapper/"));
-                        Files.write(projectDir.resolve(GradleWrapper.WRAPPER_PROPERTIES_LOCATION), ("distributionBase=GRADLE_USER_HOME\n" +
-                                "distributionPath=wrapper/dists\n" +
-                                "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
-                                "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n" +
-                                "zipStoreBase=GRADLE_USER_HOME\n" +
-                                "zipStorePath=wrapper/dists").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
-                        Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.wrapperJar().printAllAsBytes(), StandardOpenOption.CREATE_NEW);
-                        Path gradleSh = projectDir.resolve(GradleWrapper.WRAPPER_SCRIPT_LOCATION);
-                        Files.copy(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew")), gradleSh);
-                        OperatingSystemProvenance current = OperatingSystemProvenance.current();
-                        if (current.isLinux() || current.isMacOsX()) {
-                            Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(gradleSh);
-                            permissions.add(PosixFilePermission.OWNER_EXECUTE);
-                            Files.setPosixFilePermissions(gradleSh, permissions);
-                        }
-                        Files.copy(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat")), projectDir.resolve(GradleWrapper.WRAPPER_BATCH_LOCATION));
-                    }
-
-                    for (int i = 0; i < sourceFiles.size(); i++) {
-                        SourceFile sourceFile = sourceFiles.get(i);
-                        if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
-                            if (sourceFile.getSourcePath().endsWith("settings.gradle")) {
-                                OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(tempDirectory.resolve(sourceFile.getSourcePath()).getParent().toFile(), null);
-                                org.openrewrite.gradle.toolingapi.GradleSettings rawSettings = model.gradleSettings();
-                                if (rawSettings != null) {
-                                    GradleSettings gradleSettings = GradleSettings.fromToolingModel(rawSettings);
-                                    sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().add(gradleSettings)));
-                                }
-                            } else {
-                                OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), tempDirectory.resolve(sourceFile.getSourcePath()).toFile());
-                                GradleProject gradleProject = GradleProject.fromToolingModel(model.gradleProject());
-                                sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().add(gradleProject)));
-                            }
-                        }
-                    }
-                } finally {
-                    deleteDirectory(tempDirectory.toFile());
-                }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        };
+        throw new UnsupportedOperationException("This method has moved to org.openrewrite.gradle.toolingapi.Assertions. " +
+                                                "Add a dependency on org.openrewrite.gradle.tooling:model to continue using it.");
     }
 
+    /**
+     * @param version The Gradle version to use.
+     * @return An exception now that the method has moved.
+     * @deprecated This method has moved to org.openrewrite.gradle.toolingapi.Assertions. This
+     * has allowed us to remove the compile time dependency on the tooling model and thus save a lot
+     * of space in the distribution of rewrite-gradle recipes.
+     */
+    @Deprecated
     public static UncheckedConsumer<List<SourceFile>> withToolingApi(String version) {
-        return withToolingApi(version, "bin");
+        throw new UnsupportedOperationException("This method has moved to org.openrewrite.gradle.toolingapi.Assertions. " +
+                                                "Add a dependency on org.openrewrite.gradle.tooling:model to continue using it.");
     }
 
+    /**
+     * @return An exception now that the method has moved.
+     * @deprecated This method has moved to org.openrewrite.gradle.toolingapi.Assertions. This
+     * has allowed us to remove the compile time dependency on the tooling model and thus save a lot
+     * of space in the distribution of rewrite-gradle recipes.
+     */
+    @Deprecated
     public static UncheckedConsumer<List<SourceFile>> withToolingApi() {
-        return withToolingApi(null, null);
+        throw new UnsupportedOperationException("This method has moved to org.openrewrite.gradle.toolingapi.Assertions. " +
+                                                "Add a dependency on org.openrewrite.gradle.tooling:model to continue using it.");
     }
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before) {
@@ -190,16 +124,5 @@ public class Assertions {
         gradle.path("settings.gradle");
         spec.accept(gradle);
         return gradle;
-    }
-
-    private static void deleteDirectory(File directoryToBeDeleted) {
-        File[] allContents = directoryToBeDeleted.listFiles();
-        if (allContents != null) {
-            for (File file : allContents) {
-                deleteDirectory(file);
-            }
-        }
-        //noinspection ResultOfMethodCallIgnored
-        directoryToBeDeleted.delete();
     }
 }
