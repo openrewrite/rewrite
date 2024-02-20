@@ -20,7 +20,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
-import org.openrewrite.gradle.dependency.DependencyVersionSelector;
 import org.openrewrite.gradle.internal.InsertDependencyComparator;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -188,8 +187,8 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                         }),
                         newRequested));
                 if (newGdc.isCanBeResolved() && resolvedGav != null) {
-                    newGdc = newGdc.withResolved(ListUtils.concat(
-                            ListUtils.map(gdc.getResolved(), resolved -> {
+                    newGdc = newGdc.withDirectResolved(ListUtils.concat(
+                            ListUtils.map(gdc.getDirectResolved(), resolved -> {
                                 // Remove any existing dependency with the same group and artifact id
                                 if (Objects.equals(resolved.getGroupId(), resolvedGav.getGroupId()) && Objects.equals(resolved.getArtifactId(), resolvedGav.getArtifactId())) {
                                     return null;

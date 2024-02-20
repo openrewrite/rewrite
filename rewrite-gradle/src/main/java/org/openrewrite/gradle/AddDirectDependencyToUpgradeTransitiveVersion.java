@@ -18,17 +18,34 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpgradeTransitiveDependencyVersion extends Recipe {
+public class AddDirectDependencyToUpgradeTransitiveVersion extends Recipe {
+
+    @EqualsAndHashCode.Exclude
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -59,11 +76,6 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     @Nullable
     String versionPattern;
 
-    @Option(displayName = "Strategy",
-            description = "The technique used to upgrade the dependency.",
-            valid = {"direct", "resolutionStrategy"})
-    String strategy;
-
     @Override
     public String getDisplayName() {
         return "Upgrade transitive Gradle dependencies";
@@ -88,6 +100,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new GroovyVisitor<ExecutionContext>() {
             GradleProject gradleProject;
 
@@ -96,8 +109,36 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 gradleProject = cu.getMarkers().findFirst(GradleProject.class)
                         .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
 
-                if (strategy.equals("direct")) {
+                Map<GroupArtifact, List<GradleDependencyConfiguration>> toUpdate = new HashMap<>();
 
+                DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject);
+                for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
+                    for (ResolvedDependency resolvedDependency : configuration.getResolved()) {
+                        if (resolvedDependency.getDepth() > 0 &&
+                            dependencyMatcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion())) {
+
+                            try {
+                                String selected = versionSelector.select(resolvedDependency.getGav(), configuration.getName(),
+                                        version, versionPattern, ctx);
+                                if (!resolvedDependency.getVersion().equals(selected)) {
+                                    toUpdate.merge(new GroupArtifact(groupId, artifactId), singletonList(configuration), (existing, update) -> {
+                                        List<GradleDependencyConfiguration> all = ListUtils.concatAll(existing, update);
+                                        all.removeIf(c -> {
+                                            for (GradleDependencyConfiguration config : all) {
+                                                if (c.allExtendsFrom().contains(config)) {
+                                                    return true;
+                                                }
+                                            }
+                                            return false;
+                                        });
+                                        return all;
+                                    });
+                                }
+                            } catch (MavenDownloadingException e) {
+                                return Markup.warn(cu, e);
+                            }
+                        }
+                    }
                 }
 
                 return super.visitCompilationUnit(cu, ctx);

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.dependency;
+package org.openrewrite.gradle;
 
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -72,6 +72,28 @@ public class DependencyVersionSelector {
                 versionPattern,
                 ctx
         );
+    }
+
+    /**
+     * Used to upgrade a version for a dependency that already has a version.
+     *
+     * @param gav            The group, artifact, and version of the existing dependency.
+     * @param configuration  The configuration to select the version for. The configuration influences
+     *                       which set of Maven repositories (either plugin repositories or regular repositories)
+     *                       are used to resolve Maven metadata from.     * @param version        The version to select, in node-semver format.
+     * @param versionPattern The version pattern to select, if any.
+     * @param ctx            The execution context, which can influence dependency resolution.
+     * @return The selected version, if any.
+     * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
+     */
+    @Nullable
+    public String select(ResolvedGroupArtifactVersion gav,
+                         String configuration,
+                         @Nullable String version,
+                         @Nullable String versionPattern,
+                         ExecutionContext ctx) throws MavenDownloadingException {
+        return select(new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()),
+                configuration, version, versionPattern, ctx);
     }
 
     /**

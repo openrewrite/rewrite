@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.gradle.dependency.DependencyVersionSelector;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
@@ -377,7 +376,7 @@ public class ChangeDependency extends Recipe {
                         }
                         return requested;
                     }));
-                    newGdc = newGdc.withResolved(ListUtils.map(gdc.getResolved(), resolved -> {
+                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
                         if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                             ResolvedGroupArtifactVersion gav = resolved.getGav();
                             if (newGroupId != null) {
