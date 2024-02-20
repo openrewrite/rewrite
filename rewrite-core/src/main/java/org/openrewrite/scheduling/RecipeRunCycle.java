@@ -97,6 +97,12 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                             });
                         } catch (Throwable t) {
                             after = handleError(recipe, source, after, t);
+                            // while the scanner itself is not allowed to make any changes to the source, any
+                            // exception should still be recorded as a marker (so that it can be surfaced to the user)
+                            // and requires a corresponding `RecipesThatMadeChanges` marker
+                            if (after != null && after != source) {
+                                after = addRecipesThatMadeChanges(recipeStack, after);
+                            }
                         }
                     }
                     return after;
