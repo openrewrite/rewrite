@@ -145,6 +145,14 @@ public interface Parser {
     }
 
     /**
+     * The class of the parser to be used to identify files inclusions/exclusions. This is used to disambiguate
+     * when multiple parser implementations parse the same type of source file, such as the Java parser.
+     */
+    default Class<? extends Parser> getParserClass() {
+        return getClass();
+    }
+
+    /**
      * A source input. {@link Input#path} may be a synthetic path and not
      * represent a resolvable path on disk, as is the case when parsing sources
      * from BigQuery (we have a relative path from the original GitHub repository

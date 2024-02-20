@@ -15,7 +15,6 @@
  */
 package org.openrewrite.tree;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
@@ -96,16 +95,15 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
     }
 
     public <T extends Parser> boolean accepts(T parser, Path path) {
-        for (String pattern : getExcludePattern(parser.getClass())) {
+        for (String pattern : getExcludePattern(parser.getParserClass())) {
             if (PathUtils.matchesGlob(path, pattern)) {
                 return false;
             }
         }
 
-        return parser.accept(path) || getIncludePattern(parser.getClass()).stream().anyMatch(pattern -> PathUtils.matchesGlob(path, pattern));
+        return parser.accept(path) || getIncludePattern(parser.getParserClass()).stream().anyMatch(pattern -> PathUtils.matchesGlob(path, pattern));
     }
 
-    @NotNull
     private Set<String> getPatternsFromSystemProperty(String key) {
         Set<String> included = getMessage(key, Collections.emptySet());
         if (included == Collections.EMPTY_SET) {

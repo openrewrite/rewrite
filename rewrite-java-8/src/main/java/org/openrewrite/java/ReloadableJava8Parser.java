@@ -150,7 +150,7 @@ class ReloadableJava8Parser implements JavaParser {
             }
         }
 
-        @SuppressWarnings("ConstantConditions") LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles)
+        @SuppressWarnings("ConstantConditions") LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles, ctx)
                 .collect(Collectors.toMap(
                         Function.identity(),
                         input -> {

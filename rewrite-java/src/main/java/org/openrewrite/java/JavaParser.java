@@ -315,6 +315,11 @@ public interface JavaParser extends Parser {
      */
     void setClasspath(Collection<Path> classpath);
 
+    @Override
+    default Class<? extends Parser> getParserClass() {
+        return JavaParser.class;
+    }
+
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {
         protected Collection<Path> classpath = Collections.emptyList();
