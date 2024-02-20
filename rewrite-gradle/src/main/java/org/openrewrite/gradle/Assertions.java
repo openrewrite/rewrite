@@ -47,6 +47,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 public class Assertions {
 
