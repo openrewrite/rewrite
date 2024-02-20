@@ -31,7 +31,7 @@ import java.util.List;
 import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class DeleteProperty extends Recipe {
 
     @Override

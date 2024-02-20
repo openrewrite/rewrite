@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeNamespaceValue extends Recipe {
     private static final String XMLNS_PREFIX = "xmlns";
     private static final String VERSION_PREFIX = "version";

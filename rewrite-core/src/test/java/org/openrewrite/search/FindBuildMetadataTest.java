@@ -24,7 +24,7 @@ import java.util.Map;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class FindBuildMetadataTest implements RewriteTest {
+class FindBuildMetadataTest implements RewriteTest {
 
     @Test
     void findBuildMetadata() {

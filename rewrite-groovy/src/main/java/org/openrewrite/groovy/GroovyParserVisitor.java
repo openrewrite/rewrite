@@ -599,14 +599,22 @@ public class GroovyParserVisitor {
         }
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
-            AtomicInteger insideParenthesesLevel = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
+            Integer insideParenthesesLevel;
+            Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
+            if(rawIpl instanceof AtomicInteger) {
+                // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
+                insideParenthesesLevel = ((AtomicInteger) rawIpl).get();
+            } else {
+                // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
+                insideParenthesesLevel = (Integer) rawIpl;
+            }
             if (insideParenthesesLevel != null) {
                 Stack<Space> openingParens = new Stack<>();
-                for (int i = 0; i < insideParenthesesLevel.get(); i++) {
+                for (int i = 0; i < insideParenthesesLevel; i++) {
                     openingParens.push(sourceBefore("("));
                 }
                 Expression parenthesized = parenthesizedTree.apply(whitespace());
-                for (int i = 0; i < insideParenthesesLevel.get(); i++) {
+                for (int i = 0; i < insideParenthesesLevel; i++) {
                     parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
                             padRight(parenthesized, sourceBefore(")")));
                 }
@@ -651,7 +659,9 @@ public class GroovyParserVisitor {
                 cursor = saveCursor;
             }
 
-            List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = expression.getExpressions();
+            List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = expression.getExpressions().stream()
+                    .filter(GroovyParserVisitor::appearsInSource)
+                    .collect(Collectors.toList());
             // If the first parameter to a function is a Map, then groovy allows "named parameters" style invocations, see:
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
@@ -687,43 +697,33 @@ public class GroovyParserVisitor {
                 }
             }
 
-            for (int i = 0; i < unparsedArgs.size(); i++) {
-                org.codehaus.groovy.ast.expr.Expression rawArg = unparsedArgs.get(i);
-                Expression arg;
-                if (appearsInSource(rawArg)) {
-                    arg = visit(rawArg);
-                } else {
-                    arg = new J.Empty(randomId(), whitespace(), Markers.EMPTY);
-                }
-                if (omitParentheses != null) {
-                    arg = arg.withMarkers(arg.getMarkers().add(omitParentheses));
-                }
-
-                Space after = EMPTY;
-                if (i == unparsedArgs.size() - 1) {
-                    if (omitParentheses == null) {
-                        after = sourceBefore(")");
+            if(unparsedArgs.isEmpty()) {
+                args.add(JRightPadded.build((Expression)new J.Empty(randomId(), whitespace(), Markers.EMPTY))
+                        .withAfter(omitParentheses == null ? sourceBefore(")") : EMPTY));
+            } else {
+                for (int i = 0; i < unparsedArgs.size(); i++) {
+                    org.codehaus.groovy.ast.expr.Expression rawArg = unparsedArgs.get(i);
+                    Expression arg = visit(rawArg);
+                    if (omitParentheses != null) {
+                        arg = arg.withMarkers(arg.getMarkers().add(omitParentheses));
                     }
-                } else {
-                    after = whitespace();
-                    if (source.charAt(cursor) == ')') {
-                        // the next argument will have an OmitParentheses marker
-                        omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
+
+                    Space after = EMPTY;
+                    if (i == unparsedArgs.size() - 1) {
+                        if (omitParentheses == null) {
+                            after = sourceBefore(")");
+                        }
+                    } else {
+                        after = whitespace();
+                        if (source.charAt(cursor) == ')') {
+                            // the next argument will have an OmitParentheses marker
+                            omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
+                        }
+                        cursor++;
                     }
-                    cursor++;
+
+                    args.add(JRightPadded.build(arg).withAfter(after));
                 }
-
-                args.add(JRightPadded.build(arg).withAfter(after));
-            }
-
-            if (unparsedArgs.isEmpty()) {
-                Expression element = new J.Empty(randomId(),
-                        omitParentheses == null ? sourceBefore(")") : EMPTY, Markers.EMPTY);
-                if (omitParentheses != null) {
-                    element = element.withMarkers(element.getMarkers().add(omitParentheses));
-                }
-
-                args.add(JRightPadded.build(element));
             }
 
             queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));

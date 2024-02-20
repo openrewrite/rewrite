@@ -17,11 +17,11 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.groovy.GroovyParserTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-class MethodInvocationTest implements GroovyParserTest {
+class MethodInvocationTest implements RewriteTest {
     @Test
     void gradle() {
         rewriteRun(

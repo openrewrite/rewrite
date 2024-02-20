@@ -21,7 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeKey extends Recipe {
     @Option(displayName = "Old key path",
             description = "A JsonPath expression to locate a JSON entry.",

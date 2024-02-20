@@ -16,12 +16,12 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.groovy.GroovyParserTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"GroovyIfStatementWithIdenticalBranches", "GroovyConstantIfStatement", "GrUnnecessarySemicolon", "GroovyUnusedIncOrDec", "GroovyEmptyStatementBody"})
-class IfTest implements GroovyParserTest {
+class IfTest implements RewriteTest {
 
     @Test
     void ifElse() {

@@ -16,12 +16,12 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.groovy.GroovyParserTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"GroovyEmptyStatementBody", "GroovyInfiniteLoopStatement"})
-class WhileLoopTest implements GroovyParserTest {
+class WhileLoopTest implements RewriteTest {
 
     @Test
     void whileLoop() {

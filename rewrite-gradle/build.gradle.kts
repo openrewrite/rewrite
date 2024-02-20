@@ -35,7 +35,6 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     compileOnly(project(":rewrite-test"))
     implementation(project(":rewrite-properties"))
-    implementation("org.openrewrite.gradle.tooling:model:$rewriteVersion")
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())
@@ -59,6 +58,9 @@ dependencies {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
     }
+
+    testImplementation("org.openrewrite.gradle.tooling:model:latest.release")
+
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
 
     testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")

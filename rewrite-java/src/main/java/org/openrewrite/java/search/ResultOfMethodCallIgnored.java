@@ -28,7 +28,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ResultOfMethodCallIgnored extends Recipe {
     /**
      * A method pattern that is used to find matching method invocations.

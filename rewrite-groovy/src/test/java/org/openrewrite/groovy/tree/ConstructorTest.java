@@ -15,12 +15,14 @@
  */
 package org.openrewrite.groovy.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.groovy.GroovyParserTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class ConstructorTest implements GroovyParserTest {
+@SuppressWarnings("GroovyResultOfObjectAllocationIgnored")
+class ConstructorTest implements RewriteTest {
 
     @Test
     void inParens() {
@@ -28,6 +30,52 @@ public class ConstructorTest implements GroovyParserTest {
           groovy(
             """
               ( new String("foo") )
+              """
+          )
+        );
+    }
+
+    @Test
+    void anonymousClassDeclarationClosedOverVariable() {
+        rewriteRun(
+          groovy(
+            """
+              int i = 1
+              new Object() {
+                  int one() {
+                      return i
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Disabled("Fails to parse")
+    void implicitPublic() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  T(int a, int b, int c) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Disabled("Fails to parse")
+    void defaultConstructorArguments() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  T(int a = 1) {
+                  }
+              }
               """
           )
         );

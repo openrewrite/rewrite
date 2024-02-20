@@ -246,10 +246,10 @@ class AddPropertyTest implements RewriteTest {
               # sam
               com.sam=true
               com.zoe=true
-              """
-          )
+              """)
         );
     }
+
     @Test
     void orderedInsertionMiddle() {
         rewriteRun(
@@ -261,18 +261,30 @@ class AddPropertyTest implements RewriteTest {
           )),
           properties(
             """
+              # amy
               com.amy=true
+              # bea
+              com.bea=true
+              # seb
+              com.seb=true
+              # zoe
               com.zoe=true
               """,
             """
+              # amy
               com.amy=true
+              # bea
+              com.bea=true
               # sam
               com.sam=true
+              # seb
+              com.seb=true
+              # zoe
               com.zoe=true
-              """
-          )
+              """)
         );
     }
+
     @Test
     void orderedInsertionEnd() {
         rewriteRun(
@@ -290,8 +302,7 @@ class AddPropertyTest implements RewriteTest {
               com.amy=true
               # sam
               com.sam=true
-              """
-          )
+              """)
         );
     }
 }

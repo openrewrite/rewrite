@@ -24,7 +24,7 @@ import static org.openrewrite.xml.Assertions.xml;
 class CountLinesTest implements RewriteTest {
 
     @Test
-    void testLineCount() {
+    void lineCount() {
         rewriteRun(
           xml(
             """

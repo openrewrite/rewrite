@@ -426,7 +426,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     }
 
     @Test
-    void testAnyIsGenericWithUnknownType() {
+    void anyIsGenericWithUnknownType() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override

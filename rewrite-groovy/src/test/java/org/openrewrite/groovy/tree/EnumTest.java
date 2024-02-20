@@ -17,11 +17,11 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.groovy.GroovyParserTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-class EnumTest implements GroovyParserTest {
+class EnumTest implements RewriteTest {
 
     @Disabled
     @Test

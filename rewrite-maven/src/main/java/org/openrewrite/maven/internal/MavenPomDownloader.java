@@ -218,6 +218,10 @@ public class MavenPomDownloader {
             throw new MavenDownloadingException("Missing group id.", null, gav);
         }
 
+        if (containingPom != null) {
+            gav = containingPom.getValues(gav);
+        }
+
         ctx.getResolutionListener().downloadMetadata(gav);
 
         Timer.Sample sample = Timer.start();
@@ -737,7 +741,7 @@ public class MavenPomDownloader {
                     if (t instanceof HttpSenderResponseException) {
                         HttpSenderResponseException e = (HttpSenderResponseException) t;
                         // response was returned from the server, but it was not a 200 OK. The server therefore exists.
-                        if (e.getResponseCode() != null) {
+                        if (e.isServerReached()) {
                             normalized = repository.withUri(httpsUri);
                         }
                         if (!"Directory listing forbidden".equals(e.getBody())) {
@@ -759,7 +763,7 @@ public class MavenPomDownloader {
                                         repository.getPassword());
                             } catch (HttpSenderResponseException e) {
                                 //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
-                                if (e.getResponseCode() != null) {
+                                if (e.isServerReached()) {
                                     normalized = new MavenRepository(
                                             repository.getId(),
                                             originalUrl,
@@ -892,6 +896,11 @@ public class MavenPomDownloader {
 
         public boolean isAccessDenied() {
             return responseCode != null && 400 < responseCode && responseCode <= 403;
+        }
+
+        // Any response code below 100 implies that no connection was made. Sometimes 0 or -1 is used for connection failures.
+        public boolean isServerReached() {
+            return responseCode != null && responseCode >= 100;
         }
     }
 

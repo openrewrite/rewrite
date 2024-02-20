@@ -25,7 +25,7 @@ import org.openrewrite.java.tree.J;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveAnnotationAttribute extends Recipe {
 
     @Option(displayName = "Annotation Type",

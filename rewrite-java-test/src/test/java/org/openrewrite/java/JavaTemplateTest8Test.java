@@ -25,7 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class JavaTemplateTest8Test implements RewriteTest {
+class JavaTemplateTest8Test implements RewriteTest {
 
     @Test
     void parameterizedMatch() {

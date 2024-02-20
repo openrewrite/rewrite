@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava11;
@@ -1800,6 +1801,24 @@ class JavadocTest implements RewriteTest {
               interface Test {
               	/**
               	 * {@return 42
+              	 */
+              	int foo();
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    void unicodeEscape() {
+        rewriteRun(
+          java(
+            """
+              interface Test {
+              	/**
+              	 * Return the {@code \\u0000} codepoint.
               	 */
               	int foo();
               }

@@ -205,4 +205,50 @@ class AddManagedDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @DocumentExample
+    @Test
+    void propertiesAsGAVCoordinates() {
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("${quarkus.platform.group-id}", "${quarkus.platform.artifact-id}",
+            "${quarkus.platform.version}", "import", "pom", null,null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>core</artifactId>
+                <version>1</version>
+                <properties>
+                  <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+                  <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+                  <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
+                </properties>
+              </project>
+            """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>core</artifactId>
+                <version>1</version>
+                <properties>
+                  <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+                  <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+                  <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>${quarkus.platform.group-id}</groupId>
+                      <artifactId>${quarkus.platform.artifact-id}</artifactId>
+                      <version>${quarkus.platform.version}</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+            """
+          )
+        );
+    }
 }

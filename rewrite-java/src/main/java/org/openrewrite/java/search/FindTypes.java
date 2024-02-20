@@ -33,7 +33,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindTypes extends Recipe {
 
     @Option(displayName = "Fully-qualified type name",

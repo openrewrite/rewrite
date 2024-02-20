@@ -16,13 +16,13 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.groovy.GroovyParserTest;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.java.tree.Space;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-class ImportTest implements GroovyParserTest {
+class ImportTest implements RewriteTest {
     @Test
     void classImport() {
         rewriteRun(
