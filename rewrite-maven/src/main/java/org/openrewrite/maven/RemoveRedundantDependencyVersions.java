@@ -65,12 +65,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove redundant explicit dependency versions";
+        return "Remove redundant explicit dependency and plugin versions";
     }
 
     @Override
     public String getDescription() {
-        return "Remove explicitly-specified dependency versions when a parent POM's dependencyManagement " +
+        return "Remove explicitly-specified dependency/plugin versions when a parent POM's `dependencyManagement`/`pluginManagement` " +
                "specifies the version.";
     }
 
