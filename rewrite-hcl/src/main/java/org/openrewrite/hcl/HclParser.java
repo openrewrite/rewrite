@@ -85,6 +85,11 @@ public class HclParser implements Parser {
     }
 
     @Override
+    public String getDslName() {
+        return "hcl";
+    }
+
+    @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file.tf");
     }

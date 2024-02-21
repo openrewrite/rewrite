@@ -83,6 +83,11 @@ public class XmlParser implements Parser {
     }
 
     @Override
+    public String getDslName() {
+        return "xml";
+    }
+
+    @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file.xml");
     }

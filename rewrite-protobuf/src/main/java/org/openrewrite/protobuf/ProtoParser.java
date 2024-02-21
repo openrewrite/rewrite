@@ -97,6 +97,11 @@ public class ProtoParser implements Parser {
     }
 
     @Override
+    public String getDslName() {
+        return "protobuf";
+    }
+
+    @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file.proto");
     }

@@ -426,6 +426,11 @@ public class YamlParser implements org.openrewrite.Parser {
     }
 
     @Override
+    public String getDslName() {
+        return "yaml";
+    }
+
+    @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file.yaml");
     }

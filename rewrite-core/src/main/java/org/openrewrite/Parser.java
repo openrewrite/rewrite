@@ -145,12 +145,11 @@ public interface Parser {
     }
 
     /**
-     * The class of the parser to be used to identify files inclusions/exclusions. This is used to disambiguate
-     * when multiple parser implementations parse the same type of source file, such as the Java parser.
+     * The name of the domain specific language this parser builder produces a parser for.
+     * Used to disambiguate when multiple different parsers are potentially applicable to a source.
+     * For example, determining that MavenParser should be used for a pom.xml instead of XmlParser.
      */
-    default Class<? extends Parser> getParserClass() {
-        return getClass();
-    }
+    String getDslName();
 
     /**
      * A source input. {@link Input#path} may be a synthetic path and not

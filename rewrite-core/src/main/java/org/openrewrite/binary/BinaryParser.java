@@ -59,6 +59,11 @@ public class BinaryParser implements Parser {
     }
 
     @Override
+    public String getDslName() {
+        return "binary";
+    }
+
+    @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file");
     }

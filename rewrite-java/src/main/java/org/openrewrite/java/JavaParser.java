@@ -316,8 +316,8 @@ public interface JavaParser extends Parser {
     void setClasspath(Collection<Path> classpath);
 
     @Override
-    default Class<? extends Parser> getParserClass() {
-        return JavaParser.class;
+    default String getDslName() {
+        return "java";
     }
 
     @SuppressWarnings("unchecked")

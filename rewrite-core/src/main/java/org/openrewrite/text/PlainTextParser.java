@@ -99,6 +99,11 @@ public class PlainTextParser implements Parser {
     }
 
     @Override
+    public String getDslName() {
+        return "plainText";
+    }
+
+    @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file.txt");
     }

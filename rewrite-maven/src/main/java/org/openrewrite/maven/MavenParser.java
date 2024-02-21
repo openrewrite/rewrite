@@ -171,6 +171,11 @@ public class MavenParser implements Parser {
         return "pom.xml".equals(path.toString()) || path.toString().endsWith(".pom");
     }
 
+    @Override
+    public String getDslName() {
+        return "maven";
+    }
+
     public static Builder builder() {
         return new Builder();
     }

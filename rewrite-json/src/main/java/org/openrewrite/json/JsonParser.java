@@ -70,6 +70,11 @@ public class JsonParser implements Parser {
     }
 
     @Override
+    public String getDslName() {
+        return "json";
+    }
+
+    @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file.json");
     }

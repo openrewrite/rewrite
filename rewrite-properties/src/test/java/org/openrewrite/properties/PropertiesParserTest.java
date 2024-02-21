@@ -241,7 +241,7 @@ class PropertiesParserTest implements RewriteTest {
     }
 
     @Test
-    @SetSystemProperty(key = "org.openrewrite.properties.PropertiesParser.includePatterns", value = "**/*.cfg")
+    @SetSystemProperty(key = "org.openrewrite.parser.properties.includePatterns", value = "**/*.cfg")
     void parseAnAdditionalExtensionFromSystemProperty() {
         rewriteRun(
           properties(
@@ -254,7 +254,8 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void parseAnAdditionalExtensionFromContext() {
         ParsingExecutionContextView ctx = ParsingExecutionContextView.view(new InMemoryExecutionContext());
-        ctx.includePattern(PropertiesParser.class, "**/*.cfg");
+        PropertiesParser propertiesParser = PropertiesParser.builder().build();
+        ctx.includePattern(propertiesParser, "**/*.cfg");
 
         rewriteRun(
           spec -> spec.executionContext(ctx),
@@ -270,12 +271,13 @@ class PropertiesParserTest implements RewriteTest {
         ParsingExecutionContextView ctx = ParsingExecutionContextView.view(new InMemoryExecutionContext());
 
         Parser.Input input = new Parser.Input(Paths.get("exclude-this.properties"), () -> new ByteArrayInputStream("key=value".getBytes()));
-        assertThat(PropertiesParser.builder().build().parseInputs(Collections.singletonList(input), null, ctx))
+        PropertiesParser propertiesParser = PropertiesParser.builder().build();
+        assertThat(propertiesParser.parseInputs(Collections.singletonList(input), null, ctx))
           .hasSize(1)
           .allMatch(f -> f instanceof Properties.File);
 
-        ctx.excludePattern(PropertiesParser.class, "**/exclude-this.properties");
-        assertThat(PropertiesParser.builder().build().parseInputs(Collections.singletonList(input), null, ctx))
+        ctx.excludePattern(propertiesParser, "**/exclude-this.properties");
+        assertThat(propertiesParser.parseInputs(Collections.singletonList(input), null, ctx))
           .isEmpty();
     }
 

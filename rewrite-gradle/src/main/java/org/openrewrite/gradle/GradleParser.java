@@ -91,6 +91,11 @@ public class GradleParser implements Parser {
     }
 
     @Override
+    public String getDslName() {
+        return "gradle";
+    }
+
+    @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("build.gradle");
     }

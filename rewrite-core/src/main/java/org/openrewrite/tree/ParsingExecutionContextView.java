@@ -31,8 +31,8 @@ import java.util.Set;
 
 public class ParsingExecutionContextView extends DelegatingExecutionContext {
     private static final String PARSING_LISTENER = "org.openrewrite.core.parsingListener";
-    private static final String INCLUDE_PATTERNS = "%s.includePatterns";
-    private static final String EXCLUDE_PATTERNS = "%s.excludePatterns";
+    private static final String INCLUDE_PATTERNS = "org.openrewrite.parser.%s.includePatterns";
+    private static final String EXCLUDE_PATTERNS = "org.openrewrite.parser.%s.excludePatterns";
 
     private static final String CHARSET = "org.openrewrite.parser.charset";
 
@@ -66,42 +66,42 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
         return getMessage(CHARSET);
     }
 
-    public ParsingExecutionContextView includePattern(Class<? extends Parser> parserClass, String filePattern) {
-        putMessageInSet(String.format(INCLUDE_PATTERNS, parserClass.getName()), filePattern);
+    public <T extends Parser> ParsingExecutionContextView includePattern(T parser, String filePattern) {
+        putMessageInSet(String.format(INCLUDE_PATTERNS, parser.getDslName()), filePattern);
         return this;
     }
 
-    public Set<String> getIncludePattern(Class<? extends Parser> parserClass) {
-        return getPatternsFromSystemProperty(String.format(INCLUDE_PATTERNS, parserClass.getName()));
+    public <T extends Parser> Set<String> getIncludePattern(T parser) {
+        return getPatternsFromSystemProperty(String.format(INCLUDE_PATTERNS, parser.getDslName()));
     }
 
-    public ParsingExecutionContextView setIncludePattern(Class<? extends Parser> parserClass, @Nullable Set<String> filePattern) {
-        putMessage(String.format(INCLUDE_PATTERNS, parserClass.getName()), filePattern);
+    public <T extends Parser> ParsingExecutionContextView setIncludePattern(T parser, @Nullable Set<String> filePattern) {
+        putMessage(String.format(INCLUDE_PATTERNS, parser.getDslName()), filePattern);
         return this;
     }
 
-    public ParsingExecutionContextView excludePattern(Class<? extends Parser> parserClass, String filePattern) {
-        putMessageInSet(String.format(EXCLUDE_PATTERNS, parserClass.getName()), filePattern);
+    public <T extends Parser> ParsingExecutionContextView excludePattern(T parser, String filePattern) {
+        putMessageInSet(String.format(EXCLUDE_PATTERNS, parser.getDslName()), filePattern);
         return this;
     }
 
-    public Set<String> getExcludePattern(Class<? extends Parser> parserClass) {
-        return getPatternsFromSystemProperty(String.format(EXCLUDE_PATTERNS, parserClass.getName()));
+    public <T extends Parser> Set<String> getExcludePattern(T parser) {
+        return getPatternsFromSystemProperty(String.format(EXCLUDE_PATTERNS, parser.getDslName()));
     }
 
-    public ParsingExecutionContextView setExcludePattern(Class<? extends Parser> parserClass, @Nullable Set<String> filePattern) {
-        putMessage(String.format(EXCLUDE_PATTERNS, parserClass.getName()), filePattern);
+    public <T extends Parser> ParsingExecutionContextView setExcludePattern(T parser, @Nullable Set<String> filePattern) {
+        putMessage(String.format(EXCLUDE_PATTERNS, parser.getDslName()), filePattern);
         return this;
     }
 
     public <T extends Parser> boolean accepts(T parser, Path path) {
-        for (String pattern : getExcludePattern(parser.getParserClass())) {
+        for (String pattern : getExcludePattern(parser)) {
             if (PathUtils.matchesGlob(path, pattern)) {
                 return false;
             }
         }
 
-        return parser.accept(path) || getIncludePattern(parser.getParserClass()).stream().anyMatch(pattern -> PathUtils.matchesGlob(path, pattern));
+        return parser.accept(path) || getIncludePattern(parser).stream().anyMatch(pattern -> PathUtils.matchesGlob(path, pattern));
     }
 
     private Set<String> getPatternsFromSystemProperty(String key) {

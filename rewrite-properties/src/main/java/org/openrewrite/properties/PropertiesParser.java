@@ -286,6 +286,11 @@ public class PropertiesParser implements Parser {
     }
 
     @Override
+    public String getDslName() {
+        return "properties";
+    }
+
+    @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file.properties");
     }

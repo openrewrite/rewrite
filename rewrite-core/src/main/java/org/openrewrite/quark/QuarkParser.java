@@ -122,6 +122,11 @@ public class QuarkParser implements Parser {
     }
 
     @Override
+    public String getDslName() {
+        return "quark";
+    }
+
+    @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file");
     }
