@@ -23,6 +23,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
@@ -34,7 +35,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class RemoveRedundantDependencyVersions extends Recipe {
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                    "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                          "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.*",
             required = false)
     @Nullable
@@ -42,7 +43,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                    "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                          "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava*",
             required = false)
     @Nullable
@@ -56,7 +57,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Except",
             description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe."
-                    + " GAV versions are ignored if provided.",
+                          + " GAV versions are ignored if provided.",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable
@@ -70,7 +71,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Override
     public String getDescription() {
         return "Remove explicitly-specified dependency versions when a parent POM's dependencyManagement " +
-                "specifies the version.";
+               "specifies the version.";
     }
 
     @Override
@@ -142,7 +143,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             private boolean matchesVersion(Plugin p) {
-                String managedVersion = getResolutionResult().getPom().getManagedPluginVersion(p.getGroupId(), p.getArtifactId());
+                ResolvedPom resolvedPom = getResolutionResult().getPom();
+                String managedVersion = getManagedPluginVersion(resolvedPom, p.getGroupId(), p.getArtifactId());
                 return managedVersion != null && (
                         ignoreVersionMatching() || managedVersion.equals(p.getVersion())
                 );
@@ -161,12 +163,23 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     final String exceptedGroupId = split[0];
                     final String exceptedArtifactId = split[1];
                     if (matchesGlob(d.getGroupId(), exceptedGroupId)
-                            && matchesGlob(d.getArtifactId(), exceptedArtifactId)) {
+                        && matchesGlob(d.getArtifactId(), exceptedArtifactId)) {
                         return false;
                     }
                 }
                 return true;
             }
         };
+    }
+
+    @Nullable
+    private static String getManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId) {
+        for (Plugin p : resolvedPom.getPluginManagement()) {
+            if (groupId.equals(p.getGroupId()) && artifactId.equals(p.getArtifactId())) {
+                return resolvedPom.getValue(p.getVersion());
+            }
+        }
+
+        return null;
     }
 }

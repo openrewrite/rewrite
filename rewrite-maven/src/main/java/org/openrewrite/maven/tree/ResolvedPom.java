@@ -307,17 +307,6 @@ public class ResolvedPom {
         return null;
     }
 
-    @Nullable
-    public String getManagedPluginVersion(String groupId, String artifactId) {
-        for (Plugin p : pluginManagement) {
-            if (p.matches(groupId, artifactId)) {
-                return getValue(p.getVersion());
-            }
-        }
-
-        return null;
-    }
-
     public List<GroupArtifact> getManagedExclusions(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
         for (ResolvedManagedDependency dm : dependencyManagement) {
             if (dm.matches(groupId, artifactId, type, classifier)) {
