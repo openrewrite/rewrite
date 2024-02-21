@@ -141,7 +141,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                             try {
                                 String selected = versionSelector.select(resolved.getGav(), configuration.getName(),
                                         version, versionPattern, ctx);
-                                if (resolved.getVersion().equals(selected)) {
+                                if (selected == null || resolved.getVersion().equals(selected)) {
                                     continue;
                                 }
 
@@ -191,18 +191,20 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     }
                 }
 
-                cu = (G.CompilationUnit) Preconditions.check(not(new UsesMethod<>(CONSTRAINTS_MATCHER)),
-                        new AddConstraintsBlock()).visitNonNull(cu, ctx);
+                if (!toUpdate.isEmpty()) {
+                    cu = (G.CompilationUnit) Preconditions.check(not(new UsesMethod<>(CONSTRAINTS_MATCHER)),
+                            new AddConstraintsBlock()).visitNonNull(cu, ctx);
 
-                for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
-                    Map<GradleDependencyConfiguration, String> configs = update.getValue();
-                    for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
-                        cu = (G.CompilationUnit) new AddConstraint(config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
-                                update.getKey().getArtifactId(), config.getValue()), because).visitNonNull(cu, ctx);
+                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
+                        Map<GradleDependencyConfiguration, String> configs = update.getValue();
+                        for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
+                            cu = (G.CompilationUnit) new AddConstraint(config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
+                                    update.getKey().getArtifactId(), config.getValue()), because).visitNonNull(cu, ctx);
+                        }
                     }
                 }
 
-                return super.visitCompilationUnit(cu, ctx);
+                return cu;
             }
 
             @Nullable
