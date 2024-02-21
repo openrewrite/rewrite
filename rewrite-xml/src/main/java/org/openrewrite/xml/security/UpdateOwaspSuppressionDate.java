@@ -26,7 +26,6 @@ import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Value
@@ -90,7 +89,7 @@ public class UpdateOwaspSuppressionDate extends Recipe {
                         }
                     }
                     if (hasCve) {
-                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
+                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plusDays(30).toString();
                         final String zuluDate = date + "Z";
                         t = t.withAttributes(ListUtils.map(t.getAttributes(), attr -> {
                             if ("until".equals(attr.getKeyAsString())) {
