@@ -55,8 +55,8 @@ import static org.openrewrite.Preconditions.not;
 @EqualsAndHashCode(callSuper = false)
 public class UpgradeTransitiveDependencyVersion extends Recipe {
     private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
-    private static final MethodMatcher CONSTRAINTS_MATCHER = new MethodMatcher("DependencyHandlerSpec constraints(..)");
-    private static final String CONSTRAINT_MATCHER = "DependencyHandlerSpec *(..)";
+    private static final MethodMatcher CONSTRAINTS_MATCHER = new MethodMatcher("org.gradle.api.artifacts.dsl.DependencyHandler constraints(..)", true);
+    private static final String CONSTRAINT_MATCHER = "org.gradle.api.artifacts.dsl.DependencyHandler *(..)";
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -141,38 +141,49 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                             try {
                                 String selected = versionSelector.select(resolved.getGav(), configuration.getName(),
                                         version, versionPattern, ctx);
-                                if (!resolved.getVersion().equals(selected)) {
-                                    toUpdate.merge(
-                                            new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId()),
-                                            singletonMap(constraintConfiguration(configuration), selected),
-                                            (existing, update) -> {
-                                                Map<GradleDependencyConfiguration, String> all = new HashMap<>(existing);
-                                                all.putAll(update);
-                                                all.keySet().removeIf(c -> {
-                                                    for (GradleDependencyConfiguration config : all.keySet()) {
-                                                        if (c.allExtendsFrom().contains(config)) {
+                                if (resolved.getVersion().equals(selected)) {
+                                    continue;
+                                }
+
+                                GradleDependencyConfiguration constraintConfig = constraintConfiguration(configuration);
+                                if (constraintConfig == null) {
+                                    continue;
+                                }
+
+                                toUpdate.merge(
+                                        new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId()),
+                                        singletonMap(constraintConfig, selected),
+                                        (existing, update) -> {
+                                            Map<GradleDependencyConfiguration, String> all = new HashMap<>(existing);
+                                            all.putAll(update);
+                                            all.keySet().removeIf(c -> {
+                                                if (c == null) {
+                                                    return true; // TODO ?? how does this happen
+                                                }
+
+                                                for (GradleDependencyConfiguration config : all.keySet()) {
+                                                    if (c.allExtendsFrom().contains(config)) {
+                                                        return true;
+                                                    }
+
+                                                    // TODO there has to be a better way!
+                                                    if (c.getName().equals("runtimeOnly")) {
+                                                        if (config.getName().equals("implementation")) {
                                                             return true;
                                                         }
-
-                                                        // TODO there has to be a better way!
-                                                        if (c.getName().equals("runtimeOnly")) {
-                                                            if (config.getName().equals("implementation")) {
-                                                                return true;
-                                                            }
-                                                        }
-                                                        if (c.getName().equals("testRuntimeOnly")) {
-                                                            if (config.getName().equals("testImplementation") ||
-                                                                config.getName().equals("implementation")) {
-                                                                return true;
-                                                            }
+                                                    }
+                                                    if (c.getName().equals("testRuntimeOnly")) {
+                                                        if (config.getName().equals("testImplementation") ||
+                                                            config.getName().equals("implementation")) {
+                                                            return true;
                                                         }
                                                     }
-                                                    return false;
-                                                });
-                                                return all;
-                                            }
-                                    );
-                                }
+                                                }
+                                                return false;
+                                            });
+                                            return all;
+                                        }
+                                );
                             } catch (MavenDownloadingException e) {
                                 return Markup.warn(cu, e);
                             }
@@ -236,7 +247,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         "}\n"
                 ).findFirst().orElseThrow(() -> new IllegalStateException("Unable to parse constraints block"));
 
-                Statement constraints = FindMethods.find(withConstraints, "DependencyHandlerSpec constraints(..)")
+                Statement constraints = FindMethods.find(withConstraints, "org.gradle.api.artifacts.dsl.DependencyHandler constraints(..)", true)
                         .stream()
                         .filter(J.MethodInvocation.class::isInstance)
                         .map(J.MethodInvocation.class::cast)
@@ -276,7 +287,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             if (CONSTRAINTS_MATCHER.matches(method)) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                boolean constraintExists = FindMethods.find(m, CONSTRAINT_MATCHER).stream()
+                boolean constraintExists = FindMethods.find(m, CONSTRAINT_MATCHER, true).stream()
                         .filter(J.MethodInvocation.class::isInstance)
                         .map(J.MethodInvocation.class::cast)
                         .anyMatch(c -> c.getSimpleName().equals(config) && c.getArguments().stream()
@@ -300,7 +311,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         because == null ? "" : String.format(" {\n   because '%s'\n}", because)
                 )).findFirst().orElseThrow(() -> new IllegalStateException("Unable to parse constraint"));
 
-                Statement constraint = FindMethods.find(withConstraint, CONSTRAINT_MATCHER)
+                Statement constraint = FindMethods.find(withConstraint, CONSTRAINT_MATCHER, true)
                         .stream()
                         .filter(J.MethodInvocation.class::isInstance)
                         .map(J.MethodInvocation.class::cast)
