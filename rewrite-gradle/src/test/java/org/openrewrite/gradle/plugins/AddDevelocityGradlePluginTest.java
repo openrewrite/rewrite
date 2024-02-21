@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 class AddDevelocityGradlePluginTest implements RewriteTest {
@@ -43,7 +43,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-                .recipe(new AddDevelocityGradlePlugin("3.x", null, null, null, null, null));
+          .recipe(new AddDevelocityGradlePlugin("3.x", null, null, null, null, null));
     }
 
     private static Consumer<SourceSpec<CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
@@ -140,7 +140,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
               plugins {
                   id 'com.gradle.enterprise' version '%s'
               }
-              
+                            
               rootProject.name = 'my-project'
               """
             )
@@ -159,14 +159,14 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
             """
               plugins {
               }
-              
+                            
               rootProject.name = 'my-project'
               """,
             interpolateResolvedVersion("""
               plugins {
                   id 'com.gradle.enterprise' version '%s'
               }
-              
+                            
               rootProject.name = 'my-project'
               """
             )

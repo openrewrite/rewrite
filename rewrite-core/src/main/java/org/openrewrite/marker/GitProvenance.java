@@ -334,8 +334,7 @@ public class GitProvenance implements Marker {
                 PersonIdent who = commit.getAuthorIdent();
                 Committer committer = committers.computeIfAbsent(who.getEmailAddress(),
                         email -> new Committer(who.getName(), email, new TreeMap<>()));
-                committer.getCommitsByDay().compute(ZonedDateTime
-                                .ofInstant(who.getWhen().toInstant(), who.getTimeZone().toZoneId())
+                committer.getCommitsByDay().compute(who.getWhen().toInstant().atZone(who.getTimeZone().toZoneId())
                                 .toLocalDate(),
                         (day, count) -> count == null ? 1 : count + 1);
             }
