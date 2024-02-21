@@ -46,7 +46,7 @@ public class BlankLines extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                BlankLinesStyle style = ((SourceFile) cu).getStyle(BlankLinesStyle.class);
+                BlankLinesStyle style = cu.getStyle(BlankLinesStyle.class);
                 if (style == null) {
                     style = IntelliJ.blankLines();
                 }
