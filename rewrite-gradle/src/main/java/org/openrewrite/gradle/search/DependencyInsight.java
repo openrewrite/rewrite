@@ -201,11 +201,11 @@ public class DependencyInsight extends Recipe {
         private final Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency;
         private final Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
         private boolean attachToDependencyClosure = false;
-        private boolean hasMarkerOnDependencyClosure = false;
+        private boolean hasMarker = false;
 
         public Tree attachMarkers(Tree before, ExecutionContext ctx) {
             J after = super.visitNonNull(before, ctx);
-            if (!hasMarkerOnDependencyClosure) {
+            if (!hasMarker) {
                 if (after == before) {
                     attachToDependencyClosure = true;
                     after = super.visitNonNull(before, ctx);
@@ -233,7 +233,7 @@ public class DependencyInsight extends Recipe {
                         .collect(Collectors.joining(","));
                 J.MethodInvocation after = SearchResult.found(m, resultText);
                 if (after == m) {
-                    hasMarkerOnDependencyClosure = true;
+                    hasMarker = true;
                 }
                 if (attachToDependencyClosure) {
                     return after;
@@ -264,7 +264,11 @@ public class DependencyInsight extends Recipe {
                     String resultText = directDependencyToTargetDependency.get(direct).stream()
                             .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
                             .collect(Collectors.joining(","));
-                    return SearchResult.found(m, resultText);
+                    J.MethodInvocation result = SearchResult.found(m, resultText);
+                    if (m == result) {
+                        hasMarker = true;
+                    }
+                    return result;
                 }
             } else if (arg instanceof G.MapEntry) {
                 String groupId = null;
@@ -302,7 +306,11 @@ public class DependencyInsight extends Recipe {
                     String resultText = directDependencyToTargetDependency.get(direct).stream()
                             .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
                             .collect(Collectors.joining(","));
-                    return SearchResult.found(m, resultText);
+                    J.MethodInvocation result = SearchResult.found(m, resultText);
+                    if (m == result) {
+                        hasMarker = true;
+                    }
+                    return result;
                 }
             }
             return m;
