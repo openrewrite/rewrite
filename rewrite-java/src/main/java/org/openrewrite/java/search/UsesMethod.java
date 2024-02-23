@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -28,6 +29,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -106,5 +108,10 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
         UUID id;
         @EqualsAndHashCode.Include
         String methodMatcher;
+
+        @Override
+        public String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
+            return commentWrapper.apply("");
+        }
     }
 }
