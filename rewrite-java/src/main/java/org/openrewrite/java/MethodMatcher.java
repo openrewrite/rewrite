@@ -149,12 +149,14 @@ public class MethodMatcher {
         this(methodPattern(method), false);
     }
 
-    public String getTargetTypePattern() {
-        return targetTypePattern != null ? targetTypePattern.pattern() : requireNonNull(targetType);
+    @Deprecated
+    public Pattern getTargetTypePattern() {
+        return targetTypePattern != null ? targetTypePattern : Pattern.compile(requireNonNull(targetType));
     }
 
-    public String getMethodNamePattern() {
-        return methodNamePattern != null ? methodNamePattern.pattern() : requireNonNull(methodName);
+    @Deprecated
+    public Pattern getMethodNamePattern() {
+        return methodNamePattern != null ? methodNamePattern : Pattern.compile(requireNonNull(methodName));
     }
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
