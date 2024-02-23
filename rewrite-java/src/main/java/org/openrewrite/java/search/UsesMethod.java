@@ -18,7 +18,6 @@ package org.openrewrite.java.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -27,9 +26,9 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.UUID;
-import java.util.function.UnaryOperator;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -73,8 +72,9 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     }
 
     private <J2 extends J> J2 found(J2 j) {
-        return j.withMarkers(j.getMarkers()
-                .compute(new MethodMatch(randomId(), methodPattern), (s1, s2) -> s1 == null ? s2 : s1));
+        // also adding a `SearchResult` marker to get a visible diff
+        return SearchResult.found(j.withMarkers(j.getMarkers()
+                .compute(new MethodMatch(randomId(), methodPattern), (s1, s2) -> s1 == null ? s2 : s1)));
     }
 
     @Override
@@ -104,14 +104,9 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     @Value
     @With
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-    static class MethodMatch implements Marker {
+    public static class MethodMatch implements Marker {
         UUID id;
         @EqualsAndHashCode.Include
         String methodMatcher;
-
-        @Override
-        public String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
-            return commentWrapper.apply("(" + methodMatcher + ")");
-        }
     }
 }

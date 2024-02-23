@@ -60,7 +60,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~(abc.Thing newConcurrentHashSet())~~>*/package abc;
+              /*~~>*/package abc;
                             
               import java.util.Set;
               class Test {
@@ -85,7 +85,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~(A singleArg(String))~~>*/class Test {
+              /*~~>*/class Test {
                   void test() {
                       new java.util.ArrayList<String>().forEach(new A()::singleArg);
                   }
@@ -114,7 +114,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~(java.util.Collections emptyList())~~>*/import java.util.Collections;
+              /*~~>*/import java.util.Collections;
               public class A {
                  Object o = Collections.emptyList();
               }
@@ -135,7 +135,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~(java.util.Collections emptyList())~~>*/import static java.util.Collections.emptyList;
+              /*~~>*/import static java.util.Collections.emptyList;
               public class A {
                  Object o = emptyList();
               }
@@ -157,7 +157,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~(A foo(String, Object...))~~>*/public class B {
+              /*~~>*/public class B {
                  public void test() {
                      new A().foo("s", "a", 1);
                  }
@@ -187,7 +187,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~(B.C foo())~~>*/public class A {
+              /*~~>*/public class A {
                  void test() {
                      new B.C().foo();
                  }
