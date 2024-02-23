@@ -379,6 +379,15 @@ public class MethodMatcher {
         return typePattern(method.getDeclaringType()) + " " +
                method.getName() + "(" + parameters + ")";
     }
+
+    @Override
+    public String toString() {
+        //noinspection DataFlowIssue
+        return (targetType != null ? targetType : targetTypePattern.pattern()) +
+               ' ' +
+               (methodName != null ? methodName : methodNamePattern.pattern()) +
+               '(' + argumentPattern.pattern() + ')';
+    }
 }
 
 class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {

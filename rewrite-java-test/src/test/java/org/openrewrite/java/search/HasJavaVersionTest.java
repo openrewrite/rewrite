@@ -18,7 +18,6 @@ package org.openrewrite.java.search;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -97,7 +96,6 @@ class HasJavaVersionTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void combinedWithFindMethod() {
         rewriteRun(
@@ -111,7 +109,8 @@ class HasJavaVersionTest implements RewriteTest {
               - org.openrewrite.java.search.FindMethods:
                   methodPattern: java.util.List add(..)
             """, "org.openrewrite.CombinedWithFindMethod"),
-          java("""
+          java(
+            """
               import java.util.List;
               import java.util.ArrayList;
               class Test {
@@ -121,7 +120,6 @@ class HasJavaVersionTest implements RewriteTest {
                   }
               }
               """,
-
             """
               /*~~>*/import java.util.List;
               import java.util.ArrayList;
@@ -149,7 +147,8 @@ class HasJavaVersionTest implements RewriteTest {
                   version: 11
 
             """, "org.openrewrite.CombinedWithFindMethod"),
-          java("""
+          java(
+            """
               import java.util.List;
               import java.util.ArrayList;
               class Test {
@@ -159,7 +158,6 @@ class HasJavaVersionTest implements RewriteTest {
                   }
               }
               """,
-
             """
               /*~~>*/import java.util.List;
               import java.util.ArrayList;
