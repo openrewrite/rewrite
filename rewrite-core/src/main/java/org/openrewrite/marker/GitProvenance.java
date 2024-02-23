@@ -38,7 +38,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.time.ZonedDateTime;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -88,10 +87,12 @@ public class GitProvenance implements Marker {
             baseUrl = baseUrl.substring(4);
         }
         String remainder = origin.substring(origin.indexOf(baseUrl) + baseUrl.length());
+        if (remainder.startsWith(":")) {
+            remainder = remainder.substring(1);
+        }
         if (remainder.startsWith("/")) {
             remainder = remainder.substring(1);
         }
-
         return remainder.substring(0, remainder.lastIndexOf('/'));
     }
 
