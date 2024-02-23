@@ -24,6 +24,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.groovy.Assertions.groovy;
 
 class DependencyInsightTest implements RewriteTest {
 
@@ -61,6 +62,96 @@ class DependencyInsightTest implements RewriteTest {
                             
               dependencies {
                   /*~~(com.google.guava:failureaccess:1.0.1)~~>*/implementation 'com.google.guava:guava:31.1-jre'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findPluginDependencyAndAddToDependencyClosure() {
+        rewriteRun(
+          buildGradle("""
+            plugins {
+                id 'groovy-gradle-plugin'
+            }
+            repositories {
+                gradlePluginPortal()
+            }
+              """, spec -> spec.path("buildSrc/build.gradle")),
+          groovy("""
+            plugins{
+                id "java"
+            }
+            dependencies{
+                implementation 'com.google.guava:guava:31.1-jre'
+            }
+            """, spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
+          buildGradle("""
+              plugins {
+                  id 'convention-plugin'
+              }
+                            
+              repositories {
+                  mavenCentral()
+              }
+                            
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:8.0.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'convention-plugin'
+              }
+                            
+              repositories {
+                  mavenCentral()
+              }
+                            
+              /*~~(com.google.guava:failureaccess:1.0.1)~~>*/dependencies {
+                  implementation 'org.openrewrite:rewrite-java:8.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findPluginDependencyAndAddToRoot() {
+        rewriteRun(
+          buildGradle("""
+            plugins {
+                id 'groovy-gradle-plugin'
+            }
+            repositories {
+                gradlePluginPortal()
+            }
+              """, spec -> spec.path("buildSrc/build.gradle")),
+          groovy("""
+            plugins{
+                id "java"
+            }
+            dependencies{
+                implementation 'com.google.guava:guava:31.1-jre'
+            }
+            """, spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
+          buildGradle("""
+              plugins {
+                  id 'convention-plugin'
+              }
+                            
+              repositories {
+                  mavenCentral()
+              }
+              """,
+            """
+              /*~~(com.google.guava:failureaccess:1.0.1)~~>*/plugins {
+                  id 'convention-plugin'
+              }
+                            
+              repositories {
+                  mavenCentral()
               }
               """
           )
