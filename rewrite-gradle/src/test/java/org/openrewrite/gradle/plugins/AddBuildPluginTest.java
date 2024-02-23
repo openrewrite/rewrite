@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class AddBuildPluginTest implements RewriteTest {
     @Override
@@ -129,16 +129,16 @@ class AddBuildPluginTest implements RewriteTest {
           buildGradle(
             """
               import java.util.List
-              
+                            
               buildscript {
               }
               """,
             """
               import java.util.List
-              
+                            
               buildscript {
               }
-              
+                            
               plugins {
                   id 'com.jfrog.bintray' version '1.0'
               }

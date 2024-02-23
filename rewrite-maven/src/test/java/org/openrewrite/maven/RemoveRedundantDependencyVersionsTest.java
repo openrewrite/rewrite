@@ -1111,4 +1111,92 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3932")
+    void removeRedundantVersionsFromPluginsManagedByParent() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                              <version>4.9.10</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3932")
+    void noChangesIfManagedPluginVersionDoesNotMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, true, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                              <version>4.9.9</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
 }

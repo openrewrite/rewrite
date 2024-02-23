@@ -96,4 +96,79 @@ class HasJavaVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void combinedWithFindMethod() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.CombinedWithFindMethod
+            recipeList:
+              - org.openrewrite.java.search.HasJavaVersion:
+                  version: 11
+              - org.openrewrite.java.search.FindMethods:
+                  methodPattern: java.util.List add(..)
+            """, "org.openrewrite.CombinedWithFindMethod"),
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+              class Test {
+                  void test() {
+                      List<String> list = new ArrayList<>();
+                      list.add("1");
+                  }
+              }
+              """,
+            """
+              /*~~>*/import java.util.List;
+              import java.util.ArrayList;
+              class Test {
+                  void test() {
+                      List<String> list = new ArrayList<>();
+                      /*~~>*/list.add("1");
+                  }
+              }
+              """, spec -> spec.markers(javaVersion(11)))
+        );
+    }
+
+    @Test
+    void combinedWithFindMethodFirst() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.CombinedWithFindMethod
+            recipeList:
+              - org.openrewrite.java.search.FindMethods:
+                  methodPattern: java.util.List add(..)
+              - org.openrewrite.java.search.HasJavaVersion:
+                  version: 11
+
+            """, "org.openrewrite.CombinedWithFindMethod"),
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+              class Test {
+                  void test() {
+                      List<String> list = new ArrayList<>();
+                      list.add("1");
+                  }
+              }
+              """,
+            """
+              /*~~>*/import java.util.List;
+              import java.util.ArrayList;
+              class Test {
+                  void test() {
+                      List<String> list = new ArrayList<>();
+                      /*~~>*/list.add("1");
+                  }
+              }
+              """, spec -> spec.markers(javaVersion(11)))
+        );
+    }
+
 }
