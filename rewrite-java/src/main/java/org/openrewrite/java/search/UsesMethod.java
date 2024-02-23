@@ -111,7 +111,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
 
         @Override
         public String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
-            return commentWrapper.apply("");
+            return commentWrapper.apply("(" + methodMatcher + ")");
         }
     }
 }
