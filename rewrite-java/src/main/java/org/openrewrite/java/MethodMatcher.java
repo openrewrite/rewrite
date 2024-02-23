@@ -99,9 +99,9 @@ public class MethodMatcher {
                 MethodSignatureParser.TargetTypePatternContext targetTypePatternContext = ctx.targetTypePattern();
                 String pattern = new TypeVisitor().visitTargetTypePattern(targetTypePatternContext);
                 if (isPlainIdentifier(targetTypePatternContext)) {
-                    targetType = pattern.replace(ASPECTJ_DOT_PATTERN, ".").replace("\\", "");
+                    targetType = pattern;
                 } else {
-                    targetTypePattern = Pattern.compile(pattern);
+                    targetTypePattern = Pattern.compile(StringUtils.aspectjNameToPattern(pattern));
                 }
 
                 StringBuilder builder = new StringBuilder();
@@ -423,12 +423,12 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
     public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
         StringBuilder classNameBuilder = new StringBuilder();
         for (ParseTree c : ctx.children) {
-            classNameBuilder.append(StringUtils.aspectjNameToPattern(c.getText()));
+            classNameBuilder.append(c.getText());
         }
         String className = classNameBuilder.toString();
 
         if (!className.contains(".")) {
-            int arrInit = className.lastIndexOf("\\[");
+            int arrInit = className.lastIndexOf('[');
             String beforeArr = arrInit == -1 ? className : className.substring(0, arrInit);
             if (Character.isLowerCase(beforeArr.charAt(0)) && JavaType.Primitive.fromKeyword(beforeArr) != null) {
                 return className;
@@ -530,7 +530,7 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
             @Override
             String getRegex() {
                 String baseType = new TypeVisitor().visitFormalTypePattern(ctx);
-                return baseType + (variableArgs ? "\\[\\]" : "");
+                return StringUtils.aspectjNameToPattern(baseType) + (variableArgs ? "\\[\\]" : "");
             }
         }
     }
