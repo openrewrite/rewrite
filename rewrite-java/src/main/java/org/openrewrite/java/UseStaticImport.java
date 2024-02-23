@@ -65,9 +65,10 @@ public class UseStaticImport extends Recipe {
     }
 
     private class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {
+        final MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (methodMatcher.matches(m)) {
                 if (m.getTypeParameters() != null && !m.getTypeParameters().isEmpty()) {

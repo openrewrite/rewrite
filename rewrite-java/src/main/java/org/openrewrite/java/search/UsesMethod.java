@@ -15,6 +15,9 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -22,25 +25,36 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.UUID;
+
+import static org.openrewrite.Tree.randomId;
+
 public class UsesMethod<P> extends JavaIsoVisitor<P> {
+    private final String methodPattern;
     private final MethodMatcher methodMatcher;
 
     public UsesMethod(String methodPattern) {
-        this(new MethodMatcher(methodPattern));
+        this(new MethodMatcher(methodPattern), methodPattern);
     }
 
     public UsesMethod(String methodPattern, boolean matchOverrides) {
-        this(new MethodMatcher(methodPattern, matchOverrides));
+        this(new MethodMatcher(methodPattern, matchOverrides), methodPattern);
     }
 
     public UsesMethod(String methodPattern, @Nullable Boolean matchOverrides) {
-        this(new MethodMatcher(methodPattern, Boolean.TRUE.equals(matchOverrides)));
+        this(new MethodMatcher(methodPattern, Boolean.TRUE.equals(matchOverrides)), methodPattern);
     }
 
     public UsesMethod(MethodMatcher methodMatcher) {
+        this(methodMatcher, methodMatcher.toString());
+    }
+
+    private UsesMethod(MethodMatcher methodMatcher, String methodPattern) {
         this.methodMatcher = methodMatcher;
+        this.methodPattern = methodPattern;
     }
 
     @Override
@@ -49,7 +63,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
             JavaSourceFile cu = (JavaSourceFile) tree;
             for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
                 if (methodMatcher.matches(type)) {
-                    return SearchResult.found(cu);
+                    return found(cu);
                 }
             }
             return (J) tree;
@@ -57,10 +71,16 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
         return super.visit(tree, p);
     }
 
+    private <J2 extends J> J2 found(J2 j) {
+        // also adding a `SearchResult` marker to get a visible diff
+        return SearchResult.found(j.withMarkers(j.getMarkers()
+                .compute(new MethodMatch(randomId(), methodPattern), (s1, s2) -> s1 == null ? s2 : s1)));
+    }
+
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         if (methodMatcher.matches(method)) {
-            return SearchResult.found(method);
+            return found(method);
         }
         return super.visitMethodInvocation(method, p);
     }
@@ -68,7 +88,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
         if (methodMatcher.matches(memberRef)) {
-            return SearchResult.found(memberRef);
+            return found(memberRef);
         }
         return super.visitMemberReference(memberRef, p);
     }
@@ -76,8 +96,17 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     @Override
     public J.NewClass visitNewClass(J.NewClass newClass, P p) {
         if (methodMatcher.matches(newClass)) {
-            return SearchResult.found(newClass);
+            return found(newClass);
         }
         return super.visitNewClass(newClass, p);
+    }
+
+    @Value
+    @With
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    public static class MethodMatch implements Marker {
+        UUID id;
+        @EqualsAndHashCode.Include
+        String methodMatcher;
     }
 }
