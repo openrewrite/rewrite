@@ -731,6 +731,9 @@ public class MavenPomDownloader {
                 String httpsUri = repository.getUri().toLowerCase().startsWith("http:") ?
                         repository.getUri().replaceFirst("[hH][tT][tT][pP]://", "https://") :
                         repository.getUri();
+                if (!httpsUri.endsWith("/")) {
+                    httpsUri += "/";
+                }
 
                 HttpSender.Request.Builder request = applyAuthenticationToRequest(repository, httpSender.get(httpsUri));
                 MavenRepository normalized = null;
