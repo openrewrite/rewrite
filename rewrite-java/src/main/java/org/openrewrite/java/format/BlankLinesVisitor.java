@@ -287,7 +287,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 c.withSuffix(minimumLines(c.getSuffix(), min)) : c));
     }
 
-    private String minimumLines(String whitespace, int min) {
+    public static String minimumLines(String whitespace, int min) {
         if (min == 0) {
             return whitespace;
         }
