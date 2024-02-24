@@ -82,7 +82,7 @@ class MavenPomDownloaderTest {
     @Test
     void ossSonatype() {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        MavenRepository ossSonatype = new MavenRepository("oss", "https://oss.sonatype.org/content/repositories/snapshots",
+        MavenRepository ossSonatype = new MavenRepository("oss", "https://oss.sonatype.org/content/repositories/snapshots/",
           null, "true", false, null, null, null);
         MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
           MavenExecutionContextView.view(ctx), null);
@@ -169,12 +169,9 @@ class MavenPomDownloaderTest {
     @Test
     void listenerRecordsFailedRepositoryAccess() {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-        // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
-        for (MavenRepository repository : ctx.getRepositories()) {
-            repository.setKnownToExist(true);
-        }
-
-        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, false, null, null, null);
+        // Avoid actually trying to reach a made-up URL
+        String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
+        MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null);
         Map<String, Throwable> attemptedUris = new HashMap<>();
         List<MavenRepository> discoveredRepositories = new ArrayList<>();
         ctx.setResolutionListener(new ResolutionEventListener() {
@@ -191,10 +188,8 @@ class MavenPomDownloaderTest {
             // not expected to succeed
         }
         assertThat(attemptedUris).isNotEmpty();
-        assertThat(attemptedUris.get("https://internalartifactrepository.yourorg.com"))
-          .hasMessageContaining("javax.net.ssl.SSLHandshakeException");
-        assertThat(discoveredRepositories)
-          .isEmpty();
+        assertThat(attemptedUris.get(httpUrl)).hasMessageContaining("java.net.UnknownHostException");
+        assertThat(discoveredRepositories).isEmpty();
     }
 
     @Test
@@ -243,7 +238,7 @@ class MavenPomDownloaderTest {
         );
         assertThat(normalized)
           .extracting(MavenRepository::getUri)
-          .isEqualTo("https://artifactory.moderne.ninja/artifactory/moderne-cache");
+          .isEqualTo("https://artifactory.moderne.ninja/artifactory/moderne-cache/");
     }
 
     @Disabled("Flaky on CI")
@@ -255,7 +250,7 @@ class MavenPomDownloaderTest {
           MavenExecutionContextView.view(ctx), null);
 
         assertThat(oss).isNotNull();
-        assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
+        assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots/");
     }
 
     @ParameterizedTest
