@@ -423,9 +423,14 @@ public interface JavaParser extends Parser {
     static Path resolveSourcePathFromSourceText(Path prefix, String sourceCode) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum|record)\\s*(<[^>]*>)?\\s+(\\w+)");
+        Pattern publicClassPattern = Pattern.compile("public\\s+" + classPattern.pattern());
 
         Function<String, String> simpleName = sourceStr -> {
-            Matcher classMatcher = classPattern.matcher(sourceStr);
+            Matcher classMatcher = publicClassPattern.matcher(sourceStr);
+            if (classMatcher.find()) {
+                return classMatcher.group(3);
+            }
+            classMatcher = classPattern.matcher(sourceStr);
             return classMatcher.find() ? classMatcher.group(3) : null;
         };
 
