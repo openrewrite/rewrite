@@ -356,7 +356,7 @@ public interface JavaParser extends Parser {
 
         public B dependsOn(@Language("java") String... inputsAsStrings) {
             this.dependsOn = Arrays.stream(inputsAsStrings)
-                    .map(Input::fromString)
+                    .map(input -> Input.fromString(resolveSourcePathFromSourceText(Paths.get(""), input), input))
                     .collect(toList());
             return (B) this;
         }
@@ -417,6 +417,10 @@ public interface JavaParser extends Parser {
 
     @Override
     default Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return resolveSourcePathFromSourceText(prefix, sourceCode);
+    }
+
+    static Path resolveSourcePathFromSourceText(Path prefix, String sourceCode) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum|record)\\s*(<[^>]*>)?\\s+(\\w+)");
 

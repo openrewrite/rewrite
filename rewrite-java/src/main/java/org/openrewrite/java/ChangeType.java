@@ -430,6 +430,7 @@ public class ChangeType extends Recipe {
             } else if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
+                    oldNameToChangedType.put(oldType, targetType);
                     return targetType;
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
