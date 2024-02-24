@@ -18,13 +18,21 @@ package org.openrewrite.java.search;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
 import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.dir;
+import static org.openrewrite.test.SourceSpecs.text;
 
 public class IsOrIsNotLikelyTestTest {
 
@@ -112,7 +120,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndTestSourceSet() {
+        void standardMainAndTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
               srcTestJava(assertTestIsFound())
@@ -121,7 +129,7 @@ public class IsOrIsNotLikelyTestTest {
 
         @Test
         @SuppressWarnings("SpellCheckingInspection")
-        void testStandardMainAndIntegTestSourceSet() {
+        void standardMainAndIntegTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
               srcIntegTestJava(assertTestIsFound())
@@ -129,7 +137,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndCompatibilityTestSourceSet() {
+        void standardMainAndCompatibilityTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
               srcCompatibilityTestJava(assertTestIsFound())
@@ -153,7 +161,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndTestSourceSet() {
+        void standardMainAndTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),
               srcTestJava(assertTestNoChanges())
@@ -161,8 +169,24 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
+        void preconditionForOtherSourceType() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> Preconditions.check(
+                Preconditions.or(new IsLikelyTest().getVisitor()),
+                new TreeVisitor<>() {
+                    @Nullable
+                    @Override
+                    public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        return tree != null ? SearchResult.found(tree, "recipe") : null;
+                    }
+                }))),
+              text("foo")
+            );
+        }
+
+        @Test
         @SuppressWarnings("SpellCheckingInspection")
-        void testStandardMainAndIntegTestSourceSet() {
+        void standardMainAndIntegTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),
               srcIntegTestJava(assertTestNoChanges())
@@ -170,7 +194,7 @@ public class IsOrIsNotLikelyTestTest {
         }
 
         @Test
-        void testStandardMainAndCompatibilityTestSourceSet() {
+        void standardMainAndCompatibilityTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),
               srcCompatibilityTestJava(assertTestNoChanges())

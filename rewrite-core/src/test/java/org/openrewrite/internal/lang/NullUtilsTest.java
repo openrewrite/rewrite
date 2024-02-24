@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class NullUtilsTest {
 
     @Test
-    void testPackageNonNullDefault() {
+    void packageNonNullDefault() {
         var results = NullUtils.findNonNullFields(DefaultNonNullTest.class);
         assertThat(results).hasSize(4);
         assertThat(results.get(0).getName()).isEqualTo("aCoolNonNullName");
@@ -34,7 +34,7 @@ class NullUtilsTest {
     }
 
     @Test
-    void testNonNulls() {
+    void nonNulls() {
         var results = NullUtils.findNonNullFields(NonNullTest.class);
         assertThat(results).hasSize(4);
         assertThat(results.get(0).getName()).isEqualTo("aCoolNonNullName");

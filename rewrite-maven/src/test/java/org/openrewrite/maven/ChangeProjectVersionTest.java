@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class ChangeProjectVersionTest implements RewriteTest {
+class ChangeProjectVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

@@ -43,7 +43,6 @@ class JavaTemplateTest implements RewriteTest {
                       ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
                       return JavaTemplate.builder("value = 0")
                         .contextSensitive()
-                        .doBeforeParseTemplate(System.out::println)
                         .build()
                         .apply(getCursor(), assignment.getCoordinates().replace());
                   }

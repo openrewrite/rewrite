@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
@@ -34,7 +35,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpdateJavaCompatibility extends Recipe {
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",
@@ -63,6 +64,15 @@ public class UpdateJavaCompatibility extends Recipe {
     @Nullable
     Boolean allowDowngrade;
 
+    @Option(displayName = "Add Compatibility Type if missing",
+            description = "Adds the specified Compatibility Type if one is not found.",
+            required = false)
+    @Nullable
+    Boolean addIfMissing;
+
+    private static final String SOURCE_COMPATIBILITY_FOUND = "SOURCE_COMPATIBILITY_FOUND";
+    private static final String TARGET_COMPATIBILITY_FOUND = "TARGET_COMPATIBILITY_FOUND";
+
     @Override
     public String getDisplayName() {
         return "Update Gradle project Java compatibility";
@@ -87,11 +97,30 @@ public class UpdateJavaCompatibility extends Recipe {
             final MethodMatcher javaVersionToVersionMatcher = new MethodMatcher("org.gradle.api.JavaVersion toVersion(..)");
 
             @Override
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
+                G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, executionContext);
+                if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
+                    c = addCompatibilityTypeToSourceFile(c, "source");
+                }
+                if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
+                    c = addCompatibilityTypeToSourceFile(c, "target");
+                }
+                return c;
+            }
+
+            @Override
             public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                 J.Assignment a = (J.Assignment) super.visitAssignment(assignment, ctx);
 
                 if (a.getVariable() instanceof J.Identifier) {
                     J.Identifier variable = (J.Identifier) a.getVariable();
+                    if ("sourceCompatibility".equals(variable.getSimpleName())) {
+                        getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, a.getAssignment());
+                    }
+                    if ("targetCompatibility".equals(variable.getSimpleName())) {
+                        getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, TARGET_COMPATIBILITY_FOUND, a.getAssignment());
+                    }
+
                     if (compatibilityType == null) {
                         if (!("sourceCompatibility".equals(variable.getSimpleName()) || "targetCompatibility".equals(variable.getSimpleName()))) {
                             return a;
@@ -133,6 +162,12 @@ public class UpdateJavaCompatibility extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if ("sourceCompatibility".equals(m.getSimpleName())) {
+                    getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, true);
+                }
+                if ("targetCompatibility".equals(m.getSimpleName())) {
+                    getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, TARGET_COMPATIBILITY_FOUND, true);
+                }
                 if (javaLanguageVersionMatcher.matches(m)) {
                     List<Expression> args = m.getArguments();
 
@@ -342,6 +377,28 @@ public class UpdateJavaCompatibility extends Recipe {
                 return expression;
             }
         });
+    }
+
+    private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String compatibilityType) {
+        if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
+            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse("\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
+                    .findFirst()
+                    .get();
+            sourceFile.getStatements();
+            c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+        }
+        return c;
+    }
+
+    private String styleMissingCompatibilityVersion() {
+        if (declarationStyle == DeclarationStyle.String) {
+            return version <= 8 ? "'1." + version + "'" : "'" + version + "'";
+        } else if (declarationStyle == DeclarationStyle.Enum) {
+            return version <= 8 ? "JavaVersion.VERSION_1_" + version : "JavaVersion.VERSION_" + version;
+        } else if (version <= 8) {
+            return "1." + version;
+        }
+        return String.valueOf(version);
     }
 
     public enum CompatibilityType {

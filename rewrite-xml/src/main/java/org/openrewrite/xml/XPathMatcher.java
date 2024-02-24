@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
  */
 public class XPathMatcher {
     // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']`
-    private static final Pattern PATTERN = Pattern.compile("([-\\w]+)\\[([-\\w]+)='([-\\w]+)']");
+    private static final Pattern PATTERN = Pattern.compile("([-\\w]+)\\[([-\\w]+)='([-\\w.]+)']");
     private final String expression;
 
     public XPathMatcher(String expression) {

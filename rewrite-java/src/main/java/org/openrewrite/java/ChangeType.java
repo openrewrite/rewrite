@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeType extends Recipe {
 
     @Option(displayName = "Old fully-qualified type name",
@@ -430,6 +430,7 @@ public class ChangeType extends Recipe {
             } else if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
+                    oldNameToChangedType.put(oldType, targetType);
                     return targetType;
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {

@@ -32,7 +32,7 @@ import static org.openrewrite.xml.MapTagChildrenVisitor.mapTagChildren;
 import static org.openrewrite.xml.SemanticallyEqual.areEqual;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddPluginDependency extends Recipe {
     private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
 

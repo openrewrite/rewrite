@@ -25,9 +25,10 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePropertyValue extends Recipe {
     @Option(displayName = "Property key",
             description = "The key to look for. Supports glob patterns.",
@@ -45,7 +46,8 @@ public class ChangePropertyValue extends Recipe {
     String oldValue;
 
     @Option(displayName = "Regex",
-            description = "Defaults to `false`. If enabled, `oldValue` will be interpreted as a regular expression, and the capture group contents will be available in `newValue`",
+            description = "Default `false`. If enabled, `oldValue` will be interpreted as a Regular Expression, " +
+                          "to replace only all parts that match the regex. Capturing group can be used in `newValue`.",
             required = false)
     @Nullable
     Boolean regex;
@@ -122,7 +124,7 @@ public class ChangePropertyValue extends Recipe {
         Yaml.Scalar scalar = (Yaml.Scalar) value;
         return StringUtils.isNullOrEmpty(oldValue) ||
                (Boolean.TRUE.equals(regex)
-                       ? scalar.getValue().matches(oldValue)
+                       ? Pattern.compile(oldValue).matcher(scalar.getValue()).find()
                        : scalar.getValue().equals(oldValue));
     }
 

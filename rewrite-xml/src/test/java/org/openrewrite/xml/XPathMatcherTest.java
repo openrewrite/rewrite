@@ -147,6 +147,8 @@ class XPathMatcherTest {
           pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='maven-compiler-plugin']/configuration/source",
           pomXml1)).isTrue();
+        assertThat(match("/project/build/plugins/plugin[groupId='org.apache.maven.plugins']/configuration/source",
+          pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='somethingElse']/configuration/source",
           pomXml1)).isFalse();
         assertThat(match("/project/build//plugins/plugin/configuration/source",

@@ -115,6 +115,36 @@ class DependencyUseStringNotationTest implements RewriteTest {
     }
 
     @Test
+    void withGStringLiteral() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              def version = "latest.release"
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', version: "$version")
+                  implementation group: 'group', name: 'artifact', version: "$version"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              def version = "latest.release"
+              dependencies {
+                  api("org.openrewrite:rewrite-core:$version")
+                  implementation "group:artifact:$version"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void withoutVersion() {
         rewriteRun(
           buildGradle(

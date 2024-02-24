@@ -32,7 +32,7 @@ import java.util.List;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddCommentToMavenDependency extends Recipe {
 
     @Option(displayName = "XPath",

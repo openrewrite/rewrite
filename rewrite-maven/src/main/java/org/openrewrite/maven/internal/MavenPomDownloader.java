@@ -142,7 +142,8 @@ public class MavenPomDownloader {
             return Failsafe.with(retryPolicy).get(() -> {
                 try (HttpSender.Response response = httpSender.send(request)) {
                     if (!response.isSuccessful()) {
-                        throw new HttpSenderResponseException(null, response.getCode());
+                        throw new HttpSenderResponseException(null, response.getCode(),
+                                new String(response.getBodyAsBytes()));
                     }
                     return response.getBodyAsBytes();
                 }
@@ -216,6 +217,10 @@ public class MavenPomDownloader {
     public MavenMetadata downloadMetadata(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {
         if (gav.getGroupId() == null) {
             throw new MavenDownloadingException("Missing group id.", null, gav);
+        }
+
+        if (containingPom != null) {
+            gav = containingPom.getValues(gav);
         }
 
         ctx.getResolutionListener().downloadMetadata(gav);
@@ -727,6 +732,9 @@ public class MavenPomDownloader {
                 String httpsUri = repository.getUri().toLowerCase().startsWith("http:") ?
                         repository.getUri().replaceFirst("[hH][tT][tT][pP]://", "https://") :
                         repository.getUri();
+                if (!httpsUri.endsWith("/")) {
+                    httpsUri += "/";
+                }
 
                 HttpSender.Request.Builder request = applyAuthenticationToRequest(repository, httpSender.get(httpsUri));
                 MavenRepository normalized = null;
@@ -734,11 +742,10 @@ public class MavenPomDownloader {
                     sendRequest(request.build());
                     normalized = repository.withUri(httpsUri).withKnownToExist(true);
                 } catch (Throwable t) {
-                    ctx.getResolutionListener().repositoryAccessFailed(httpsUri, t);
                     if (t instanceof HttpSenderResponseException) {
                         HttpSenderResponseException e = (HttpSenderResponseException) t;
                         // response was returned from the server, but it was not a 200 OK. The server therefore exists.
-                        if (e.getResponseCode() != null) {
+                        if (e.isServerReached()) {
                             normalized = repository.withUri(httpsUri);
                         }
                     }
@@ -757,7 +764,7 @@ public class MavenPomDownloader {
                                         repository.getReadTimeout());
                             } catch (HttpSenderResponseException e) {
                                 //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
-                                if (e.getResponseCode() != null) {
+                                if (e.isServerReached()) {
                                     normalized = new MavenRepository(
                                             repository.getId(),
                                             originalUrl,
@@ -772,11 +779,11 @@ public class MavenPomDownloader {
                                 }
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
-                                ctx.getResolutionListener().repositoryAccessFailed(originalUrl, t);
                             }
                         }
                     }
-                    if (normalized == null) {
+                    if (normalized == null && !(t instanceof HttpSenderResponseException &&
+                                                ((HttpSenderResponseException) t).getBody().contains("Directory listing forbidden"))) {
                         ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), t);
                     }
                 }
@@ -874,9 +881,13 @@ public class MavenPomDownloader {
         @Nullable
         private final Integer responseCode;
 
-        public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode) {
+        private final String body;
+
+        public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode,
+                                           String body) {
             super(cause);
             this.responseCode = responseCode;
+            this.body = body;
         }
 
         /**
@@ -900,6 +911,11 @@ public class MavenPomDownloader {
 
         public boolean isAccessDenied() {
             return responseCode != null && 400 < responseCode && responseCode <= 403;
+        }
+
+        // Any response code below 100 implies that no connection was made. Sometimes 0 or -1 is used for connection failures.
+        public boolean isServerReached() {
+            return responseCode != null && responseCode >= 100;
         }
     }
 

@@ -49,6 +49,20 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
                           </plugin>
                       </plugins>
                   </build>
+                  <profiles>
+                      <profile>
+                          <id>profile</id>
+                          <build>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>io.quarkus</groupId>
+                                      <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                      <version>3.0.0.Beta1</version>
+                                  </plugin>
+                              </plugins>
+                          </build>
+                      </profile>
+                  </profiles>
               </project>
               """,
             """
@@ -66,6 +80,20 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
                           </plugin>
                       </plugins>
                   </build>
+                  <profiles>
+                      <profile>
+                          <id>profile</id>
+                          <build>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>io.quarkus</groupId>
+                                      <artifactId>quarkus-extension-maven-plugin</artifactId>
+                                      <version>3.0.0.Beta1</version>
+                                  </plugin>
+                              </plugins>
+                          </build>
+                      </profile>
+                  </profiles>
               </project>
               """
           )

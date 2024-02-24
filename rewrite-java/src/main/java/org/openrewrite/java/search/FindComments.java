@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class FindComments extends Recipe {
 

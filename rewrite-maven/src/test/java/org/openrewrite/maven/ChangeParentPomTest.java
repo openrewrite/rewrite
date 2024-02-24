@@ -26,7 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.Collections;
 import java.util.List;
 
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeParentPomTest implements RewriteTest {
@@ -1320,6 +1320,45 @@ class ChangeParentPomTest implements RewriteTest {
                   """
               )
             )
+          )
+        );
+    }
+
+    @Test
+    void changeParentToSameVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-dependencies", "spring-boot-starter-parent", "latest.patch", null, null, null, null, null)),
+          pomXml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-dependencies</artifactId>
+                  <version>2.7.18</version>
+                </parent>
+              </project>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                </parent>
+              </project>
+              """
           )
         );
     }

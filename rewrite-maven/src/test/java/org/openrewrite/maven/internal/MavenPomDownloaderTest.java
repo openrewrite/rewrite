@@ -44,8 +44,13 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import static java.util.Collections.*;
-import static org.assertj.core.api.Assertions.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
@@ -72,6 +77,16 @@ class MavenPomDownloaderTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    void ossSonatype() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        MavenRepository ossSonatype = new MavenRepository("oss", "https://oss.sonatype.org/content/repositories/snapshots/",
+          null, "true", false, null, null, null);
+        MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
+          MavenExecutionContextView.view(ctx), null);
+        assertThat(requireNonNull(repo).getUri()).isEqualTo(ossSonatype.getUri());
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/3908")
@@ -153,13 +168,10 @@ class MavenPomDownloaderTest {
 
     @Test
     void listenerRecordsFailedRepositoryAccess() {
-        var ctx = MavenExecutionContextView.view(this.ctx);
-        // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
-        for (MavenRepository repository : ctx.getRepositories()) {
-            repository.setKnownToExist(true);
-        }
-
-        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, false, null, null, null, null, null);
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        // Avoid actually trying to reach a made-up URL
+        String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
+        MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null, null);
         Map<String, Throwable> attemptedUris = new HashMap<>();
         List<MavenRepository> discoveredRepositories = new ArrayList<>();
         ctx.setResolutionListener(new ResolutionEventListener() {
@@ -176,10 +188,8 @@ class MavenPomDownloaderTest {
             // not expected to succeed
         }
         assertThat(attemptedUris).isNotEmpty();
-        assertThat(attemptedUris.get("https://internalartifactrepository.yourorg.com"))
-          .hasMessageContaining("javax.net.ssl.SSLHandshakeException");
-        assertThat(discoveredRepositories)
-          .isEmpty();
+        assertThat(attemptedUris.get(httpUrl)).hasMessageContaining("java.net.UnknownHostException");
+        assertThat(discoveredRepositories).isEmpty();
     }
 
     @Test
@@ -228,7 +238,7 @@ class MavenPomDownloaderTest {
         );
         assertThat(normalized)
           .extracting(MavenRepository::getUri)
-          .isEqualTo("https://artifactory.moderne.ninja/artifactory/moderne-cache");
+          .isEqualTo("https://artifactory.moderne.ninja/artifactory/moderne-cache/");
     }
 
     @Disabled("Flaky on CI")
@@ -240,7 +250,7 @@ class MavenPomDownloaderTest {
           MavenExecutionContextView.view(ctx), null);
 
         assertThat(oss).isNotNull();
-        assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
+        assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots/");
     }
 
     @ParameterizedTest

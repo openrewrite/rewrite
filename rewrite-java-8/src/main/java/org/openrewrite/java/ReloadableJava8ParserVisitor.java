@@ -1470,7 +1470,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
-            typeExpr = new J.AnnotatedType(randomId(), Space.EMPTY, Markers.EMPTY, typeExprAnnotations, typeExpr);
+            Space prefix = typeExprAnnotations.get(0).getPrefix();
+            typeExpr = new J.AnnotatedType(randomId(), prefix, Markers.EMPTY, ListUtils.mapFirst(typeExprAnnotations, a -> a.withPrefix(EMPTY)), typeExpr);
         }
 
         List<JLeftPadded<Space>> beforeDimensions = emptyList();

@@ -108,6 +108,13 @@ public class GradleWrapper {
         ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
     }
 
+    public Remote wrapperJar(SourceFile before) {
+        return Remote.builder(
+                before,
+                URI.create(distributionInfos.getDownloadUrl())
+        ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
+    }
+
     public Remote gradlew() {
         return Remote.builder(
                 WRAPPER_SCRIPT_LOCATION,

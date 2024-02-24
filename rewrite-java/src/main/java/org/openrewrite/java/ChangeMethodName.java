@@ -24,7 +24,7 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeMethodName extends Recipe {
 
     @Option(displayName = "Method pattern",
@@ -147,7 +147,7 @@ public class ChangeMethodName extends Recipe {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
-                if (methodMatcher.isFullyQualifiedClassReference(f)) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof J.Import && methodMatcher.isFullyQualifiedClassReference(f)) {
                     Expression target = f.getTarget();
                     if (target instanceof J.FieldAccess) {
                         String className = target.printTrimmed(getCursor());

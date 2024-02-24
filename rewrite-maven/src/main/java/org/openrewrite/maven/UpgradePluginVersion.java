@@ -41,7 +41,7 @@ import static java.util.Objects.requireNonNull;
  * more precise control over version updates to patch or minor releases.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpgradePluginVersion extends Recipe {
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);

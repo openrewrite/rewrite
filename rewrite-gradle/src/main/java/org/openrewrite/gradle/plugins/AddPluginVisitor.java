@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
@@ -91,7 +90,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     }
 
     private static MavenMetadata downloadMetadata(String groupId, String artifactId, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new MavenPomDownloader(emptyMap(), ctx, null, null)
+        return new MavenPomDownloader(ctx)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
                         repositories);
     }

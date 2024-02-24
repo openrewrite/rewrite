@@ -30,7 +30,7 @@ import java.util.Optional;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ExcludeDependency extends Recipe {
 
     @Option(displayName = "Group",

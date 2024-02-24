@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class RecipeEqualsAndHashCodeCallSuperTest implements RewriteTest {
+class RecipeEqualsAndHashCodeCallSuperTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -38,7 +38,7 @@ public class RecipeEqualsAndHashCodeCallSuperTest implements RewriteTest {
               import org.openrewrite.Recipe;
               import lombok.EqualsAndHashCode;
               import lombok.Value;
-                            
+              
               @Value
               @EqualsAndHashCode(callSuper = true)
               class MyRecipe extends Recipe {
@@ -48,10 +48,59 @@ public class RecipeEqualsAndHashCodeCallSuperTest implements RewriteTest {
               import org.openrewrite.Recipe;
               import lombok.EqualsAndHashCode;
               import lombok.Value;
-                            
+              
               @Value
               @EqualsAndHashCode(callSuper = false)
               class MyRecipe extends Recipe {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainExclude() {
+        rewriteRun(
+          java(
+            """
+              import org.openrewrite.Recipe;
+              import lombok.EqualsAndHashCode;
+              import lombok.Value;
+              
+              @Value
+              @EqualsAndHashCode(callSuper = true, exclude = "messages")
+              class MyRecipe extends Recipe {
+                  String messages;
+              }
+              """,
+            """
+              import org.openrewrite.Recipe;
+              import lombok.EqualsAndHashCode;
+              import lombok.Value;
+              
+              @Value
+              @EqualsAndHashCode(callSuper = false, exclude = "messages")
+              class MyRecipe extends Recipe {
+                  String messages;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipFalse() {
+        rewriteRun(
+          java(
+            """
+              import org.openrewrite.Recipe;
+              import lombok.EqualsAndHashCode;
+              import lombok.Value;
+              
+              @Value
+              @EqualsAndHashCode(callSuper = false, exclude = "messages")
+              class MyRecipe extends Recipe {
+                  String messages;
               }
               """
           )
