@@ -262,7 +262,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
         return whitespace;
     }
 
-    public <J2 extends J> JRightPadded<J2> minimumLines(JRightPadded<J2> tree, int min) {
+    private <J2 extends J> JRightPadded<J2> minimumLines(JRightPadded<J2> tree, int min) {
         return tree.withElement(minimumLines(tree.getElement(), min));
     }
 

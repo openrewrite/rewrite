@@ -147,7 +147,7 @@ public class ChangeMethodName extends Recipe {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
-                if (methodMatcher.isFullyQualifiedClassReference(f)) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof J.Import && methodMatcher.isFullyQualifiedClassReference(f)) {
                     Expression target = f.getTarget();
                     if (target instanceof J.FieldAccess) {
                         String className = target.printTrimmed(getCursor());

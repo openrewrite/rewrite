@@ -26,6 +26,8 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import java.io.Serializable;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+
 @SuppressWarnings("unused")
 @Value
 @With
@@ -59,11 +61,15 @@ public class GradleDependencyConfiguration implements Serializable {
      */
     List<ResolvedDependency> directResolved;
 
+    public List<ResolvedDependency> getDirectResolved() {
+        return directResolved == null ? emptyList() : directResolved;
+    }
+
     /**
      * The list of all dependencies resolved for this configuration, including transitive dependencies.
      */
     public List<ResolvedDependency> getResolved() {
-        List<ResolvedDependency> resolved = new ArrayList<>(directResolved);
+        List<ResolvedDependency> resolved = new ArrayList<>(getDirectResolved());
         Set<ResolvedDependency> alreadyResolved = new HashSet<>();
         return resolveTransitiveDependencies(resolved, alreadyResolved);
     }

@@ -25,13 +25,16 @@ import org.openrewrite.table.CommitsByDay;
 import org.openrewrite.table.DistinctCommitters;
 
 import java.time.LocalDate;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class FindCommitters extends Recipe {
+public class FindCommitters extends ScanningRecipe<AtomicReference<GitProvenance>> {
 
-    transient AtomicBoolean process = new AtomicBoolean(true);
     transient DistinctCommitters committers = new DistinctCommitters(this);
     transient CommitsByDay commitsByDay = new CommitsByDay(this);
 
@@ -59,38 +62,51 @@ public class FindCommitters extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(process.get(), new TreeVisitor<Tree, ExecutionContext>() {
+    public AtomicReference<GitProvenance> getInitialValue(ExecutionContext ctx) {
+        return new AtomicReference<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<GitProvenance> acc) {
+        return Preconditions.check(acc.get() == null, new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     sourceFile.getMarkers().findFirst(GitProvenance.class).ifPresent(provenance -> {
-                        process.set(false);
                         if (provenance.getCommitters() != null) {
-                            LocalDate from = StringUtils.isBlank(fromDate) ? null : LocalDate.parse(fromDate).minusDays(1);
-                            for (GitProvenance.Committer committer : provenance.getCommitters()) {
-                                if (from == null || committer.getCommitsByDay().keySet().stream().anyMatch(day -> day.isAfter(from))) {
-                                    committers.insertRow(ctx, new DistinctCommitters.Row(
-                                            committer.getName(),
-                                            committer.getEmail(),
-                                            committer.getCommitsByDay().lastKey(),
-                                            committer.getCommitsByDay().values().stream().mapToInt(Integer::intValue).sum()
-                                    ));
-
-                                    committer.getCommitsByDay().forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
-                                            committer.getName(),
-                                            committer.getEmail(),
-                                            day,
-                                            commits
-                                    )));
-                                }
-                            }
+                            acc.set(provenance);
                         }
                     });
                 }
                 return tree;
             }
         });
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicReference<GitProvenance> acc, ExecutionContext ctx) {
+        GitProvenance gitProvenance = acc.get();
+        if (gitProvenance != null) {
+            LocalDate from = StringUtils.isBlank(fromDate) ? null : LocalDate.parse(fromDate).minusDays(1);
+            for (GitProvenance.Committer committer : requireNonNull(gitProvenance.getCommitters())) {
+                if (from == null || committer.getCommitsByDay().keySet().stream().anyMatch(day -> day.isAfter(from))) {
+                    committers.insertRow(ctx, new DistinctCommitters.Row(
+                            committer.getName(),
+                            committer.getEmail(),
+                            committer.getCommitsByDay().lastKey(),
+                            committer.getCommitsByDay().values().stream().mapToInt(Integer::intValue).sum()
+                    ));
+
+                    committer.getCommitsByDay().forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
+                            committer.getName(),
+                            committer.getEmail(),
+                            day,
+                            commits
+                    )));
+                }
+            }
+        }
+        return Collections.emptyList();
     }
 }
