@@ -31,7 +31,6 @@ import java.util.regex.Pattern;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
-@SuppressWarnings("NotNullFieldNotInitialized")
 @Getter
 public class TypeMatcher {
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
@@ -51,16 +50,6 @@ public class TypeMatcher {
     @Getter
     private final boolean matchInherited;
 
-    public boolean matches(@Nullable TypeTree tt) {
-        return tt != null && matches(tt.getType());
-    }
-
-    public boolean matchesPackage(String packageName) {
-        return targetTypePattern.matcher(packageName).matches() ||
-               targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
-                       "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
-    }
-
     public TypeMatcher(@Nullable String fieldType) {
         this(fieldType, false);
     }
@@ -79,14 +68,24 @@ public class TypeMatcher {
                 @Override
                 public Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
                     String pattern = new TypeVisitor().visitTargetTypePattern(ctx);
-                    targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(ctx));
-                    targetType = isPlainIdentifier(ctx)
-                            ? pattern.replace(ASPECTJ_DOT_PATTERN, ".").replace("\\", "")
-                            : null;
+                    if (isPlainIdentifier(ctx)) {
+                        targetType = pattern;
+                    }
+                    targetTypePattern = Pattern.compile(StringUtils.aspectjNameToPattern(pattern));
                     return null;
                 }
             }.visitTargetTypePattern(parser.targetTypePattern());
         }
+    }
+
+    public boolean matches(@Nullable TypeTree tt) {
+        return tt != null && matches(tt.getType());
+    }
+
+    public boolean matchesPackage(String packageName) {
+        return targetTypePattern.matcher(packageName).matches() ||
+               targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
+                       "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
     }
 
     public boolean matches(@Nullable JavaType type) {
@@ -99,7 +98,7 @@ public class TypeMatcher {
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
         return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
-               this.targetType == null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+               this.targetTypePattern != null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
