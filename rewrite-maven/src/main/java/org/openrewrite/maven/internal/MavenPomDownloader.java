@@ -731,6 +731,9 @@ public class MavenPomDownloader {
                 String httpsUri = repository.getUri().toLowerCase().startsWith("http:") ?
                         repository.getUri().replaceFirst("[hH][tT][tT][pP]://", "https://") :
                         repository.getUri();
+                if (!httpsUri.endsWith("/")) {
+                    httpsUri += "/";
+                }
 
                 HttpSender.Request.Builder request = applyAuthenticationToRequest(repository, httpSender.get(httpsUri));
                 MavenRepository normalized = null;
@@ -744,11 +747,6 @@ public class MavenPomDownloader {
                         if (e.isServerReached()) {
                             normalized = repository.withUri(httpsUri);
                         }
-                        if (!"Directory listing forbidden".equals(e.getBody())) {
-                            ctx.getResolutionListener().repositoryAccessFailed(httpsUri, t);
-                        }
-                    } else {
-                        ctx.getResolutionListener().repositoryAccessFailed(httpsUri, t);
                     }
                     if (normalized == null) {
                         if (!httpsUri.equals(originalUrl)) {
@@ -776,11 +774,11 @@ public class MavenPomDownloader {
                                 }
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
-                                ctx.getResolutionListener().repositoryAccessFailed(originalUrl, t);
                             }
                         }
                     }
-                    if (normalized == null) {
+                    if (normalized == null && !(t instanceof HttpSenderResponseException &&
+                                                ((HttpSenderResponseException) t).getBody().contains("Directory listing forbidden"))) {
                         ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), t);
                     }
                 }
