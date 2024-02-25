@@ -133,14 +133,11 @@ public class AddNullMethodArgument extends Recipe {
 
                 JavaType.Method methodType = m.getMethodType();
                 if (methodType != null) {
-                    List<String> parameterNames = new ArrayList<>(methodType.getParameterNames());
-                    parameterNames.add(argumentIndex, parameterName == null ? "arg" + argumentIndex : parameterName);
-                    List<JavaType> parameterTypes = new ArrayList<>(methodType.getParameterTypes());
-                    parameterTypes.add(argumentIndex, JavaType.buildType(parameterType));
-
                     m = m.withMethodType(methodType
-                            .withParameterNames(parameterNames)
-                            .withParameterTypes(parameterTypes));
+                            .withParameterNames(ListUtils.insert(methodType.getParameterNames(),
+                                    parameterName == null ? "arg" + argumentIndex : parameterName, argumentIndex))
+                            .withParameterTypes(ListUtils.insert(methodType.getParameterTypes(),
+                                    JavaType.buildType(parameterType), argumentIndex)));
                     if (m instanceof J.MethodInvocation && ((J.MethodInvocation) m).getName().getType() != null) {
                         m = ((J.MethodInvocation) m).withName(((J.MethodInvocation) m).getName().withType(m.getMethodType()));
                     }

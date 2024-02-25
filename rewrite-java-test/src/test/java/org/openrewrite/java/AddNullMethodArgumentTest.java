@@ -81,7 +81,7 @@ class AddNullMethodArgumentTest implements RewriteTest {
           spec -> spec.recipe(new AddNullMethodArgument("B foo(Integer,Integer,Integer)", 3, "java.lang.String", "n2", true)),
           java(
             "class A {{ B.foo(0, 1, 2); }}",
-            "class A {{ B.foo(0, 1, 2, (String) null); }}"
+            "class A {{ B.foo(0, 1, 2, (java.lang.String) null); }}"
           )
         );
     }
