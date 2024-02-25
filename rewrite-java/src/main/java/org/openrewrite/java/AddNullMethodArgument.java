@@ -18,6 +18,8 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -26,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.Space.EMPTY;
 
 /**
  * This recipe finds method invocations matching a method pattern and uses a zero-based argument index to determine
@@ -51,6 +54,23 @@ public class AddNullMethodArgument extends Recipe {
             description = "A zero-based index that indicates which argument will be added as null to the method invocation.",
             example = "0")
     int argumentIndex;
+
+    @Option(displayName = "Parameter type",
+            description = "The type of the parameter that we add the argument for.",
+            example = "java.lang.String")
+    String parameterType;
+
+    @Option(displayName = "Parameter name",
+            description = "The name of the parameter that we add the argument for.",
+            required = false,
+            example = "name")
+    @Nullable String parameterName;
+
+    @Option(displayName = "Explicit cast",
+            description = "Explicitly cast the argument to the parameter type. Useful if the method is overridden with another type.",
+            required = false,
+            example = "true")
+    @Nullable Boolean explicitCast;
 
     @Override
     public String getInstanceNameSuffix() {
@@ -97,19 +117,26 @@ public class AddNullMethodArgument extends Recipe {
             if (methodMatcher.matches(m) && (long) originalArgs.size() >= argumentIndex) {
                 List<Expression> args = new ArrayList<>(originalArgs);
 
-                if(args.size() == 1 && args.get(0) instanceof J.Empty) {
+                if (args.size() == 1 && args.get(0) instanceof J.Empty) {
                     args.remove(0);
                 }
 
-                args.add(argumentIndex, new J.Literal(randomId(), args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE, Markers.EMPTY, "null", "null", null, JavaType.Primitive.Null));
-                m = m.withArguments(args);
+                Expression nullLiteral = new J.Literal(randomId(), args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE, Markers.EMPTY, "null", "null", null, JavaType.Primitive.Null);
+                if (explicitCast == Boolean.TRUE) {
+                    nullLiteral = new J.TypeCast(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                            new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
+                                    new JRightPadded<>(TypeTree.build(parameterType), EMPTY, Markers.EMPTY)),
+                            nullLiteral);
+                    maybeAddImport(parameterType);
+                }
+                m = m.withArguments(ListUtils.insert(args, nullLiteral, argumentIndex));
 
                 JavaType.Method methodType = m.getMethodType();
                 if (methodType != null) {
                     List<String> parameterNames = new ArrayList<>(methodType.getParameterNames());
-                    parameterNames.add(argumentIndex, "null");
+                    parameterNames.add(argumentIndex, parameterName == null ? "arg" + argumentIndex : parameterName);
                     List<JavaType> parameterTypes = new ArrayList<>(methodType.getParameterTypes());
-                    parameterTypes.add(argumentIndex, JavaType.Primitive.Null);
+                    parameterTypes.add(argumentIndex, JavaType.buildType(parameterType));
 
                     m = m.withMethodType(methodType
                             .withParameterNames(parameterNames)
@@ -121,5 +148,6 @@ public class AddNullMethodArgument extends Recipe {
             }
             return m;
         }
+
     }
 }
