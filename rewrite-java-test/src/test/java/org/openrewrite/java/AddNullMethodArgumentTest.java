@@ -42,7 +42,7 @@ class AddNullMethodArgumentTest implements RewriteTest {
     @Test
     void addToMiddleArgument() {
         rewriteRun(
-          spec -> spec.recipe(new AddNullMethodArgument("B foo(Integer, Integer)", 1, Integer.class.getName(), "n2", false)),
+          spec -> spec.recipe(new AddNullMethodArgument("B foo(Integer, Integer)", 1, "java.lang.Integer", "n2", false)),
           java(
             "class A {{ B.foo(0, 1); }}",
             "class A {{ B.foo(0, null, 1); }}"
@@ -54,8 +54,8 @@ class AddNullMethodArgumentTest implements RewriteTest {
     void addArgumentsConsecutively() {
         rewriteRun(
           spec -> spec.recipes(
-            new AddNullMethodArgument("B foo(Integer)", 1, Integer.class.getName(), "n2", false),
-            new AddNullMethodArgument("B foo(Integer, Integer)", 1, Integer.class.getName(), "n2", false)
+            new AddNullMethodArgument("B foo(Integer)", 1, "java.lang.Integer", "n2", false),
+            new AddNullMethodArgument("B foo(Integer, Integer)", 1, "java.lang.Integer", "n2", false)
           ),
           java(
             "class A {{ B.foo(0); }}",
@@ -67,7 +67,7 @@ class AddNullMethodArgumentTest implements RewriteTest {
     @Test
     void addToConstructorArgument() {
         rewriteRun(
-          spec -> spec.recipe(new AddNullMethodArgument("B <constructor>()", 0, Integer.class.getName(), "arg", false)),
+          spec -> spec.recipe(new AddNullMethodArgument("B <constructor>()", 0, "java.lang.Integer", "arg", false)),
           java(
             "class A { B b = new B(); }",
             "class A { B b = new B(null); }"
