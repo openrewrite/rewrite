@@ -143,7 +143,7 @@ class JavaParserTest implements RewriteTest {
         rewriteRun(
           java(
             source,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).hasToString("my/example/PublicClass.java"))
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my","example","PublicClass.java")))
           )
         );
     }
