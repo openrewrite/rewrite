@@ -15,23 +15,24 @@
  */
 package org.openrewrite.java;
 
-import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 class AddNullMethodArgumentTest implements RewriteTest {
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.parser(JavaParser.fromJavaVersion().dependsOn("""
           class B {
-             public static void foo() {}
-             public static void foo(Integer n) {}
-             public static void foo(Integer n1, Integer n2) {}
-             public static void foo(Integer n1, Integer n2, Integer n3) {}
-             public B() {}
-             public B(Integer n) {}
+             static void foo() {}
+             static void foo(Integer n) {}
+             static void foo(Integer n1, Integer n2) {}
+             static void foo(Integer n1, Integer n2, Integer n3) {}
+             B() {}
+             B(Integer n) {}
           }
           """));
     }
@@ -41,8 +42,8 @@ class AddNullMethodArgumentTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddNullMethodArgument("B foo(Integer, Integer)", 1)),
           java(
-            "public class A {{ B.foo(0, 1); }}",
-            "public class A {{ B.foo(0, null, 1); }}"
+            "class A {{ B.foo(0, 1); }}",
+            "class A {{ B.foo(0, null, 1); }}"
           )
         );
     }
@@ -54,7 +55,6 @@ class AddNullMethodArgumentTest implements RewriteTest {
             new AddNullMethodArgument("B foo(Integer)", 1),
             new AddNullMethodArgument("B foo(Integer, null)", 1)
           ),
-          java(b),
           java(
             "class A {{ B.foo(0); }}",
             "class A {{ B.foo(0, null, null); }}"
@@ -66,10 +66,9 @@ class AddNullMethodArgumentTest implements RewriteTest {
     void addToConstructorArgument() {
         rewriteRun(
           spec -> spec.recipe(new AddNullMethodArgument("B <constructor>()", 0)),
-          java(b),
           java(
-            "public class A { B b = new B(); }",
-            "public class A { B b = new B(null); }"
+            "class A { B b = new B(); }",
+            "class A { B b = new B(null); }"
           )
         );
     }

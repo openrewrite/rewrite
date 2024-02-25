@@ -59,12 +59,12 @@ public class AddNullMethodArgument extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Add a `null` method argument"
+        return "Add a `null` method argument";
     }
 
     @Override
     public String getDescription() {
-        return "Add a `null` argument to method invocations."
+        return "Add a `null` argument to method invocations.";
     }
 
     @Override
