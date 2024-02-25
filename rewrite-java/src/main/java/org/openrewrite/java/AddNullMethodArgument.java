@@ -127,7 +127,6 @@ public class AddNullMethodArgument extends Recipe {
                             new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
                                     new JRightPadded<>(TypeTree.build(parameterType), EMPTY, Markers.EMPTY)),
                             nullLiteral);
-                    maybeAddImport(parameterType);
                 }
                 m = m.withArguments(ListUtils.insert(args, nullLiteral, argumentIndex));
 
