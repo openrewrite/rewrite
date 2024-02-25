@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,12 +59,12 @@ public class AddNullMethodArgument extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Delete method argument";
+        return "Add a `null` method argument"
     }
 
     @Override
     public String getDescription() {
-        return "Delete an argument from method invocations.";
+        return "Add a `null` argument to method invocations."
     }
 
     @Override

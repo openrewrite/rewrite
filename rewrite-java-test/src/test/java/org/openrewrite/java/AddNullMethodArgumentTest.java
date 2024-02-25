@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,23 +22,24 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 class AddNullMethodArgumentTest implements RewriteTest {
-    @Language("java")
-    String b = """
-      class B {
-         public static void foo() {}
-         public static void foo(Integer n) {}
-         public static void foo(Integer n1, Integer n2) {}
-         public static void foo(Integer n1, Integer n2, Integer n3) {}
-         public B() {}
-         public B(Integer n) {}
-      }
-      """;
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.parser(JavaParser.fromJavaVersion().dependsOn("""
+          class B {
+             public static void foo() {}
+             public static void foo(Integer n) {}
+             public static void foo(Integer n1, Integer n2) {}
+             public static void foo(Integer n1, Integer n2, Integer n3) {}
+             public B() {}
+             public B(Integer n) {}
+          }
+          """));
+    }
 
     @Test
     void addToMiddleArgument() {
         rewriteRun(
           spec -> spec.recipe(new AddNullMethodArgument("B foo(Integer, Integer)", 1)),
-          java(b),
           java(
             "public class A {{ B.foo(0, 1); }}",
             "public class A {{ B.foo(0, null, 1); }}"
@@ -54,8 +55,9 @@ class AddNullMethodArgumentTest implements RewriteTest {
             new AddNullMethodArgument("B foo(Integer, null)", 1)
           ),
           java(b),
-          java("public class A {{ B.foo(0); }}",
-            "public class A {{ B.foo(0, null, null); }}"
+          java(
+            "class A {{ B.foo(0); }}",
+            "class A {{ B.foo(0, null, null); }}"
           )
         );
     }
