@@ -35,9 +35,11 @@ class AddPropertyTest implements RewriteTest {
         rewriteRun(
           buildGradle("plugins { id 'java' }"),
           properties(
+            //language=properties
             """
               project.name=helloworld
               """,
+            //language=properties
             """
               org.gradle.caching=true
               project.name=helloworld
@@ -52,10 +54,12 @@ class AddPropertyTest implements RewriteTest {
         rewriteRun(
           buildGradle("plugins { id 'java' }"),
           properties(
+            //language=properties
             """
               project.name=helloworld
               org.gradle.caching=false
               """,
+            //language=properties
             """
               project.name=helloworld
               org.gradle.caching=true
@@ -71,6 +75,7 @@ class AddPropertyTest implements RewriteTest {
           buildGradle("plugins { id 'java' }"),
           properties(
             null,
+            //language=properties
             """
               org.gradle.caching=true
               """,
@@ -86,6 +91,7 @@ class AddPropertyTest implements RewriteTest {
           buildGradle("plugins { id 'java' }"),
           properties(
             "",
+            //language=properties
             """
               org.gradle.caching=true
               """,

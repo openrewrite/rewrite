@@ -103,16 +103,36 @@ public class MergeYaml extends Recipe {
                         return d;
                     }
                     // If there is no space between the colon and the value it will not be interpreted as a mapping
-                    @Language("yml") String snippet =
-                            valueKey + ":" +
-                            ((yaml.startsWith(" ")) ? "" : " ")
-                            + yaml;
+                    String snippet;
+                    if (incoming instanceof Yaml.Mapping) {
+                        snippet = valueKey + ":\n" + indent(yaml);
+                    } else {
+                        snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
+                    }
                     // No matching element already exists, so it must be constructed
                     return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), snippet,
                             Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(d.getBlock(),
                             ctx, getCursor()));
                 }
                 return d;
+            }
+
+            public String indent(String text) {
+                int index = text.indexOf('\n');
+                if (index == -1 || index == text.length() - 1) {
+                    return text;
+                }
+                StringBuilder padding = new StringBuilder();
+                for (int i = index + 1; i < text.length(); i++) {
+                    if (!Character.isWhitespace(text.charAt(i))) {
+                        break;
+                    }
+                    padding.append(text.charAt(i));
+                }
+                if (padding.length() == 0) {
+                    padding.append("  ");
+                }
+                return text.replaceAll("(?m)^", padding.toString());
             }
 
             @Nullable
@@ -141,9 +161,13 @@ public class MergeYaml extends Recipe {
                     // this tests for an awkward case that will be better handled by JsonPathMatcher.
                     // if it is a sequence, we want to insert into every sequence entry for now.
                     if (!(entry.getValue() instanceof Yaml.Sequence)) {
-                        return entry.withValue((Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
-                                Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(entry.getValue(),
-                                ctx, getCursor()));
+                        Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
+                                Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visitNonNull(entry.getValue(),
+                                ctx, getCursor());
+                        if (value instanceof Yaml.Scalar && value.getPrefix().isEmpty()) {
+                            value = value.withPrefix(" ");
+                        }
+                        return entry.withValue(value);
                     }
                 }
                 return super.visitMappingEntry(entry, ctx);

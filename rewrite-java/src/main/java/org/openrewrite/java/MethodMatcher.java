@@ -32,7 +32,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static java.util.stream.Collectors.joining;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 /**
@@ -62,10 +62,10 @@ public class MethodMatcher {
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
     private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
 
-    @Getter
+    @Nullable
     private Pattern targetTypePattern;
 
-    @Getter
+    @Nullable
     private Pattern methodNamePattern;
 
     @Getter
@@ -98,15 +98,22 @@ public class MethodMatcher {
             public Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
                 MethodSignatureParser.TargetTypePatternContext targetTypePatternContext = ctx.targetTypePattern();
                 String pattern = new TypeVisitor().visitTargetTypePattern(targetTypePatternContext);
-                targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(targetTypePatternContext));
-                targetType = isPlainIdentifier(targetTypePatternContext)
-                        ? pattern.replace(ASPECTJ_DOT_PATTERN, ".").replace("\\", "")
-                        : null;
-                pattern = ctx.simpleNamePattern().children.stream()
-                        .map(c -> StringUtils.aspectjNameToPattern(c.toString()))
-                        .collect(joining(""));
-                methodNamePattern = Pattern.compile(pattern);
-                methodName = isPlainIdentifier(ctx.simpleNamePattern()) ? pattern : null;
+                if (isPlainIdentifier(targetTypePatternContext)) {
+                    targetType = pattern;
+                } else {
+                    targetTypePattern = Pattern.compile(StringUtils.aspectjNameToPattern(pattern));
+                }
+
+                StringBuilder builder = new StringBuilder();
+                for (ParseTree child : ctx.simpleNamePattern().children) {
+                    builder.append(StringUtils.aspectjNameToPattern(child.getText()));
+                }
+                if (isPlainIdentifier(ctx.simpleNamePattern())) {
+                    methodName = builder.toString();
+                } else {
+                    methodNamePattern = Pattern.compile(builder.toString());
+                }
+
                 argumentPattern = Pattern.compile(new FormalParameterVisitor().visitFormalParametersPattern(
                         ctx.formalParametersPattern()));
                 return null;
@@ -142,9 +149,19 @@ public class MethodMatcher {
         this(methodPattern(method), false);
     }
 
+    @Deprecated
+    public Pattern getTargetTypePattern() {
+        return targetTypePattern != null ? targetTypePattern : Pattern.compile(requireNonNull(targetType));
+    }
+
+    @Deprecated
+    public Pattern getMethodNamePattern() {
+        return methodNamePattern != null ? methodNamePattern : Pattern.compile(requireNonNull(methodName));
+    }
+
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
         return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
-               this.targetType == null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+               this.targetTypePattern != null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
@@ -158,7 +175,7 @@ public class MethodMatcher {
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private boolean matchesMethodName(String methodName) {
         return this.methodName != null && this.methodName.equals(methodName) ||
-               this.methodName == null && methodNamePattern.matcher(methodName).matches();
+               this.methodNamePattern != null && methodNamePattern.matcher(methodName).matches();
     }
 
     private boolean matchesParameterTypes(List<JavaType> parameterTypes) {
@@ -205,7 +222,7 @@ public class MethodMatcher {
 
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
-        boolean matchesTargetType = (targetType == null && "[^.]*".equals(targetTypePattern.pattern()))
+        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern()))
                                     || matchesTargetType(enclosing.getType());
         if (!matchesTargetType) {
             return false;
@@ -281,6 +298,7 @@ public class MethodMatcher {
         if (targetType != null) {
             return targetType.equals(select.getSimpleName()) || targetType.endsWith('.' + select.getSimpleName());
         }
+        //noinspection DataFlowIssue
         return targetTypePattern.matcher(select.getSimpleName()).matches() ||
                Pattern.compile(targetTypePattern.pattern()
                                .replaceAll(".*" + Pattern.quote(ASPECTJ_DOT_PATTERN), "")
@@ -308,16 +326,22 @@ public class MethodMatcher {
      *
      * @param fieldAccess A J.FieldAccess that hopefully has the same fully qualified type as this matcher.
      */
+    @SuppressWarnings("DataFlowIssue")
     public boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess) {
-        String hopefullyFullyQualifiedMethod;
-        if (targetType != null) {
-            hopefullyFullyQualifiedMethod = targetType + "." + methodNamePattern.pattern();
-        } else {
-            hopefullyFullyQualifiedMethod = targetTypePattern.pattern()
-                                                    .replace(ASPECTJ_DOT_PATTERN, ".")
-                                            + "." + methodNamePattern.pattern();
+        if (methodName != null && !methodName.equals(fieldAccess.getName().getSimpleName())) {
+            return false;
+        } else if (methodNamePattern != null && !methodNamePattern.matcher(fieldAccess.getName().getSimpleName()).matches()) {
+            return false;
         }
-        return fieldAccess.isFullyQualifiedClassReference(hopefullyFullyQualifiedMethod);
+
+        Expression target = fieldAccess.getTarget();
+        if (target instanceof J.Identifier) {
+            return targetType != null && targetType.equals(((J.Identifier) target).getSimpleName()) ||
+                    targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
+        } else if (target instanceof J.FieldAccess) {
+            return ((J.FieldAccess) target).isFullyQualifiedClassReference(targetType != null ? targetType : targetTypePattern.pattern());
+        }
+        return false;
     }
 
     @Nullable
@@ -354,6 +378,15 @@ public class MethodMatcher {
 
         return typePattern(method.getDeclaringType()) + " " +
                method.getName() + "(" + parameters + ")";
+    }
+
+    @Override
+    public String toString() {
+        //noinspection DataFlowIssue
+        return (targetType != null ? targetType : targetTypePattern.pattern()) +
+               ' ' +
+               (methodName != null ? methodName : methodNamePattern.pattern()) +
+               '(' + argumentPattern.pattern() + ')';
     }
 }
 
@@ -399,12 +432,12 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
     public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
         StringBuilder classNameBuilder = new StringBuilder();
         for (ParseTree c : ctx.children) {
-            classNameBuilder.append(StringUtils.aspectjNameToPattern(c.getText()));
+            classNameBuilder.append(c.getText());
         }
         String className = classNameBuilder.toString();
 
         if (!className.contains(".")) {
-            int arrInit = className.lastIndexOf("\\[");
+            int arrInit = className.lastIndexOf('[');
             String beforeArr = arrInit == -1 ? className : className.substring(0, arrInit);
             if (Character.isLowerCase(beforeArr.charAt(0)) && JavaType.Primitive.fromKeyword(beforeArr) != null) {
                 return className;
@@ -506,7 +539,7 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
             @Override
             String getRegex() {
                 String baseType = new TypeVisitor().visitFormalTypePattern(ctx);
-                return baseType + (variableArgs ? "\\[\\]" : "");
+                return StringUtils.aspectjNameToPattern(baseType) + (variableArgs ? "\\[\\]" : "");
             }
         }
     }

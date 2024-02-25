@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 
 @Value
 @With
@@ -35,6 +36,10 @@ public class Dependency {
 
     @Nullable
     String ext;
+
+    public GroupArtifactVersion getGav() {
+        return new GroupArtifactVersion(groupId, artifactId, version);
+    }
 
     public String toStringNotation() {
         StringBuilder builder = new StringBuilder();

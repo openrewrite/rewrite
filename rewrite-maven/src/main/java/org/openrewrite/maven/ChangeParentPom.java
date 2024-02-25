@@ -185,18 +185,20 @@ public class ChangeParentPom extends Recipe {
                         (oldRelativePath == null || matchesGlob(resolvedPom.getValue(tag.getChildValue("relativePath").orElse(null)), oldRelativePath))) {
                         String oldVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
                         assert oldVersion != null;
-                        String targetGroupId = newGroupId == null ? tag.getChildValue("groupId").orElse(oldGroupId) : newGroupId;
-                        String targetArtifactId = newArtifactId == null ? tag.getChildValue("artifactId").orElse(oldArtifactId) : newArtifactId;
+                        String currentGroupId = tag.getChildValue("groupId").orElse(oldGroupId);
+                        String targetGroupId = newGroupId == null ? currentGroupId : newGroupId;
+                        String currentArtifactId = tag.getChildValue("artifactId").orElse(oldArtifactId);
+                        String targetArtifactId = newArtifactId == null ? currentArtifactId : newArtifactId;
                         String targetRelativePath = newRelativePath == null ? tag.getChildValue("relativePath").orElse(oldRelativePath) : newRelativePath;
                         try {
-                            Optional<String> targetVersion = findNewerDependencyVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
+                            Optional<String> targetVersion = findAcceptableVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
                             if (targetVersion.isPresent()) {
                                 List<XmlVisitor<ExecutionContext>> changeParentTagVisitors = new ArrayList<>();
-                                if (!oldGroupId.equals(targetGroupId)) {
+                                if (!currentGroupId.equals(targetGroupId)) {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId));
                                 }
 
-                                if (!oldArtifactId.equals(targetArtifactId)) {
+                                if (!currentArtifactId.equals(targetArtifactId)) {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), targetArtifactId));
                                 }
 
@@ -207,7 +209,7 @@ public class ChangeParentPom extends Recipe {
                                 // Update or add relativePath
                                 if (oldRelativePath != null && !oldRelativePath.equals(targetRelativePath)) {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("relativePath").get(), targetRelativePath));
-                                } else if (tag.getChildValue("relativePath").orElse(null) == null && targetRelativePath != null) {
+                                } else if (mismatches(tag.getChild("relativePath").orElse(null), targetRelativePath)) {
                                     final Xml.Tag relativePathTag;
                                     if (StringUtils.isBlank(targetRelativePath)) {
                                         relativePathTag = Xml.Tag.build("<relativePath />");
@@ -218,7 +220,7 @@ public class ChangeParentPom extends Recipe {
                                     maybeUpdateModel();
                                 }
 
-                                if (changeParentTagVisitors.size() > 0) {
+                                if (!changeParentTagVisitors.isEmpty()) {
                                     retainVersions();
                                     doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions).getVisitor());
                                     for (XmlVisitor<ExecutionContext> visitor : changeParentTagVisitors) {
@@ -236,6 +238,17 @@ public class ChangeParentPom extends Recipe {
                 return t;
             }
 
+            private boolean mismatches(@Nullable Xml.Tag relativePath, @Nullable String targetRelativePath) {
+                if (relativePath == null) {
+                    return targetRelativePath != null;
+                }
+                String relativePathValue = relativePath.getValue().orElse(null);
+                if (relativePathValue == null) {
+                    return !StringUtils.isBlank(targetRelativePath);
+                }
+                return !relativePathValue.equals(targetRelativePath);
+            }
+
             private void retainVersions() {
                 for (Recipe retainVersionRecipe : RetainVersions.plan(this, retainVersions == null ?
                         emptyList() : retainVersions)) {
@@ -243,7 +256,7 @@ public class ChangeParentPom extends Recipe {
                 }
             }
 
-            private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
+            private Optional<String> findAcceptableVersion(String groupId, String artifactId, String currentVersion,
                                                                 ExecutionContext ctx) throws MavenDownloadingException {
                 String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
 
@@ -251,10 +264,18 @@ public class ChangeParentPom extends Recipe {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                             .filter(v -> versionComparator.isValid(finalCurrentVersion, v))
-                            .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(finalCurrentVersion, finalCurrentVersion, v) < 0)
+                            .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(finalCurrentVersion, finalCurrentVersion, v) <= 0)
                             .collect(Collectors.toList());
                 }
-                return Boolean.TRUE.equals(allowVersionDowngrades) ? availableVersions.stream().max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2)) : versionComparator.upgrade(finalCurrentVersion, availableVersions);
+                if (Boolean.TRUE.equals(allowVersionDowngrades)) {
+                    return availableVersions.stream()
+                            .max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2));
+                }
+                Optional<String> upgradedVersion = versionComparator.upgrade(finalCurrentVersion, availableVersions);
+                if (upgradedVersion.isPresent()) {
+                    return upgradedVersion;
+                }
+                return availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
             }
         });
     }

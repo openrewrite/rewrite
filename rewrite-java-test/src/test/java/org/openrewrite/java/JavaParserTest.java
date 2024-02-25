@@ -20,6 +20,8 @@ import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
@@ -129,5 +131,20 @@ class JavaParserTest implements RewriteTest {
                   i -> assertThat(i.getType()).hasToString("InterfaceB")
                 )));
         }
+    }
+
+    @ParameterizedTest
+    // language=java
+    @ValueSource(strings = {
+      "package my.example; class PrivateClass { void foo() {} } public class PublicClass { void bar() {} }",
+      "package my.example; public class PublicClass { void bar() {} } class PrivateClass { void foo() {} }"
+    })
+    void shouldResolvePathUsingPublicClasses(@Language("java") String source) {
+        rewriteRun(
+          java(
+            source,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my","example","PublicClass.java")))
+          )
+        );
     }
 }

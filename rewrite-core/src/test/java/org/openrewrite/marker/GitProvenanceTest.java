@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.marker.ci.*;
 
@@ -68,6 +69,16 @@ class GitProvenanceTest {
     void getOrganizationName(String remote) {
         assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getOrganizationName())
           .isEqualTo("openrewrite");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+      "git@gitlab.acme.com:organization/subgroup/repository.git, https://gitlab.acme.com, organization/subgroup",
+      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, organization/subgroup"
+    })
+    void getOrganizationNameWithBaseUrl(String gitOrigin, String baseUrl, String organizationName) {
+        assertThat(new GitProvenance(randomId(), gitOrigin, "main", "123", null, null, emptyList()).getOrganizationName(baseUrl))
+          .isEqualTo(organizationName);
     }
 
     @ParameterizedTest

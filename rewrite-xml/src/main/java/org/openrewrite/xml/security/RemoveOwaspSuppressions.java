@@ -29,7 +29,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -71,7 +70,7 @@ public class RemoveOwaspSuppressions extends Recipe {
                                 }
                                 try {
                                     LocalDate date = LocalDate.parse(maybeDate);
-                                    if (date.isBefore(LocalDate.now().minus(1, ChronoUnit.DAYS))) {
+                                    if (date.isBefore(LocalDate.now().minusDays(1))) {
                                         return true;
                                     }
                                 } catch (DateTimeParseException e) {

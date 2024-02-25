@@ -200,6 +200,11 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public T visitNonNull(Tree tree, P p, Cursor parent) {
+        if (parent.getValue() instanceof Tree && ((Tree) parent.getValue()).isScope(tree)) {
+            throw new IllegalArgumentException(
+                    "The `parent` cursor must not point to the same `tree` as the tree to be visited"
+            );
+        }
         T t = visit(tree, p, parent);
         assert t != null;
         return t;
