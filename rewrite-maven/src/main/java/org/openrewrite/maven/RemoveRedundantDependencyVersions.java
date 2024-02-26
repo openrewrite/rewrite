@@ -173,9 +173,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     @Nullable
-    private static String getManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId) {
+    private static String getManagedPluginVersion(ResolvedPom resolvedPom, @Nullable String groupId, String artifactId) {
         for (Plugin p : resolvedPom.getPluginManagement()) {
-            if (groupId.equals(p.getGroupId()) && artifactId.equals(p.getArtifactId())) {
+            if (p.getGroupId().equals(groupId) && p.getArtifactId().equals(artifactId)) {
                 return resolvedPom.getValue(p.getVersion());
             }
         }
