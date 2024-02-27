@@ -20,43 +20,19 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-class ClassExpressionTest implements RewriteTest {
+@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
+class AttributeTest implements RewriteTest {
 
     @Test
-    void classExpressions() {
+    void usingGroovyNode() {
         rewriteRun(
           groovy(
             """
-              maven( List , List ) {
-                  from(components.java)
-              }
+              def xml = new Node(null, "ivy")
+              def n = xml.dependencies.dependency.find { it.@name == 'test-module' }
+              n.@conf = 'runtime->default;docs->docs;sources->sources'
               """
           )
         );
-    }
-
-    @Test
-    void innerClassExpression() {
-        rewriteRun(
-          groovy(
-            """
-              ProcessBuilder.Redirect.to(new File("wat"))
-              """
-          )
-        );
-
-    }
-
-    @Test
-    void innerClassViaImport() {
-        rewriteRun(
-          groovy(
-            """
-              import java.lang.ProcessBuilder.Redirect
-              Redirect.to(new File("wat"))
-              """
-          )
-        );
-
     }
 }
