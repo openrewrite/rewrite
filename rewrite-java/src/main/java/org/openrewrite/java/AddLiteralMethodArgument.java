@@ -59,14 +59,14 @@ public class AddLiteralMethodArgument extends Recipe {
 
     @Option(displayName = "Literal",
             description = "The literal value that we add the argument for.",
-            example = "0")
+            example = "abc")
     Object literal;
 
     @Option(displayName = "Parameter type",
-            description = "The type of the parameter that we add the argument for. Options are: `String`, `int`,`short`, " +
-                          "`long`, `float`, `double`, `boolean` or `char`. Defaults to `String`.",
+            description = "The type of the parameter that we add the argument for. Defaults to `String`.",
             required = false,
-            example = "String")
+            example = "String",
+            valid = {"String", "int", "short", "long", "float", "double", "boolean", "char"})
     @Nullable
     String primitiveType;
 
@@ -129,10 +129,6 @@ public class AddLiteralMethodArgument extends Recipe {
                 }else {
                     primitive = Primitive.fromKeyword(primitiveType.toLowerCase());
                     valueSource = String.valueOf(getLiteral());
-                }
-
-                if (Arrays.asList(Primitive.Byte, Primitive.Null, JavaType.Primitive.Void, Primitive.None).contains(primitive)) {
-                    throw new IllegalArgumentException("Invalid primitive type: " + primitiveType);
                 }
 
                 Expression literal = new J.Literal(randomId(), args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE, Markers.EMPTY, getLiteral(), valueSource, null, primitive);
