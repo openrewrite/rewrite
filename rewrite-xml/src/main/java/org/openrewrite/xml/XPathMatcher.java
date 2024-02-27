@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.Cursor;
+import org.openrewrite.xml.internal.Namespaces;
 import org.openrewrite.xml.search.FindTags;
 import org.openrewrite.xml.tree.Xml;
 
@@ -42,9 +43,15 @@ public class XPathMatcher {
     // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']`
     private static final Pattern PATTERN = Pattern.compile("([-\\w]+)\\[([-\\w]+)='([-\\w.]+)']");
     private final String expression;
+    private final Namespaces namespaces;
 
     public XPathMatcher(String expression) {
+        this(expression, new Namespaces());
+    }
+
+    public XPathMatcher(String expression, Namespaces namespaces) {
         this.expression = expression;
+        this.namespaces = namespaces;
     }
 
     /**

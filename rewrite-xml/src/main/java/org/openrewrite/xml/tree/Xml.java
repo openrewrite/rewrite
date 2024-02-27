@@ -27,6 +27,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.internal.Namespaces;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlNamespaceUtils;
 import org.openrewrite.xml.internal.XmlPrinter;
@@ -98,7 +99,7 @@ public interface Xml extends Tree {
         /**
          * @return a map of namespace prefixes (without the <code>xmlns</code> prefix) to URIs for this document.
          */
-        public Map<String, String> getNamespaces() {
+        public Namespaces getNamespaces() {
             if (root == null) {
                 throw new IllegalStateException("Cannot get namespaces if root tag is null");
             }
@@ -106,7 +107,7 @@ public interface Xml extends Tree {
             return root.getNamespaces();
         }
 
-        public Document withNamespaces(Map<String, String> namespaces) {
+        public Document withNamespaces(Namespaces namespaces) {
             if (root == null) {
                 throw new IllegalStateException("Cannot add namespaces if root tag is null");
             }
@@ -318,12 +319,12 @@ public interface Xml extends Tree {
         /**
          * @return a map of namespace prefixes (without the <code>xmlns</code> prefix) to URIs for this tag.
          */
-        public Map<String, String> getNamespaces() {
+        public Namespaces getNamespaces() {
             return XmlNamespaceUtils.extractNamespaces(attributes);
         }
 
-        public Tag withNamespaces(Map<String, String> namespaces) {
-            Map<String, String> currentNamespaces = getNamespaces();
+        public Tag withNamespaces(Namespaces namespaces) {
+            Namespaces currentNamespaces = getNamespaces();
             if (currentNamespaces.equals(namespaces)) {
                 return this;
             }

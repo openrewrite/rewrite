@@ -22,10 +22,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.xml.internal.Namespaces;
 import org.openrewrite.xml.internal.XmlNamespaceUtils;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -215,7 +215,7 @@ public class ChangeNamespaceValue extends Recipe {
 
             private Optional<Xml.Attribute> maybeGetSchemaLocation(Cursor cursor, Xml.Tag tag) {
                 Xml.Tag schemaLocationTag = XmlNamespaceUtils.findTagContainingXmlSchemaInstanceNamespace(cursor, tag);
-                Map<String, String> namespaces = tag.getNamespaces();
+                Namespaces namespaces = tag.getNamespaces();
                 return schemaLocationTag.getAttributes().stream().filter(attribute -> {
                     String attributeNamespace = namespaces.get(XmlNamespaceUtils.extractNamespacePrefix(attribute.getKeyAsString()));
                     return XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI.equals(attributeNamespace)
@@ -224,9 +224,9 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             private Xml.Tag maybeAddNamespace(Xml.Tag root) {
-                Map<String, String> namespaces = root.getNamespaces();
-                if (namespaces.containsValue(newValue) && !namespaces.containsValue(XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI)) {
-                    namespaces.put(XmlNamespaceUtils.XML_SCHEMA_INSTANCE_PREFIX, XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI);
+                Namespaces namespaces = root.getNamespaces();
+                if (namespaces.containsUri(newValue) && !namespaces.containsUri(XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI)) {
+                    namespaces.add(XmlNamespaceUtils.XML_SCHEMA_INSTANCE_PREFIX, XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI);
                     root = root.withNamespaces(namespaces);
                 }
                 return root;

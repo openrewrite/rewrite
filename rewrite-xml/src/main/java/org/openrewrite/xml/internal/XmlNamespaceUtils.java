@@ -21,10 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class XmlNamespaceUtils {
 
@@ -77,17 +74,19 @@ public class XmlNamespaceUtils {
         return "xmlns".equals(name) ? "" : extractLocalName(name);
     }
 
-    public static Map<String, String> extractNamespaces(Collection<Xml.Attribute> attributes) {
-        return attributes.isEmpty()
-                ? Collections.emptyMap()
-                : attributes.stream()
-                .filter(attribute -> isNamespaceDefinitionAttribute(attribute.getKeyAsString()))
-                .map(attribute -> new PrefixUri(
-                        extractPrefixFromNamespaceDefinition(attribute.getKeyAsString()),
-                        attribute.getValueAsString()
-                ))
-                .distinct()
-                .collect(Collectors.toMap(PrefixUri::getPrefix, PrefixUri::getUri));
+    public static Namespaces extractNamespaces(Collection<Xml.Attribute> attributes) {
+        final Namespaces namespaces = new Namespaces();
+        if (!attributes.isEmpty()) {
+                attributes.stream()
+                    .filter(attribute -> isNamespaceDefinitionAttribute(attribute.getKeyAsString()))
+                    .map(attribute -> new PrefixUri(
+                            extractPrefixFromNamespaceDefinition(attribute.getKeyAsString()),
+                            attribute.getValueAsString()
+                    ))
+                    .distinct()
+                    .forEach(prefixUri -> namespaces.add(prefixUri.getPrefix(), prefixUri.getUri()));
+        }
+        return namespaces;
     }
 
     /**
@@ -97,20 +96,20 @@ public class XmlNamespaceUtils {
      * @param currentTag the current tag
      * @return a map containing all namespaces defined in the current scope, including all parent scopes.
      */
-    public static Map<String, String> findNamespaces(Cursor cursor, @Nullable Xml.Tag currentTag) {
-        Map<String, String> namespaces = new HashMap<>();
+    public static Namespaces findNamespaces(Cursor cursor, @Nullable Xml.Tag currentTag) {
+        Namespaces namespaces = new Namespaces();
         if (currentTag != null) {
-            namespaces.putAll(currentTag.getNamespaces());
+            namespaces.combine(currentTag.getNamespaces());
         }
 
         while (cursor != null) {
             Xml.Tag enclosing = cursor.firstEnclosing(Xml.Tag.class);
             if (enclosing != null) {
                 for (Map.Entry<String, String> ns : enclosing.getNamespaces().entrySet()) {
-                    if (namespaces.containsValue(ns.getKey())) {
+                    if (namespaces.containsUri(ns.getKey())) {
                         throw new IllegalStateException(java.lang.String.format("Cannot have two namespaces with the same prefix (%s): '%s' and '%s'", ns.getKey(), namespaces.get(ns.getKey()), ns.getValue()));
                     }
-                    namespaces.put(ns.getKey(), ns.getValue());
+                    namespaces.add(ns.getKey(), ns.getValue());
                 }
             }
             cursor = cursor.getParent();
@@ -128,7 +127,7 @@ public class XmlNamespaceUtils {
      */
     public static Xml.Tag findTagContainingXmlSchemaInstanceNamespace(Cursor cursor, Xml.Tag currentTag) {
         Xml.Tag tag = currentTag;
-        if (tag.getNamespaces().containsValue(XML_SCHEMA_INSTANCE_URI)) {
+        if (tag.getNamespaces().containsUri(XML_SCHEMA_INSTANCE_URI)) {
             return tag;
         }
         while (cursor != null) {
@@ -137,7 +136,7 @@ public class XmlNamespaceUtils {
             }
             tag = cursor.firstEnclosing(Xml.Tag.class);
             if (tag != null) {
-                if (tag.getNamespaces().containsValue(XML_SCHEMA_INSTANCE_URI)) {
+                if (tag.getNamespaces().containsUri(XML_SCHEMA_INSTANCE_URI)) {
                     return tag;
                 }
             }
