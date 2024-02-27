@@ -27,6 +27,7 @@ import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
+import java.util.Objects;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -175,11 +176,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Nullable
     private static String getManagedPluginVersion(ResolvedPom resolvedPom, @Nullable String groupId, String artifactId) {
         for (Plugin p : resolvedPom.getPluginManagement()) {
-            if (p.getGroupId().equals(groupId) && p.getArtifactId().equals(artifactId)) {
+            if (Objects.equals(p.getGroupId(), groupId) &&
+                Objects.equals(p.getArtifactId(), artifactId)) {
                 return resolvedPom.getValue(p.getVersion());
             }
         }
-
         return null;
     }
 }
