@@ -17,12 +17,22 @@ package org.openrewrite;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.config.ColumnDescriptor;
+import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.PrintWriter;
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
+import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 @Value
 public class RecipeRun {
@@ -52,5 +62,40 @@ public class RecipeRun {
             }
         }
         return emptyList();
+    }
+
+    public void exportDatatablesToCsv(String filePath) {
+        dataTables.forEach((dataTable, rows) -> {
+            File csv = new File(filePath + dataTable.getName() + ".csv");
+            try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(csv, false))) {
+                DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
+                List<String> fieldNames = descriptor.getColumns().stream().map(ColumnDescriptor::getName)
+                        .collect(toList());
+                printWriter.println(descriptor.getColumns().stream()
+                        .map(columnDescriptor -> String.format("\"%s\"", columnDescriptor.getDisplayName()))
+                        .collect(joining(",")));
+                printWriter.println(descriptor.getColumns().stream()
+                        .map(columnDescriptor -> String.format("\"%s\"", columnDescriptor.getDescription()))
+                        .collect(joining(",")));
+                printRowData(printWriter, rows, fieldNames);
+            } catch (FileNotFoundException | IllegalAccessException e) {
+                //TODO Handle exceptions
+            }
+        });
+    }
+
+    private void printRowData(PrintWriter printWriter, List<?> rows, List<String> fieldNames)
+            throws IllegalAccessException {
+        rows.forEach(row ->
+            printWriter.println(fieldNames.stream().map(fieldName -> {
+                try {
+                    Field field = row.getClass().getDeclaredField(fieldName);
+                    field.setAccessible(true);
+                    //Assume every column value is printable with toString
+                    return field.get(row).toString();
+                } catch (NoSuchFieldException | IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
+            }).collect(joining(","))));
     }
 }
