@@ -21,6 +21,7 @@ root: true
 ---
 type: specs.openrewrite.org/v1beta/category
 packageName: ai.timefold.solver
+name: Timefold
 root: true
 description: |
   [Timefold](https://timefold.ai/) is the open source AI solver to optimize operations and scheduling in Java, Python or Kotlin.
