@@ -20,6 +20,10 @@ packageName: org.openrewrite
 root: true
 ---
 type: specs.openrewrite.org/v1beta/category
+packageName: ai
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
 packageName: io
 root: true
 ---
@@ -30,3 +34,8 @@ root: true
 type: specs.openrewrite.org/v1beta/category
 packageName: org
 root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: tech
+root: true
+---
