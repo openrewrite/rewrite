@@ -1,9 +1,15 @@
 name: receive-pr
+
 on:
   pull_request:
     types: [opened, synchronize]
     branches:
       - main
+
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.ref }}'
+  cancel-in-progress: true
+
 # https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
 # Since this pull request receives untrusted code, we should **NOT** have any secrets in the environment.
 jobs:
