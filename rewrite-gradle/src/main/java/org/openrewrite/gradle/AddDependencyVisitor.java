@@ -230,7 +230,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     resolvedVersion = version;
                 } else {
                     try {
-                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gp)
+                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gp, null)
                                 .select(new GroupArtifact(groupId, artifactId), configuration, version, versionPattern, ctx);
                     } catch (MavenDownloadingException e) {
                         return e.warn(m);

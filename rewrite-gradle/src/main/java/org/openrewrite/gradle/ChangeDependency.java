@@ -213,7 +213,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(original.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
                                 String resolvedVersion;
                                 try {
-                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject)
+                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
                                             .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
@@ -247,7 +247,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newVersion)) {
                                 String resolvedVersion;
                                 try {
-                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject)
+                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
                                             .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
@@ -320,7 +320,7 @@ public class ChangeDependency extends Recipe {
                     if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(version) || Boolean.TRUE.equals(overrideManagedVersion))) {
                         String resolvedVersion;
                         try {
-                            resolvedVersion = new DependencyVersionSelector(null, gradleProject)
+                            resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
                                     .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);

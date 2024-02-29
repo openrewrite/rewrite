@@ -18,6 +18,7 @@ package org.openrewrite.gradle.plugins;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
@@ -34,14 +35,13 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.Semver;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * When changing a plugin id that uses the `apply` syntax or versionless plugins syntax, the version is will not be changed.
@@ -174,8 +174,8 @@ public class ChangePlugin extends Recipe {
 
                         if (!StringUtils.isBlank(newVersion)) {
                             try {
-                                String resolvedVersion = AddPluginVisitor.resolvePluginVersion(newPluginId, "0", newVersion, null, getPluginRepositories(), ctx)
-                                        .orElse(null);
+                                String resolvedVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
+                                        .select(new GroupArtifact(newPluginId, newPluginId + ".gradle.plugin"), "classpath", newVersion, null, ctx);
                                 if (resolvedVersion == null) {
                                     return m;
                                 }
