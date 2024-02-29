@@ -144,7 +144,7 @@ public class ChangePlugin extends Recipe {
 
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                        J.MethodInvocation m = method;
                         if (versionMatcher.matches(m) &&
                             m.getSelect() instanceof J.MethodInvocation &&
                             pluginMatcher.matches(m.getSelect())) {
@@ -154,11 +154,12 @@ public class ChangePlugin extends Recipe {
                         } else if (applyMatcher.matches(m)) {
                             m = maybeUpdateApplySyntax(m);
                         }
-                        return m;
+                        return super.visitMethodInvocation(m, ctx);
                     }
 
                     private J.MethodInvocation maybeUpdateVersion(J.MethodInvocation m, ExecutionContext ctx) {
-                        if (!newPluginId.equals(((J.Literal) requireNonNull((J.MethodInvocation) m.getSelect()).getArguments().get(0)).getValue())) {
+                        J.MethodInvocation select = (J.MethodInvocation) m.getSelect();
+                        if (!pluginId.equals(((J.Literal) select.getArguments().get(0)).getValue())) {
                             return m;
                         }
 
@@ -180,7 +181,8 @@ public class ChangePlugin extends Recipe {
                                     return m;
                                 }
 
-                                m = m.withArguments(Collections.singletonList(ChangeStringLiteral.withStringValue(versionLiteral, resolvedVersion)));
+                                m = m.withSelect(select.withArguments(ListUtils.mapFirst(select.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newPluginId))))
+                                        .withArguments(Collections.singletonList(ChangeStringLiteral.withStringValue(versionLiteral, resolvedVersion)));
                             } catch (MavenDownloadingException e) {
                                 return e.warn(m);
                             }
