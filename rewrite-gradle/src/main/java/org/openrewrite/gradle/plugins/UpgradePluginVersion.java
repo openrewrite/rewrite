@@ -18,6 +18,7 @@ package org.openrewrite.gradle.plugins;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -32,7 +33,8 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.Semver;
@@ -44,7 +46,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.gradle.plugins.AddPluginVisitor.resolvePluginVersion;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -151,7 +152,8 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                             return m;
                         }
 
-                        String resolvedVersion = resolvePluginVersion(pluginId, currentVersion, newVersion, versionPattern, getRepositories(), ctx).orElse(null);
+                        String resolvedVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
+                                .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
                         acc.pluginIdToNewVersion.put(pluginId, resolvedVersion);
                     } else if (versionArgs.get(0) instanceof G.GString) {
                         G.GString gString = (G.GString) versionArgs.get(0);
@@ -161,7 +163,8 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
                         G.GString.Value gStringValue = (G.GString.Value) gString.getStrings().get(0);
                         String versionVariableName = gStringValue.getTree().toString();
-                        String resolvedPluginVersion = resolvePluginVersion(pluginId, "0", newVersion, versionPattern, getRepositories(), ctx).orElse(null);
+                        String resolvedPluginVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
+                                .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
 
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
                         acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
@@ -170,14 +173,6 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     // continue
                 }
                 return m;
-            }
-
-            private List<MavenRepository> getRepositories() {
-                if (gradleSettings != null) {
-                    return gradleSettings.getPluginRepositories();
-                }
-                assert gradleProject != null;
-                return gradleProject.getMavenPluginRepositories();
             }
         };
         return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), groovyVisitor);

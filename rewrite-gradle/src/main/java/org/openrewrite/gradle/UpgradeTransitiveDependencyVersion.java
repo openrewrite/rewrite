@@ -136,7 +136,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
                 Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new HashMap<>();
 
-                DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject);
+                DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
                 for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
                     for (ResolvedDependency resolved : configuration.getResolved()) {
                         if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(),
