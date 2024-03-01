@@ -112,6 +112,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
         GroovyVisitor<ExecutionContext> groovyVisitor = new GroovyVisitor<ExecutionContext>() {
             @Nullable
             private GradleProject gradleProject;
+
             @Nullable
             private GradleSettings gradleSettings;
 

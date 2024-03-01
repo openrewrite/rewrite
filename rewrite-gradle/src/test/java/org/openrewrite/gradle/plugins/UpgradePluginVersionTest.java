@@ -60,6 +60,29 @@ class UpgradePluginVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void pluginManagementPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "latest.patch", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  plugins {
+                      id 'org.openrewrite.rewrite' version '5.40.0'
+                  }
+              }
+              """,
+            """
+              pluginManagement {
+                  plugins {
+                      id 'org.openrewrite.rewrite' version '5.40.6'
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample("Upgrading a settings plugin")
     @Test
     void upgradeGradleSettingsPlugin() {
