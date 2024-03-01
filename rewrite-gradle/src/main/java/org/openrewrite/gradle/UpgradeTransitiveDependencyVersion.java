@@ -47,6 +47,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.singletonMap;
@@ -324,7 +325,6 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             } else {
                 m = (J.MethodInvocation) new UpdateConstraintVersionVisitor(gav, existingConstraint, because)
                         .visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
-
             }
             return m;
         }
@@ -335,6 +335,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
         String config;
         GroupArtifactVersion gav;
+        @Nullable
         String because;
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -377,28 +378,40 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     private static class UpdateConstraintVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
         GroupArtifactVersion gav;
         J.MethodInvocation existingConstraint;
+        @Nullable
         String because;
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m2 = super.visitMethodInvocation(method, ctx);
-            if(existingConstraint.isScope(m2)) {
-                m2 = m2.withArguments(ListUtils.map(m2.getArguments(), arg -> {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            if(existingConstraint.isScope(m)) {
+                AtomicBoolean updated = new AtomicBoolean(false);
+                m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                     if(arg instanceof J.Literal) {
                         char quote;
                         if(((J.Literal) arg).getValueSource() == null) {
-                            quote = '"';
+                            quote = '\'';
                         } else {
                             quote = ((J.Literal) arg).getValueSource().charAt(0);
                         }
                         return ((J.Literal) arg).withValue(gav.toString())
                                 .withValueSource(quote + gav.toString() + quote);
                     }
-                    return (Expression) new UpdateBecauseTextVisitor(because)
-                            .visitNonNull(arg, ctx, getCursor());
+                    if(because != null) {
+                        Expression arg2 = (Expression) new UpdateBecauseTextVisitor(because)
+                                .visitNonNull(arg, ctx, getCursor());
+                        if(arg2 != arg) {
+                            updated.set(true);
+                        }
+                        return arg2;
+                    }
+                    return arg;
                 }));
+                if(because != null && !updated.get()) {
+                    m = (J.MethodInvocation) new CreateBecauseVisitor(because).visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
+                }
             }
-            return m2;
+            return m;
         }
     }
 
@@ -408,11 +421,11 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         String because;
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m2 = super.visitMethodInvocation(method, ctx);
-            if(!"because".equals(m2.getSimpleName())) {
-                return m2;
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            if(!"because".equals(m.getSimpleName())) {
+                return m;
             }
-            m2 = m2.withArguments(ListUtils.map(m2.getArguments(), arg -> {
+            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                 if(arg instanceof J.Literal) {
                     char quote;
                     if(((J.Literal) arg).getValueSource() == null) {
@@ -425,8 +438,42 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 }
                 return arg;
             }));
-            return m2;
+            return m;
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class CreateBecauseVisitor extends GroovyIsoVisitor<ExecutionContext> {
+        String because;
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            J.Lambda becauseArg = GradleParser.builder().build().parse(String.format(
+                    "plugin { id 'java' }\n" +
+                    "dependencies { constraints {\n" +
+                    "    implementation('org.openrewrite:rewrite-core:8.0.0') {\n" +
+                    "        because '%s'\n" +
+                    "    }\n" +
+                    "}}",
+                    because))
+                    .map(G.CompilationUnit.class::cast)
+                    .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
+                    .map(J.MethodInvocation.class::cast)
+                    .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
+                    .map(dependenciesClosure -> ((J.Block)dependenciesClosure.getBody()).getStatements().get(0))
+                    .map(J.Return.class::cast)
+                    .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
+                    .map(J.Lambda.class::cast)
+                    .map(constraintsClosure -> ((J.Block)constraintsClosure.getBody()).getStatements().get(0))
+                    .map(J.Return.class::cast)
+                    .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
+                    .map(J.Lambda.class::cast)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
+            m = m.withArguments(ListUtils.concat(m.getArguments().subList(0, 1), becauseArg));
+            m = autoFormat(m, ctx, getCursor().getParentOrThrow());
+            return m;
+        }
+    }
 }
