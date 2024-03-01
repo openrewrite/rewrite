@@ -263,6 +263,9 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         .withMarkers(Markers.EMPTY);
 
                 return autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                    if(!(arg instanceof J.Lambda)) {
+                        return arg;
+                    }
                     J.Lambda dependencies = (J.Lambda) arg;
                     if (!(dependencies.getBody() instanceof J.Block)) {
                         return m;
@@ -360,6 +363,9 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     .withMarkers(Markers.EMPTY);
 
             m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                if(!(arg instanceof J.Lambda)) {
+                    return arg;
+                }
                 J.Lambda dependencies = (J.Lambda) arg;
                 if (!(dependencies.getBody() instanceof J.Block)) {
                     return arg;
