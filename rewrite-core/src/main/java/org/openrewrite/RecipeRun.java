@@ -92,7 +92,7 @@ public class RecipeRun {
                     Field field = row.getClass().getDeclaredField(fieldName);
                     field.setAccessible(true);
                     //Assume every column value is printable with toString
-                    return field.get(row).toString();
+                    return String.format("\"%s\"", field.get(row).toString());
                 } catch (NoSuchFieldException | IllegalAccessException e) {
                     throw new RuntimeException(e);
                 }
