@@ -122,7 +122,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.";
+        return "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
+               "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
     }
 
     @Override

@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
@@ -25,6 +26,13 @@ import java.lang.annotation.Target;
  */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.SOURCE)
+@Repeatable(Issue.Issues.class)
 public @interface Issue {
     String value();
+
+    @Target({ElementType.TYPE, ElementType.METHOD})
+    @Retention(RetentionPolicy.SOURCE)
+    @interface Issues {
+        Issue[] value();
+    }
 }
