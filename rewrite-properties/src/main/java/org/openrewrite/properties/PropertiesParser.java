@@ -238,16 +238,19 @@ public class PropertiesParser implements Parser {
                         break;
                     } else if (c == '=' || c == ':') {
                         delimiter = Properties.Entry.Delimiter.getDelimiter(String.valueOf(c));
+                        state++;
+                        break;
                     }
-                    state++;
                 case 4:
-                    if (c == '=' || c == ':') {
-                        continue;
-                    } else if (Character.isWhitespace(c)) {
+                    if (Character.isWhitespace(c)) {
                         valuePrefix.append(c);
                         break;
                     }
-                    state++;
+                    else {
+                        value.append(c);
+                        state++;
+                        break;
+                    }
                 case 5:
                     if (!Character.isWhitespace(c)) {
                         value.append(c);

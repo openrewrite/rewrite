@@ -233,6 +233,23 @@ class PropertiesParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4026")
+    @Test
+    void repeatedDelimiter() {
+        rewriteRun(
+          properties(
+            """
+              key1==value1
+              key2::value2
+              key3======value3
+              key4=:value4
+              key5 = = value5
+              """,
+            containsValues("=value1", ":value2", "=====value3", ":value4", "= value5")
+          )
+        );
+    }
+
     private static Consumer<SourceSpec<Properties.File>> containsValues(String... valueAssertions) {
         return spec -> spec.beforeRecipe(props -> {
             List<String> values = TreeVisitor.collect(new PropertiesVisitor<>() {
