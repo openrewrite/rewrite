@@ -138,7 +138,7 @@ public class WriteVisitorMethods extends Recipe {
                         }
                     }
                 }
-                c = visitMethod.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
+                c = visitMethod.apply(updateCursor(c), c.getBody().getCoordinates().lastStatement(),
                         modelTypeName, modelTypeName, paramName,
                         modelTypeName, varName, paramName,
                         varName, varName, varName,
@@ -168,7 +168,7 @@ public class WriteVisitorMethods extends Recipe {
             for (J.ClassDeclaration modelClass : missingVisitorMethods(c)) {
                 String modelTypeName = modelClass.getSimpleName();
                 String paramName = modelTypeName.substring(0, 1).toLowerCase() + modelTypeName.substring(1);
-                c = isoVisitMethod.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
+                c = isoVisitMethod.apply(updateCursor(c), c.getBody().getCoordinates().lastStatement(),
                         modelTypeName, modelTypeName, modelTypeName, paramName,
                         modelTypeName, modelTypeName, paramName);
             }

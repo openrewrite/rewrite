@@ -97,7 +97,7 @@ public class GenerateModel {
                         .collect(toList())), ctx).getChangeset().getAllResults());
         results.addAll(new WritePrinter(modelClasses)
                 .run(new InMemoryLargeSourceSet(jp().parse(List.of(
-                                Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/tree/TomlContainer.java")), null, ctx)
+                                Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/internal/TomlPrinter.java")), null, ctx)
                         .collect(toList())), ctx).getChangeset().getAllResults());
 
         writeResults(results);

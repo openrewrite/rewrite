@@ -16,6 +16,7 @@
 package generate;
 
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
@@ -66,9 +67,9 @@ public class WriteModel extends Recipe {
                         """
         ).javaParser(parser).build();
 
-        final JavaTemplate idField = JavaTemplate.builder("@EqualsAndHashCode.Include UUID id;").javaParser(parser).build();
+        final JavaTemplate idField = JavaTemplate.builder("@EqualsAndHashCode.Include UUID id;").imports("java.util.UUID").javaParser(parser).build();
         final JavaTemplate prefixField = JavaTemplate.builder("Space prefix;").javaParser(parser).build();
-        final JavaTemplate markersField = JavaTemplate.builder("Markers markers;").javaParser(parser).build();
+        final JavaTemplate markersField = JavaTemplate.builder("Markers markers;").imports("org.openrewrite.marker.Markers").javaParser(parser).build();
         final JavaTemplate paddingField = JavaTemplate.builder("@Nullable @NonFinal transient WeakReference<Padding> padding;").javaParser(parser).build();
         final JavaTemplate implementsTree = JavaTemplate.builder("Toml").javaParser(parser).build();
 
@@ -170,14 +171,14 @@ public class WriteModel extends Recipe {
             boolean padded = c.getBody().getStatements().stream().anyMatch(this::isPadded);
 
             if (c.getImplements() == null) {
-                c = implementsTree.apply(getCursor(), c.getCoordinates().addImplementsClause());
+                c = implementsTree.apply(updateCursor(c), c.getCoordinates().addImplementsClause());
             }
 
 
-            c = markersField.apply(getCursor(), c.getBody().getCoordinates().firstStatement());
-            c = prefixField.apply(getCursor(), c.getBody().getCoordinates().firstStatement());
-            c = idField.apply(getCursor(), c.getBody().getCoordinates().firstStatement());
-            c = acceptMethod.apply(getCursor(), c.getBody().getCoordinates().lastStatement(), classDecl.getSimpleName());
+            c = markersField.apply(updateCursor(c), c.getBody().getCoordinates().firstStatement());
+            c = prefixField.apply(updateCursor(c), c.getBody().getCoordinates().firstStatement());
+            c = idField.apply(updateCursor(c), c.getBody().getCoordinates().firstStatement());
+            c = acceptMethod.apply(updateCursor(c), c.getBody().getCoordinates().lastStatement(), classDecl.getSimpleName());
 
             for (Statement statement : c.getBody().getStatements()) {
                 if (statement instanceof J.VariableDeclarations varDec) {
@@ -196,24 +197,24 @@ public class WriteModel extends Recipe {
                                 case "TomlContainer" -> writeContainerGetterWithers(c, varDec, elementType);
                                 case "TomlLeftPadded" -> writePaddedGetterWithers(c, varDec, elementType, "Left");
                                 case "TomlRightPadded" -> writePaddedGetterWithers(c, varDec, elementType, "Right");
-                                default -> withGetterAnnotations.apply(getCursor(), varDec.getCoordinates()
-                                        .addAnnotation(Comparator.comparing(J.Annotation::getSimpleName)));
+                                default -> writeModelGetterWithers(c, varDec);
                             };
                         } else if (padded) {
-                            c = withGetterAnnotations.apply(getCursor(), varDec.getCoordinates()
-                                    .addAnnotation(Comparator.comparing(J.Annotation::getSimpleName)));
+                            c = writeModelGetterWithers(c, varDec);
                         }
+                    } else if (padded) {
+                        c = writeModelGetterWithers(c, varDec);
                     }
                 }
             }
 
             if (padded) {
-                c = paddedModel.apply(getCursor(), c.getCoordinates().replaceAnnotations());
-                c = paddingField.apply(getCursor(), c.getBody().getCoordinates().firstStatement());
-                c = getPadding.apply(getCursor(), c.getBody().getCoordinates().lastStatement());
-                c = paddingClass.apply(getCursor(), c.getBody().getCoordinates().lastStatement(), c.getSimpleName());
+                c = paddedModel.apply(updateCursor(c), c.getCoordinates().replaceAnnotations());
+                c = paddingField.apply(updateCursor(c), c.getBody().getCoordinates().firstStatement());
+                c = getPadding.apply(updateCursor(c), c.getBody().getCoordinates().lastStatement());
+                c = paddingClass.apply(updateCursor(c), c.getBody().getCoordinates().lastStatement(), c.getSimpleName());
             } else {
-                c = valueModel.apply(getCursor(), c.getCoordinates().replaceAnnotations());
+                c = valueModel.apply(updateCursor(c), c.getCoordinates().replaceAnnotations());
             }
 
             List<Statement> statements = c.getBody().getStatements();
@@ -231,20 +232,30 @@ public class WriteModel extends Recipe {
             return c;
         }
 
+        private J.ClassDeclaration writeModelGetterWithers(J.ClassDeclaration c, J.VariableDeclarations varDec) {
+            return c.withBody(c.getBody().withStatements(ListUtils.map(c.getBody().getStatements(), statement -> {
+                if (statement == varDec) {
+                    Cursor cursor = new Cursor(new Cursor(updateCursor(c), c.getBody()), varDec);
+                    statement = withGetterAnnotations.apply(cursor, varDec.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName)));
+                }
+                return statement;
+            })));
+        }
+
         private J.ClassDeclaration writeContainerGetterWithers(J.ClassDeclaration c, J.VariableDeclarations varDec, JavaType.FullyQualified elementType) {
             String name = varDec.getVariables().get(0).getSimpleName();
             String capitalizedName = name.substring(0, 1).toUpperCase() + name.substring(1);
             String elementTypeName = elementType.getClassName();
             String modelTypeName = c.getSimpleName();
 
-            c = unwrappedContainerGetterWither.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
+            J.Block body = unwrappedContainerGetterWither.apply(new Cursor(updateCursor(c), c.getBody()), c.getBody().getCoordinates().lastStatement(),
                     elementTypeName, capitalizedName,
                     name,
                     modelTypeName, capitalizedName, elementTypeName, name,
                     capitalizedName, name,
                     name, name);
 
-            return c;
+            return c.withBody(body);
         }
 
         private J.ClassDeclaration writePaddedGetterWithers(J.ClassDeclaration c, J.VariableDeclarations varDec, JavaType.FullyQualified elementType,
@@ -255,26 +266,27 @@ public class WriteModel extends Recipe {
             String elementTypeName = elementType.getClassName();
             String modelTypeName = c.getSimpleName();
 
+            J.Block body = c.getBody();
             if (nullable) {
                 StringJoiner newModelArguments = new StringJoiner(", ");
-                for (Statement statement : c.getBody().getStatements()) {
+                for (Statement statement : body.getStatements()) {
                     if (statement instanceof J.VariableDeclarations) {
                         newModelArguments.add(statement == varDec ? "null" : ((J.VariableDeclarations) statement).getVariables()
                                 .get(0).getSimpleName());
                     }
                 }
-                c = nullableUnwrappedPaddedGetterWither.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
+                body = nullableUnwrappedPaddedGetterWither.apply(new Cursor(getCursor(), body), body.getCoordinates().lastStatement(),
                         elementTypeName, capitalizedName, name, name, modelTypeName, capitalizedName,
                         elementTypeName, name, name, name, modelTypeName, newModelArguments.toString(),
                         capitalizedName, leftOrRight, name, name);
             } else {
-                c = unwrappedPaddedGetterWither.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
+                body = unwrappedPaddedGetterWither.apply(new Cursor(getCursor(), body), body.getCoordinates().lastStatement(),
                         elementTypeName, capitalizedName, name,
                         modelTypeName, capitalizedName, elementTypeName, name,
                         capitalizedName, leftOrRight, name, name);
             }
 
-            return c;
+            return c.withBody(body);
         }
 
         boolean isPadded(Statement statement) {

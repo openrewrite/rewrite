@@ -117,7 +117,7 @@ public class WritePaddingAccessors extends Recipe {
                 }
             }
 
-            c = paddedGetterWither.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
+            c = paddedGetterWither.apply(updateCursor(c), c.getBody().getCoordinates().lastStatement(),
                     nullable ? "@Nullable " : "", leftOrRight, elementTypeName, capitalizedName,
                     name, modelTypeName, capitalizedName,
                     nullable ? "@Nullable " : "", leftOrRight,

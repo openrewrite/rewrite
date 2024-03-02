@@ -117,7 +117,7 @@ public class WritePrinter extends Recipe {
                             .build();
 
                     try {
-                        c = visitMethod.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
+                        c = visitMethod.apply(updateCursor(c), c.getBody().getCoordinates().lastStatement(),
                                 modelTypeName, modelTypeName, paramName,
                                 paramName,
                                 paramName,
