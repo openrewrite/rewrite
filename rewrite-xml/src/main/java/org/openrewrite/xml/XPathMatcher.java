@@ -36,10 +36,17 @@ import java.util.regex.Pattern;
 public class XPathMatcher {
     // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']`
     private static final Pattern PATTERN = Pattern.compile("([-\\w]+)\\[([-\\w]+)='([-\\w.]+)']");
+
     private final String expression;
+    private final boolean startsWithSlash;
+    private final boolean startsWithDoubleSlash;
+    private final String[] parts;
 
     public XPathMatcher(String expression) {
         this.expression = expression;
+        startsWithSlash = expression.startsWith("/");
+        startsWithDoubleSlash = expression.startsWith("//");
+        parts = expression.substring(startsWithDoubleSlash ? 2 : startsWithSlash ? 1 : 0).split("/");
     }
 
     /**
@@ -56,14 +63,10 @@ public class XPathMatcher {
             }
         }
 
-        if (expression.startsWith("//") || !expression.startsWith("/")) {
-            List<String> parts = new ArrayList<>(Arrays.asList((expression.startsWith("//") ?
-                    expression.substring(2) : expression).split("/")));
-            Collections.reverse(parts);
-
+        if (startsWithDoubleSlash || !startsWithSlash) {
             int pathIndex = 0;
-            for (int i = 0; i < parts.size(); i++, pathIndex++) {
-                String part = parts.get(i);
+            for (int i = parts.length - 1; i >= 0; i--, pathIndex++) {
+                String part = parts[i];
                 if (part.startsWith("@")) {
                     if (!(cursor.getValue() instanceof Xml.Attribute &&
                           (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
@@ -80,10 +83,9 @@ public class XPathMatcher {
                 }
             }
 
-            return expression.startsWith("/") || path.size() - pathIndex <= 1;
-        } else if (expression.startsWith("/")) {
+            return startsWithSlash || path.size() - pathIndex <= 1;
+        } else {
             Collections.reverse(path);
-            String[] parts = expression.substring(1).split("/");
 
             // Deal with the two forward slashes in the expression; works, but I'm not proud of it.
             if (expression.contains("//") && Arrays.stream(parts).anyMatch(StringUtils::isBlank)) {
@@ -151,7 +153,5 @@ public class XPathMatcher {
 
             return cursor.getValue() instanceof Xml.Tag && path.size() == parts.length;
         }
-
-        return false;
     }
 }
