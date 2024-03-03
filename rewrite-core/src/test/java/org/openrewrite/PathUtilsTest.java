@@ -101,7 +101,6 @@ class PathUtilsTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/3758")
-    @Disabled("{} syntax not supported yet")
     void eitherOr() {
         // matches with {}'s, used in for instance `"**/{application,application-*,bootstrap,bootstrap-*}.{yml,yaml}"`
         assertThat(matchesGlob(path("test/"), "test/{foo,bar}")).isFalse();
@@ -120,6 +119,21 @@ class PathUtilsTest {
         assertThat(matchesGlob(path("test/bar"), "test/!(foo|bar)")).isFalse();
         assertThat(matchesGlob(path("test/quz"), "test/!(foo|bar)")).isTrue();
         assertThat(matchesGlob(path("test/bar"), "test/!(f*|b*)")).isFalse();
+    }
+
+    @Test
+    void combinedTest() {
+        assertThat(matchesGlob(path("a/b/java"), "{a,b}/!(c)/java")).isTrue();
+        assertThat(matchesGlob(path("a/c/java"), "{a,b}/!(c)/java")).isFalse();
+        assertThat(matchesGlob(path("b/d/java"), "{a,b}/!(c)/java")).isTrue();
+        assertThat(matchesGlob(path("b/c/java"), "{a,b}/!(c)/java")).isFalse();
+        assertThat(matchesGlob(path("a/b/java"), "{a,b}/!(c)/java")).isTrue();
+        assertThat(matchesGlob(path("a/java"), "!(a|b|c)/{java,txt}")).isFalse();
+        assertThat(matchesGlob(path("b/java"), "!(a|b|c)/{java,txt}")).isFalse();
+        assertThat(matchesGlob(path("c/java"), "!(a|b|c)/{java,txt}")).isFalse();
+        assertThat(matchesGlob(path("d/java"), "!(a|b|c)/{java,txt}")).isTrue();
+        assertThat(matchesGlob(path("d/txt"), "!(a|b|c)/{java,txt}")).isTrue();
+        assertThat(matchesGlob(path("d/xml"), "!(a|b|c)/{java,txt}")).isFalse();
     }
 
     private static Path path(String path) {
