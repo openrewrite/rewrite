@@ -21,21 +21,22 @@ import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.GitProvenance;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.CommitsByDay;
 import org.openrewrite.table.DistinctCommitters;
 
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Committer>> {
-    private transient final DistinctCommitters committers = new DistinctCommitters(this);
-    private transient final CommitsByDay commitsByDay = new CommitsByDay(this);
+public class FindCommitters extends ScanningRecipe<AtomicReference<GitProvenance>> {
+
+    transient DistinctCommitters committers = new DistinctCommitters(this);
+    transient CommitsByDay commitsByDay = new CommitsByDay(this);
 
     @Option(displayName = "From date",
             required = false,
@@ -55,64 +56,57 @@ public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Com
     }
 
     @Override
-    public Map<String, GitProvenance.Committer> getInitialValue(ExecutionContext ctx) {
-        return new TreeMap<>();
+    public int maxCycles() {
+        // This recipe does not modify the LSTs and only requires the `GitProvenance` marker
+        return 1;
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Map<String, GitProvenance.Committer> acc) {
-        LocalDate from = StringUtils.isBlank(this.fromDate) ? null : LocalDate.parse(this.fromDate).minusDays(1);
-        return new TreeVisitor<Tree, ExecutionContext>() {
+    public AtomicReference<GitProvenance> getInitialValue(ExecutionContext ctx) {
+        return new AtomicReference<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<GitProvenance> acc) {
+        return Preconditions.check(acc.get() == null, new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     sourceFile.getMarkers().findFirst(GitProvenance.class).ifPresent(provenance -> {
                         if (provenance.getCommitters() != null) {
-                            for (GitProvenance.Committer committer : provenance.getCommitters()) {
-                                if (from == null || committer.getCommitsByDay().keySet().stream().anyMatch(day -> day.isAfter(from))) {
-                                    acc.put(committer.getEmail(), committer);
-                                }
-                            }
+                            acc.set(provenance);
                         }
                     });
                 }
                 return tree;
             }
-        };
+        });
     }
 
     @Override
-    public Collection<? extends SourceFile> generate(Map<String, GitProvenance.Committer> acc, ExecutionContext ctx) {
-        for (GitProvenance.Committer committer : acc.values()) {
-            committers.insertRow(ctx, new DistinctCommitters.Row(
-                    committer.getName(),
-                    committer.getEmail(),
-                    committer.getCommitsByDay().lastKey(),
-                    committer.getCommitsByDay().values().stream().mapToInt(Integer::intValue).sum()
-            ));
+    public Collection<? extends SourceFile> generate(AtomicReference<GitProvenance> acc, ExecutionContext ctx) {
+        GitProvenance gitProvenance = acc.get();
+        if (gitProvenance != null) {
+            LocalDate from = StringUtils.isBlank(fromDate) ? null : LocalDate.parse(fromDate).minusDays(1);
+            for (GitProvenance.Committer committer : requireNonNull(gitProvenance.getCommitters())) {
+                if (from == null || committer.getCommitsByDay().keySet().stream().anyMatch(day -> day.isAfter(from))) {
+                    committers.insertRow(ctx, new DistinctCommitters.Row(
+                            committer.getName(),
+                            committer.getEmail(),
+                            committer.getCommitsByDay().lastKey(),
+                            committer.getCommitsByDay().values().stream().mapToInt(Integer::intValue).sum()
+                    ));
 
-            committer.getCommitsByDay().forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
-                    committer.getName(),
-                    committer.getEmail(),
-                    day,
-                    commits
-            )));
+                    committer.getCommitsByDay().forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
+                            committer.getName(),
+                            committer.getEmail(),
+                            day,
+                            commits
+                    )));
+                }
+            }
         }
         return Collections.emptyList();
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Map<String, GitProvenance.Committer> acc) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            @Nullable
-            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof SourceFile) {
-                    return SearchResult.found(tree, String.join("\n", acc.keySet()));
-                }
-                return tree;
-            }
-        };
     }
 }

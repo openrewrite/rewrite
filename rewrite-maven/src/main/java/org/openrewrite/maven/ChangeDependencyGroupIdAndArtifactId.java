@@ -122,7 +122,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.";
+        return "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
+               "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
     }
 
     @Override
@@ -182,9 +183,10 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }
+                    String currentVersion = t.getChildValue("version").orElse(null);
                     if (newVersion != null) {
                         try {
-                            String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId);
+                            String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId, currentVersion);
                             Optional<Xml.Tag> scopeTag = t.getChild("scope");
                             Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
                             Optional<Xml.Tag> versionTag = t.getChild("version");
@@ -203,7 +205,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                     // Otherwise, change the version to the new value.
                                     t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                                 }
-                            } else if (configuredToOverrideManageVersion || !newDependencyManaged && !(oldDependencyManaged && configuredToChangeManagedDependency)) {
+                            } else if (configuredToOverrideManageVersion || !newDependencyManaged) {
                                 //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
                                 Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
                                 //noinspection ConstantConditions
@@ -242,15 +244,16 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId) throws MavenDownloadingException {
+            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
                 if (versionComparator == null) {
                     return newVersion;
                 }
+                String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
                 if (availableVersions == null) {
                     availableVersions = new ArrayList<>();
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(newVersion, v)) {
+                        if (versionComparator.isValid(finalCurrentVersion, v)) {
                             availableVersions.add(v);
                         }
                     }

@@ -38,7 +38,6 @@ import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.semver.*;
 import org.openrewrite.tree.ParseError;
 
 import java.util.*;
@@ -188,8 +187,8 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                         }),
                         newRequested));
                 if (newGdc.isCanBeResolved() && resolvedGav != null) {
-                    newGdc = newGdc.withResolved(ListUtils.concat(
-                            ListUtils.map(gdc.getResolved(), resolved -> {
+                    newGdc = newGdc.withDirectResolved(ListUtils.concat(
+                            ListUtils.map(gdc.getDirectResolved(), resolved -> {
                                 // Remove any existing dependency with the same group and artifact id
                                 if (Objects.equals(resolved.getGroupId(), resolvedGav.getGroupId()) && Objects.equals(resolved.getArtifactId(), resolvedGav.getArtifactId())) {
                                     return null;
@@ -227,11 +226,15 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             }
 
             if (version != null) {
-                try {
-                    resolvedVersion = resolveDependencyVersion(groupId, artifactId, "0", version, versionPattern, gp.getMavenRepositories(), metadataFailures, ctx)
-                            .orElse(null);
-                } catch (MavenDownloadingException e) {
-                    return e.warn(m);
+                if (version.startsWith("$")) {
+                    resolvedVersion = version;
+                } else {
+                    try {
+                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gp, null)
+                                .select(new GroupArtifact(groupId, artifactId), configuration, version, versionPattern, ctx);
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(m);
+                    }
                 }
             }
 
@@ -360,43 +363,5 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
         }
 
         return string >= map ? DependencyStyle.String : DependencyStyle.Map;
-    }
-
-    public static Optional<String> resolveDependencyVersion(String groupId, String artifactId, String currentVersion, @Nullable String newVersion, @Nullable String versionPattern,
-                                                            List<MavenRepository> repositories, @Nullable MavenMetadataFailures metadataFailures, ExecutionContext ctx) throws MavenDownloadingException {
-        VersionComparator versionComparator = StringUtils.isBlank(newVersion) ?
-                new LatestRelease(versionPattern) :
-                requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
-
-        Optional<String> version;
-        if (versionComparator instanceof ExactVersion) {
-            version = Optional.of(newVersion);
-        } else if (versionComparator instanceof LatestPatch && !versionComparator.isValid(currentVersion, currentVersion)) {
-            // in the case of "latest.patch", a new version can only be derived if the
-            // current version is a semantic version
-            return Optional.empty();
-        } else {
-            version = findNewerVersion(groupId, artifactId, currentVersion, versionComparator, repositories, metadataFailures, ctx);
-        }
-        return version;
-    }
-
-    private static Optional<String> findNewerVersion(String groupId, String artifactId, String version, VersionComparator versionComparator,
-                                                     List<MavenRepository> repositories, @Nullable MavenMetadataFailures metadataFailures, ExecutionContext ctx) throws MavenDownloadingException {
-        try {
-            MavenMetadata mavenMetadata = metadataFailures == null ?
-                    downloadMetadata(groupId, artifactId, repositories, ctx) :
-                    metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, repositories, ctx));
-            return versionComparator.upgrade(version, mavenMetadata.getVersioning().getVersions());
-        } catch (IllegalStateException e) {
-            // this can happen when we encounter exotic versions
-            return Optional.empty();
-        }
-    }
-
-    private static MavenMetadata downloadMetadata(String groupId, String artifactId, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new MavenPomDownloader(ctx)
-                .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
-                        repositories);
     }
 }

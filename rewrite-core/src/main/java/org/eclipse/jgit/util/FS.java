@@ -1417,7 +1417,7 @@ public abstract class FS {
 		GobblerThread(Process p, String[] command, File dir) {
 			this.p = p;
 			this.desc = Arrays.toString(command);
-			this.dir = Objects.toString(dir);
+			this.dir = String.valueOf(dir);
 		}
 
 		@Override

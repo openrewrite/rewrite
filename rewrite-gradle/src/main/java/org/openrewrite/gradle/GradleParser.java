@@ -155,7 +155,6 @@ public class GradleParser implements Parser {
         public String getDslName() {
             return "gradle";
         }
-
     }
 
     private static List<Path> loadDefaultClasspath() {

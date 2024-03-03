@@ -164,9 +164,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 if (marker.getName() != null) {
                     for (Map.Entry<J, String> matchedParameter : matchedParameters.entrySet()) {
                         if (matchedParameter.getValue().equals(marker.getName())) {
-                            if (!SemanticallyEqual.areEqual(matchedParameter.getKey(), j)) {
-                                return false;
-                            }
+                            return SemanticallyEqual.areEqual(matchedParameter.getKey(), j);
                         }
                     }
                 }

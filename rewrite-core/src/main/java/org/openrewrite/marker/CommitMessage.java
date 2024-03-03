@@ -15,6 +15,7 @@
  */
 package org.openrewrite.marker;
 
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Recipe;
@@ -29,8 +30,10 @@ import static org.openrewrite.Tree.randomId;
  */
 @Value
 public class CommitMessage implements Marker {
+    @EqualsAndHashCode.Exclude
     @With
     UUID id;
+
     String recipeName;
     String message;
 

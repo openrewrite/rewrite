@@ -21,10 +21,14 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -33,7 +37,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class RemoveRedundantDependencyVersions extends Recipe {
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                    "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                          "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.*",
             required = false)
     @Nullable
@@ -41,7 +45,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                    "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                          "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava*",
             required = false)
     @Nullable
@@ -55,7 +59,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Except",
             description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe."
-                    + " GAV versions are ignored if provided.",
+                          + " GAV versions are ignored if provided.",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable
@@ -63,13 +67,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove redundant explicit dependency versions";
+        return "Remove redundant explicit dependency and plugin versions";
     }
 
     @Override
     public String getDescription() {
-        return "Remove explicitly-specified dependency versions when a parent POM's dependencyManagement " +
-                "specifies the version.";
+        return "Remove explicitly-specified dependency/plugin versions when a parent POM's `dependencyManagement`/`pluginManagement` " +
+               "specifies the version.";
     }
 
     @Override
@@ -96,13 +100,21 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (!isManagedDependencyTag()) {
-                    ResolvedDependency d = findDependency(tag);
-                    if (d != null && matchesVersion(d) &&
+                if (isDependencyLikeTag() && !isManagedDependencyTag()) {
+                    if (isPluginTag()) {
+                        Plugin p = findPlugin(tag);
+                        if (p != null && matchesVersion(p) && matchesGroup(p) && matchesArtifact(p)) {
+                            Xml.Tag version = tag.getChild("version").orElse(null);
+                            return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                        }
+                    } else {
+                        ResolvedDependency d = findDependency(tag);
+                        if (d != null && matchesVersion(d) &&
                             matchesGroup(d) && matchesArtifact(d)
                             && isNotExcepted(d)) {
-                        Xml.Tag version = tag.getChild("version").orElse(null);
-                        return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                            Xml.Tag version = tag.getChild("version").orElse(null);
+                            return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                        }
                     }
                 }
                 return super.visitTag(tag, ctx);
@@ -112,8 +124,16 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 return StringUtils.isNullOrEmpty(groupPattern) || matchesGlob(d.getGroupId(), groupPattern);
             }
 
+            private boolean matchesGroup(Plugin p) {
+                return StringUtils.isNullOrEmpty(groupPattern) || matchesGlob(p.getGroupId(), groupPattern);
+            }
+
             private boolean matchesArtifact(ResolvedDependency d) {
                 return StringUtils.isNullOrEmpty(artifactPattern) || matchesGlob(d.getArtifactId(), artifactPattern);
+            }
+
+            private boolean matchesArtifact(Plugin p) {
+                return StringUtils.isNullOrEmpty(artifactPattern) || matchesGlob(p.getArtifactId(), artifactPattern);
             }
 
             private boolean matchesVersion(ResolvedDependency d) {
@@ -121,6 +141,14 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         d.getArtifactId(), d.getRequested().getType(), d.getRequested().getClassifier());
                 return managedVersion != null && (
                         ignoreVersionMatching() || managedVersion.equals(d.getRequested().getVersion())
+                );
+            }
+
+            private boolean matchesVersion(Plugin p) {
+                ResolvedPom resolvedPom = getResolutionResult().getPom();
+                String managedVersion = getManagedPluginVersion(resolvedPom, p.getGroupId(), p.getArtifactId());
+                return managedVersion != null && (
+                        ignoreVersionMatching() || managedVersion.equals(p.getVersion())
                 );
             }
 
@@ -137,12 +165,25 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     final String exceptedGroupId = split[0];
                     final String exceptedArtifactId = split[1];
                     if (matchesGlob(d.getGroupId(), exceptedGroupId)
-                            && matchesGlob(d.getArtifactId(), exceptedArtifactId)) {
+                        && matchesGlob(d.getArtifactId(), exceptedArtifactId)) {
                         return false;
                     }
                 }
                 return true;
             }
         };
+    }
+
+    @Nullable
+    private static String getManagedPluginVersion(ResolvedPom resolvedPom, @Nullable String groupId, String artifactId) {
+        for (Plugin p : resolvedPom.getPluginManagement()) {
+            if (Objects.equals(
+                    Optional.ofNullable(p.getGroupId()).orElse("org.apache.maven.plugins"),
+                    Optional.ofNullable(groupId).orElse("org.apache.maven.plugins")) &&
+                Objects.equals(p.getArtifactId(), artifactId)) {
+                return resolvedPom.getValue(p.getVersion());
+            }
+        }
+        return null;
     }
 }

@@ -364,4 +364,30 @@ class ChangeMethodNameTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void fullyQualifiedStaticMemberReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "static2", null, null)),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              package com.abc;
+              class A {
+                 public void test() {
+                     com.abc.B.static1("boo");
+                 }
+              }
+              """,
+            """
+              package com.abc;
+              class A {
+                 public void test() {
+                     com.abc.B.static2("boo");
+                 }
+              }
+              """
+          )
+        );
+    }
 }

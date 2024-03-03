@@ -217,4 +217,44 @@ class RemoveManagedDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeBomImport() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveManagedDependency(
+            "io.micrometer",
+            "micrometer-bom",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.micrometer</groupId>
+                              <artifactId>micrometer-bom</artifactId>
+                              <version>1.9.9</version>
+                              <scope>import</scope>
+                              <type>bom</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
 }

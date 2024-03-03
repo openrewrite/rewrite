@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
+@SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
 class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/support-public/issues/5")
@@ -746,6 +747,36 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mergeMappingIntoNewMapping() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.testing",
+              //language=yaml
+              """
+                table:
+                  - name: jdk_version
+                    value: 17
+                """,
+              false,
+              "name"
+            )),
+          yaml(
+            """
+              foo: bar
+              """,
+            """
+              foo: bar
+              testing:
+                table:
+                  - name: jdk_version
+                    value: 17
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2157")
     @Test
     void mergeSequenceMapAddComplexMapping() {
@@ -835,4 +866,50 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mergeScalar() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.name",
+              //language=yaml
+              """
+                sam
+                """,
+              false,
+              null
+            )),
+          yaml(
+            """
+              name: jon
+              """,
+            """
+              name: sam
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertScalar() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.name",
+              //language=yaml
+              """
+                sam
+                """,
+              false,
+              null
+            )),
+          yaml(
+            """
+              """,
+            """
+              name: sam
+              """
+          )
+        );
+    }
 }

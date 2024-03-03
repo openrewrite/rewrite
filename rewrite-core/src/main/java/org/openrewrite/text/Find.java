@@ -48,7 +48,7 @@ public class Find extends Recipe {
     }
 
     @Option(displayName = "Find",
-            description = "The text to find.",
+            description = "The text to find. This snippet can be multiline.",
             example = "blacklist")
     String find;
 
