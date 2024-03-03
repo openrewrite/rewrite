@@ -15,19 +15,14 @@
  */
 package org.openrewrite.xml;
 
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.Cursor;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.xml.search.FindTags;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Supports a limited set of XPath expressions, specifically those
@@ -54,10 +49,12 @@ public class XPathMatcher {
      * @return true if the expression matches the cursor, false otherwise
      */
     public boolean matches(Cursor cursor) {
-        List<Xml.Tag> path = cursor.getPathAsStream()
-                .filter(p -> p instanceof Xml.Tag)
-                .map(Xml.Tag.class::cast)
-                .collect(Collectors.toList());
+        List<Xml.Tag> path = new ArrayList<>();
+        for (Cursor c = cursor; c != null; c = c.getParent()) {
+            if (c.getValue() instanceof Xml.Tag) {
+                path.add(c.getValue());
+            }
+        }
 
         if (expression.startsWith("//") || !expression.startsWith("/")) {
             List<String> parts = new ArrayList<>(Arrays.asList((expression.startsWith("//") ?
@@ -97,16 +94,16 @@ public class XPathMatcher {
                     String newExpression;
                     if (Objects.equals(path.get(blankPartIndex).getName(), parts[blankPartIndex + 1])) {
                         newExpression = String.format(
-                            "%s/%s",
-                            expression.substring(0, doubleSlashIndex),
-                            expression.substring(doubleSlashIndex + 2)
+                                "%s/%s",
+                                expression.substring(0, doubleSlashIndex),
+                                expression.substring(doubleSlashIndex + 2)
                         );
                     } else {
                         newExpression = String.format(
-                            "%s/%s/%s",
-                            expression.substring(0, doubleSlashIndex),
-                            path.get(blankPartIndex).getName(),
-                            expression.substring(doubleSlashIndex + 2)
+                                "%s/%s/%s",
+                                expression.substring(0, doubleSlashIndex),
+                                path.get(blankPartIndex).getName(),
+                                expression.substring(doubleSlashIndex + 2)
                         );
                     }
                     return new XPathMatcher(newExpression).matches(cursor);
@@ -123,16 +120,16 @@ public class XPathMatcher {
                 Xml.Tag tag = i < path.size() ? path.get(i) : null;
                 String partName;
 
-                Matcher matcher = PATTERN.matcher(part);
-                if (tag != null && matcher.matches()) {
+                Matcher matcher;
+                if (tag != null && part.endsWith("]") && (matcher = PATTERN.matcher(part)).matches()) {
                     String name = matcher.group(1);
                     String subTag = matcher.group(2);
                     String subTagValue = matcher.group(3);
 
                     boolean matchCondition =
-                        FindTags.find(tag, subTag).stream().anyMatch(t ->
-                            t.getValue().map(v -> v.equals(subTagValue)).orElse(false)
-                        );
+                            FindTags.find(tag, subTag).stream().anyMatch(t ->
+                                    t.getValue().map(v -> v.equals(subTagValue)).orElse(false)
+                            );
                     if (!matchCondition) {
                         return false;
                     }
