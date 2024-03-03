@@ -375,6 +375,14 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       boolean i=a!=true
                   }
               }
+              """,
+            """
+              class A {
+                  def m() {
+                      boolean a=true
+                      boolean i=!a
+                  }
+              }
               """
           )
         );
