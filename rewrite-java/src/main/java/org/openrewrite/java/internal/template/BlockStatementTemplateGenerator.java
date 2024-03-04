@@ -203,7 +203,7 @@ public class BlockStatementTemplateGenerator {
     }
 
     @SuppressWarnings("DataFlowIssue")
-    private void contextFreeTemplate(Cursor cursor, J j, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, StringBuilder before, StringBuilder after) {
         if (j instanceof J.Lambda) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
