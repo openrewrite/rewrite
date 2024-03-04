@@ -427,4 +427,32 @@ class RemoveDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeBuildscriptDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("org.springframework.boot", "spring-boot-gradle-plugin", null)),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath "org.springframework.boot:spring-boot-gradle-plugin:2.7.18"
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                  }
+              }
+              """
+          )
+        );
+    }
 }

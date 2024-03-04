@@ -113,7 +113,8 @@ public class RemoveDependency extends Recipe {
                 }
 
                 if (!anyChanged) {
-                    return cu;
+                    // instance was changed, but no marker update is needed
+                    return g;
                 }
 
                 return g.withMarkers(g.getMarkers().setByType(gp.withNameToConfiguration(nameToConfiguration)));
