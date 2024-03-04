@@ -221,7 +221,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitExpression(Expression expression, Integer p) {
-                if (loc.equals(EXPRESSION_PREFIX) && expression.isScope(insertionPoint)) {
+                if ((loc.equals(EXPRESSION_PREFIX) ||
+                     loc.equals(STATEMENT_PREFIX) && expression instanceof Statement) &&
+                    expression.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,

@@ -20,10 +20,10 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
 import java.util.List;

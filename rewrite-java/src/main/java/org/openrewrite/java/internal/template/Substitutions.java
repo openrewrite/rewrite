@@ -23,12 +23,12 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
+import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
 import org.openrewrite.java.tree.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -100,7 +100,7 @@ public class Substitutions {
         Object parameter = parameters[index];
         String s;
         String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
-        List<TemplateParameterParser.MatcherParameterContext> params = typedPattern.patternType().matcherParameter();
+        TypeContext param = typedPattern.patternType().type();
 
         if ("anyArray".equals(matcherName)) {
             if (!(parameter instanceof TypedTree)) {
@@ -108,6 +108,10 @@ public class Substitutions {
             }
 
             JavaType type = ((TypedTree) parameter).getType();
+            if (type == null && parameter instanceof J.Empty && ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).isPresent()) {
+                // this is a hack, but since we currently represent template parameters as `J.Empty`, this is the only way to get the type now
+                type = ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).get().getType();
+            }
             JavaType.Array arrayType = TypeUtils.asArray(type);
             if (arrayType == null) {
                 arrayType = TypeUtils.asArray(type);
@@ -123,29 +127,22 @@ public class Substitutions {
 
             s = "(" + newArrayParameter(arrayType.getElemType(), dimensions, index) + ")";
         } else if ("any".equals(matcherName)) {
-            String fqn;
-
-            if (params.size() == 1) {
-                if (params.get(0).Identifier() != null) {
-                    fqn = params.get(0).Identifier().getText();
-                } else {
-                    fqn = params.get(0).FullyQualifiedName().getText();
-                }
+            JavaType type;
+            if (param != null) {
+                type = TypeParameter.toFullyQualifiedName(param);
             } else {
                 if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null
                     && ((J.NewClass) parameter).getClazz() != null) {
                     // for anonymous classes get the type from the supertype
-                    fqn = getTypeName(((J.NewClass) parameter).getClazz().getType());
-                } else if (!(parameter instanceof TypedTree)) {
-                    // any should only be used on TypedTree parameters, but will give it best effort
-                    fqn = "java.lang.Object";
+                    type = ((J.NewClass) parameter).getClazz().getType();
+                } else if (parameter instanceof TypedTree) {
+                    type = ((TypedTree) parameter).getType();
                 } else {
-                    fqn = getTypeName(((TypedTree) parameter).getType());
+                    type = null;
                 }
             }
 
-            fqn = fqn.replace("$", ".");
-
+            String fqn = getTypeName(type);
             JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
             s = primitive == null || primitive.equals(JavaType.Primitive.String) ?
                     newObjectParameter(fqn, index) :
@@ -180,24 +177,17 @@ public class Substitutions {
     }
 
     private String getTypeName(@Nullable JavaType type) {
-        if (type instanceof JavaType.Parameterized) {
-            StringJoiner joiner = new StringJoiner(",", "<", ">");
-            for (JavaType parameter : ((JavaType.Parameterized) type).getTypeParameters()) {
-                joiner.add(getTypeName(parameter));
-            }
-            return ((JavaType.Parameterized) type).getFullyQualifiedName() + joiner;
-        } else if (type instanceof JavaType.GenericTypeVariable) {
-            String name = ((JavaType.GenericTypeVariable) type).getName();
-            return "?".equals(name) ? "Object" : name;
-        } else if (type instanceof JavaType.FullyQualified) {
-            return ((JavaType.FullyQualified) type).getFullyQualifiedName();
-        } else if (type instanceof JavaType.Primitive) {
-            return ((JavaType.Primitive) type).getKeyword();
-        } else if (type instanceof JavaType.Array) {
-            return getTypeName(((JavaType.Array) type).getElemType()) + "[]";
-        } else {
+        if (type == null) {
             return "java.lang.Object";
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable genericTypeVariable = (JavaType.GenericTypeVariable) type;
+            if (genericTypeVariable.getName().equals("?")) {
+                // wildcards cannot be used as type parameters on method invocations
+                return "java.lang.Object";
+            }
+            return TypeUtils.toString(type);
         }
+        return TypeUtils.toString(type).replace("$", ".");
     }
 
     private String substituteUntyped(Object parameter, int index) {

@@ -35,7 +35,7 @@ import java.util.Optional;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveExclusion extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",

@@ -18,17 +18,16 @@ package org.openrewrite.ipc.http;
 import io.micrometer.core.instrument.util.StringUtils;
 import io.micrometer.core.lang.Nullable;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.zip.GZIPOutputStream;
@@ -281,6 +280,33 @@ public interface HttpSender {
                 if (when.get())
                     return compress();
                 return this;
+            }
+
+            public final Builder withMultipartFile(File file) throws IOException {
+                String boundary = UUID.randomUUID().toString();
+                String contentType = "multipart/form-data; boundary=" + boundary;
+                byte[] content = multipart(boundary, file);
+                return withContent(contentType, content);
+            }
+
+            private byte[] multipart(String boundary, File file) throws IOException {
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                String mimeType = Files.probeContentType(file.toPath());
+                if (mimeType == null) {
+                    mimeType = "application/octet-stream";
+                }
+                outputStream.write(("--" + boundary + "\r\n").getBytes());
+                outputStream.write(("Content-Disposition: form-data; name=\"file\"; filename=\"" + file.getName() + "\"\r\n").getBytes());
+                outputStream.write(("Content-Type: " + mimeType + "\r\n").getBytes());
+                outputStream.write(("\r\n--" + boundary + "--\r\n").getBytes());
+                FileInputStream fileInputStream = new FileInputStream(file);
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+                fileInputStream.close();
+                return outputStream.toByteArray();
             }
 
             private static byte[] gzip(byte[] data) throws IOException {

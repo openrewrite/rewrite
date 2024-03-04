@@ -38,7 +38,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.time.ZonedDateTime;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -88,10 +87,12 @@ public class GitProvenance implements Marker {
             baseUrl = baseUrl.substring(4);
         }
         String remainder = origin.substring(origin.indexOf(baseUrl) + baseUrl.length());
+        if (remainder.startsWith(":")) {
+            remainder = remainder.substring(1);
+        }
         if (remainder.startsWith("/")) {
             remainder = remainder.substring(1);
         }
-
         return remainder.substring(0, remainder.lastIndexOf('/'));
     }
 
@@ -321,8 +322,12 @@ public class GitProvenance implements Marker {
     private static List<Committer> getCommitters(Repository repository) {
         try (Git git = Git.open(repository.getDirectory())) {
             ObjectId head = repository.readOrigHead();
-            if(head == null) {
-                return emptyList();
+            if (head == null) {
+                Ref headRef = repository.getRefDatabase().findRef("HEAD");
+                if (headRef == null || headRef.getObjectId() == null) {
+                    return emptyList();
+                }
+                head = headRef.getObjectId();
             }
 
             Map<String, Committer> committers = new TreeMap<>();
@@ -330,8 +335,7 @@ public class GitProvenance implements Marker {
                 PersonIdent who = commit.getAuthorIdent();
                 Committer committer = committers.computeIfAbsent(who.getEmailAddress(),
                         email -> new Committer(who.getName(), email, new TreeMap<>()));
-                committer.getCommitsByDay().compute(ZonedDateTime
-                                .ofInstant(who.getWhen().toInstant(), who.getTimeZone().toZoneId())
+                committer.getCommitsByDay().compute(who.getWhen().toInstant().atZone(who.getTimeZone().toZoneId())
                                 .toLocalDate(),
                         (day, count) -> count == null ? 1 : count + 1);
             }

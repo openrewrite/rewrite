@@ -26,6 +26,9 @@ import java.util.stream.Stream;
 
 import static java.util.stream.StreamSupport.stream;
 
+/**
+ * A cursor is linked path of LST elements that can be used to traverse down the tree towards the root.
+ */
 @EqualsAndHashCode(exclude = "messages")
 public class Cursor {
     public static final String ROOT_VALUE = "root";
@@ -49,6 +52,13 @@ public class Cursor {
             c = c.parent;
         }
         return c;
+    }
+
+    /**
+     * @return true if this cursor is the root of the tree, false otherwise
+     */
+    final boolean isRoot() {
+        return ROOT_VALUE.equals(value);
     }
 
     public Iterator<Cursor> getPathAsCursors() {

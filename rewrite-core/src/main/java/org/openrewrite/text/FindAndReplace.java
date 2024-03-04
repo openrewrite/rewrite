@@ -34,16 +34,16 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindAndReplace extends Recipe {
 
     @Option(displayName = "Find",
-            description = "The text to find (and replace).",
+            description = "The text to find (and replace). This snippet can be multiline.",
             example = "blacklist")
     String find;
 
     @Option(displayName = "Replace",
-            description = "The replacement text for `find`. This supports multiline strings.",
+            description = "The replacement text for `find`. This snippet can be multiline.",
             example = "denylist",
             required = false)
     @Nullable

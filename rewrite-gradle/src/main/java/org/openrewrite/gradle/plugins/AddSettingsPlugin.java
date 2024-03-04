@@ -19,17 +19,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsSettingsGradle;
-import org.openrewrite.gradle.marker.GradleSettings;
-import org.openrewrite.groovy.GroovyIsoVisitor;
-import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
 
-import java.util.Optional;
-
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddSettingsPlugin extends Recipe {
     @Option(displayName = "Plugin id",
             description = "The plugin id to apply.",
@@ -78,17 +73,7 @@ public class AddSettingsPlugin extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
                 new IsSettingsGradle<>(),
-                new GroovyIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                        Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
-                        if (!maybeGradleSettings.isPresent()) {
-                            return cu;
-                        }
-
-                        GradleSettings gradleSettings = maybeGradleSettings.get();
-                        return (G.CompilationUnit) new AddPluginVisitor(pluginId, StringUtils.isBlank(version) ? "latest.release" : version, versionPattern, gradleSettings.getPluginRepositories()).visitNonNull(cu, ctx);
-                    }
-                });
+                new AddPluginVisitor(pluginId, StringUtils.isBlank(version) ? "latest.release" : version, versionPattern)
+        );
     }
 }

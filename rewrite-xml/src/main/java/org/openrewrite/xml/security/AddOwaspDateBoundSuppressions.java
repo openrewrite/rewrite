@@ -26,11 +26,10 @@ import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddOwaspDateBoundSuppressions extends Recipe {
 
     @Option(displayName = "Until date",
@@ -81,7 +80,7 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
                         }
                     }
                     if (!hasUntil) {
-                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
+                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plusDays(30).toString();
                         return t.withAttributes(ListUtils.concat(attributes, autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
                                 new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
                                 "",

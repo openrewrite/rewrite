@@ -49,15 +49,13 @@ public class Space {
 
     @JsonCreator
     public static Space build(@Nullable String whitespace) {
-        if (comments.isEmpty()) {
-            if (whitespace == null || whitespace.isEmpty()) {
-                return Space.EMPTY;
-            } else if (whitespace.length() <= 100) {
-                //noinspection StringOperationCanBeSimplified
-                return flyweights.computeIfAbsent(whitespace, k -> new Space(new String(whitespace), comments));
-            }
+        if (whitespace == null || whitespace.isEmpty()) {
+            return Space.EMPTY;
+        } else if (whitespace.length() <= 100) {
+            //noinspection StringOperationCanBeSimplified
+            return flyweights.computeIfAbsent(whitespace, k -> new Space(new String(whitespace)));
         }
-        return new Space(whitespace, comments);
+        return new Space(whitespace);
     }
 
     public String getIndent() {

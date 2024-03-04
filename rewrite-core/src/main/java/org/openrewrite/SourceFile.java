@@ -112,6 +112,11 @@ public interface SourceFile extends Tree {
         throw new UnsupportedOperationException("SourceFile implementations should override this method");
     }
 
+    @Incubating(since = "8.2.0")
+    default <S, T extends S> T service(Class<S> service) {
+        throw new UnsupportedOperationException("Service " + service + " not supported");
+    }
+
     /**
      * A measure of the size of the AST by count of number of AST nodes or some other similar measure. Because perfect referential
      * uniqueness is space inefficient, this weight will always be approximate and is best used for comparative size between two ASTs

@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 /**
  * Finds matching method invocations.
  */
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class FindMethods extends Recipe {
     transient MethodCalls methodCalls = new MethodCalls(this);
@@ -67,8 +67,9 @@ public class FindMethods extends Recipe {
     @Override
     @SuppressWarnings("ConstantConditions")
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
         return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaIsoVisitor<ExecutionContext>() {
+            final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
+
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);

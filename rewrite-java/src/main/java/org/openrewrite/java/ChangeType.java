@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeType extends Recipe {
 
     @Option(displayName = "Old fully-qualified type name",
@@ -117,7 +117,7 @@ public class ChangeType extends Recipe {
         @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
-                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                JavaSourceFile cu = (JavaSourceFile) tree;
                 if (!Boolean.TRUE.equals(ignoreDefinition)) {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
                     if (fq != null) {
@@ -430,6 +430,7 @@ public class ChangeType extends Recipe {
             } else if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
+                    oldNameToChangedType.put(oldType, targetType);
                     return targetType;
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
@@ -500,7 +501,7 @@ public class ChangeType extends Recipe {
         @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
-                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                JavaSourceFile cu = (JavaSourceFile) tree;
                 String oldPath = cu.getSourcePath().toString().replace('\\', '/');
                 // The old FQN must exist in the path.
                 String oldFqn = fqnToPath(originalType.getFullyQualifiedName());
@@ -508,7 +509,7 @@ public class ChangeType extends Recipe {
 
                 Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
                 if (updatePath(cu, oldPath, newPath.toString())) {
-                    cu = (JavaSourceFile) cu.withSourcePath(newPath);
+                    cu = cu.withSourcePath(newPath);
                 }
                 return super.visit(cu, ctx);
             }
@@ -617,6 +618,15 @@ public class ChangeType extends Recipe {
     public static boolean containsClassDefinition(JavaSourceFile sourceFile, String fullyQualifiedTypeName) {
         AtomicBoolean found = new AtomicBoolean(false);
         JavaIsoVisitor<AtomicBoolean> visitor = new JavaIsoVisitor<AtomicBoolean>() {
+            @Nullable
+            @Override
+            public J visit(@Nullable Tree tree, AtomicBoolean found) {
+                if (found.get()) {
+                    return (J) tree;
+                }
+                return super.visit(tree, found);
+            }
+
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, AtomicBoolean found) {
                 if (found.get()) {
@@ -625,6 +635,7 @@ public class ChangeType extends Recipe {
 
                 if (classDecl.getType() != null && TypeUtils.isOfClassType(classDecl.getType(), fullyQualifiedTypeName)) {
                     found.set(true);
+                    return classDecl;
                 }
                 return super.visitClassDeclaration(classDecl, found);
             }

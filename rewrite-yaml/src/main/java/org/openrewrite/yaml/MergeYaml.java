@@ -24,7 +24,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class MergeYaml extends Recipe {
     @Option(displayName = "Key path",
             description = "A [JsonPath](https://github.com/json-path/JsonPath) expression used to find matching keys.",
@@ -76,6 +76,8 @@ public class MergeYaml extends Recipe {
         return "Merge a YAML snippet with an existing YAML document.";
     }
 
+    final static String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(key);
@@ -93,13 +95,59 @@ public class MergeYaml extends Recipe {
                             Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(document.getBlock(),
                             ctx, getCursor()));
                 }
-                return super.visitDocument(document, ctx);
+                Yaml.Document d = super.visitDocument(document, ctx);
+                if(d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
+                    // No matching element already exists, attempt to construct one
+                    String valueKey = maybeKeyFromJsonPath(key);
+                    if(valueKey == null) {
+                        return d;
+                    }
+                    // If there is no space between the colon and the value it will not be interpreted as a mapping
+                    String snippet;
+                    if (incoming instanceof Yaml.Mapping) {
+                        snippet = valueKey + ":\n" + indent(yaml);
+                    } else {
+                        snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
+                    }
+                    // No matching element already exists, so it must be constructed
+                    return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), snippet,
+                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(d.getBlock(),
+                            ctx, getCursor()));
+                }
+                return d;
+            }
+
+            public String indent(String text) {
+                int index = text.indexOf('\n');
+                if (index == -1 || index == text.length() - 1) {
+                    return text;
+                }
+                StringBuilder padding = new StringBuilder();
+                for (int i = index + 1; i < text.length(); i++) {
+                    if (!Character.isWhitespace(text.charAt(i))) {
+                        break;
+                    }
+                    padding.append(text.charAt(i));
+                }
+                if (padding.length() == 0) {
+                    padding.append("  ");
+                }
+                return text.replaceAll("(?m)^", padding.toString());
+            }
+
+            @Nullable
+            private String maybeKeyFromJsonPath(String jsonPath) {
+                if(!jsonPath.startsWith("$.")) {
+                    return null;
+                }
+                return jsonPath.substring(2);
             }
 
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
                 Yaml.Mapping m = super.visitMapping(mapping, ctx);
                 if (matcher.matches(getCursor())) {
+                    getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, Boolean.TRUE.equals(acceptTheirs),
                             objectIdentifyingProperty).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
                 }
@@ -109,12 +157,17 @@ public class MergeYaml extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 if (matcher.matches(getCursor())) {
+                    getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     // this tests for an awkward case that will be better handled by JsonPathMatcher.
                     // if it is a sequence, we want to insert into every sequence entry for now.
                     if (!(entry.getValue() instanceof Yaml.Sequence)) {
-                        return entry.withValue((Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
-                                Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(entry.getValue(),
-                                ctx, getCursor()));
+                        Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
+                                Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visitNonNull(entry.getValue(),
+                                ctx, getCursor());
+                        if (value instanceof Yaml.Scalar && value.getPrefix().isEmpty()) {
+                            value = value.withPrefix(" ");
+                        }
+                        return entry.withValue(value);
                     }
                 }
                 return super.visitMappingEntry(entry, ctx);
@@ -123,6 +176,7 @@ public class MergeYaml extends Recipe {
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
                 if (matcher.matches(getCursor().getParentOrThrow())) {
+                    getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     return sequence.withEntries(ListUtils.map(sequence.getEntries(),
                             entry -> entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
                                     Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty)

@@ -15,7 +15,10 @@
  */
 package org.openrewrite.internal;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
+import java.util.StringJoiner;
 
 public class ExceptionUtils {
     /**
@@ -35,7 +38,7 @@ public class ExceptionUtils {
             if (stackTraceElement.getClassName().equals(until.getName())) {
                 break;
             }
-            if (i++ >= 8) {
+            if (i++ >= 16) {
                 sanitized.add("  ...");
                 break;
             }

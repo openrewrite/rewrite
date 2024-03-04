@@ -23,7 +23,7 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.J;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeMethodAccessLevel extends Recipe {
 
     @Option(displayName = "Method pattern",

@@ -29,7 +29,7 @@ import org.openrewrite.java.tree.Javadoc;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
 @RequiredArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UseStaticImport extends Recipe {
 
     /**
@@ -65,9 +65,10 @@ public class UseStaticImport extends Recipe {
     }
 
     private class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {
+        final MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (methodMatcher.matches(m)) {
                 if (m.getTypeParameters() != null && !m.getTypeParameters().isEmpty()) {

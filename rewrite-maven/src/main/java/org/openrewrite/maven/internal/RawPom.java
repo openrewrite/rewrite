@@ -35,6 +35,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -341,7 +342,12 @@ public class RawPom {
                 inputPath,
                 repo,
                 parent,
-                new ResolvedGroupArtifactVersion(repo == null ? null : repo.getUri(), getGroupId(), artifactId, getVersion(), null),
+                new ResolvedGroupArtifactVersion(
+                        repo == null ? null : repo.getUri(),
+                        Objects.requireNonNull(getGroupId()),
+                        artifactId,
+                        Objects.requireNonNull(getVersion()),
+                        null),
                 name,
                 getPackaging(),
                 getProperties() == null ? emptyMap() : getProperties(),
@@ -350,7 +356,7 @@ public class RawPom {
                 mapRepositories(getRepositories()),
                 mapLicenses(getLicenses()),
                 mapProfiles(getProfiles()),
-                mapPlugins((build != null) ? build.getPlugins()  : null),
+                mapPlugins((build != null) ? build.getPlugins() : null),
                 mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
         );
     }
@@ -386,7 +392,7 @@ public class RawPom {
                             mapRequestedDependencies(p.getDependencies()),
                             mapDependencyManagement(p.getDependencyManagement()),
                             mapRepositories(p.getRepositories()),
-                            mapPlugins((build != null) ? build.getPlugins()  : null),
+                            mapPlugins((build != null) ? build.getPlugins() : null),
                             mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
                     ));
                 }
@@ -488,7 +494,8 @@ public class RawPom {
         if (configuration == null || configuration.isEmpty()) {
             return emptyMap();
         }
-        return MavenXmlMapper.readMapper().convertValue(configuration, new TypeReference<Map<String, Object>>(){});
+        return MavenXmlMapper.readMapper().convertValue(configuration, new TypeReference<Map<String, Object>>() {
+        });
     }
 
     private List<org.openrewrite.maven.tree.Plugin.Execution> mapPluginExecutions(@Nullable List<Execution> rawExecutions) {

@@ -25,7 +25,10 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.java.Assertions.srcMainJava;
+import static org.openrewrite.java.Assertions.srcTestJava;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -71,7 +74,7 @@ class AddDependencyTest implements RewriteTest {
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                         <dependencies>
-                            <!--~~(Unable to download POM. Tried repositories:
+                            <!--~~(Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
                     https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
                                 <groupId>doesnotexist</groupId>
                                 <artifactId>doesnotexist</artifactId>
@@ -116,6 +119,43 @@ class AddDependencyTest implements RewriteTest {
                             </dependency>
                         </dependencies>
                     </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void pomType() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, null, null, "pom", null, null, null, null)),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <type>pom</type>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )

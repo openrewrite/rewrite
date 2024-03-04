@@ -178,7 +178,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM. Tried repositories:
+                  <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
               https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM. Tried repositories:
               https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
                     <groupId>com.bad</groupId>
@@ -247,7 +247,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(after -> {
                 Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
-                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM. Tried repositories"));
+                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"));
             })
           )
         );

@@ -29,8 +29,11 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
+import static org.openrewrite.Validated.test;
+import static org.openrewrite.internal.StringUtils.isBlank;
+
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -100,6 +103,17 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
+        validated =
+            validated.and(test(
+                "coordinates",
+                "newGroupId OR newArtifactId must be different from before",
+                this,
+                r -> {
+                    boolean sameGroupId = isBlank(r.newGroupId) || Objects.equals(r.oldGroupId, r.newGroupId);
+                    boolean sameArtifactId = isBlank(r.newArtifactId) || Objects.equals(r.oldArtifactId, r.newArtifactId);
+                    return !(sameGroupId && sameArtifactId);
+                }
+            ));
         return validated;
     }
 
@@ -139,11 +153,10 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (newVersion != null) {
                         try {
-                            String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, newArtifactId);
-
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
                             if (versionTag.isPresent()) {
+                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, newArtifactId, versionTag.get().getValue().orElse(null));
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                             }
                             changed = true;
@@ -153,21 +166,23 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (changed) {
                         maybeUpdateModel();
+                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
                     }
                 }
                 return t;
             }
 
             @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId) throws MavenDownloadingException {
+            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
                 if (versionComparator == null) {
                     return newVersion;
                 }
+                String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
                 if (availableVersions == null) {
                     availableVersions = new ArrayList<>();
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(newVersion, v)) {
+                        if (versionComparator.isValid(finalCurrentVersion, v)) {
                             availableVersions.add(v);
                         }
                     }

@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyEmptyStatementBody", "GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
+@SuppressWarnings({"GroovyEmptyStatementBody", "GroovyUnusedAssignment", "GrUnnecessarySemicolon", "GroovyUnnecessaryContinue"})
 class ForLoopTest implements RewriteTest {
 
     @Test
@@ -200,7 +200,7 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              for(int i in [1, 2, 3]) {continue}
+              for(int i in [1, 2, 3]) { continue }
               """
           )
         );
@@ -211,7 +211,7 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              f: for(int i in [1, 2, 3]) {continue f}
+              f: for(int i in [1, 2, 3]) { continue f }
               """
           )
         );

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
 import lombok.Value;
 import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
@@ -62,7 +63,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         return TEMPLATE_CLASSPATH_DIR;
     }
 
+    @Getter
     private final String code;
+
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
@@ -79,10 +82,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.templateParser = templateParser;
-    }
-
-    public String getCode() {
-        return code;
     }
 
     @Override

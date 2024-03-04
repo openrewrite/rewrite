@@ -33,7 +33,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddPlugin extends Recipe {
 
     private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
@@ -72,7 +72,7 @@ public class AddPlugin extends Recipe {
 
     @Option(displayName = "Executions",
             description = "Optional executions provided as raw XML.",
-            example = "<execution><phase>generate-sources</phase><goals><goal>add-source</goal></goals></execution>",
+            example = "<executions><execution><phase>generate-sources</phase><goals><goal>add-source</goal></goals></execution></executions>",
             required = false)
     @Nullable
     String executions;

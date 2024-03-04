@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Value;
 import lombok.With;
@@ -48,6 +49,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @Getter
+@Builder
 public class ResolvedPom {
 
     public static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
@@ -82,25 +84,32 @@ public class ResolvedPom {
     }
 
     @NonFinal
-    Map<String, String> properties;
+    @Builder.Default
+    Map<String, String> properties = emptyMap();
 
     @NonFinal
-    List<ResolvedManagedDependency> dependencyManagement;
+    @Builder.Default
+    List<ResolvedManagedDependency> dependencyManagement = emptyList();
 
     @NonFinal
-    List<MavenRepository> initialRepositories;
+    @Builder.Default
+    List<MavenRepository> initialRepositories = emptyList();
 
     @NonFinal
-    List<MavenRepository> repositories;
+    @Builder.Default
+    List<MavenRepository> repositories = emptyList();
 
     @NonFinal
-    List<Dependency> requestedDependencies;
+    @Builder.Default
+    List<Dependency> requestedDependencies = emptyList();
 
     @NonFinal
-    List<Plugin> plugins;
+    @Builder.Default
+    List<Plugin> plugins = emptyList();
 
     @NonFinal
-    List<Plugin> pluginManagement;
+    @Builder.Default
+    List<Plugin> pluginManagement = emptyList();
 
 
     /**

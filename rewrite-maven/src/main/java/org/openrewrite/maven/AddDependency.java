@@ -36,7 +36,6 @@ import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
-
 /**
  * This recipe will detect the presence of Java types (in Java ASTs) to determine if a dependency should be added
  * to a maven build file. Java Provenance information is used to filter the type search to only those java ASTs that
@@ -46,7 +45,7 @@ import static java.util.Objects.requireNonNull;
  * NOTE: IF PROVENANCE INFORMATION IS NOT PRESENT, THIS RECIPE WILL DO NOTHING.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -178,17 +177,17 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (tree instanceof JavaSourceFile) {
-                    boolean sourceFileUsesType = onlyIfUsing == null || sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx);
-                    acc.usingType |= sourceFileUsesType;
-                    sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                            sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                                if (sourceFileUsesType) {
-                                    acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
-                                            scope /* a `compile` scope dependency will also be available in test source set */ :
-                                            "test".equals(sourceSet.getName()) ? "test" : "compile"
-                                    );
-                                }
-                            }));
+                    if (onlyIfUsing == null || sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
+                        acc.usingType = true;
+                        sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
+                                sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
+                                        acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
+                                                scope /* a `compile` scope dependency will also be available in test source set */ :
+                                                "test".equals(sourceSet.getName()) ? "test" : "compile"
+                                        )
+                                )
+                        );
+                    }
                 }
                 return sourceFile;
             }

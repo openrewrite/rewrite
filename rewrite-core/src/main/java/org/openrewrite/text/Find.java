@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class Find extends Recipe {
 
     @Override
@@ -48,7 +48,7 @@ public class Find extends Recipe {
     }
 
     @Option(displayName = "Find",
-            description = "The text to find.",
+            description = "The text to find. This snippet can be multiline.",
             example = "blacklist")
     String find;
 

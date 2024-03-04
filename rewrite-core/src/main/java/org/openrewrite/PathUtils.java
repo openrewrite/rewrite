@@ -20,8 +20,14 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
 
 public class PathUtils {
     private PathUtils() {
@@ -67,18 +73,37 @@ public class PathUtils {
         if ("**".equals(globPattern)) {
             return true;
         }
-        if (globPattern == null) {
+        if (globPattern == null || path == null) {
             return false;
         }
-        if (path == null) {
-            return false;
-        }
+
         String relativePath = path.toString();
         if (relativePath.isEmpty() && globPattern.isEmpty()) {
             return true;
         }
 
-        return matchesGlob(globPattern, relativePath);
+        List<String> eitherOrPatterns = getEitherOrPatterns(globPattern);
+        List<String> excludedPatterns = getExcludedPatterns(globPattern);
+        if (eitherOrPatterns.isEmpty() && excludedPatterns.isEmpty()) {
+            return matchesGlob(globPattern, relativePath);
+        } else if (!eitherOrPatterns.isEmpty()) {
+            for (String eitherOrPattern : eitherOrPatterns) {
+                if (matchesGlob(Paths.get(relativePath), eitherOrPattern)) {
+                    return true;
+                }
+            }
+            return false;
+        } else { // If eitherOrPatterns is empty and excludedPatterns is not
+            if (!matchesGlob(convertNegationToWildcard(globPattern), relativePath)) {
+                return false;
+            }
+            for (String excludedPattern : excludedPatterns) {
+                if (matchesGlob(excludedPattern, relativePath)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static boolean matchesGlob(String pattern, String path) {
@@ -186,6 +211,61 @@ public class PathUtils {
             }
         }
         return true;
+    }
+
+    public static String convertNegationToWildcard(String globPattern) {
+        // Regular expression to match !(...)
+        String negationPattern = "\\!\\((.*?)\\)";
+        // Replace all negation patterns with *
+        return globPattern.replaceAll(negationPattern, "*");
+    }
+
+    public static List<String> getExcludedPatterns(String globPattern) {
+        if (!globPattern.contains("!")) {
+            return emptyList();
+        }
+
+        List<String> excludedPatterns = new ArrayList<>(3);
+
+        // Regular expression to match !(...)
+        String negationPattern = "\\!\\((.*?)\\)";
+        Pattern pattern = Pattern.compile(negationPattern);
+        Matcher matcher = pattern.matcher(globPattern);
+
+        // Find all negation patterns and generate excluded patterns
+        while (matcher.find()) {
+            String negationContent = matcher.group(1);
+            String[] options = negationContent.split("\\|");
+            for (String option : options) {
+                excludedPatterns.add(globPattern.replace(matcher.group(), option));
+            }
+        }
+
+        return excludedPatterns;
+    }
+
+    public static List<String> getEitherOrPatterns(String globPattern) {
+        if (!globPattern.contains("{")) {
+            return emptyList();
+        }
+
+        List<String> eitherOrPatterns = new ArrayList<>(3);
+
+        // Regular expression to match {...}
+        String eitherOrPattern = "\\{(.*?)\\}";
+        Pattern pattern = Pattern.compile(eitherOrPattern);
+        Matcher matcher = pattern.matcher(globPattern);
+
+        // Find all possible patterns and generate patterns
+        while (matcher.find()) {
+            String eitherOrContent = matcher.group(1);
+            String[] options = eitherOrContent.split("\\,");
+            for (String option : options) {
+                eitherOrPatterns.add(globPattern.replace(matcher.group(), option));
+            }
+        }
+
+        return eitherOrPatterns;
     }
 
     private static String[] tokenize(String path) {

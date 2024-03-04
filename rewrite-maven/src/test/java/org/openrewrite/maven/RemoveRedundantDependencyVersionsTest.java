@@ -1017,49 +1017,50 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     void except() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, Collections.singletonList("org.junit.jupiter:junit-jupiter-api"))),
-          pomXml("""
-                <project>
-                    <parent>
-                        <groupId>org.junit</groupId>
-                        <artifactId>junit-bom</artifactId>
-                        <version>5.8.0</version>
-                    </parent>
-                    <artifactId>child</artifactId>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.junit.jupiter</groupId>
-                            <artifactId>junit-jupiter-api</artifactId>
-                            <version>5.8.0</version>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.junit.jupiter</groupId>
-                            <artifactId>junit-jupiter-params</artifactId>
-                            <version>5.8.0</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """,
+          pomXml(
             """
-                <project>
-                    <parent>
-                        <groupId>org.junit</groupId>
-                        <artifactId>junit-bom</artifactId>
-                        <version>5.8.0</version>
-                    </parent>
-                    <artifactId>child</artifactId>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.junit.jupiter</groupId>
-                            <artifactId>junit-jupiter-api</artifactId>
-                            <version>5.8.0</version>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.junit.jupiter</groupId>
-                            <artifactId>junit-jupiter-params</artifactId>
-                        </dependency>
-                    </dependencies>
-                </project>
-                  """
+              <project>
+                  <parent>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.8.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>5.8.0</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-params</artifactId>
+                          <version>5.8.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <parent>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.8.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>5.8.0</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-params</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+                """
           )
         );
     }
@@ -1070,18 +1071,18 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.sample</groupId>
-                      <artifactId>sample</artifactId>
-                      <version>1.0.0</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>30.0-jre</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>30.0-jre</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -1094,18 +1095,106 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>org.sample</groupId>
-                      <artifactId>sample</artifactId>
-                      <version>1.0.0</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>30.0-jre</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>30.0-jre</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3932")
+    void removeRedundantVersionsFromPluginsManagedByParent() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                              <version>4.9.10</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3932")
+    void noChangesIfManagedPluginVersionDoesNotMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, true, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                              <version>4.9.9</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """
           )
         );

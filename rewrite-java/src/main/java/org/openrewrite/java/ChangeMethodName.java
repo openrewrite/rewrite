@@ -23,10 +23,8 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
-import static java.util.Objects.requireNonNull;
-
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeMethodName extends Recipe {
 
     @Option(displayName = "Method pattern",
@@ -73,16 +71,19 @@ public class ChangeMethodName extends Recipe {
             @Override
             public J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    JavaSourceFile cu = (JavaSourceFile) tree;
                     if (Boolean.TRUE.equals(ignoreDefinition)) {
                         J j = new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
                         if (cu != j) {
                             return cu;
                         }
+                    } else {
+                        cu = (JavaSourceFile) new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
+                        if (cu != tree) {
+                            return cu;
+                        }
                     }
-                    cu = (JavaSourceFile) new UsesMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
-                    cu = (JavaSourceFile) new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
-                    return cu;
+                    return new UsesMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
                 }
                 return super.visit(tree, ctx);
             }
@@ -146,7 +147,7 @@ public class ChangeMethodName extends Recipe {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
-                if (methodMatcher.isFullyQualifiedClassReference(f)) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof J.Import && methodMatcher.isFullyQualifiedClassReference(f)) {
                     Expression target = f.getTarget();
                     if (target instanceof J.FieldAccess) {
                         String className = target.printTrimmed(getCursor());

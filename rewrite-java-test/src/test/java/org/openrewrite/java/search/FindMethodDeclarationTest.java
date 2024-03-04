@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("InfiniteRecursion")
-public class FindMethodDeclarationTest implements RewriteTest {
+class FindMethodDeclarationTest implements RewriteTest {
     @Test
     void find() {
         rewriteRun(
