@@ -601,7 +601,7 @@ public class MavenPomDownloader {
         }
         ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
         sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
-        throw new MavenDownloadingException("Unable to download POM.", null, originalGav)
+        throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
                 .setRepositoryResponses(repositoryResponses);
     }
 
