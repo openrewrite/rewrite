@@ -179,7 +179,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <version>1</version>
                 <dependencies>
                   <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM. Tried repositories:
+              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM: doesnotexist:another:1. Tried repositories:
               https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
                     <groupId>com.bad</groupId>
                     <artifactId>bad-artifact</artifactId>
