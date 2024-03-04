@@ -101,6 +101,9 @@ public class AddProperty extends Recipe {
                     Xml.Tag propertyTag = Xml.Tag.build("<" + propertyName + ">" + value + "</" + propertyName + ">");
                     d = (Xml.Document) new AddToTagVisitor<>(properties.get(), propertyTag, new TagNameComparator()).visitNonNull(d, ctx);
                 }
+                if (d != document) {
+                    maybeUpdateModel();
+                }
                 return d;
             }
 
