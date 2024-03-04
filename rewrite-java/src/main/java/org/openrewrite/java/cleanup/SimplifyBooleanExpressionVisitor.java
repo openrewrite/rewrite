@@ -21,10 +21,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.SemanticallyEqual;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.MethodCall;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import java.util.Collections;
 
@@ -69,6 +67,14 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
                     j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
                 }
+            } else if (isLiteralFalse(asBinary.getLeft())) {
+                if (shouldSimplifyEqualsOn(asBinary.getRight())) {
+                    j = not(asBinary.getRight());
+                }
+            } else if (isLiteralFalse(asBinary.getRight())) {
+                if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
+                    j = not(asBinary.getLeft());
+                }
             } else {
                 j = maybeReplaceCompareWithNull(asBinary, true);
             }
@@ -80,6 +86,14 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             } else if (isLiteralFalse(asBinary.getRight())) {
                 if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
                     j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
+                }
+            } else if (isLiteralTrue(asBinary.getLeft())) {
+                if (shouldSimplifyEqualsOn(asBinary.getRight())) {
+                    j = not(asBinary.getRight());
+                }
+            } else if (isLiteralTrue(asBinary.getRight())) {
+                if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
+                    j = not(asBinary.getLeft());
                 }
             } else {
                 j = maybeReplaceCompareWithNull(asBinary, false);
@@ -265,13 +279,35 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         return asBinary;
     }
 
-    private J.Literal booleanLiteral(J j, boolean value) {
+    private static J.Literal booleanLiteral(J j, boolean value) {
         return new J.Literal(Tree.randomId(),
                 j.getPrefix(),
                 j.getMarkers(),
                 value,
                 String.valueOf(value),
                 Collections.emptyList(),
+                JavaType.Primitive.Boolean);
+    }
+
+    private static J.Unary not(Expression sideRetained) {
+        if (!(sideRetained instanceof J.FieldAccess) &&
+            !(sideRetained instanceof J.Identifier) &&
+            !(sideRetained instanceof J.Literal) &&
+            !(sideRetained instanceof J.MethodInvocation) &&
+            !(sideRetained instanceof J.Parentheses) &&
+            !(sideRetained instanceof J.Unary)) {
+            sideRetained = new J.Parentheses<>(Tree.randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    JRightPadded.build(sideRetained));
+        }
+        return new J.Unary(Tree.randomId(),
+                sideRetained.getPrefix(),
+                sideRetained.getMarkers(),
+                JLeftPadded.build(J.Unary.Type.Not),
+                sideRetained
+                        .withPrefix(Space.EMPTY)
+                        .withMarkers(Markers.EMPTY),
                 JavaType.Primitive.Boolean);
     }
 
