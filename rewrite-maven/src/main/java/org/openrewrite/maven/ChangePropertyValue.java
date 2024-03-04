@@ -99,6 +99,7 @@ public class ChangePropertyValue extends Recipe {
                 if (isPropertyTag() && propertyName.equals(tag.getName()) &&
                     !newValue.equals(tag.getValue().orElse(null))) {
                     doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+                    maybeUpdateModel();
                 }
                 return super.visitTag(tag, ctx);
             }
