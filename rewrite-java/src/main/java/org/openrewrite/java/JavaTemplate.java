@@ -75,7 +75,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     }
 
     private static JavaParser.Builder<?,?> augmentClasspath(JavaParser.Builder<?,?> parserBuilder) {
-        return parserBuilder.classpathEntry(getTemplateClasspathDir());
+        return parserBuilder.addClasspathEntry(getTemplateClasspathDir());
     }
 
     protected JavaTemplate(String code, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {

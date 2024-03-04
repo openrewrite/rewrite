@@ -366,8 +366,8 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
-        B classpathEntry(Path entry) {
-            this.artifactNames = Collections.emptyList();
+        // internal method which doesn't overwrite the classpath but just amends it
+        B addClasspathEntry(Path entry) {
             if (this.classpath.isEmpty()) {
                 this.classpath = Collections.singletonList(entry);
             } else {
@@ -376,9 +376,9 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
-        public B classpath(String... classpath) {
-            this.artifactNames = Collections.emptyList();
-            this.classpath = dependenciesFromClasspath(classpath);
+        public B classpath(String... artifactNames) {
+            this.artifactNames = Arrays.asList(artifactNames);
+            this.classpath = Collections.emptyList();
             return (B) this;
         }
 
@@ -403,7 +403,8 @@ public interface JavaParser extends Parser {
 
         protected Collection<Path> resolvedClasspath() {
             if (!artifactNames.isEmpty()) {
-                classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
+                classpath = new ArrayList<>(classpath);
+                classpath.addAll(JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0])));
                 artifactNames = Collections.emptyList();
             }
             return classpath;
