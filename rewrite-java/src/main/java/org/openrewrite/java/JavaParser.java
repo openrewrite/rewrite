@@ -371,6 +371,7 @@ public interface JavaParser extends Parser {
             if (this.classpath.isEmpty()) {
                 this.classpath = Collections.singletonList(entry);
             } else {
+                this.classpath = new ArrayList<>(classpath);
                 this.classpath.add(entry);
             }
             return (B) this;
@@ -382,7 +383,7 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
-        @SuppressWarnings("UnusedReturnValue")
+        @SuppressWarnings({"UnusedReturnValue", "unused"})
         public B classpathFromResources(ExecutionContext ctx, String... classpath) {
             this.artifactNames = Collections.emptyList();
             this.classpath = dependenciesFromResources(ctx, classpath);
