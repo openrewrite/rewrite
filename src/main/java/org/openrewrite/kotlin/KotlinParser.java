@@ -286,6 +286,18 @@ public class KotlinParser implements Parser {
             return this;
         }
 
+        /**
+         * This is an internal API which is subject to removal or change.
+         */
+        public Builder addClasspathEntry(Path classpath) {
+            if (this.classpath.isEmpty()) {
+                this.classpath = Collections.singletonList(classpath);
+            } else {
+                this.classpath.add(classpath);
+            }
+            return this;
+        }
+
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
             return this;
