@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -142,6 +142,16 @@ public interface XMLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitElement(XMLParser.ElementContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspdirective}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspdirective(XMLParser.JspdirectiveContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspdirective}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspdirective(XMLParser.JspdirectiveContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link XMLParser#reference}.
 	 * @param ctx the parse tree
