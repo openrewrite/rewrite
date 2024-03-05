@@ -45,7 +45,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
     static final XPathMatcher PROFILE_PLUGIN_MATCHER = new XPathMatcher("/project/profiles/*/build/plugins/plugin");
-    private transient MavenResolutionResult resolutionResult;
 
     @Override
     public String getLanguage() {
@@ -59,15 +58,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     protected MavenResolutionResult getResolutionResult() {
-        //noinspection ConstantConditions
-        if (resolutionResult == null) {
-            resolutionResult = ((Xml.Document) getCursor()
-                    .getPath(Xml.Document.class::isInstance)
-                    .next())
-                    .getMarkers().findFirst(MavenResolutionResult.class)
-                    .orElseThrow(() -> new IllegalStateException("Maven visitors should not be visiting XML documents without a Maven marker"));
-        }
-        return resolutionResult;
+        return ((Xml.Document) getCursor()
+                .getPath(Xml.Document.class::isInstance)
+                .next())
+                .getMarkers().findFirst(MavenResolutionResult.class)
+                .orElseThrow(() -> new IllegalStateException("Maven visitors should not be visiting XML documents without a Maven marker"));
     }
 
     public boolean isPropertyTag() {
