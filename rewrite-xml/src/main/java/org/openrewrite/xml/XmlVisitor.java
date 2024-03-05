@@ -119,6 +119,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         pl = pl.withMarkers(visitMarkers(pl.getMarkers(), p));
         pl = pl.withXmlDecl(visitAndCast(prolog.getXmlDecl(), p));
         pl = pl.withMisc(ListUtils.map(pl.getMisc(), m -> visitAndCast(m, p)));
+        pl = pl.withJspDirectives(ListUtils.map(pl.getJspDirectives(), m -> visitAndCast(m, p)));
         return pl;
     }
 
@@ -131,5 +132,12 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
         e = e.withSubset(ListUtils.map(e.getSubset(), i -> visitAndCast(i, p)));
         return e;
+    }
+
+    public Xml visitJspDirective(Xml.JspDirective jspDirective, P p) {
+        Xml.JspDirective j = jspDirective;
+        j = j.withMarkers(visitMarkers(j.getMarkers(), p));
+        j = j.withAttributes(ListUtils.map(j.getAttributes(), a -> visitAndCast(a, p)));
+        return j;
     }
 }
