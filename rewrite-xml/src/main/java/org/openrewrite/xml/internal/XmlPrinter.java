@@ -57,8 +57,12 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitTag(Xml.Tag tag, PrintOutputCapture<P> p) {
         beforeSyntax(tag, p);
-        p.append('<')
-                .append(tag.getName());
+        p.append('<');
+        boolean isJspDirective = getCursor().getParentOrThrow().getValue() instanceof Xml.Prolog;
+        if (isJspDirective) {
+            p.append("%@");
+        }
+        p.append(tag.getName());
         visit(tag.getAttributes(), p);
         p.append(tag.getBeforeTagDelimiterPrefix());
         if (tag.getClosing() == null) {
@@ -171,6 +175,19 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         p.append(ident.getName());
         afterSyntax(ident, p);
         return ident;
+    }
+
+    @Override
+    public Xml visitJspDirective(Xml.JspDirective jsp, PrintOutputCapture<P> p) {
+        beforeSyntax(jsp, p);
+        p.append("<%@");
+        p.append(jsp.getBeforeTypePrefix());
+        p.append(jsp.getType());
+        visit(jsp.getAttributes(), p);
+        p.append(jsp.getBeforeDirectiveEndPrefix());
+        p.append("%>");
+        afterSyntax(jsp, p);
+        return jsp;
     }
 
     private static final UnaryOperator<String> XML_MARKER_WRAPPER =

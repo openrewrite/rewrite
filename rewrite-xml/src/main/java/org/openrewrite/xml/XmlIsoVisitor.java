@@ -69,6 +69,11 @@ public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
+    public Xml.JspDirective visitJspDirective(Xml.JspDirective jspDirective, P p) {
+        return (Xml.JspDirective) super.visitJspDirective(jspDirective, p);
+    }
+
+    @Override
     public Xml.Element visitElement(Xml.Element element, P p) {
         return (Xml.Element) super.visitElement(element, p);
     }
