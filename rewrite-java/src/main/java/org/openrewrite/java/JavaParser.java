@@ -20,10 +20,7 @@ import io.github.classgraph.Resource;
 import io.github.classgraph.ResourceList;
 import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -367,7 +364,8 @@ public interface JavaParser extends Parser {
         }
 
         // internal method which doesn't overwrite the classpath but just amends it
-        B addClasspathEntry(Path entry) {
+        @Incubating(since = "8.18.3")
+        public B addClasspathEntry(Path entry) {
             if (this.classpath.isEmpty()) {
                 this.classpath = Collections.singletonList(entry);
             } else {
