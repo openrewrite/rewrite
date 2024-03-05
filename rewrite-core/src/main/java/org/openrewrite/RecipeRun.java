@@ -26,6 +26,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -64,38 +65,46 @@ public class RecipeRun {
         return emptyList();
     }
 
-    public void exportDatatablesToCsv(String filePath) {
-        dataTables.forEach((dataTable, rows) -> {
+    public void exportDatatablesToCsv(String filePath, ExecutionContext ctx) {
+        for (Map.Entry<DataTable<?>, List<?>> entry : dataTables.entrySet()) {
+            DataTable<?> dataTable = entry.getKey();
+            List<?> rows = entry.getValue();
             File csv = new File(filePath + dataTable.getName() + ".csv");
             try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(csv, false))) {
                 DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
-                List<String> fieldNames = descriptor.getColumns().stream().map(ColumnDescriptor::getName)
-                        .collect(toList());
-                printWriter.println(descriptor.getColumns().stream()
-                        .map(columnDescriptor -> String.format("\"%s\"", columnDescriptor.getDisplayName()))
-                        .collect(joining(",")));
-                printWriter.println(descriptor.getColumns().stream()
-                        .map(columnDescriptor -> String.format("\"%s\"", columnDescriptor.getDescription()))
-                        .collect(joining(",")));
-                printRowData(printWriter, rows, fieldNames);
-            } catch (FileNotFoundException | IllegalAccessException e) {
-                //TODO Handle exceptions
+                List<String> fieldNames = new ArrayList<>();
+                List<String> fieldTitles = new ArrayList<>();
+                List<String> fieldDescriptions = new ArrayList<>();
+
+                for (ColumnDescriptor columnDescriptor : descriptor.getColumns()) {
+                    fieldNames.add(columnDescriptor.getName());
+                    fieldTitles.add(String.format("\"%s\"", columnDescriptor.getDisplayName()));
+                    fieldDescriptions.add(String.format("\"%s\"", columnDescriptor.getDescription()));
+                }
+
+                printWriter.println(String.join(",", fieldTitles));
+                printWriter.println(String.join(",", fieldDescriptions));
+                printRowData(printWriter, rows, fieldNames, ctx);
+            } catch (FileNotFoundException e) {
+                ctx.getOnError().accept(e);
             }
-        });
+        }
     }
 
-    private void printRowData(PrintWriter printWriter, List<?> rows, List<String> fieldNames)
-            throws IllegalAccessException {
-        rows.forEach(row ->
-            printWriter.println(fieldNames.stream().map(fieldName -> {
+    private void printRowData(PrintWriter printWriter, List<?> rows, List<String> fieldNames, ExecutionContext ctx) {
+        for (Object row : rows) {
+            List<String> rowValues = new ArrayList<>();
+            for (String fieldName : fieldNames) {
                 try {
                     Field field = row.getClass().getDeclaredField(fieldName);
                     field.setAccessible(true);
                     //Assume every column value is printable with toString
-                    return String.format("\"%s\"", field.get(row).toString());
+                    rowValues.add(String.format("\"%s\"", field.get(row).toString()));
                 } catch (NoSuchFieldException | IllegalAccessException e) {
-                    throw new RuntimeException(e);
+                    ctx.getOnError().accept(e);
                 }
-            }).collect(joining(","))));
+            }
+            printWriter.println(String.join(",", rowValues));
+        }
     }
 }
