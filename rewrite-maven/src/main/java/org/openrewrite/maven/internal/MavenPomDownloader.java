@@ -151,8 +151,7 @@ public class MavenPomDownloader {
             throw failsafeException.getCause() == null ? failsafeException : failsafeException.getCause();
         } catch (Throwable e) {
             throw new HttpSenderResponseException(e, null, "");
-        }
-        finally {
+        } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }
     }
