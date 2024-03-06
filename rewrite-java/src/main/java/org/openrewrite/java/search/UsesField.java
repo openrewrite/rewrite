@@ -38,7 +38,10 @@ public class UsesField<P> extends JavaIsoVisitor<P> {
             boolean isGlob = field.contains("*") || field.contains("?");
             TypeMatcher typeMatcher = null;
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-                if ((variable.getName().equals(field) || isGlob && StringUtils.matchesGlob(variable.getName(), field)) &&
+                if (isGlob && (typeMatcher = typeMatcher == null ? new TypeMatcher(owner, true) : typeMatcher).matches(variable.getOwner()) &&
+                    StringUtils.matchesGlob(variable.getName(), field)) {
+                    return SearchResult.found(cu);
+                } else if (!isGlob && variable.getName().equals(field) &&
                     (typeMatcher = typeMatcher == null ? new TypeMatcher(owner, true) : typeMatcher).matches(variable.getOwner())) {
                     return SearchResult.found(cu);
                 }
