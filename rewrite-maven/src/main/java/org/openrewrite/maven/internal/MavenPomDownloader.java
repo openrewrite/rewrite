@@ -771,8 +771,6 @@ public class MavenPomDownloader {
                                             repository.getSnapshots(),
                                             repository.getUsername(),
                                             repository.getPassword());
-                                } else if (!e.isClientSideException()) {
-                                    return originalRepository;
                                 }
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
