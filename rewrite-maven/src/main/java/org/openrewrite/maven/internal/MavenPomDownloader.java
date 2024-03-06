@@ -149,7 +149,10 @@ public class MavenPomDownloader {
             });
         } catch (FailsafeException failsafeException) {
             throw failsafeException.getCause() == null ? failsafeException : failsafeException.getCause();
-        } finally {
+        } catch (Throwable e) {
+            throw new HttpSenderResponseException(e, null, "");
+        }
+        finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }
     }

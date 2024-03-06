@@ -48,7 +48,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
-import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -86,7 +85,7 @@ class MavenPomDownloaderTest {
           null, "true", false, null, null, null);
         MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
           MavenExecutionContextView.view(ctx), null);
-        assertThat(requireNonNull(repo).getUri()).isEqualTo(ossSonatype.getUri());
+        assertThat(repo).isNotNull().extracting((MavenRepository::getUri)).isEqualTo(ossSonatype.getUri());
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/3908")
@@ -740,6 +739,20 @@ class MavenPomDownloaderTest {
         var result = downloader.download(gav, null, null, List.of());
         assertThat(result.getRepository()).isNotNull();
         assertThat(result.getRepository().getUri()).startsWith(tempDir.toUri().toString());
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4080")
+    @Test
+    void connectTimeout() {
+        var downloader = new MavenPomDownloader(ctx);
+        var gav = new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0");
+        var repos = singletonList(MavenRepository.builder()
+          .id("non-routable").uri("http://10.0.0.0/maven").knownToExist(true).build());
+
+        assertThatThrownBy(() -> downloader.download(gav, null, null, repos))
+          .isInstanceOf(MavenDownloadingException.class)
+          .hasMessageContaining("rewrite-core")
+          .hasMessageContaining("10.0.0.0");
     }
 
     private static GroupArtifactVersion createArtifact(Path repository) throws IOException {
