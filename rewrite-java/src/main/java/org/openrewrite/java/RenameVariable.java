@@ -160,23 +160,23 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
          */
         private boolean fieldAccessTargetsVariable(J.FieldAccess fieldAccess) {
             if (renameVariable.getName().getFieldType() != null) {
-                J target = getTarget(fieldAccess);
+                Expression target = getTarget(fieldAccess);
+                JavaType targetType = resolveType(target.getType());
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
+                if (TypeUtils.isOfType(variableNameFieldType.getOwner(), targetType)) {
+                    return true;
+                }
                 if (target instanceof J.TypeCast) {
-                    J.TypeCast typeCast = (J.TypeCast) target;
-                    JavaType targetType = resolveType(typeCast.getType());
-                    return variableNameFieldType.equals(targetType) || targetType != null && targetType.equals(variableNameFieldType.getOwner());
+                    return TypeUtils.isOfType(variableNameFieldType, targetType);
                 } else if (target instanceof J.Identifier) {
-                    J.Identifier fieldAccessTarget = (J.Identifier) target;
-                    JavaType fieldAccessTargetType = resolveType(fieldAccessTarget.getType());
-                    return variableNameFieldType.equals(fieldAccessTarget.getFieldType()) || fieldAccessTargetType != null && fieldAccessTargetType.equals(variableNameFieldType.getOwner());
+                    return TypeUtils.isOfType(variableNameFieldType, ((J.Identifier) target).getFieldType());
                 }
             }
             return false;
         }
 
         @Nullable
-        private J getTarget(J.FieldAccess fieldAccess) {
+        private Expression getTarget(J.FieldAccess fieldAccess) {
             Expression target = fieldAccess.getTarget();
             if (target instanceof J.Identifier) {
                 return target;
@@ -187,14 +187,15 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             if (target instanceof J.Parentheses<?>) {
                 J tree = ((J.Parentheses<?>) target).getTree();
                 if (tree instanceof J.TypeCast) {
-                    return tree;
+                    return (J.TypeCast) tree;
                 }
                 return null;
             }
             return null;
         }
 
-        private JavaType resolveType(JavaType type) {
+        @Nullable
+        private JavaType resolveType(@Nullable JavaType type) {
             return type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type;
         }
 
