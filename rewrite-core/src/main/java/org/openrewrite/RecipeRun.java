@@ -24,15 +24,16 @@ import org.openrewrite.internal.lang.Nullable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 @Value
@@ -65,11 +66,16 @@ public class RecipeRun {
         return emptyList();
     }
 
-    public void exportDatatablesToCsv(String filePath, ExecutionContext ctx) {
+    public void exportDatatablesToCsv(Path filePath, ExecutionContext ctx) {
+        try {
+            Files.createDirectories(filePath);
+        } catch (IOException e) {
+            ctx.getOnError().accept(e);
+        }
         for (Map.Entry<DataTable<?>, List<?>> entry : dataTables.entrySet()) {
             DataTable<?> dataTable = entry.getKey();
             List<?> rows = entry.getValue();
-            File csv = new File(filePath + dataTable.getName() + ".csv");
+            File csv = filePath.resolve(dataTable.getName() + ".csv").toFile();
             try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(csv, false))) {
                 DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
                 List<String> fieldNames = new ArrayList<>();
@@ -78,8 +84,8 @@ public class RecipeRun {
 
                 for (ColumnDescriptor columnDescriptor : descriptor.getColumns()) {
                     fieldNames.add(columnDescriptor.getName());
-                    fieldTitles.add(String.format("\"%s\"", columnDescriptor.getDisplayName()));
-                    fieldDescriptions.add(String.format("\"%s\"", columnDescriptor.getDescription()));
+                    fieldTitles.add(formatForCsv(columnDescriptor.getDisplayName()));
+                    fieldDescriptions.add(formatForCsv(columnDescriptor.getDescription()));
                 }
 
                 printWriter.println(String.join(",", fieldTitles));
@@ -99,12 +105,20 @@ public class RecipeRun {
                     Field field = row.getClass().getDeclaredField(fieldName);
                     field.setAccessible(true);
                     //Assume every column value is printable with toString
-                    rowValues.add(String.format("\"%s\"", field.get(row).toString()));
+                    rowValues.add(formatForCsv(field.get(row).toString()));
                 } catch (NoSuchFieldException | IllegalAccessException e) {
                     ctx.getOnError().accept(e);
                 }
             }
             printWriter.println(String.join(",", rowValues));
+        }
+    }
+
+    private String formatForCsv(@Nullable String data) {
+        if (data != null) {
+            return String.format("\"%s\"", data.replace("\"", "\"\""));
+        } else {
+            return "\"\"";
         }
     }
 }
