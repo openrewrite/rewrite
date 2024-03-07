@@ -152,16 +152,50 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
          * FieldAccess targets the variable if its target is an Identifier and either
          * its target FieldType equals variable.Name.FieldType
          * or its target Type equals variable.Name.FieldType.Owner
+         * or if FieldAccess targets a TypCast and either
+         * its type equals variable.Name.FieldType
+         * or its type equals variable.Name.FieldType.Owner.
+         * In case the FieldAccess targets another FieldAccess, the target is followed
+         * until it is either an Identifier or a TypeCast.
          */
         private boolean fieldAccessTargetsVariable(J.FieldAccess fieldAccess) {
-            if (renameVariable.getName().getFieldType() != null && fieldAccess.getTarget() instanceof J.Identifier) {
-                J.Identifier fieldAccessTarget = (J.Identifier) fieldAccess.getTarget();
+            if (renameVariable.getName().getFieldType() != null) {
+                J target = getTarget(fieldAccess);
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
-                JavaType fieldAccessTargetType = fieldAccessTarget.getType() instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fieldAccessTarget.getType()).getType() : fieldAccessTarget.getType();
-                return variableNameFieldType.equals(fieldAccessTarget.getFieldType()) ||
-                       (fieldAccessTargetType != null && fieldAccessTargetType.equals(variableNameFieldType.getOwner()));
+                if (target instanceof J.TypeCast) {
+                    J.TypeCast typeCast = (J.TypeCast) target;
+                    JavaType targetType = resolveType(typeCast.getType());
+                    return variableNameFieldType.equals(targetType) || targetType != null && targetType.equals(variableNameFieldType.getOwner());
+                } else if (target instanceof J.Identifier) {
+                    J.Identifier fieldAccessTarget = (J.Identifier) target;
+                    JavaType fieldAccessTargetType = resolveType(fieldAccessTarget.getType());
+                    return variableNameFieldType.equals(fieldAccessTarget.getFieldType()) || fieldAccessTargetType != null && fieldAccessTargetType.equals(variableNameFieldType.getOwner());
+                }
             }
             return false;
+        }
+
+        @Nullable
+        private J getTarget(J.FieldAccess fieldAccess) {
+            Expression target = fieldAccess.getTarget();
+            if (target instanceof J.Identifier) {
+                return target;
+            }
+            if (target instanceof J.FieldAccess) {
+                return getTarget((J.FieldAccess) target);
+            }
+            if (target instanceof J.Parentheses<?>) {
+                J tree = ((J.Parentheses<?>) target).getTree();
+                if (tree instanceof J.TypeCast) {
+                    return tree;
+                }
+                return null;
+            }
+            return null;
+        }
+
+        private JavaType resolveType(JavaType type) {
+            return type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type;
         }
 
         @Override
