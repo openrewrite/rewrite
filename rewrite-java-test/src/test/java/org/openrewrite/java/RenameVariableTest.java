@@ -77,33 +77,33 @@ class RenameVariableTest implements RewriteTest {
           spec -> spec.recipe(renameVariableTest("name", "_name", false)),
           java(
             """
-            public class A {
-                private String name;
-                
-                /**
-                 * The length of <code>name</code> added to the length of {@link #name}.
-                 *
-                 * @param name My parameter.
-                 */
-                int fooA(String name) {
-                    return name.length() + this.name.length();
-                }
-            }
-            """,
+              public class A {
+                  private String name;
+                  
+                  /**
+                   * The length of <code>name</code> added to the length of {@link #name}.
+                   *
+                   * @param name My parameter.
+                   */
+                  int fooA(String name) {
+                      return name.length() + this.name.length();
+                  }
+              }
+              """,
             """
-            public class A {
-                private String _name;
-                
-                /**
-                 * The length of <code>name</code> added to the length of {@link #_name}.
-                 *
-                 * @param name My parameter.
-                 */
-                int fooA(String name) {
-                    return name.length() + this._name.length();
-                }
-            }
-            """
+              public class A {
+                  private String _name;
+                  
+                  /**
+                   * The length of <code>name</code> added to the length of {@link #_name}.
+                   *
+                   * @param name My parameter.
+                   */
+                  int fooA(String name) {
+                      return name.length() + this._name.length();
+                  }
+              }
+              """
           )
         );
     }
@@ -180,7 +180,7 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-              
+                            
               public class A<T> {
                   private String _val;
                   private String name;
@@ -193,7 +193,7 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-              
+                            
               public class A<T> {
                   private String v;
                   private String name;
@@ -820,7 +820,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class B {
                   int n;
-              
+                            
                   {
                       n++; // do not change.
                       int n;
@@ -838,7 +838,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class B {
                   int n;
-              
+                            
                   {
                       n++; // do not change.
                       int n1;
@@ -950,6 +950,46 @@ class RenameVariableTest implements RewriteTest {
               class FooBarBaz {}
               class A {
                   ArrayList<FooBarBaz> fooBarBaz = new ArrayList<FooBarBaz>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4059")
+    void renameTypeCastedField() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("objArray", "objects", false)),
+          java(
+            """
+              import java.util.Arrays;
+
+              public class A {
+                private Object[] objArray;
+
+                public boolean isEqualTo(Object object) {
+                  return Arrays.equals(objArray, ((A) object).objArray);
+                }
+
+                public int length() {
+                  return objArray.length;
+                }
+              }
+              """,
+            """
+              import java.util.Arrays;
+
+              public class A {
+                private Object[] objects;
+
+                public boolean isEqualTo(Object object) {
+                  return Arrays.equals(objects, ((A) object).objects);
+                }
+
+                public int length() {
+                  return objects.length;
+                }
               }
               """
           )
