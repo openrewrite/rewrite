@@ -158,6 +158,22 @@ class XPathMatcherTest {
     }
 
     @Test
+    void attributePredicate() {
+        SourceFile xml = new XmlParser().parse(
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <root>
+              <element1 foo="bar"><foo>baz</foo></element1>
+            </root>
+            """
+        ).toList().get(0);
+        assertThat(match("/root/element1[@foo='bar']", xml)).isTrue();
+        assertThat(match("/root/element1[@foo='baz']", xml)).isFalse();
+        assertThat(match("/root/element1[foo='bar']", xml)).isFalse();
+        assertThat(match("/root/element1[foo='baz']", xml)).isTrue();
+    }
+
+    @Test
     @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/3919")
     void matchFunctions() {
