@@ -135,7 +135,7 @@ public class MavenPomDownloader {
         this.mavenCache = this.ctx.getPomCache();
     }
 
-    byte[] sendRequest(HttpSender.Request request) throws Throwable {
+    byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
         long start = System.nanoTime();
         try {
             return Failsafe.with(retryPolicy).get(() -> {
@@ -148,7 +148,10 @@ public class MavenPomDownloader {
                 }
             });
         } catch (FailsafeException failsafeException) {
-            throw failsafeException.getCause() == null ? failsafeException : failsafeException.getCause();
+            if (failsafeException.getCause() instanceof HttpSenderResponseException) {
+                throw (HttpSenderResponseException) failsafeException.getCause();
+            }
+            throw failsafeException;
         } catch (UncheckedIOException e) {
             throw e.getCause();
         } finally {
@@ -808,10 +811,6 @@ public class MavenPomDownloader {
             } else {
                 throw e;
             }
-        } catch (IOException e) {
-            throw e;
-        } catch (Throwable t) {
-            throw new RuntimeException(t);  // unreachable
         }
     }
 
@@ -824,10 +823,6 @@ public class MavenPomDownloader {
             } else {
                 throw retryException;
             }
-        } catch (IOException e) {
-            throw e;
-        } catch (Throwable t) {
-            throw new RuntimeException(t);  // unreachable
         }
     }
 
