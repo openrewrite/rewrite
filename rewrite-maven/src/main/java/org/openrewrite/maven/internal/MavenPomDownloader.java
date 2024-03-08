@@ -284,7 +284,7 @@ public class MavenPomDownloader {
                                     .increment();
                             result = Optional.of(derivedMeta);
                         }
-                    } catch (HttpSenderResponseException | MavenDownloadingException e) {
+                    } catch (HttpSenderResponseException | MavenDownloadingException | IOException e) {
                         repositoryResponses.put(repo, e.getMessage());
                     }
                 }
@@ -330,7 +330,7 @@ public class MavenPomDownloader {
      * @return Metadata or null if the metadata cannot be derived.
      */
     @Nullable
-    private MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, MavenDownloadingException {
+    private MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, IOException, MavenDownloadingException {
         if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null) {
             // Do not derive metadata if we cannot navigate/browse the artifacts.
             // Do not derive metadata if a specific version has been defined.
@@ -592,6 +592,8 @@ public class MavenPomDownloader {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
                         }
+                    } catch (IOException e) {
+                        repositoryResponses.put(repo, e.getMessage());
                     }
                 }
             } else if (result.isPresent()) {
@@ -797,7 +799,7 @@ public class MavenPomDownloader {
     /**
      * Replicates Apache Maven's behavior to attempt anonymous download if repository credentials prove invalid
      */
-    private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException {
+    private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         try {
             return sendRequest(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
         } catch (HttpSenderResponseException e) {
@@ -806,12 +808,14 @@ public class MavenPomDownloader {
             } else {
                 throw e;
             }
+        } catch (IOException e) {
+            throw e;
         } catch (Throwable t) {
             throw new RuntimeException(t);  // unreachable
         }
     }
 
-    private byte[] retryRequestAnonymously(String uriString, HttpSenderResponseException originalException) throws HttpSenderResponseException {
+    private byte[] retryRequestAnonymously(String uriString, HttpSenderResponseException originalException) throws HttpSenderResponseException, IOException {
         try {
             return sendRequest(httpSender.get(uriString).build());
         } catch (HttpSenderResponseException retryException) {
@@ -820,6 +824,8 @@ public class MavenPomDownloader {
             } else {
                 throw retryException;
             }
+        } catch (IOException e) {
+            throw e;
         } catch (Throwable t) {
             throw new RuntimeException(t);  // unreachable
         }

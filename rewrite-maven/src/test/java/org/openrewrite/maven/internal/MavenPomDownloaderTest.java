@@ -36,6 +36,7 @@ import org.openrewrite.maven.tree.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -187,7 +188,7 @@ class MavenPomDownloaderTest {
             // not expected to succeed
         }
         assertThat(attemptedUris).isNotEmpty();
-        assertThat(attemptedUris.get(httpUrl)).hasMessageContaining("java.net.UnknownHostException");
+        assertThat(attemptedUris.get(httpUrl)).isInstanceOf(UnknownHostException.class);
         assertThat(discoveredRepositories).isEmpty();
     }
 
