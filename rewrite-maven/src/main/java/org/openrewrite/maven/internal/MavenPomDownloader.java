@@ -135,7 +135,7 @@ public class MavenPomDownloader {
         this.mavenCache = this.ctx.getPomCache();
     }
 
-    byte[] sendRequest(HttpSender.Request request) throws Throwable {
+    byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
         long start = System.nanoTime();
         try {
             return Failsafe.with(retryPolicy).get(() -> {
@@ -148,7 +148,12 @@ public class MavenPomDownloader {
                 }
             });
         } catch (FailsafeException failsafeException) {
-            throw failsafeException.getCause() == null ? failsafeException : failsafeException.getCause();
+            if (failsafeException.getCause() instanceof HttpSenderResponseException) {
+                throw (HttpSenderResponseException) failsafeException.getCause();
+            }
+            throw failsafeException;
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
         } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }
@@ -282,7 +287,7 @@ public class MavenPomDownloader {
                                     .increment();
                             result = Optional.of(derivedMeta);
                         }
-                    } catch (HttpSenderResponseException | MavenDownloadingException e) {
+                    } catch (HttpSenderResponseException | MavenDownloadingException | IOException e) {
                         repositoryResponses.put(repo, e.getMessage());
                     }
                 }
@@ -328,7 +333,7 @@ public class MavenPomDownloader {
      * @return Metadata or null if the metadata cannot be derived.
      */
     @Nullable
-    private MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, MavenDownloadingException {
+    private MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, IOException, MavenDownloadingException {
         if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null) {
             // Do not derive metadata if we cannot navigate/browse the artifacts.
             // Do not derive metadata if a specific version has been defined.
@@ -590,6 +595,8 @@ public class MavenPomDownloader {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
                         }
+                    } catch (IOException e) {
+                        repositoryResponses.put(repo, e.getMessage());
                     }
                 }
             } else if (result.isPresent()) {
@@ -769,8 +776,6 @@ public class MavenPomDownloader {
                                             repository.getSnapshots(),
                                             repository.getUsername(),
                                             repository.getPassword());
-                                } else if (!e.isClientSideException()) {
-                                    return originalRepository;
                                 }
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
@@ -797,7 +802,7 @@ public class MavenPomDownloader {
     /**
      * Replicates Apache Maven's behavior to attempt anonymous download if repository credentials prove invalid
      */
-    private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException {
+    private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         try {
             return sendRequest(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
         } catch (HttpSenderResponseException e) {
@@ -806,12 +811,10 @@ public class MavenPomDownloader {
             } else {
                 throw e;
             }
-        } catch (Throwable t) {
-            throw new RuntimeException(t);  // unreachable
         }
     }
 
-    private byte[] retryRequestAnonymously(String uriString, HttpSenderResponseException originalException) throws HttpSenderResponseException {
+    private byte[] retryRequestAnonymously(String uriString, HttpSenderResponseException originalException) throws HttpSenderResponseException, IOException {
         try {
             return sendRequest(httpSender.get(uriString).build());
         } catch (HttpSenderResponseException retryException) {
@@ -820,8 +823,6 @@ public class MavenPomDownloader {
             } else {
                 throw retryException;
             }
-        } catch (Throwable t) {
-            throw new RuntimeException(t);  // unreachable
         }
     }
 
