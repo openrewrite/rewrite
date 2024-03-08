@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
@@ -77,27 +78,33 @@ public class RecipeRun {
             List<?> rows = entry.getValue();
             File csv = filePath.resolve(dataTable.getName() + ".csv").toFile();
             try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(csv, false))) {
-                DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
-                List<String> fieldNames = new ArrayList<>();
-                List<String> fieldTitles = new ArrayList<>();
-                List<String> fieldDescriptions = new ArrayList<>();
-
-                for (ColumnDescriptor columnDescriptor : descriptor.getColumns()) {
-                    fieldNames.add(columnDescriptor.getName());
-                    fieldTitles.add(formatForCsv(columnDescriptor.getDisplayName()));
-                    fieldDescriptions.add(formatForCsv(columnDescriptor.getDescription()));
-                }
-
-                printWriter.println(String.join(",", fieldTitles));
-                printWriter.println(String.join(",", fieldDescriptions));
-                printRowData(printWriter, rows, fieldNames, ctx);
+                exportCsv(ctx, dataTable, printWriter::println, rows);
             } catch (FileNotFoundException e) {
                 ctx.getOnError().accept(e);
             }
         }
     }
 
-    private void printRowData(PrintWriter printWriter, List<?> rows, List<String> fieldNames, ExecutionContext ctx) {
+    public static void exportCsv(final ExecutionContext ctx, final DataTable<?> dataTable, final Consumer<String> output,
+            final List<?> rows) {
+        DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
+        List<String> fieldNames = new ArrayList<>();
+        List<String> fieldTitles = new ArrayList<>();
+        List<String> fieldDescriptions = new ArrayList<>();
+
+        for (ColumnDescriptor columnDescriptor : descriptor.getColumns()) {
+            fieldNames.add(columnDescriptor.getName());
+            fieldTitles.add(formatForCsv(columnDescriptor.getDisplayName()));
+            fieldDescriptions.add(formatForCsv(columnDescriptor.getDescription()));
+        }
+
+        output.accept(String.join(",", fieldTitles));
+        output.accept(String.join(",", fieldDescriptions));
+        exportRowData(output, rows, fieldNames, ctx);
+    }
+
+    private static void exportRowData(Consumer<String> output, List<?> rows, List<String> fieldNames,
+            ExecutionContext ctx) {
         for (Object row : rows) {
             List<String> rowValues = new ArrayList<>();
             for (String fieldName : fieldNames) {
@@ -110,11 +117,11 @@ public class RecipeRun {
                     ctx.getOnError().accept(e);
                 }
             }
-            printWriter.println(String.join(",", rowValues));
+            output.accept(String.join(",", rowValues));
         }
     }
 
-    private String formatForCsv(@Nullable String data) {
+    private static String formatForCsv(@Nullable String data) {
         if (data != null) {
             return String.format("\"%s\"", data.replace("\"", "\"\""));
         } else {
