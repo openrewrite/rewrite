@@ -34,8 +34,8 @@ import java.util.regex.Pattern;
  * As a result, '.' and '..' are not recognized.
  */
 public class XPathMatcher {
-    // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']`
-    private static final Pattern PATTERN = Pattern.compile("([-\\w]+)\\[([-\\w]+)='([-\\w.]+)']");
+    // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']` or foo[@bar='baz']
+    private static final Pattern PATTERN = Pattern.compile("([-\\w]+)\\[(@)?([-\\w]+)='([-\\w.]+)']");
 
     private final String expression;
     private final boolean startsWithSlash;
@@ -125,12 +125,14 @@ public class XPathMatcher {
                 Matcher matcher;
                 if (tag != null && part.endsWith("]") && (matcher = PATTERN.matcher(part)).matches()) {
                     String name = matcher.group(1);
-                    String subTag = matcher.group(2);
-                    String subTagValue = matcher.group(3);
+                    boolean isAttribute = Objects.equals(matcher.group(2), "@");
+                    String selector = matcher.group(3);
+                    String value = matcher.group(4);
 
-                    boolean matchCondition =
-                            FindTags.find(tag, subTag).stream().anyMatch(t ->
-                                    t.getValue().map(v -> v.equals(subTagValue)).orElse(false)
+                    boolean matchCondition = isAttribute ? tag.getAttributes().stream().anyMatch(a ->
+                            a.getKeyAsString().equals(selector) && a.getValueAsString().equals(value)) :
+                            FindTags.find(tag, selector).stream().anyMatch(t ->
+                                    t.getValue().map(v -> v.equals(value)).orElse(false)
                             );
                     if (!matchCondition) {
                         return false;
