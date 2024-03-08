@@ -199,6 +199,12 @@ public class MethodMatcher {
     }
 
     private boolean matchesParameterTypes(List<JavaType> parameterTypes) {
+        if (argumentPattern == ANY_ARGUMENTS_PATTERN) {
+            return true;
+        } else if (argumentPattern == EMPTY_ARGUMENTS_PATTERN) {
+            return parameterTypes.isEmpty();
+        }
+
         StringJoiner joiner = new StringJoiner(",");
         for (JavaType javaType : parameterTypes) {
             String s = typePattern(javaType);
