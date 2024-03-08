@@ -58,7 +58,7 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 @SuppressWarnings({"HttpUrlsUsage"})
 class MavenPomDownloaderTest {
     private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-      .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(100), Duration.ofMillis(100)));
+      .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(150), Duration.ofMillis(150)));
 
     private void mockServer(Integer responseCode, Consumer<MockWebServer> block) {
         try (MockWebServer mockRepo = new MockWebServer()) {
@@ -92,7 +92,7 @@ class MavenPomDownloaderTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3908")
     @Test
     void centralIdOverridesDefaultRepository() {
-        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var ctx = MavenExecutionContextView.view(this.ctx);
         ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
           //language=xml
           """
@@ -133,13 +133,13 @@ class MavenPomDownloaderTest {
 
     @Test
     void listenerRecordsRepository() {
-        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var ctx = MavenExecutionContextView.view(this.ctx);
         // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
         for (MavenRepository repository : ctx.getRepositories()) {
             repository.setKnownToExist(true);
         }
 
-        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, true, null, null, null);
+        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, true, null, null, null, null, null);
         List<String> attemptedUris = new ArrayList<>();
         List<MavenRepository> discoveredRepositories = new ArrayList<>();
         ctx.setResolutionListener(new ResolutionEventListener() {
@@ -171,7 +171,7 @@ class MavenPomDownloaderTest {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
         // Avoid actually trying to reach a made-up URL
         String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
-        MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null);
+        MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null, null);
         Map<String, Throwable> attemptedUris = new HashMap<>();
         List<MavenRepository> discoveredRepositories = new ArrayList<>();
         ctx.setResolutionListener(new ResolutionEventListener() {
@@ -194,7 +194,7 @@ class MavenPomDownloaderTest {
 
     @Test
     void mirrorsOverrideRepositoriesInPom() {
-        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var ctx = MavenExecutionContextView.view(this.ctx);
         ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
           //language=xml
           """
@@ -285,7 +285,7 @@ class MavenPomDownloaderTest {
         try (MockWebServer server = new MockWebServer()) {
             server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
             server.enqueue(new MockResponse().setResponseCode(200).setBody("body"));
-            String body = new String(downloader.sendRequest(new HttpSender.Request(server.url("/test").url(), "request".getBytes(), HttpSender.Method.GET, Map.of())));
+            String body = new String(downloader.sendRequest(new HttpSender.Request(server.url("/test").url(), "request".getBytes(), HttpSender.Method.GET, Map.of(), null, null)));
             assertThat(body).isEqualTo("body");
             assertThat(server.getRequestCount()).isEqualTo(2);
             server.shutdown();
@@ -596,7 +596,7 @@ class MavenPomDownloaderTest {
           .knownToExist(true)
           .deriveMetadataIfMissing(true)
           .build();
-        MavenMetadata metaData = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+        MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
           .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
         assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(Arrays.asList("1.0.0", "1.1.0", "2.0.0"));
     }
@@ -656,7 +656,7 @@ class MavenPomDownloaderTest {
         var m1 = MavenMetadata.parse(metadata1.getBytes());
         var m2 = MavenMetadata.parse(metadata2.getBytes());
 
-        var merged = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext()).mergeMetadata(m1, m2);
+        var merged = new MavenPomDownloader(emptyMap(), ctx).mergeMetadata(m1, m2);
 
         assertThat(merged.getVersioning().getSnapshot().getTimestamp()).isEqualTo("20220927.033510");
         assertThat(merged.getVersioning().getSnapshot().getBuildNumber()).isEqualTo("223");
@@ -694,7 +694,7 @@ class MavenPomDownloaderTest {
 
         // Does not return invalid dependency.
         assertThrows(MavenDownloadingException.class, () ->
-          new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+          new MavenPomDownloader(emptyMap(), ctx)
             .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
     }
 
@@ -727,7 +727,7 @@ class MavenPomDownloaderTest {
 
         // Does not return invalid dependency.
         assertThrows(MavenDownloadingException.class, () ->
-          new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+          new MavenPomDownloader(emptyMap(), ctx)
             .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
     }
 
