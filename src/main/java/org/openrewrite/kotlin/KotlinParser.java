@@ -329,6 +329,7 @@ public class KotlinParser implements Parser {
             return classpath;
         }
 
+        @Override
         public KotlinParser build() {
             return new KotlinParser(resolvedClasspath(), styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel, isKotlinScript);
         }
@@ -338,6 +339,7 @@ public class KotlinParser implements Parser {
             return "kotlin";
         }
 
+        @Override
         public KotlinParser.Builder clone() {
             KotlinParser.Builder clone = (KotlinParser.Builder) super.clone();
             clone.typeCache = this.typeCache.clone();

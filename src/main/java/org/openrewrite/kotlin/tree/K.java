@@ -70,8 +70,10 @@ public interface K extends J {
         return v.defaultValue(this, p);
     }
 
+    @Override
     Space getPrefix();
 
+    @Override
     default List<Comment> getComments() {
         return getPrefix().getComments();
     }
@@ -191,20 +193,24 @@ public interface K extends J {
         JRightPadded<Package> packageDeclaration;
 
         @Nullable
+        @Override
         public Package getPackageDeclaration() {
             return packageDeclaration == null ? null : packageDeclaration.getElement();
         }
 
+        @Override
         public K.CompilationUnit withPackageDeclaration(Package packageDeclaration) {
             return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
         }
 
         List<JRightPadded<Import>> imports;
 
+        @Override
         public List<Import> getImports() {
             return JRightPadded.getElements(imports);
         }
 
+        @Override
         public K.CompilationUnit withImports(List<Import> imports) {
             return getPadding().withImports(JRightPadded.withElements(this.imports, imports));
         }
@@ -223,6 +229,7 @@ public interface K extends J {
         @Getter
         Space eof;
 
+        @Override
         @Transient
         public List<J.ClassDeclaration> getClasses() {
             return statements.stream()
@@ -242,6 +249,7 @@ public interface K extends J {
             return getPadding().withClasses(JRightPadded.withElements(this.getPadding().getClasses(), classes));
         }
 
+        @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
             return v.visitCompilationUnit(this, p);
         }
@@ -251,6 +259,7 @@ public interface K extends J {
             return new KotlinPrinter<>();
         }
 
+        @Override
         @Transient
         public TypesInUse getTypesInUse() {
             TypesInUse cache;
@@ -267,6 +276,7 @@ public interface K extends J {
             return cache;
         }
 
+        @Override
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -1104,6 +1114,7 @@ public interface K extends J {
         @With
         Space prefix;
 
+        @Override
         public Space getPrefix() {
             //noinspection ConstantConditions
             return prefix == null ? returnType.getElement().getPrefix() : prefix;
@@ -1112,6 +1123,7 @@ public interface K extends J {
         @With
         Markers markers;
 
+        @Override
         public Markers getMarkers() {
             // For backwards compatibility with older LST before there was a prefix field
             //noinspection ConstantConditions
@@ -1168,6 +1180,7 @@ public interface K extends J {
             return returnType != null && returnType.getElement() != null ? returnType.getElement().getType() : null;
         }
 
+        @Override
         public <T extends J> T withType(@Nullable JavaType type) {
             TypeTree newType = returnType.getElement().withType(type);
             //noinspection unchecked

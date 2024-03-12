@@ -82,6 +82,7 @@ public class KotlinTemplate extends JavaTemplate {
             this.code = code;
         }
 
+        @Override
         public Builder imports(String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
                 validateImport(typeName);
@@ -105,16 +106,19 @@ public class KotlinTemplate extends JavaTemplate {
             return this;
         }
 
+        @Override
         public Builder doAfterVariableSubstitution(Consumer<String> afterVariableSubstitution) {
             this.onAfterVariableSubstitution = afterVariableSubstitution;
             return this;
         }
 
+        @Override
         public Builder doBeforeParseTemplate(Consumer<String> beforeParseTemplate) {
             this.onBeforeParseTemplate = beforeParseTemplate;
             return this;
         }
 
+        @Override
         public KotlinTemplate build() {
             return new KotlinTemplate(false, parser, code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
