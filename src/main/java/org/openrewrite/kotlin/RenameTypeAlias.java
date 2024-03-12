@@ -98,7 +98,9 @@ public class RenameTypeAlias extends Recipe {
                 return vd.getModifiers().stream().noneMatch(x -> x.getType() == J.Modifier.Type.LanguageExtension && "typealias".equals(x.getKeyword()));
             }
             return true;
-        } else return !(value instanceof J.ParameterizedType);
+        } else {
+            return !(value instanceof J.ParameterizedType);
+        }
     }
 
     private boolean isAliasImport(Cursor cursor, J.Identifier id) {
