@@ -17,12 +17,25 @@ package org.openrewrite;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.config.ColumnDescriptor;
+import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 @Value
 public class RecipeRun {
@@ -52,5 +65,67 @@ public class RecipeRun {
             }
         }
         return emptyList();
+    }
+
+    public void exportDatatablesToCsv(Path filePath, ExecutionContext ctx) {
+        try {
+            Files.createDirectories(filePath);
+        } catch (IOException e) {
+            ctx.getOnError().accept(e);
+        }
+        for (Map.Entry<DataTable<?>, List<?>> entry : dataTables.entrySet()) {
+            DataTable<?> dataTable = entry.getKey();
+            List<?> rows = entry.getValue();
+            File csv = filePath.resolve(dataTable.getName() + ".csv").toFile();
+            try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(csv, false))) {
+                exportCsv(ctx, dataTable, printWriter::println, rows);
+            } catch (FileNotFoundException e) {
+                ctx.getOnError().accept(e);
+            }
+        }
+    }
+
+    public static void exportCsv(final ExecutionContext ctx, final DataTable<?> dataTable, final Consumer<String> output,
+            final List<?> rows) {
+        DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
+        List<String> fieldNames = new ArrayList<>();
+        List<String> fieldTitles = new ArrayList<>();
+        List<String> fieldDescriptions = new ArrayList<>();
+
+        for (ColumnDescriptor columnDescriptor : descriptor.getColumns()) {
+            fieldNames.add(columnDescriptor.getName());
+            fieldTitles.add(formatForCsv(columnDescriptor.getDisplayName()));
+            fieldDescriptions.add(formatForCsv(columnDescriptor.getDescription()));
+        }
+
+        output.accept(String.join(",", fieldTitles));
+        output.accept(String.join(",", fieldDescriptions));
+        exportRowData(output, rows, fieldNames, ctx);
+    }
+
+    private static void exportRowData(Consumer<String> output, List<?> rows, List<String> fieldNames,
+            ExecutionContext ctx) {
+        for (Object row : rows) {
+            List<String> rowValues = new ArrayList<>();
+            for (String fieldName : fieldNames) {
+                try {
+                    Field field = row.getClass().getDeclaredField(fieldName);
+                    field.setAccessible(true);
+                    //Assume every column value is printable with toString
+                    rowValues.add(formatForCsv(field.get(row).toString()));
+                } catch (NoSuchFieldException | IllegalAccessException e) {
+                    ctx.getOnError().accept(e);
+                }
+            }
+            output.accept(String.join(",", rowValues));
+        }
+    }
+
+    private static String formatForCsv(@Nullable String data) {
+        if (data != null) {
+            return String.format("\"%s\"", data.replace("\"", "\"\""));
+        } else {
+            return "\"\"";
+        }
     }
 }
