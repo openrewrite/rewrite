@@ -196,7 +196,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        return Preconditions.check(acc.usingType && !acc.scopeByProject.isEmpty(), new MavenVisitor<ExecutionContext>() {
+        return Preconditions.check(onlyIfUsing == null || acc.usingType && !acc.scopeByProject.isEmpty(), new MavenVisitor<ExecutionContext>() {
             @Nullable
             final Pattern familyPatternCompiled = familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"));
 
@@ -206,13 +206,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                 JavaProject javaProject = document.getMarkers().findFirst(JavaProject.class).orElse(null);
                 String maybeScope = javaProject == null ? null : acc.scopeByProject.get(javaProject);
-                if (maybeScope == null) {
+                if (maybeScope == null && !acc.scopeByProject.isEmpty()) {
                     return maven;
                 }
 
                 // If the dependency is already in compile scope it will be available everywhere, no need to continue
                 for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
-                    if (hasAcceptableTransitivity(d)
+                    if (hasAcceptableTransitivity(d, acc)
                         && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                         return maven;
                     }
@@ -222,7 +222,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
                 if (resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) {
                     for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScopeEnum)) {
-                        if (hasAcceptableTransitivity(d)
+                        if (hasAcceptableTransitivity(d, acc)
                             && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                             return maven;
                         }
@@ -236,7 +236,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         });
     }
 
-    private boolean hasAcceptableTransitivity(ResolvedDependency d) {
-        return d.isDirect() || Boolean.TRUE.equals(acceptTransitive);
+    private boolean hasAcceptableTransitivity(ResolvedDependency d, Scanned acc) {
+        return d.isDirect() || Boolean.TRUE.equals(acceptTransitive) && !acc.scopeByProject.isEmpty();
     }
 }
