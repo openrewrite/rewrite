@@ -27,6 +27,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -103,7 +104,7 @@ public class PropertiesParser implements Parser {
                 "",
                 Markers.EMPTY,
                 sourceFile,
-                contents,
+                Collections.unmodifiableList(contents),
                 prefix.toString(),
                 source.getCharset().name(),
                 source.isCharsetBomMarked(),
