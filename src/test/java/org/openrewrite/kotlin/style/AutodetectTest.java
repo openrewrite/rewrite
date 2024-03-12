@@ -493,15 +493,15 @@ class AutodetectTest implements RewriteTest {
 
         assertThat(importLayout.getLayout().get(1))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
+          .matches(b -> "java\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(2))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
+          .matches(b -> "javax\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(3))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("kotlin\\..+"));
+          .matches(b -> "kotlin\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(4)).isInstanceOf(ImportLayoutStyle.Block.AllAliases.class);
     }
@@ -551,15 +551,15 @@ class AutodetectTest implements RewriteTest {
 
         assertThat(importLayout.getLayout().get(1))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("kotlin\\..+"));
+          .matches(b -> "kotlin\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(2))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
+          .matches(b -> "javax\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(3))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
+          .matches(b -> "java\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(4)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
     }
@@ -594,17 +594,17 @@ class AutodetectTest implements RewriteTest {
 
         assertThat(importLayout.getLayout().get(0))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
+          .matches(b -> "java\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(1))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("kotlin\\..+"));
+          .matches(b -> "kotlin\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(2)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
 
         assertThat(importLayout.getLayout().get(3))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
+          .matches(b -> "javax\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(4)).isInstanceOf(ImportLayoutStyle.Block.AllAliases.class);
     }

@@ -83,7 +83,7 @@ public class KotlinTypeMappingTest {
 
     public K.Property getProperty(String fieldName) {
         return goatClassDeclaration.getClassDeclaration().getBody().getStatements().stream()
-                .filter(it -> it instanceof K.Property)
+                .filter(K.Property.class::isInstance)
                 .map(K.Property.class::cast)
                 .filter(mv -> mv.getVariableDeclarations().getVariables().stream().anyMatch(v -> v.getSimpleName().equals(fieldName)))
                 .findFirst()
@@ -110,7 +110,7 @@ public class KotlinTypeMappingTest {
         assertThat(id.getType()).isInstanceOf(JavaType.Class.class);
         assertThat(id.getType().toString()).isEqualTo("kotlin.Int");
 
-        J.MethodDeclaration getter = property.getAccessors().getElements().stream().filter(x -> x.getName().getSimpleName().equals("get")).findFirst().orElse(null);
+        J.MethodDeclaration getter = property.getAccessors().getElements().stream().filter(x -> "get".equals(x.getName().getSimpleName())).findFirst().orElse(null);
         JavaType.FullyQualified declaringType = getter.getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
         assertThat(getter.getMethodType().getName()).isEqualTo("get");
@@ -118,7 +118,7 @@ public class KotlinTypeMappingTest {
         assertThat(getter.getName().getType()).isEqualTo(getter.getMethodType());
         assertThat(getter.getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=get,return=kotlin.Int,parameters=[]}");
 
-        J.MethodDeclaration setter = property.getAccessors().getElements().stream().filter(x -> x.getName().getSimpleName().equals("set")).findFirst().orElse(null);
+        J.MethodDeclaration setter = property.getAccessors().getElements().stream().filter(x -> "set".equals(x.getName().getSimpleName())).findFirst().orElse(null);
         declaringType = setter.getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
         assertThat(setter.getMethodType().getName()).isEqualTo("set");
@@ -129,7 +129,7 @@ public class KotlinTypeMappingTest {
     @Test
     void fileField() {
         J.VariableDeclarations.NamedVariable nv = cu.getStatements().stream()
-          .filter(it -> it instanceof J.VariableDeclarations)
+          .filter(J.VariableDeclarations.class::isInstance)
           .flatMap(it -> ((J.VariableDeclarations) it).getVariables().stream())
           .filter(it -> "field".equals(it.getSimpleName())).findFirst().orElseThrow();
 
@@ -142,7 +142,7 @@ public class KotlinTypeMappingTest {
     @Test
     void fileFunction() {
         J.MethodDeclaration md = cu.getStatements().stream()
-            .filter(it -> it instanceof J.MethodDeclaration)
+            .filter(J.MethodDeclaration.class::isInstance)
               .map(J.MethodDeclaration.class::cast)
                 .filter(it -> "function".equals(it.getSimpleName())).findFirst().orElseThrow();
 
@@ -199,7 +199,7 @@ public class KotlinTypeMappingTest {
           .map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
         assertThat(md.getMethodType().toString())
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=parameterized,return=org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>,parameters=[org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>]}");
-        J.VariableDeclarations vd = ((J.VariableDeclarations) md.getParameters().get(0));
+        J.VariableDeclarations vd = (J.VariableDeclarations) md.getParameters().get(0);
         assertThat(vd.getTypeExpression().getType().toString())
           .isEqualTo("org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>");
         assertThat(((J.ParameterizedType) vd.getTypeExpression()).getClazz().getType().toString())
@@ -1267,7 +1267,7 @@ public class KotlinTypeMappingTest {
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.Annotation visitAnnotation(J.Annotation annotation, Integer integer) {
-                            assertThat(String.valueOf(annotation.getType().toString())).isEqualTo(type);
+                            assertThat(annotation.getType().toString()).isEqualTo(type);
                             found.set(true);
                             return super.visitAnnotation(annotation, integer);
                         }
@@ -1316,11 +1316,11 @@ public class KotlinTypeMappingTest {
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
-                            if (identifier.getSimpleName().equals("lang")) {
+                            if ("lang".equals(identifier.getSimpleName())) {
                                 assertThat(identifier.getType()).isNull();
                                 isFieldTargetNull.set(true);
                             }
-                            if (identifier.getSimpleName().equals("StringBuilder")) {
+                            if ("StringBuilder".equals(identifier.getSimpleName())) {
                                 assertThat(identifier.getType().toString()).isEqualTo("java.lang.StringBuilder");
                                 isStringBuilderTyped.set(true);
                             }
@@ -1419,15 +1419,12 @@ public class KotlinTypeMappingTest {
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
-                            switch (identifier.getSimpleName()) {
-                                case "String" -> {
-                                    assertThat(identifier.getType().toString()).isEqualTo("kotlin.String");
-                                    count.incrementAndGet();
-                                }
-                                case "Number" -> {
-                                    assertThat(identifier.getType().toString()).isEqualTo("kotlin.Number");
-                                    count.incrementAndGet();
-                                }
+                            if ("String".equals(identifier.getSimpleName())) {
+                                assertThat(identifier.getType().toString()).isEqualTo("kotlin.String");
+                                count.incrementAndGet();
+                            } else if ("Number".equals(identifier.getSimpleName())) {
+                                assertThat(identifier.getType().toString()).isEqualTo("kotlin.Number");
+                                count.incrementAndGet();
                             }
                             return super.visitIdentifier(identifier, integer);
                         }
