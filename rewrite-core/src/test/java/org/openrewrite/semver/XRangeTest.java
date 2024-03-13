@@ -105,4 +105,11 @@ class XRangeTest {
         // The version pattern of javax.validation:validation-api
         assertThat(xRange.isValid("1.0", "2.0.1.Final")).isTrue();
     }
+
+    @Test
+    void matchCustomMetadata() {
+        assertThat(new XRange("3", "2", "*", "", null).isValid(null, "3.2.9")).isTrue();
+        assertThat(new XRange("3", "2", "*", "", null).isValid(null, "3.2.9.Final")).isTrue();
+        assertThat(new XRange("3", "2", "*", "", "-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
+    }
 }
