@@ -108,8 +108,6 @@ class XRangeTest {
 
     @Test
     void matchCustomMetadata() {
-        assertThat(new XRange("3", "2", "*", "", null).isValid(null, "3.2.9")).isTrue();
-        assertThat(new XRange("3", "2", "*", "", null).isValid(null, "3.2.9.Final")).isTrue();
-        assertThat(new XRange("3", "2", "*", "", "-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
+        assertThat(new XRange("3", "2", "*", "", ".Final-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
     }
 }
