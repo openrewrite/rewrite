@@ -141,4 +141,9 @@ class LatestReleaseTest {
         assertThat(latestRelease.compare(null, "7.17.0-20211102.000501-28",
           "7.17.0-20211102.012229-29")).isLessThan(0);
     }
+
+    @Test
+    void matchCustomMetadata() {
+        assertThat(new LatestRelease(".Final-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
+    }
 }
