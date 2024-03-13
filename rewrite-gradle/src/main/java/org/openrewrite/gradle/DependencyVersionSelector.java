@@ -116,7 +116,7 @@ public class DependencyVersionSelector {
      */
     @Nullable
     public String select(GroupArtifactVersion gav,
-                         String configuration,
+                         @Nullable String configuration,
                          @Nullable String version,
                          @Nullable String versionPattern,
                          ExecutionContext ctx) throws MavenDownloadingException {
@@ -143,10 +143,13 @@ public class DependencyVersionSelector {
     }
 
     private Optional<String> findNewerVersion(GroupArtifactVersion gav,
-                                              String configuration,
+                                              @Nullable String configuration,
                                               VersionComparator versionComparator,
                                               ExecutionContext ctx) throws MavenDownloadingException {
         try {
+            if(gav.getGroupId() == null) {
+                return Optional.empty();
+            }
             List<MavenRepository> repos = determineRepos(configuration);
             MavenMetadata mavenMetadata = metadataFailures == null ?
                     downloadMetadata(gav.getGroupId(), gav.getArtifactId(), repos, ctx) :
@@ -165,7 +168,7 @@ public class DependencyVersionSelector {
                 new GroupArtifact(groupId, artifactId), null, repositories);
     }
 
-    private List<MavenRepository> determineRepos(String configuration) {
+    private List<MavenRepository> determineRepos(@Nullable String configuration) {
         if (gradleSettings != null) {
             return gradleSettings.getPluginRepositories();
         }
