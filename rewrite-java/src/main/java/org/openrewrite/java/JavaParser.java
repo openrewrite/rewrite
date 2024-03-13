@@ -366,11 +366,11 @@ public interface JavaParser extends Parser {
         // internal method which doesn't overwrite the classpath but just amends it
         @Incubating(since = "8.18.3")
         public B addClasspathEntry(Path entry) {
-            if (this.classpath.isEmpty()) {
-                this.classpath = Collections.singletonList(entry);
-            } else {
-                this.classpath = new ArrayList<>(classpath);
-                this.classpath.add(entry);
+            if (classpath.isEmpty()) {
+                classpath = Collections.singletonList(entry);
+            } else if (!classpath.contains(entry)) {
+                classpath = new ArrayList<>(classpath);
+                classpath.add(entry);
             }
             return (B) this;
         }
