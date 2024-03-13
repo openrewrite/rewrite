@@ -20,6 +20,7 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.UUID;
 
@@ -37,7 +38,11 @@ public class CommitMessage implements Marker {
     String recipeName;
     String message;
 
-    public static <T extends Tree> T message(Tree t, Recipe r, String message) {
+    public static <T extends Tree> T message(Tree t, Recipe r, @Nullable String message) {
+        if(message == null) {
+            //noinspection unchecked
+            return (T) t;
+        }
         return t.withMarkers(t.getMarkers().add(new CommitMessage(randomId(), r.getName(), message)));
     }
 }
