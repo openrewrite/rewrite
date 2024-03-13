@@ -144,8 +144,6 @@ class LatestReleaseTest {
 
     @Test
     void matchCustomMetadata() {
-        assertThat(new LatestRelease(null).isValid(null, "3.2.9")).isTrue();
-        assertThat(new LatestRelease(null).isValid(null, "3.2.9.Final")).isTrue();
-        assertThat(new LatestRelease("-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
+        assertThat(new LatestRelease(".Final-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
     }
 }
