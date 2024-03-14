@@ -66,6 +66,10 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency testRuntime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency testRuntimeOnly(Object... dependencyNotation)
     Dependency testRuntimeOnly(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency deploy(Object... dependencyNotation)
+    Dependency deploy(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency earlib(Object... dependencyNotation)
+    Dependency earlib(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
 
     void constraints(Action<? super DependencyConstraintHandler> configureAction)
 }
