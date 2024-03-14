@@ -33,9 +33,8 @@ import java.util.stream.Collectors;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * This visitor can remove the specified method calls if it can be deleted without compile error,
- * It can be used to remove deprecated or unnecessary method calls, but be sure to carefully
- * review your code before deleting any methods to avoid errors or unexpected behavior.
+ * This visitor removes method calls matching some criteria.
+ * Tries to intelligently remove within chains without breaking other methods in the chain.
  */
 public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext> {
     private final Map<MethodMatcher, Predicate<List<Expression>>> matchers;
@@ -64,7 +63,8 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
             j = j.withPrefix(method.getPrefix());
         }
 
-        if (method.getArguments().stream().allMatch(ToBeRemoved::hasMarker)) {
+        // There should always be
+        if (!method.getArguments().isEmpty() && method.getArguments().stream().allMatch(ToBeRemoved::hasMarker)) {
             return ToBeRemoved.withMarker(j);
         }
         return j;
