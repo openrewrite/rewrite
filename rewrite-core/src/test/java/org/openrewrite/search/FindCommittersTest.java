@@ -40,7 +40,7 @@ class FindCommittersTest implements RewriteTest {
     void findCommitters() {
         GitProvenance git = new GitProvenance(
           randomId(), "github.com", "main", "123", null, null,
-          List.of(new GitProvenance.Committer("Jon", "jkschneider@gmail.com",
+          List.of(GitProvenance.Committer.from("Jon", "jkschneider@gmail.com",
             new TreeMap<>() {{
                 put(LocalDate.now().minusDays(5), 5);
                 put(LocalDate.now(), 5);
@@ -64,12 +64,12 @@ class FindCommittersTest implements RewriteTest {
     void findCommittersFromDate() {
         GitProvenance git = new GitProvenance(
           randomId(), "github.com", "main", "123", null, null,
-          List.of(new GitProvenance.Committer("Jon", "jkschneider@gmail.com",
+          List.of(GitProvenance.Committer.from("Jon", "jkschneider@gmail.com",
               new TreeMap<>() {{
                   put(LocalDate.of(2023, 1, 9), 5);
                   put(LocalDate.of(2023, 1, 1), 5);
               }}),
-            new GitProvenance.Committer("Peter", "p.streef@gmail.com",
+            GitProvenance.Committer.from("Peter", "p.streef@gmail.com",
               new TreeMap<>() {{
                   put(LocalDate.of(2023, 1, 10), 5);
               }}))
@@ -93,12 +93,12 @@ class FindCommittersTest implements RewriteTest {
     void findCommittersFromDateEmpty() {
         GitProvenance git = new GitProvenance(
           randomId(), "github.com", "main", "123", null, null,
-          List.of(new GitProvenance.Committer("Jon", "jkschneider@gmail.com",
+          List.of(GitProvenance.Committer.from("Jon", "jkschneider@gmail.com",
               new TreeMap<>() {{
                   put(LocalDate.of(2023, 1, 9), 5);
                   put(LocalDate.of(2023, 1, 1), 5);
               }}),
-            new GitProvenance.Committer("Peter", "p.streef@gmail.com",
+            GitProvenance.Committer.from("Peter", "p.streef@gmail.com",
               new TreeMap<>() {{
                   put(LocalDate.of(2023, 1, 10), 5);
               }}))

@@ -16,6 +16,9 @@
 package org.openrewrite.marker;
 
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.eclipse.jgit.api.Git;
@@ -41,6 +44,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -330,16 +334,22 @@ public class GitProvenance implements Marker {
                 head = headRef.getObjectId();
             }
 
-            Map<String, Committer> committers = new TreeMap<>();
+            Map<String, String> committerName = new HashMap<>();
+            Map<String, NavigableMap<LocalDate, Integer>> commitMap = new HashMap<>();
             for (RevCommit commit : git.log().add(head).call()) {
                 PersonIdent who = commit.getAuthorIdent();
-                Committer committer = committers.computeIfAbsent(who.getEmailAddress(),
-                        email -> new Committer(who.getName(), email, new TreeMap<>()));
-                committer.getCommitsByDay().compute(who.getWhen().toInstant().atZone(who.getTimeZone().toZoneId())
+                committerName.putIfAbsent(who.getEmailAddress(), who.getName());
+                commitMap.computeIfAbsent(who.getEmailAddress(),
+                        email -> new TreeMap<>()).compute(who.getWhen().toInstant().atZone(who.getTimeZone().toZoneId())
                                 .toLocalDate(),
                         (day, count) -> count == null ? 1 : count + 1);
             }
-            return new ArrayList<>(committers.values());
+            return committerName.entrySet().stream()
+                    .map(c -> Committer.from(
+                            c.getValue(),
+                            c.getKey(),
+                            commitMap.get(c.getKey()))
+                    ).collect(toList());
         } catch (IOException | GitAPIException e) {
             return emptyList();
         }
@@ -380,9 +390,32 @@ public class GitProvenance implements Marker {
 
     @Value
     @With
+    @RequiredArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     public static class Committer {
         String name;
         String email;
-        NavigableMap<LocalDate, Integer> commitsByDay;
+        int[] dates;
+        int[] commits;
+
+        @JsonCreator
+        public static Committer from(
+                @JsonProperty("name") String name,
+                @JsonProperty("email") String email,
+                @JsonProperty("commitsByDay") NavigableMap<LocalDate, Integer> commitsByDay) {
+            return new Committer(
+                    name,
+                    email,
+                    commitsByDay.keySet().stream().mapToInt(localDate -> (int) localDate.toEpochDay()).toArray(),
+                    commitsByDay.values().stream().mapToInt(Integer::intValue).toArray()
+            );
+        }
+
+        public NavigableMap<LocalDate, Integer> getCommitsByDay() {
+            TreeMap<LocalDate, Integer> commitsByDay = new TreeMap<>();
+            for (int i = 0; i < dates.length; i++) {
+                commitsByDay.put(LocalDate.ofEpochDay(dates[i]), commits[i]);
+            }
+            return commitsByDay;
+        }
     }
 }
