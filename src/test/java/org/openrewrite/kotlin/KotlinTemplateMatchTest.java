@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
@@ -24,8 +25,9 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class KotlinTemplateMatchTest implements RewriteTest {
+class KotlinTemplateMatchTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void matchBinary() {
         rewriteRun(
