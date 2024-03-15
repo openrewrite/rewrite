@@ -24,6 +24,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.table.TextMatches;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,6 +37,7 @@ import static java.util.Objects.requireNonNull;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class Find extends Recipe {
+    transient TextMatches textMatches = new TextMatches(this);
 
     @Override
     public String getDisplayName() {
@@ -128,6 +130,18 @@ public class Find extends Recipe {
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
                     snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
                     previousEnd = matcher.end();
+
+                    int startLine = Math.max(0, rawText.substring(0, matchStart).lastIndexOf('\n') + 1);
+                    int endLine = rawText.indexOf('\n', matcher.end());
+                    if (endLine == -1) {
+                        endLine = rawText.length();
+                    }
+
+                    textMatches.insertRow(ctx, new TextMatches.Row(
+                            sourceFile.getSourcePath().toString(),
+                            rawText.substring(startLine, matcher.start()) + "~~>" +
+                            rawText.substring(matcher.start(), endLine)
+                    ));
                 }
                 snippets.add(snippet(rawText.substring(previousEnd)));
                 return plainText.withText("").withSnippets(snippets);
