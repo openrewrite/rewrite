@@ -15,10 +15,21 @@
  */
 package org.openrewrite.yaml;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.HttpSenderExecutionContextView;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.test.MockHttpSender;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class CreateYamlFileTest implements RewriteTest {
@@ -35,6 +46,7 @@ class CreateYamlFileTest implements RewriteTest {
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
             fileContents,
+            null,
             null
           )),
           yaml(
@@ -52,6 +64,7 @@ class CreateYamlFileTest implements RewriteTest {
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
             "after: true",
+            null,
             true
           )),
           yaml(
@@ -67,6 +80,7 @@ class CreateYamlFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
+            null,
             null,
             false
           )),
@@ -85,6 +99,7 @@ class CreateYamlFileTest implements RewriteTest {
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
             null,
+            null,
             null
           )),
           yaml(
@@ -100,6 +115,7 @@ class CreateYamlFileTest implements RewriteTest {
           spec -> spec.recipe(new CreateYamlFile(
             "test/test-file-2.yaml",
             null,
+            null,
             true
           )),
           yaml(
@@ -110,6 +126,55 @@ class CreateYamlFileTest implements RewriteTest {
             null,
             "",
             spec -> spec.path("test/test-file-2.yaml")
+          )
+        );
+    }
+
+    @Test
+    void shouldDownloadFileContents() throws IOException {
+        URL fileContentsUri = requireNonNull(
+          CreateYamlFileTest.class.getClassLoader().getResource(
+            "create-yaml-file-tests/test.yaml"));
+        @Language("yml") String fileContents;
+        try (InputStream inputStream = fileContentsUri.openStream()) {
+            fileContents = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        HttpSenderExecutionContextView.view(ctx)
+          .setLargeFileHttpSender(new MockHttpSender(fileContentsUri::openStream));
+        rewriteRun(
+          spec -> spec.executionContext(ctx).recipe(new CreateYamlFile(
+            "test/test.yaml",
+            null,
+            fileContentsUri.toString(),
+            true)
+          ),
+          yaml(
+            null,
+            fileContents,
+            spec -> spec.path("test/test.yaml")
+          )
+        );
+    }
+
+    @Test
+    void shouldUseFileContentsWhenContentsAndContentsUrlNotNull() {
+        String fileContents = """
+          # This is a comment
+          x:
+            y: z
+          """;
+        rewriteRun(
+          spec -> spec.recipe(new CreateYamlFile(
+            "test/test.yaml",
+            fileContents,
+            "http://foo.bar/baz.yaml",
+            true)
+          ),
+          yaml(
+            null,
+            fileContents,
+            spec -> spec.path("test/test.yaml")
           )
         );
     }
