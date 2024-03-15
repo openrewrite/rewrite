@@ -81,7 +81,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
-        return estimatedEffortPerOccurrence == null ? super.getEstimatedEffortPerOccurrence() :
+        return estimatedEffortPerOccurrence == null ? Duration.ofMinutes(0) :
                 estimatedEffortPerOccurrence;
     }
 
