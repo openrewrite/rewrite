@@ -116,7 +116,7 @@ public interface RewriteTest extends SourceSpecs {
      * before or after a recipe run.
      */
     @Nullable
-    default String doesNotExist() {
+    default  String doesNotExist() {
         return null;
     }
 
