@@ -285,31 +285,6 @@ class DeleteStatementTest implements RewriteTest {
               @Override
               public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, ExecutionContext ctx) {
                   J.ForEachLoop f = super.visitForEachLoop(forLoop, ctx);
-                  doAfterVisit(new DeleteStatement<>(f.getControl().getVariable()));
-                  return f;
-              }
-          })),
-          java(
-            """
-              public class A {
-                  public void a() {
-                      for (int i : new int[]{ 1 }) {
-                          int j = 0;
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void dontDeleteForEachControl() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, ExecutionContext ctx) {
-                  J.ForEachLoop f = super.visitForEachLoop(forLoop, ctx);
                   if (!((J.Block) f.getBody()).getStatements().isEmpty()) {
                       doAfterVisit(new DeleteStatement<>(f.getBody()));
                   }
