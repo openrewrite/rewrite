@@ -22,6 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.properties.Assertions.properties;
 
 class FindPluginsTest implements RewriteTest {
     @Override
@@ -51,6 +52,38 @@ class FindPluginsTest implements RewriteTest {
               .anySatisfy(p -> {
                   assertThat(p.getPluginId()).isEqualTo("com.jfrog.bintray");
                   assertThat(p.getVersion()).isEqualTo("1.8.5");
+              }))
+          )
+        );
+    }
+
+    @Test
+    void findPluginWithVariable() {
+        rewriteRun(
+          properties(
+            """
+              jfrogBintrayVersion=1.8.5
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.jfrog.bintray'
+                  id 'com.jfrog.bintray' version "${jfrogBintrayVersion}"
+              }
+              """,
+            """
+              plugins {
+                  /*~~>*/id 'com.jfrog.bintray'
+                  /*~~>*/id 'com.jfrog.bintray' version "${jfrogBintrayVersion}"
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "com.jfrog.bintray"))
+              .isNotEmpty()
+              .anySatisfy(p -> {
+                  assertThat(p.getPluginId()).isEqualTo("com.jfrog.bintray");
+                  assertThat(p.getVersion()).isEqualTo("jfrogBintrayVersion");
               }))
           )
         );
