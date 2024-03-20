@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -23,6 +24,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -90,6 +92,79 @@ class AddDependencyTest implements RewriteTest {
                     mavenCentral()
                 }
                                 
+                dependencies {
+                    testImplementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Disabled
+    @ParameterizedTest
+    @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
+    void multipleCycles(String onlyIfUsing) {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangePackage("foo.math", "com.google.common.math", false),
+            addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing))
+            .typeValidationOptions(TypeValidation.none())
+            .afterTypeValidationOptions(TypeValidation.all()),
+          mavenProject("project",
+            srcTestJava(
+              java(
+                """
+                  package foo.math;
+                  
+                  public class A {
+                      boolean getMap() {
+                          return IntMath.isPrime(5);
+                      }
+                  }
+                  
+                  class IntMath {
+                      static boolean isPrime(int i) {
+                          return i % 2 != 0;
+                      }
+                  }
+                  """,
+                """
+                  package com.google.common.math;
+                  
+                  public class A {
+                      boolean getMap() {
+                          return IntMath.isPrime(5);
+                      }
+                  }
+                  
+                  class IntMath {
+                      static boolean isPrime(int i) {
+                          return i % 2 != 0;
+                      }
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     testImplementation "com.google.guava:guava:29.0-jre"
                 }
