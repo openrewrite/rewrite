@@ -343,7 +343,9 @@ public class ResolvedPom {
         MavenPomDownloader downloader;
 
         public ResolvedPom resolve() throws MavenDownloadingException {
-            resolveParentsRecursively(requested);
+            if (!MavenExecutionContextView.view(ctx).getSkipDependencyResolution()) {
+                resolveParentsRecursively(requested);
+            }
             return ResolvedPom.this;
         }
 
