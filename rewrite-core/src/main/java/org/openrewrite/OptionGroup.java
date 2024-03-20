@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,8 @@
  */
 package org.openrewrite;
 
-import org.intellij.lang.annotations.Language;
+import com.fasterxml.jackson.annotation.JacksonAnnotationsInside;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -23,17 +24,17 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Options are used to configure recipes. They are annotated on fields of recipes and are used to generate
- * documentation and to validate user input.
+ * Nested options are used to configure recipes.
  * <p>
- * For nested options, see {@link OptionGroup}.
+ * They allow for options to be re-used across multiple {@link Recipe} implementations through object composition.
+ * <p>
+ * Fields annotated with this method <i>may</i> also be annotated with {@link JsonUnwrapped} for further configuration
+ * of the deserialized JSON.
  */
+@Incubating(since = "8.12.0")
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Option {
-    @Language("markdown") String displayName() default "";
-    @Language("markdown") String description() default "";
-    String example() default "";
-    String[] valid() default "";
-    boolean required() default true;
+@JsonUnwrapped
+@JacksonAnnotationsInside
+public @interface OptionGroup {
 }
