@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -446,7 +447,17 @@ public class Space {
         WHILE_PREFIX,
         WILDCARD_BOUND,
         WILDCARD_PREFIX,
-        YIELD_PREFIX,
+        YIELD_PREFIX;
+
+        @Incubating(since = "8.12.1")
+        public boolean isPrefix() {
+            return this.toString().endsWith("_PREFIX");
+        }
+
+        @Incubating(since = "8.12.1")
+        public boolean isSuffix() {
+            return this.toString().endsWith("_SUFFIX");
+        }
     }
 
     static void rangeCheck(int arrayLength, int fromIndex, int toIndex) {
