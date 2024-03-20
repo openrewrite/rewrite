@@ -27,6 +27,7 @@ import org.openrewrite.table.DistinctCommitters;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.NavigableMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
@@ -90,15 +91,16 @@ public class FindCommitters extends ScanningRecipe<AtomicReference<GitProvenance
         if (gitProvenance != null) {
             LocalDate from = StringUtils.isBlank(fromDate) ? null : LocalDate.parse(fromDate).minusDays(1);
             for (GitProvenance.Committer committer : requireNonNull(gitProvenance.getCommitters())) {
-                if (from == null || committer.getCommitsByDay().keySet().stream().anyMatch(day -> day.isAfter(from))) {
+                NavigableMap<LocalDate, Integer> committerCommits = committer.getCommitsByDay();
+                if (from == null || committerCommits.keySet().stream().anyMatch(day -> day.isAfter(from))) {
                     committers.insertRow(ctx, new DistinctCommitters.Row(
                             committer.getName(),
                             committer.getEmail(),
-                            committer.getCommitsByDay().lastKey(),
-                            committer.getCommitsByDay().values().stream().mapToInt(Integer::intValue).sum()
+                            committerCommits.lastKey(),
+                            committerCommits.values().stream().mapToInt(Integer::intValue).sum()
                     ));
 
-                    committer.getCommitsByDay().forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
+                    committerCommits.forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
                             committer.getName(),
                             committer.getEmail(),
                             day,

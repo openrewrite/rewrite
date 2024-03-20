@@ -48,3 +48,17 @@ tasks.named<Test>("test").configure {
     dependsOn(shadowJar)
     classpath = files(shadowJar, sourceSets.test.get().output, configurations.testRuntimeClasspath)
 }
+
+tasks.withType<Javadoc> {
+    // generated ANTLR sources violate doclint
+    (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
+
+    // Items besides JavaParser due to lombok error which looks similar to this:
+    //     openrewrite/rewrite/rewrite-java/src/main/java/org/openrewrite/java/OrderImports.java:42: error: cannot find symbol
+    // @AllArgsConstructor(onConstructor_=@JsonCreator)
+    //                     ^
+    //   symbol:   method onConstructor_()
+    //   location: @interface AllArgsConstructor
+    // 1 error
+    exclude("**/GitProvenance.java")
+}
