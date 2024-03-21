@@ -1199,4 +1199,37 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doesNotDowngradeVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                              <!-- version in pom is 4.9.10, pin should be kept-->
+                              <version>4.9.11</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
 }

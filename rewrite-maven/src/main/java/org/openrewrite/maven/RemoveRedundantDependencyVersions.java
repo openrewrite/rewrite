@@ -24,6 +24,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.semver.LatestIntegration;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
@@ -52,7 +53,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     String artifactPattern;
 
     @Option(displayName = "Only if versions match",
-            description = "Only remove the explicit version if it matches the managed dependency version. Default true.",
+            description = "Only remove the explicit version if it exactly matches the managed dependency version. " +
+                          "When `false` explicit versions will be removed if they are older than or equal to the managed dependency version. " +
+                          "Default `true`.",
             required = false)
     @Nullable
     Boolean onlyIfVersionsMatch;
@@ -103,15 +106,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 if (isDependencyLikeTag() && !isManagedDependencyTag()) {
                     if (isPluginTag()) {
                         Plugin p = findPlugin(tag);
-                        if (p != null && matchesVersion(p) && matchesGroup(p) && matchesArtifact(p)) {
+                        if (p != null && matchesGroup(p) && matchesArtifact(p) && matchesVersion(p)) {
                             Xml.Tag version = tag.getChild("version").orElse(null);
                             return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
                         }
                     } else {
                         ResolvedDependency d = findDependency(tag);
-                        if (d != null && matchesVersion(d) &&
-                            matchesGroup(d) && matchesArtifact(d)
-                            && isNotExcepted(d)) {
+                        if (d != null && matchesGroup(d) && matchesArtifact(d) && matchesVersion(d) && isNotExcepted(d)) {
                             Xml.Tag version = tag.getChild("version").orElse(null);
                             return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
                         }
@@ -137,23 +138,35 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             private boolean matchesVersion(ResolvedDependency d) {
+                if(d.getRequested().getVersion() == null) {
+                    return false;
+                }
                 String managedVersion = getResolutionResult().getPom().getManagedVersion(d.getGroupId(),
                         d.getArtifactId(), d.getRequested().getType(), d.getRequested().getClassifier());
-                return managedVersion != null && (
-                        ignoreVersionMatching() || managedVersion.equals(d.getRequested().getVersion())
-                );
+                if(isExactMatchRequired()) {
+                    return Objects.equals(managedVersion, d.getRequested().getVersion());
+                }
+                return isManagedNewerThanRequested(managedVersion, d.getRequested().getVersion());
             }
 
             private boolean matchesVersion(Plugin p) {
-                ResolvedPom resolvedPom = getResolutionResult().getPom();
-                String managedVersion = getManagedPluginVersion(resolvedPom, p.getGroupId(), p.getArtifactId());
-                return managedVersion != null && (
-                        ignoreVersionMatching() || managedVersion.equals(p.getVersion())
-                );
+                if(p.getVersion() == null) {
+                    return false;
+                }
+                String managedVersion = getManagedPluginVersion(getResolutionResult().getPom(), p.getGroupId(), p.getArtifactId());
+                if(isExactMatchRequired()) {
+                    return Objects.equals(managedVersion, p.getVersion());
+                }
+                return isManagedNewerThanRequested(managedVersion, p.getVersion());
             }
 
-            private boolean ignoreVersionMatching() {
-                return Boolean.FALSE.equals(onlyIfVersionsMatch);
+            private boolean isManagedNewerThanRequested(@Nullable String managedVersion, String requestedVersion) {
+                return managedVersion != null && new LatestIntegration(null)
+                                  .compare(null, managedVersion, requestedVersion) >= 0;
+            }
+
+            private boolean isExactMatchRequired() {
+                return onlyIfVersionsMatch == null || onlyIfVersionsMatch;
             }
 
             private boolean isNotExcepted(ResolvedDependency d) {
