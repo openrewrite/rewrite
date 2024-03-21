@@ -22,17 +22,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SemverTest {
     @Test
     void validToVersion() {
-        assertThat(Semver.validate("latest.release", null).<VersionComparator>getValue())
+        assertThat(Semver.validate("latest.release", null).getValue())
           .isInstanceOf(LatestRelease.class);
-        assertThat(Semver.validate("1.5 - 2", null).<VersionComparator>getValue())
+        assertThat(Semver.validate("latest.integration", null).getValue())
+          .isInstanceOf(LatestIntegration.class);
+        assertThat(Semver.validate("latest.snapshot", null).getValue())
+          .isInstanceOf(LatestIntegration.class);
+        assertThat(Semver.validate("1.5 - 2", null).getValue())
           .isInstanceOf(HyphenRange.class);
-        assertThat(Semver.validate("1.x", null).<VersionComparator>getValue())
+        assertThat(Semver.validate("1.x", null).getValue())
           .isInstanceOf(XRange.class);
-        assertThat(Semver.validate("~1.5", null).<VersionComparator>getValue())
+        assertThat(Semver.validate("~1.5", null).getValue())
           .isInstanceOf(TildeRange.class);
-        assertThat(Semver.validate("^1.5", null).<VersionComparator>getValue())
+        assertThat(Semver.validate("^1.5", null).getValue())
           .isInstanceOf(CaretRange.class);
-        assertThat(Semver.validate("[1.5,2)", null).<VersionComparator>getValue())
+        assertThat(Semver.validate("[1.5,2)", null).getValue())
           .isInstanceOf(SetRange.class);
     }
 }
