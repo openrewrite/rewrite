@@ -92,14 +92,15 @@ public class MavenArtifactDownloader {
             return null;
         }
         return mavenArtifactCache.computeArtifact(dependency, () -> {
-            String uri = requireNonNull(dependency.getRepository(),
-                    String.format("Repository for dependency '%s' was null.", dependency)).getUri() + "/" +
-                         dependency.getGroupId().replace('.', '/') + '/' +
-                         dependency.getArtifactId() + '/' +
-                         dependency.getVersion() + '/' +
-                         dependency.getArtifactId() + '-' +
-                         (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                         ".jar";
+            String base = requireNonNull(dependency.getRepository(),
+                    String.format("Repository for dependency '%s' was null.", dependency)).getUri();
+            String path = dependency.getGroupId().replace('.', '/') + '/' +
+                          dependency.getArtifactId() + '/' +
+                          dependency.getVersion() + '/' +
+                          dependency.getArtifactId() + '-' +
+                          (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                          ".jar";
+            String uri = base + (base.endsWith("/") ? "" : "/") + path;
 
             InputStream bodyStream;
 
@@ -112,8 +113,8 @@ public class MavenArtifactDownloader {
                 try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                      InputStream body = response.getBody()) {
                     if (!response.isSuccessful() || body == null) {
-                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s. Response was %d",
-                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), response.getCode()), null,
+                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s from %s. Response was %d",
+                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, response.getCode()), null,
                                 dependency.getRequested().getGav()));
                         return null;
                     }
