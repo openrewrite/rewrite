@@ -92,7 +92,7 @@ public class MavenArtifactDownloader {
             return null;
         }
         return mavenArtifactCache.computeArtifact(dependency, () -> {
-            String base = requireNonNull(dependency.getRepository(),
+            String baseUri = requireNonNull(dependency.getRepository(),
                     String.format("Repository for dependency '%s' was null.", dependency)).getUri();
             String path = dependency.getGroupId().replace('.', '/') + '/' +
                           dependency.getArtifactId() + '/' +
@@ -100,7 +100,7 @@ public class MavenArtifactDownloader {
                           dependency.getArtifactId() + '-' +
                           (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
                           ".jar";
-            String uri = base + (base.endsWith("/") ? "" : "/") + path;
+            String uri = baseUri + (baseUri.endsWith("/") ? "" : "/") + path;
 
             InputStream bodyStream;
 
