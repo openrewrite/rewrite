@@ -21,12 +21,12 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Plugin;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.LatestIntegration;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -102,8 +102,18 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml.Document d = super.visitDocument(document, ctx);
+                if(d != document) {
+                    // Remove newly empty <dependencyManagement> and <dependencies> tags
+                    d = (Xml.Document) new RemoveEmptyDependencyTags().visitNonNull(d, ctx);
+                }
+                return d;
+            }
+
+            @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependencyLikeTag() && !isManagedDependencyTag()) {
+                if (isDependencyTag() || isPluginTag()) {
                     if (isPluginTag()) {
                         Plugin p = findPlugin(tag);
                         if (p != null && matchesGroup(p) && matchesArtifact(p) && matchesVersion(p)) {
@@ -117,8 +127,18 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
                         }
                     }
+                } else if (isManagedDependencyTag()) {
+                    ResolvedManagedDependency managed = findManagedDependency(tag);
+                    if (managed != null && matchesGroup(managed) && matchesArtifact(managed) && matchesVersion(managed, ctx)) {
+                        //noinspection DataFlowIssue
+                        return null;
+                    }
                 }
                 return super.visitTag(tag, ctx);
+            }
+
+            private boolean matchesGroup(ResolvedManagedDependency d) {
+                return StringUtils.isNullOrEmpty(groupPattern) || matchesGlob(d.getGroupId(), groupPattern);
             }
 
             private boolean matchesGroup(ResolvedDependency d) {
@@ -129,6 +149,10 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 return StringUtils.isNullOrEmpty(groupPattern) || matchesGlob(p.getGroupId(), groupPattern);
             }
 
+            private boolean matchesArtifact(ResolvedManagedDependency d) {
+                return StringUtils.isNullOrEmpty(artifactPattern) || matchesGlob(d.getArtifactId(), artifactPattern);
+            }
+
             private boolean matchesArtifact(ResolvedDependency d) {
                 return StringUtils.isNullOrEmpty(artifactPattern) || matchesGlob(d.getArtifactId(), artifactPattern);
             }
@@ -137,24 +161,59 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 return StringUtils.isNullOrEmpty(artifactPattern) || matchesGlob(p.getArtifactId(), artifactPattern);
             }
 
+            /**
+             * This compares a managed dependency version to the version which would be used if only the parent's
+             * dependency management were in effect. This enables detection of managed dependency versions which
+             * could be left to the parent.
+             */
+            private boolean matchesVersion(ResolvedManagedDependency d, ExecutionContext ctx) {
+                MavenResolutionResult mrr = getResolutionResult();
+                if (d.getRequested().getVersion() == null || mrr.getPom().getRequested().getParent() == null) {
+                    return false;
+                }
+                try {
+                    GroupArtifactVersion parentGav = mrr.getPom().getRequested().getParent().getGav();
+                    MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, null, null);
+                    ResolvedPom parentPom = mpd.download(parentGav, null, null, mrr.getPom().getRepositories())
+                            .resolve(Collections.emptyList(), mpd, ctx);
+                    ResolvedManagedDependency parentManagedVersion = parentPom.getDependencyManagement().stream()
+                            .filter(dep -> dep.getGroupId().equals(d.getGroupId()) && dep.getArtifactId().equals(d.getArtifactId()))
+                            .findFirst()
+                            .orElse(null);
+                    if(parentManagedVersion == null) {
+                        return false;
+                    }
+                    String versionAccordingToParent = parentManagedVersion.getVersion();
+                    if(versionAccordingToParent == null) {
+                        return false;
+                    }
+                    if (isExactMatchRequired()) {
+                        return Objects.equals(versionAccordingToParent, d.getRequested().getVersion());
+                    }
+                    return isManagedNewerThanRequested(versionAccordingToParent, d.getRequested().getVersion());
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+
             private boolean matchesVersion(ResolvedDependency d) {
-                if(d.getRequested().getVersion() == null) {
+                if (d.getRequested().getVersion() == null) {
                     return false;
                 }
                 String managedVersion = getResolutionResult().getPom().getManagedVersion(d.getGroupId(),
                         d.getArtifactId(), d.getRequested().getType(), d.getRequested().getClassifier());
-                if(isExactMatchRequired()) {
+                if (isExactMatchRequired()) {
                     return Objects.equals(managedVersion, d.getRequested().getVersion());
                 }
                 return isManagedNewerThanRequested(managedVersion, d.getRequested().getVersion());
             }
 
             private boolean matchesVersion(Plugin p) {
-                if(p.getVersion() == null) {
+                if (p.getVersion() == null) {
                     return false;
                 }
                 String managedVersion = getManagedPluginVersion(getResolutionResult().getPom(), p.getGroupId(), p.getArtifactId());
-                if(isExactMatchRequired()) {
+                if (isExactMatchRequired()) {
                     return Objects.equals(managedVersion, p.getVersion());
                 }
                 return isManagedNewerThanRequested(managedVersion, p.getVersion());
@@ -198,5 +257,17 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
         }
         return null;
+    }
+
+    private static class RemoveEmptyDependencyTags extends MavenIsoVisitor<ExecutionContext> {
+        @Override
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            Xml.Tag t = super.visitTag(tag, ctx);
+            if(("dependencyManagement".equals(t.getName()) || "dependencies".equals(t.getName())) && (t.getContent() == null || t.getContent().isEmpty())) {
+                //noinspection DataFlowIssue
+                return null;
+            }
+            return t;
+        }
     }
 }

@@ -1227,4 +1227,51 @@ class ChangeParentPomTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotAddUnnecessaryManagedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", "org.springframework.boot",
+            "spring-boot-starter-parent", "spring-boot-starter-parent",
+            "2.3.12.RELEASE", null, null, null, null)),
+          pomXml("""
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.2.13.RELEASE</version>
+                </parent>
+                <groupId>com.example</groupId>
+                <artifactId>acme</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-web</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+            """,
+            """
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.3.12.RELEASE</version>
+                </parent>
+                <groupId>com.example</groupId>
+                <artifactId>acme</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-web</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+            """)
+        );
+    }
 }
