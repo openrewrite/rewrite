@@ -86,36 +86,43 @@ public class AddProperty extends Recipe {
                 }
                 return document;
             }
-        }, new MavenIsoVisitor<ExecutionContext>() {
-            final String propertyName = key.replace("${", "").replace("}", "");
+        }, new AddPropertyVisitor(key.replace("${", "").replace("}", ""), value, preserveExistingValue, trustParent));
+    }
+}
 
-            @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Xml.Document d = super.visitDocument(document, ctx);
-                Xml.Tag root = d.getRoot();
-                Optional<Xml.Tag> properties = root.getChild("properties");
-                if (!properties.isPresent()) {
-                    Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + propertyName + ">" + value + "</" + propertyName + ">\n</properties>");
-                    d = (Xml.Document) new AddToTagVisitor<ExecutionContext>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())).visitNonNull(d, ctx);
-                } else if (!properties.get().getChildValue(propertyName).isPresent()) {
-                    Xml.Tag propertyTag = Xml.Tag.build("<" + propertyName + ">" + value + "</" + propertyName + ">");
-                    d = (Xml.Document) new AddToTagVisitor<>(properties.get(), propertyTag, new TagNameComparator()).visitNonNull(d, ctx);
-                }
-                if (d != document) {
-                    maybeUpdateModel();
-                }
-                return d;
-            }
+@Value
+@EqualsAndHashCode(callSuper = false)
+class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
+    String propertyName;
+    String value;
+    @Nullable Boolean preserveExistingValue;
+    @Nullable Boolean trustParent;
 
-            @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (!Boolean.TRUE.equals(preserveExistingValue)
-                    && isPropertyTag() && propertyName.equals(tag.getName())
-                    && !value.equals(tag.getValue().orElse(null))) {
-                    doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
-                }
-                return super.visitTag(tag, ctx);
-            }
-        });
+    @Override
+    public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+        Xml.Document d = super.visitDocument(document, ctx);
+        Xml.Tag root = d.getRoot();
+        Optional<Xml.Tag> properties = root.getChild("properties");
+        if (!properties.isPresent()) {
+            Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + propertyName + ">" + value + "</" + propertyName + ">\n</properties>");
+            d = (Xml.Document) new AddToTagVisitor<ExecutionContext>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())).visitNonNull(d, ctx);
+        } else if (!properties.get().getChildValue(propertyName).isPresent()) {
+            Xml.Tag propertyTag = Xml.Tag.build("<" + propertyName + ">" + value + "</" + propertyName + ">");
+            d = (Xml.Document) new AddToTagVisitor<>(properties.get(), propertyTag, new TagNameComparator()).visitNonNull(d, ctx);
+        }
+        if (d != document) {
+            maybeUpdateModel();
+        }
+        return d;
+    }
+
+    @Override
+    public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+        if (!Boolean.TRUE.equals(preserveExistingValue)
+            && isPropertyTag() && propertyName.equals(tag.getName())
+            && !value.equals(tag.getValue().orElse(null))) {
+            doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
+        }
+        return super.visitTag(tag, ctx);
     }
 }
