@@ -104,9 +104,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Document d = super.visitDocument(document, ctx);
-                if(d != document) {
-                    // Remove newly empty <dependencyManagement> and <dependencies> tags
+                if (d != document) {
                     d = (Xml.Document) new RemoveEmptyDependencyTags().visitNonNull(d, ctx);
+                    if (onlyIfVersionsMatch == null || !onlyIfVersionsMatch) {
+                        maybeUpdateModel();
+                    }
                 }
                 return d;
             }
@@ -180,11 +182,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             .filter(dep -> dep.getGroupId().equals(d.getGroupId()) && dep.getArtifactId().equals(d.getArtifactId()))
                             .findFirst()
                             .orElse(null);
-                    if(parentManagedVersion == null) {
+                    if (parentManagedVersion == null) {
                         return false;
                     }
                     String versionAccordingToParent = parentManagedVersion.getVersion();
-                    if(versionAccordingToParent == null) {
+                    if (versionAccordingToParent == null) {
                         return false;
                     }
                     if (isExactMatchRequired()) {
@@ -221,7 +223,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
             private boolean isManagedNewerThanRequested(@Nullable String managedVersion, String requestedVersion) {
                 return managedVersion != null && new LatestIntegration(null)
-                                  .compare(null, managedVersion, requestedVersion) >= 0;
+                                                         .compare(null, managedVersion, requestedVersion) >= 0;
             }
 
             private boolean isExactMatchRequired() {
@@ -263,7 +265,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
-            if(("dependencyManagement".equals(t.getName()) || "dependencies".equals(t.getName())) && (t.getContent() == null || t.getContent().isEmpty())) {
+            if (("dependencyManagement".equals(t.getName()) || "dependencies".equals(t.getName())) && (t.getContent() == null || t.getContent().isEmpty())) {
                 //noinspection DataFlowIssue
                 return null;
             }
