@@ -168,4 +168,37 @@ public class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addConstraintToConfigurationNotExtendingAnything() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'ear' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  earlib 'org.openrewrite:rewrite-java:7.0.0'
+                  
+                  constraints {
+                  }
+              }
+              """,
+            """
+              plugins { id 'ear' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  earlib 'org.openrewrite:rewrite-java:7.0.0'
+              
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
