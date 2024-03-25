@@ -211,9 +211,31 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 return cu;
             }
 
+            /*
+             * It is typical in Gradle for there to be a number of unresolvable configurations that developers put
+             * dependencies into in their build files, like implementation. Other configurations like compileClasspath
+             * and runtimeClasspath are resolvable and will directly or transitively extend from those unresolvable
+             * configurations.
+             *
+             * It isn't impossible to manage the version of the dependency directly in the child configuration, but you
+             * might end up with the same dependency managed multiple times, something like this:
+             *
+             * constraints {
+             *     runtimeClasspath("g:a:v") { }
+             *     compileClasspath("g:a:v") { }
+             *     testRuntimeClasspath("g:a:v") { }
+             *     testCompileClasspath("g:a:v") { }
+             * }
+             *
+             * whereas if we find a common root configuration, the above can be simplified to:
+             *
+             * constraints {
+             *     implementation("g:a:v") { }
+             * }
+             */
             @Nullable
             private GradleDependencyConfiguration constraintConfiguration(GradleDependencyConfiguration config) {
-                String constraintConfigName = null;
+                String constraintConfigName = config.getName();
                 switch (config.getName()) {
                     case "compileClasspath":
                         constraintConfigName = "implementation";
