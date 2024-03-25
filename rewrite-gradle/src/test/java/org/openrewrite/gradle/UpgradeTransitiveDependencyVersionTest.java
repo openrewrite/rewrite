@@ -54,7 +54,7 @@ public class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                           because 'CVE-2024-BAD'
                       }
                   }
-                            
+              
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -143,7 +143,7 @@ public class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-                            
+              
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
                   
@@ -154,7 +154,7 @@ public class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-
+              
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               
