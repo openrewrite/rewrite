@@ -255,7 +255,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         return extended;
                     }
                 }
-                return null;
+                return config;
             }
         });
     }
