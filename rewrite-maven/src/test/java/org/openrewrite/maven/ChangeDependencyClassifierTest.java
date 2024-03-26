@@ -26,7 +26,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeDependencyClassifier("org.ehcache", "ehcache", "jakarta"));
+        spec.recipe(new ChangeDependencyClassifier("org.ehcache", "ehcache", "jakarta", null));
     }
 
     @DocumentExample
@@ -73,11 +73,74 @@ class ChangeDependencyClassifierTest implements RewriteTest {
         );
     }
 
+
+    @Test
+    void noManagedClassifierToClassifier() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.ehcache", "ehcache", "jakarta", true)),
+        pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.ehcache</groupId>
+                      <artifactId>ehcache</artifactId>
+                      <version>3.10.0</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>org.ehcache</groupId>
+                    <artifactId>ehcache</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.ehcache</groupId>
+                      <artifactId>ehcache</artifactId>
+                      <version>3.10.0</version>
+                      <classifier>jakarta</classifier>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>org.ehcache</groupId>
+                    <artifactId>ehcache</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void addClassifierUsingGlobsExpressions() {
         rewriteRun(
           spec -> spec.recipe(
-            new ChangeDependencyClassifier("org.ehcache", "*", "jakarta")
+            new ChangeDependencyClassifier("org.ehcache", "*", "jakarta", null)
           ),
           pomXml(
             """
@@ -177,7 +240,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @Test
     void classifierToNoClassifier() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier("org.ehcache", "ehcache", null)),
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.ehcache", "ehcache", null, null)),
           pomXml(
             """
               <project>
