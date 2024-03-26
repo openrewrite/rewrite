@@ -23,8 +23,7 @@ class TestAssignmentToNull {
     void test2(File srcDir, File destDir, FileFilter filter) {
         // Cater for destination being directory within the source directory (see IO-141)
         List<String> exclusionList = null;
-        String canonicalDestDir = destDir.getCanonicalPath();
-        if (canonicalDestDir.startsWith(srcDir.getCanonicalPath())) {
+        if (destDir.getCanonicalFile().toPath().startsWith(srcDir.getCanonicalFile().toPath())) {
             File[] srcFiles = filter == null ? srcDir.listFiles() : srcDir.listFiles(filter);
             if (srcFiles != null && srcFiles.length > 0) {
                 exclusionList = new ArrayList<String>(srcFiles.length);

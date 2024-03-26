@@ -311,7 +311,7 @@ public class SimpleFileServer extends AbstractTestServer {
          */
         private boolean checkFileLocation(File file, File root) {
             try {
-                return file.getCanonicalPath().startsWith(root.getCanonicalPath());
+                return file.getCanonicalFile().toPath().startsWith(root.getCanonicalFile().toPath());
             } catch (IOException ex) {
                 LOG.warn("File {}:", file.getAbsolutePath(), ex);
                 return false;
