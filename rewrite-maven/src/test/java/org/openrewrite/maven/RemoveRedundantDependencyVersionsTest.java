@@ -1288,4 +1288,36 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void propertySubstitution() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          pomXml("""
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.3.0.RELEASE</version>
+                    <relativePath/>
+                </parent>
+            
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            
+                <modelVersion>4.0.0</modelVersion>
+                <build>
+                    <plugins>
+                        <plugin>
+                            <artifactId>kotlin-maven-plugin</artifactId>
+                            <groupId>org.jetbrains.kotlin</groupId>
+                            <version>${kotlin.version}</version>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+            """)
+        );
+    }
 }
