@@ -117,8 +117,7 @@ public class JobUtils {
     private static File createFile(File destinationDir, ZipEntry zipEntry) throws IOException {
         File destFile = new File(destinationDir, zipEntry.getName());
         String destDirPath = destinationDir.getCanonicalPath();
-        String destFilePath = destFile.getCanonicalPath();
-        if (!destFilePath.startsWith(destDirPath)) {
+        if (!destFile.getCanonicalFile().toPath().startsWith(destDirPath)) {
             throw new IOException("entry outside target dir: " + zipEntry.getName());
         }
         return destFile;
