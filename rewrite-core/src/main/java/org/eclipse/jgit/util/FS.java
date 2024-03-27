@@ -975,7 +975,7 @@ public abstract class FS {
 	private void detectSymlinkSupport() {
 		File tempFile = null;
 		try {
-			tempFile = File.createTempFile("tempsymlinktarget", ""); //$NON-NLS-1$ //$NON-NLS-2$
+			tempFile = Files.createTempFile("tempsymlinktarget", "").toFile(); //$NON-NLS-1$ //$NON-NLS-2$
 			File linkName = new File(tempFile.getParentFile(), "tempsymlink"); //$NON-NLS-1$
 			createSymLink(linkName, tempFile.getPath());
 			supportSymlinks = Boolean.TRUE;
