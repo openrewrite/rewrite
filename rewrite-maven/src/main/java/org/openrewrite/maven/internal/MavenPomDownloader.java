@@ -97,6 +97,8 @@ public class MavenPomDownloader {
         this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
         this.mavenSettings = mavenSettings;
         this.activeProfiles = activeProfiles;
+        Boolean enableDefaultRepositories = MavenExecutionContextView.view(ctx).isEnableDefaultRepositories();
+        this.addDefaultRepositories = enableDefaultRepositories == null || enableDefaultRepositories;
     }
 
     /**
@@ -108,7 +110,8 @@ public class MavenPomDownloader {
      */
     public MavenPomDownloader(ExecutionContext ctx) {
         this(emptyMap(), HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-        this.addDefaultRepositories = false;
+        Boolean enableDefaultRepositories = MavenExecutionContextView.view(ctx).isEnableDefaultRepositories();
+        this.addDefaultRepositories = enableDefaultRepositories != null && enableDefaultRepositories;
     }
 
     /**
@@ -249,7 +252,7 @@ public class MavenPomDownloader {
                 try {
                     String scheme = URI.create(repo.getUri()).getScheme();
                     String uri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                                 gav.getGroupId().replace('.', '/') + '/' +
+                                 requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
                                  gav.getArtifactId() + '/' +
                                  (gav.getVersion() == null ? "" : gav.getVersion() + '/') +
                                  "maven-metadata.xml";
