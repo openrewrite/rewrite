@@ -45,6 +45,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
+    private static final String IS_ENABLE_DEFAULT_REPOSITORIES = "org.openrewrite.maven.isEnableDefaultRepositories";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -209,6 +210,16 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     @Nullable
     public MavenSettings getSettings() {
         return getMessage(MAVEN_SETTINGS, null);
+    }
+
+    @Nullable
+    public Boolean isEnableDefaultRepositories() {
+        return getMessage(IS_ENABLE_DEFAULT_REPOSITORIES, null);
+    }
+
+    public MavenExecutionContextView setEnableDefaultRepositories(@Nullable Boolean enableDefaultRepositories) {
+        putMessage(IS_ENABLE_DEFAULT_REPOSITORIES, enableDefaultRepositories);
+        return this;
     }
 
     private static List<String> mapActiveProfiles(MavenSettings settings, String... activeProfiles) {
