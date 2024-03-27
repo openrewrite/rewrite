@@ -254,12 +254,13 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     case "testRuntime":
                         constraintConfigName = "testRuntimeOnly";
                         break;
-                    case "deploy":
-                        constraintConfigName = "earlib";
-                        break;
                 }
 
-                return gradleProject.getConfiguration(constraintConfigName);
+                GradleDependencyConfiguration configuration = gradleProject.getConfiguration(constraintConfigName);
+                if (configuration != null && configuration.isTransitive()) {
+                    return configuration;
+                }
+                return null;
             }
         });
     }
