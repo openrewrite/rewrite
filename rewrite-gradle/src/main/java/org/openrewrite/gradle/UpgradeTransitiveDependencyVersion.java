@@ -236,26 +236,31 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             @Nullable
             private GradleDependencyConfiguration constraintConfiguration(GradleDependencyConfiguration config) {
                 String constraintConfigName = config.getName();
-                switch (config.getName()) {
+                switch (constraintConfigName) {
                     case "compileClasspath":
+                    case "compileOnly":
+                    case "compile":
                         constraintConfigName = "implementation";
                         break;
                     case "runtimeClasspath":
+                    case "runtime":
                         constraintConfigName = "runtimeOnly";
                         break;
                     case "testCompileClasspath":
+                    case "testCompile":
                         constraintConfigName = "testImplementation";
                         break;
                     case "testRuntimeClasspath":
+                    case "testRuntime":
                         constraintConfigName = "testRuntimeOnly";
                         break;
                 }
-                for (GradleDependencyConfiguration extended : config.getExtendsFrom()) {
-                    if (extended.getName().equals(constraintConfigName)) {
-                        return extended;
-                    }
+
+                GradleDependencyConfiguration configuration = gradleProject.getConfiguration(constraintConfigName);
+                if (configuration != null && configuration.isTransitive()) {
+                    return configuration;
                 }
-                return config;
+                return null;
             }
         });
     }
