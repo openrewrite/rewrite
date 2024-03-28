@@ -107,8 +107,8 @@ public class MavenRepositoryMirror {
         if (matches(repo)) {
             return repo.withUri(url)
                     .withId(id)
-                    .withReleases(!Boolean.FALSE.equals(releases) ? "true" : "false")
-                    .withSnapshots(!Boolean.FALSE.equals(snapshots) ? "true" : "false")
+                    .withReleases(Boolean.FALSE.equals(releases) ? "false" : "true")
+                    .withSnapshots(Boolean.FALSE.equals(snapshots) ? "false" : "true")
                     // Since the URL has likely changed we cannot assume that the new repository is known to exist
                     .withKnownToExist(false);
         }

@@ -104,7 +104,7 @@ public class RemovePluginDependency extends Recipe {
                             && childValueMatches(dependencyTag, "artifactId", artifactId))
             );
             plugins = filterTagChildren(plugins, plugin, pluginChildTag ->
-                    !(pluginChildTag.getName().equals("dependencies") && pluginChildTag.getChildren().isEmpty()));
+                    !("dependencies".equals(pluginChildTag.getName()) && pluginChildTag.getChildren().isEmpty()));
             return plugins;
         }
 

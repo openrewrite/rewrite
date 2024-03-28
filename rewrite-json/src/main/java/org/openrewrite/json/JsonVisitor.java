@@ -116,6 +116,6 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
             return null;
         }
         Space after = visitSpace(right.getAfter(), p);
-        return (after == right.getAfter() && t == right.getElement()) ? right : new JsonRightPadded<>(t, after, right.getMarkers());
+        return after == right.getAfter() && t == right.getElement() ? right : new JsonRightPadded<>(t, after, right.getMarkers());
     }
 }

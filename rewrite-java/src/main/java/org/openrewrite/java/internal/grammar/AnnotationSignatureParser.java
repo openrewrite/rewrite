@@ -31,15 +31,38 @@ public class AnnotationSignatureParser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4, 
-		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11, 
-		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19, 
-		DOTDOT=20, SPACE=21, Identifier=22;
-	public static final int
-		RULE_annotation = 0, RULE_annotationName = 1, RULE_qualifiedName = 2, 
-		RULE_elementValuePairs = 3, RULE_elementValuePair = 4, RULE_elementValue = 5, 
-		RULE_primary = 6, RULE_type = 7, RULE_classOrInterfaceType = 8, RULE_literal = 9;
+    public static final int IntegerLiteral = 1;
+    public static final int FloatingPointLiteral = 2;
+    public static final int BooleanLiteral = 3;
+    public static final int CharacterLiteral = 4;
+    public static final int StringLiteral = 5;
+    public static final int LPAREN = 6;
+    public static final int RPAREN = 7;
+    public static final int LBRACK = 8;
+    public static final int RBRACK = 9;
+    public static final int COMMA = 10;
+    public static final int DOT = 11;
+    public static final int ASSIGN = 12;
+    public static final int COLON = 13;
+    public static final int ADD = 14;
+    public static final int SUB = 15;
+    public static final int AND = 16;
+    public static final int OR = 17;
+    public static final int AT = 18;
+    public static final int ELLIPSIS = 19;
+    public static final int DOTDOT = 20;
+    public static final int SPACE = 21;
+    public static final int Identifier = 22;
+    public static final int RULE_annotation = 0;
+    public static final int RULE_annotationName = 1;
+    public static final int RULE_qualifiedName = 2;
+    public static final int RULE_elementValuePairs = 3;
+    public static final int RULE_elementValuePair = 4;
+    public static final int RULE_elementValue = 5;
+    public static final int RULE_primary = 6;
+    public static final int RULE_type = 7;
+    public static final int RULE_classOrInterfaceType = 8;
+    public static final int RULE_literal = 9;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"annotation", "annotationName", "qualifiedName", "elementValuePairs", 
@@ -136,30 +159,37 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_annotation; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterAnnotation(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterAnnotation(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitAnnotation(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitAnnotation(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitAnnotation(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitAnnotation(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final AnnotationContext annotation() throws RecognitionException {
-		AnnotationContext _localctx = new AnnotationContext(_ctx, getState());
-		enterRule(_localctx, 0, RULE_annotation);
-		int _la;
+		AnnotationContext localctx = new AnnotationContext(_ctx, getState());
+		enterRule(localctx, 0, RULE_annotation);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(21);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==AT) {
+			la = _input.LA(1);
+			if (la==AT) {
 				{
 				setState(20);
 				match(AT);
@@ -170,27 +200,20 @@ public class AnnotationSignatureParser extends Parser {
 			annotationName();
 			setState(30);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==LPAREN) {
+			la = _input.LA(1);
+			if (la==LPAREN) {
 				{
 				setState(24);
 				match(LPAREN);
 				setState(27);
 				_errHandler.sync(this);
-				switch ( getInterpreter().adaptivePredict(_input,1,_ctx) ) {
-				case 1:
-					{
-					setState(25);
-					elementValuePairs();
-					}
-					break;
-				case 2:
-					{
-					setState(26);
-					elementValue();
-					}
-					break;
-				}
+                    if (getInterpreter().adaptivePredict(_input, 1, _ctx) == 1) {
+                        setState(25);
+                        elementValuePairs();
+                    } else if (getInterpreter().adaptivePredict(_input, 1, _ctx) == 2) {
+                        setState(26);
+                        elementValue();
+                    }
 				setState(29);
 				match(RPAREN);
 				}
@@ -199,14 +222,14 @@ public class AnnotationSignatureParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -220,38 +243,45 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_annotationName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterAnnotationName(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterAnnotationName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitAnnotationName(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitAnnotationName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitAnnotationName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitAnnotationName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final AnnotationNameContext annotationName() throws RecognitionException {
-		AnnotationNameContext _localctx = new AnnotationNameContext(_ctx, getState());
-		enterRule(_localctx, 2, RULE_annotationName);
+		AnnotationNameContext localctx = new AnnotationNameContext(_ctx, getState());
+		enterRule(localctx, 2, RULE_annotationName);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(32);
 			qualifiedName();
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -274,41 +304,50 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_qualifiedName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterQualifiedName(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterQualifiedName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitQualifiedName(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitQualifiedName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitQualifiedName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitQualifiedName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final QualifiedNameContext qualifiedName() throws RecognitionException {
-		QualifiedNameContext _localctx = new QualifiedNameContext(_ctx, getState());
-		enterRule(_localctx, 4, RULE_qualifiedName);
-		int _la;
+		QualifiedNameContext localctx = new QualifiedNameContext(_ctx, getState());
+		enterRule(localctx, 4, RULE_qualifiedName);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(34);
 			match(Identifier);
 			setState(39);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==DOT || _la==DOTDOT) {
+			la = _input.LA(1);
+			while (la==DOT || la==DOTDOT) {
 				{
 				{
 				setState(35);
-				_la = _input.LA(1);
-				if ( !(_la==DOT || _la==DOTDOT) ) {
+				la = _input.LA(1);
+				if ( !(la==DOT || la==DOTDOT) ) {
 				_errHandler.recoverInline(this);
 				}
 				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                    if (_input.LA(1) == Token.EOF) {
+                        matchedEOF = true;
+                    }
 					_errHandler.reportMatch(this);
 					consume();
 				}
@@ -318,19 +357,19 @@ public class AnnotationSignatureParser extends Parser {
 				}
 				setState(41);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -351,32 +390,39 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_elementValuePairs; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterElementValuePairs(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterElementValuePairs(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitElementValuePairs(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitElementValuePairs(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitElementValuePairs(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitElementValuePairs(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ElementValuePairsContext elementValuePairs() throws RecognitionException {
-		ElementValuePairsContext _localctx = new ElementValuePairsContext(_ctx, getState());
-		enterRule(_localctx, 6, RULE_elementValuePairs);
-		int _la;
+		ElementValuePairsContext localctx = new ElementValuePairsContext(_ctx, getState());
+		enterRule(localctx, 6, RULE_elementValuePairs);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(42);
 			elementValuePair();
 			setState(47);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==COMMA) {
+			la = _input.LA(1);
+			while (la==COMMA) {
 				{
 				{
 				setState(43);
@@ -387,19 +433,19 @@ public class AnnotationSignatureParser extends Parser {
 				}
 				setState(49);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -415,24 +461,31 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_elementValuePair; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterElementValuePair(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterElementValuePair(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitElementValuePair(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitElementValuePair(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitElementValuePair(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitElementValuePair(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ElementValuePairContext elementValuePair() throws RecognitionException {
-		ElementValuePairContext _localctx = new ElementValuePairContext(_ctx, getState());
-		enterRule(_localctx, 8, RULE_elementValuePair);
+		ElementValuePairContext localctx = new ElementValuePairContext(_ctx, getState());
+		enterRule(localctx, 8, RULE_elementValuePair);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(50);
 			match(Identifier);
@@ -443,14 +496,14 @@ public class AnnotationSignatureParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -464,38 +517,45 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_elementValue; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterElementValue(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterElementValue(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitElementValue(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitElementValue(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitElementValue(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitElementValue(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ElementValueContext elementValue() throws RecognitionException {
-		ElementValueContext _localctx = new ElementValueContext(_ctx, getState());
-		enterRule(_localctx, 10, RULE_elementValue);
+		ElementValueContext localctx = new ElementValueContext(_ctx, getState());
+		enterRule(localctx, 10, RULE_elementValue);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(54);
 			primary();
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -512,22 +572,29 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_primary; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterPrimary(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterPrimary(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitPrimary(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitPrimary(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitPrimary(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitPrimary(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final PrimaryContext primary() throws RecognitionException {
-		PrimaryContext _localctx = new PrimaryContext(_ctx, getState());
-		enterRule(_localctx, 12, RULE_primary);
+		PrimaryContext localctx = new PrimaryContext(_ctx, getState());
+		enterRule(localctx, 12, RULE_primary);
 		try {
 			setState(58);
 			_errHandler.sync(this);
@@ -537,14 +604,14 @@ public class AnnotationSignatureParser extends Parser {
 			case BooleanLiteral:
 			case CharacterLiteral:
 			case StringLiteral:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(56);
 				literal();
 				}
 				break;
 			case Identifier:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(57);
 				type();
@@ -555,14 +622,14 @@ public class AnnotationSignatureParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -584,32 +651,39 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_type; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterType(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitType(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final TypeContext type() throws RecognitionException {
-		TypeContext _localctx = new TypeContext(_ctx, getState());
-		enterRule(_localctx, 14, RULE_type);
-		int _la;
+		TypeContext localctx = new TypeContext(_ctx, getState());
+		enterRule(localctx, 14, RULE_type);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(60);
 			classOrInterfaceType();
 			setState(65);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==LBRACK) {
+			la = _input.LA(1);
+			while (la==LBRACK) {
 				{
 				{
 				setState(61);
@@ -620,19 +694,19 @@ public class AnnotationSignatureParser extends Parser {
 				}
 				setState(67);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -655,41 +729,50 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_classOrInterfaceType; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterClassOrInterfaceType(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterClassOrInterfaceType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitClassOrInterfaceType(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitClassOrInterfaceType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitClassOrInterfaceType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitClassOrInterfaceType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ClassOrInterfaceTypeContext classOrInterfaceType() throws RecognitionException {
-		ClassOrInterfaceTypeContext _localctx = new ClassOrInterfaceTypeContext(_ctx, getState());
-		enterRule(_localctx, 16, RULE_classOrInterfaceType);
-		int _la;
+		ClassOrInterfaceTypeContext localctx = new ClassOrInterfaceTypeContext(_ctx, getState());
+		enterRule(localctx, 16, RULE_classOrInterfaceType);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(68);
 			match(Identifier);
 			setState(73);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==DOT || _la==DOTDOT) {
+			la = _input.LA(1);
+			while (la==DOT || la==DOTDOT) {
 				{
 				{
 				setState(69);
-				_la = _input.LA(1);
-				if ( !(_la==DOT || _la==DOTDOT) ) {
+				la = _input.LA(1);
+				if ( !(la==DOT || la==DOTDOT) ) {
 				_errHandler.recoverInline(this);
 				}
 				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                    if (_input.LA(1) == Token.EOF) {
+                        matchedEOF = true;
+                    }
 					_errHandler.reportMatch(this);
 					consume();
 				}
@@ -699,19 +782,19 @@ public class AnnotationSignatureParser extends Parser {
 				}
 				setState(75);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -727,47 +810,56 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_literal; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterLiteral(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterLiteral(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitLiteral(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitLiteral(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitLiteral(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitLiteral(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final LiteralContext literal() throws RecognitionException {
-		LiteralContext _localctx = new LiteralContext(_ctx, getState());
-		enterRule(_localctx, 18, RULE_literal);
-		int _la;
+		LiteralContext localctx = new LiteralContext(_ctx, getState());
+		enterRule(localctx, 18, RULE_literal);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(76);
-			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 62L) != 0) ) {
+			la = _input.LA(1);
+			if ( !((la & ~0x3f) == 0 && ((1L << la) & 62L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	public static final String _serializedATN =

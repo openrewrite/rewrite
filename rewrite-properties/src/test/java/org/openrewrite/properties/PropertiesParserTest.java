@@ -83,10 +83,10 @@ class PropertiesParserTest implements RewriteTest {
             spec -> spec.beforeRecipe(p -> {
                 assertThat(p.getContent().get(0))
                   .isInstanceOf(Properties.Comment.class)
-                  .matches(comment -> ((Properties.Comment) comment).getMessage().equals(" this is a comment"));
+                  .matches(comment -> " this is a comment".equals(((Properties.Comment) comment).getMessage()));
                 assertThat(p.getContent().get(1))
                   .isInstanceOf(Properties.Entry.class)
-                  .matches(e -> e.getPrefix().equals("\n"));
+                  .matches(e -> "\n".equals(e.getPrefix()));
             })
           )
         );

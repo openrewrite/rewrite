@@ -89,7 +89,7 @@ public class UpdateOwaspSuppressionDate extends Recipe {
                         }
                     }
                     if (hasCve) {
-                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plusDays(30).toString();
+                        String date = untilDate != null && !untilDate.isEmpty() ? untilDate : LocalDate.now().plusDays(30).toString();
                         final String zuluDate = date + "Z";
                         t = t.withAttributes(ListUtils.map(t.getAttributes(), attr -> {
                             if ("until".equals(attr.getKeyAsString())) {

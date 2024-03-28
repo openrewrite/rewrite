@@ -105,7 +105,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public Collection<PlainText> generate(AtomicBoolean fileExists, Collection<SourceFile> generatedInThisCycle, ExecutionContext ctx) {
-        String maybeNewline = !Boolean.FALSE.equals(appendNewline) ? "\n" : "";
+        String maybeNewline = Boolean.FALSE.equals(appendNewline) ? "" : "\n";
         String content = this.content + maybeNewline;
         String preamble = this.preamble != null ? this.preamble + maybeNewline : "";
 
@@ -135,19 +135,18 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (sourceFile.getSourcePath().toString().equals(Paths.get(relativeFileName).toString())) {
-                    String maybeNewline = !Boolean.FALSE.equals(appendNewline) ? "\n" : "";
+                    String maybeNewline = Boolean.FALSE.equals(appendNewline) ? "" : "\n";
                     String content = AppendToTextFile.this.content + maybeNewline;
                     String preamble = AppendToTextFile.this.preamble != null ? AppendToTextFile.this.preamble + maybeNewline : "";
 
                     PlainText existingPlainText = (PlainText) sourceFile;
-                    switch (existingFileStrategy != null ? existingFileStrategy : Strategy.Leave) {
-                        case Continue:
-                            if (!maybeNewline.isEmpty() && !existingPlainText.getText().endsWith(maybeNewline)) {
-                                content = maybeNewline + content;
-                            }
-                            return existingPlainText.withText(existingPlainText.getText() + content);
-                        case Replace:
-                            return existingPlainText.withText(preamble + content);
+                    if (existingFileStrategy != null ? existingFileStrategy : Strategy.Leave == AppendToTextFile.Strategy.Continue) {
+                        if (!maybeNewline.isEmpty() && !existingPlainText.getText().endsWith(maybeNewline)) {
+                            content = maybeNewline + content;
+                        }
+                        return existingPlainText.withText(existingPlainText.getText() + content);
+                    } else if (existingFileStrategy != null ? existingFileStrategy : Strategy.Leave == AppendToTextFile.Strategy.Replace) {
+                        return existingPlainText.withText(preamble + content);
                     }
                 }
                 return sourceFile;

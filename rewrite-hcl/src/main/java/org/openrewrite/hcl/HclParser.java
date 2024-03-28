@@ -36,7 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
-public class HclParser implements Parser {
+public final class HclParser implements Parser {
     private final List<NamedStyles> styles;
 
     private HclParser(List<NamedStyles> styles) {
@@ -89,7 +89,7 @@ public class HclParser implements Parser {
         return prefix.resolve("file.tf");
     }
 
-    private static class ForwardingErrorListener extends BaseErrorListener {
+    private static final class ForwardingErrorListener extends BaseErrorListener {
         private final Path sourcePath;
         private final ExecutionContext ctx;
 

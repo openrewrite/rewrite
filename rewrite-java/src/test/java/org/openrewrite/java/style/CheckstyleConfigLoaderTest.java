@@ -325,7 +325,7 @@ class CheckstyleConfigLoaderTest {
         """, emptyMap());
 
         assertThat(checkstyle.getStyles()).hasSize(2);
-        assertThat(checkstyle.getStyles()).allMatch(s -> s instanceof UnnecessaryParenthesesStyle);
+        assertThat(checkstyle.getStyles()).allMatch(UnnecessaryParenthesesStyle.class::isInstance);
 
         UnnecessaryParenthesesStyle unnecessaryParenthesesStyle = (UnnecessaryParenthesesStyle) checkstyle.getStyles().iterator().next();
         assertThat(unnecessaryParenthesesStyle.getStringLiteral()).isTrue();

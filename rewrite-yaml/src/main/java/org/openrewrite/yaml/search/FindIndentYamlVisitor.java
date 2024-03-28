@@ -77,9 +77,8 @@ public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
                     })
                     .mapToObj(c -> c == ' ')
                     .collect(Collectors.groupingBy(identity(), counting()));
-
-            if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
-            }
+            indentTypeCounts.getOrDefault(true, 0L);
+            indentTypeCounts.getOrDefault(false, 0L);
         }
 
         return super.preVisit(tree, p);

@@ -65,7 +65,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     private String firstPrefix = "";
 
     private String source;
-    private int cursor = 0;
+    private int cursor;
 
     public ReloadableJava11JavadocVisitor(Context context, TreePath scope, ReloadableJava11TypeMapping typeMapping, String source, JCTree tree) {
         this.attr = Attr.instance(context);
@@ -125,8 +125,8 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     inFirstPrefix = false;
                 } else {
                     // Handle consecutive new lines.
-                    if ((prev == '\n' ||
-                            prev == '\r' && source.charAt(i - 2) == '\n')) {
+                    if (prev == '\n' ||
+                            prev == '\r' && source.charAt(i - 2) == '\n') {
                         String prevLineLine = prev == '\n' ? "\n" : "\r\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
                     } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.

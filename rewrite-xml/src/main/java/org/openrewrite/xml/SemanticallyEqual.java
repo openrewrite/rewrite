@@ -28,7 +28,7 @@ import static java.util.stream.Collectors.toList;
  * Recursively check the equality of XML tags and attributes.
  * Ignores comments. Ignores the order of attributes.
  */
-public class SemanticallyEqual {
+public final class SemanticallyEqual {
 
     private SemanticallyEqual() {
     }

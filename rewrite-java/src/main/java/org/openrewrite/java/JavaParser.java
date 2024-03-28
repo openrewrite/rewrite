@@ -322,7 +322,7 @@ public interface JavaParser extends Parser {
         protected Collection<Input> dependsOn;
 
         protected Charset charset = Charset.defaultCharset();
-        protected boolean logCompilationWarningsAndErrors = false;
+        protected boolean logCompilationWarningsAndErrors;
         protected final List<NamedStyles> styles = new ArrayList<>();
 
         public Builder() {

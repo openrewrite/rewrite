@@ -56,9 +56,9 @@ public class TypeParameter {
                 JavaType type;
                 if (fqn.contains(".")) {
                     type = JavaType.ShallowClass.build(fqn);
-                } else if (fqn.equals("String")) {
+                } else if ("String".equals(fqn)) {
                     type = JavaType.ShallowClass.build("java.lang.String");
-                } else if (fqn.equals("Object")) {
+                } else if ("Object".equals(fqn)) {
                     type = TYPE_OBJECT;
                 } else if ((type = JavaType.Primitive.fromKeyword(fqn)) != null) {
                     // empty
@@ -72,7 +72,7 @@ public class TypeParameter {
             public JavaType visitTypeParameter(TemplateParameterParser.TypeParameterContext ctx) {
                 JavaType type1 = super.visitTypeParameter(ctx);
                 if (ctx.variance() != null) {
-                    JavaType.GenericTypeVariable.Variance variance = ctx.variance().Variance().getSymbol().getText().equals("extends") ?
+                    JavaType.GenericTypeVariable.Variance variance = "extends".equals(ctx.variance().Variance().getSymbol().getText()) ?
                             JavaType.GenericTypeVariable.Variance.COVARIANT : JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
                     type1 = new JavaType.GenericTypeVariable(null, ctx.variance().WILDCARD().getText(), variance, singletonList(type1));
                 } else if (ctx.WILDCARD() != null) {

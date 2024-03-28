@@ -105,9 +105,9 @@ public class ChangePropertyValue extends Recipe {
         }
 
         private boolean matchesPropertyKey(String prop) {
-            return !Boolean.FALSE.equals(relaxedBinding)
-                    ? NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey)
-                    : StringUtils.matchesGlob(prop, propertyKey);
+            return Boolean.FALSE.equals(relaxedBinding)
+                    ? StringUtils.matchesGlob(prop, propertyKey)
+                    : NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey);
         }
 
         private boolean matchesOldValue(Properties.Value value) {

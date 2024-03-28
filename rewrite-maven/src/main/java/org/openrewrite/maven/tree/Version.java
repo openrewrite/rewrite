@@ -156,11 +156,6 @@ public class Version implements Comparable<Version> {
                     case 0:
                         rel = -1;
                         break;
-                    case 1:
-                    case 6:
-                    case 7:
-                    default:
-                        throw new IllegalStateException("unknown version item kind " + this.kind);
                     case 2:
                     case 4:
                         rel = (Integer) this.value;
@@ -169,6 +164,12 @@ public class Version implements Comparable<Version> {
                     case 5:
                     case 8:
                         rel = 1;
+                        break;
+                    case 1:
+                    case 6:
+                    case 7:
+                    default:
+                        throw new IllegalStateException("unknown version item kind " + this.kind);
                 }
             } else {
                 rel = this.kind - that.kind;
@@ -177,11 +178,6 @@ public class Version implements Comparable<Version> {
                         case 0:
                         case 8:
                             break;
-                        case 1:
-                        case 6:
-                        case 7:
-                        default:
-                            throw new IllegalStateException("unknown version item kind " + this.kind);
                         case 2:
                         case 4:
                             rel = ((Integer) this.value).compareTo((Integer) that.value);
@@ -191,6 +187,12 @@ public class Version implements Comparable<Version> {
                             break;
                         case 5:
                             rel = ((BigInteger) this.value).compareTo((BigInteger) that.value);
+                            break;
+                        case 1:
+                        case 6:
+                        case 7:
+                        default:
+                            throw new IllegalStateException("unknown version item kind " + this.kind);
                     }
                 }
             }
@@ -278,7 +280,7 @@ public class Version implements Comparable<Version> {
         }
 
         public String toString() {
-            return String.valueOf(this.token);
+            return this.token;
         }
 
         public Version.Item toItem() {

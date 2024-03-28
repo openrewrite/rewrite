@@ -28,20 +28,24 @@ import java.util.Set;
  * and file path validation.
  */
 public final class SecurityUtils {
-    private static Logger log = LoggerFactory.getLogger(SecurityUtils.class);
+    private static final Logger log = LoggerFactory.getLogger(SecurityUtils.class);
 
-    private static Set<String> SCHEMES = new HashSet<String>() {{
-        add("http");
-        add("https");
-        add("HTTP");
-        add("HTTPS");
-    }};
+    private static final Set<String> SCHEMES;
+    static {
+        SCHEMES = new HashSet<>();
+        SCHEMES.add("http");
+        SCHEMES.add("https");
+        SCHEMES.add("HTTP");
+        SCHEMES.add("HTTPS");
+    }
 
-    private static Set<Integer> PORTS = new HashSet<Integer>() {{
-        add(443);
-        add(80);
-        add(3000); // we allow port 3000 for SAM local
-    }};
+    private static final Set<Integer> PORTS;
+    static {
+        PORTS = new HashSet<>();
+        PORTS.add(443);
+        PORTS.add(80);
+        PORTS.add(3000);
+    }
 
     public static boolean isValidPort(String port) {
         if (port == null) {
@@ -65,10 +69,7 @@ public final class SecurityUtils {
             return false;
         }
         if (host.endsWith(".amazonaws.com")) {
-            String defaultHost = new StringBuilder().append(apiId)
-                    .append(".execute-api.")
-                    .append(region)
-                    .append(".amazonaws.com").toString();
+            String defaultHost = apiId + ".execute-api." + region + ".amazonaws.com";
             return host.equals(defaultHost);
         } else {
             return LambdaContainerHandler.getContainerConfig().getCustomDomainNames().contains(host);
@@ -216,7 +217,7 @@ public final class SecurityUtils {
                 throw new IllegalArgumentException("File path not allowed: " + encode(canonicalPath));
             }
 
-            return (inputPath.startsWith("file://") ? "file://" + canonicalPath : canonicalPath);
+            return inputPath.startsWith("file://") ? "file://" + canonicalPath : canonicalPath;
         } catch (IOException e) {
             log.error("Invalid file path: {}", encode(testInputPath));
             throw new IllegalArgumentException("Invalid file path", e);

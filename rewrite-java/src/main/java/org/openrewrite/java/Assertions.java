@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings("unused")
-public class Assertions {
+public final class Assertions {
     private static final Map<Integer, JavaVersion> javaVersions = new HashMap<>();
     private static final Map<String, JavaProject> javaProjects = new HashMap<>();
     private static final Map<String, JavaSourceSet> javaSourceSets = new HashMap<>();

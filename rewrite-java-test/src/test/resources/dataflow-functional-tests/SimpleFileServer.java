@@ -70,7 +70,7 @@ public class SimpleFileServer extends AbstractTestServer {
         TcpConfig.register();
     }
 
-    private static DefinitionsProvider DEFAULTS = new DefinitionsProvider() {
+    private static final DefinitionsProvider DEFAULTS = new DefinitionsProvider() {
 
         @Override
         public void applyDefinitions(Configuration config) {

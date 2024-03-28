@@ -334,7 +334,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
     private String escapeIfNecessary(String configurationName) {
         // default is a gradle configuration created by the base plugin and a groovy keyword if
         // it is used it needs to be escaped
-        return configurationName.equals("default") ? "'" + configurationName + "'" : configurationName;
+        return "default".equals(configurationName) ? "'" + configurationName + "'" : configurationName;
     }
 
     enum DependencyStyle {

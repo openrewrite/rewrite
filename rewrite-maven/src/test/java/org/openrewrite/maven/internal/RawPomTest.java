@@ -400,7 +400,7 @@ class RawPomTest {
         assertThat(model.getPlugins()).hasSize(2);
 
         Plugin surefirePlugin = model.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("maven-surefire-plugin"))
+          .filter(p -> "maven-surefire-plugin".equals(p.getArtifactId()))
           .findFirst()
           .orElseThrow();
 
@@ -414,14 +414,14 @@ class RawPomTest {
 
         assertThat(surefirePlugin.getConfigurationStringValue("argLine")).isEqualTo("hello");
         Plugin jacocoPlugin = model.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("jacoco-maven-plugin"))
+          .filter(p -> "jacoco-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
         assertThat(jacocoPlugin.getExecutions()).hasSize(2);
 
         var rewritePlugin = model.getPluginManagement().stream()
-          .filter(p -> p.getArtifactId().equals("rewrite-maven-plugin"))
+          .filter(p -> "rewrite-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
@@ -463,14 +463,14 @@ class RawPomTest {
 
         assertThat(rewriteProfile.getPlugins()).hasSize(2);
         jacocoPlugin = rewriteProfile.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("jacoco-maven-plugin"))
+          .filter(p -> "jacoco-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
         assertThat(jacocoPlugin.getExecutions()).hasSize(2);
 
         rewritePlugin = rewriteProfile.getPluginManagement().stream()
-          .filter(p -> p.getArtifactId().equals("rewrite-maven-plugin"))
+          .filter(p -> "rewrite-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 

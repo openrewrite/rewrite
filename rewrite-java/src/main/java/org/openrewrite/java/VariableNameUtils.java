@@ -26,7 +26,7 @@ import java.util.*;
 
 @Incubating(since = "7.25.0")
 @Value
-public class VariableNameUtils {
+public final class VariableNameUtils {
 
     private VariableNameUtils() {
     }
@@ -155,16 +155,7 @@ public class VariableNameUtils {
          */
         private Cursor aggregateNameScope() {
             return getCursor().dropParentUntil(is ->
-                    is instanceof JavaSourceFile ||
-                            is instanceof J.ClassDeclaration ||
-                            is instanceof J.MethodDeclaration ||
-                            is instanceof J.Block ||
-                            is instanceof J.ForLoop ||
-                            is instanceof J.ForEachLoop ||
-                            is instanceof J.Case ||
-                            is instanceof J.Try ||
-                            is instanceof J.Try.Catch ||
-                            is instanceof J.Lambda);
+                    is instanceof JavaSourceFile);
         }
 
         @Override

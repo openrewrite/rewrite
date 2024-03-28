@@ -193,7 +193,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return (J) tree;
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
-                        if (!s.getSourcePath().toString().endsWith(".gradle") || s.getSourcePath().getFileName().toString().equals("settings.gradle")) {
+                        if (!s.getSourcePath().toString().endsWith(".gradle") || "settings.gradle".equals(s.getSourcePath().getFileName().toString())) {
                             return s;
                         }
 

@@ -31,19 +31,58 @@ public class XMLParser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		COMMENT=1, CDATA=2, ParamEntityRef=3, EntityRef=4, CharRef=5, SEA_WS=6, 
-		UTF_ENCODING_BOM=7, QUESTION_MARK=8, SPECIAL_OPEN_XML=9, OPEN=10, SPECIAL_OPEN=11, 
-		DTD_OPEN=12, TEXT=13, DTD_CLOSE=14, DTD_SUBSET_OPEN=15, DTD_S=16, DOCTYPE=17, 
-		DTD_SUBSET_CLOSE=18, MARKUP_OPEN=19, DTS_SUBSET_S=20, MARK_UP_CLOSE=21, 
-		MARKUP_S=22, MARKUP_TEXT=23, MARKUP_SUBSET=24, PI_S=25, PI_TEXT=26, CLOSE=27, 
-		SPECIAL_CLOSE=28, SLASH_CLOSE=29, S=30, DIRECTIVE_OPEN=31, DIRECTIVE_CLOSE=32, 
-		SLASH=33, EQUALS=34, STRING=35, Name=36;
-	public static final int
-		RULE_document = 0, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4, 
-		RULE_intsubset = 5, RULE_markupdecl = 6, RULE_declSep = 7, RULE_externalid = 8, 
-		RULE_processinginstruction = 9, RULE_content = 10, RULE_element = 11, 
-		RULE_jspdirective = 12, RULE_reference = 13, RULE_attribute = 14, RULE_chardata = 15;
+    public static final int COMMENT = 1;
+    public static final int CDATA = 2;
+    public static final int ParamEntityRef = 3;
+    public static final int EntityRef = 4;
+    public static final int CharRef = 5;
+    public static final int SEA_WS = 6;
+    public static final int UTF_ENCODING_BOM = 7;
+    public static final int QUESTION_MARK = 8;
+    public static final int SPECIAL_OPEN_XML = 9;
+    public static final int OPEN = 10;
+    public static final int SPECIAL_OPEN = 11;
+    public static final int DTD_OPEN = 12;
+    public static final int TEXT = 13;
+    public static final int DTD_CLOSE = 14;
+    public static final int DTD_SUBSET_OPEN = 15;
+    public static final int DTD_S = 16;
+    public static final int DOCTYPE = 17;
+    public static final int DTD_SUBSET_CLOSE = 18;
+    public static final int MARKUP_OPEN = 19;
+    public static final int DTS_SUBSET_S = 20;
+    public static final int MARK_UP_CLOSE = 21;
+    public static final int MARKUP_S = 22;
+    public static final int MARKUP_TEXT = 23;
+    public static final int MARKUP_SUBSET = 24;
+    public static final int PI_S = 25;
+    public static final int PI_TEXT = 26;
+    public static final int CLOSE = 27;
+    public static final int SPECIAL_CLOSE = 28;
+    public static final int SLASH_CLOSE = 29;
+    public static final int S = 30;
+    public static final int DIRECTIVE_OPEN = 31;
+    public static final int DIRECTIVE_CLOSE = 32;
+    public static final int SLASH = 33;
+    public static final int EQUALS = 34;
+    public static final int STRING = 35;
+    public static final int Name = 36;
+    public static final int RULE_document = 0;
+    public static final int RULE_prolog = 1;
+    public static final int RULE_xmldecl = 2;
+    public static final int RULE_misc = 3;
+    public static final int RULE_doctypedecl = 4;
+    public static final int RULE_intsubset = 5;
+    public static final int RULE_markupdecl = 6;
+    public static final int RULE_declSep = 7;
+    public static final int RULE_externalid = 8;
+    public static final int RULE_processinginstruction = 9;
+    public static final int RULE_content = 10;
+    public static final int RULE_element = 11;
+    public static final int RULE_jspdirective = 12;
+    public static final int RULE_reference = 13;
+    public static final int RULE_attribute = 14;
+    public static final int RULE_chardata = 15;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"document", "prolog", "xmldecl", "misc", "doctypedecl", "intsubset", 
@@ -139,30 +178,37 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_document; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterDocument(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterDocument(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitDocument(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitDocument(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitDocument(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitDocument(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final DocumentContext document() throws RecognitionException {
-		DocumentContext _localctx = new DocumentContext(_ctx, getState());
-		enterRule(_localctx, 0, RULE_document);
-		int _la;
+		DocumentContext localctx = new DocumentContext(_ctx, getState());
+		enterRule(localctx, 0, RULE_document);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(33);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==UTF_ENCODING_BOM) {
+			la = _input.LA(1);
+			if (la==UTF_ENCODING_BOM) {
 				{
 				setState(32);
 				match(UTF_ENCODING_BOM);
@@ -176,14 +222,14 @@ public class XMLParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -209,31 +255,38 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_prolog; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterProlog(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterProlog(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitProlog(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitProlog(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitProlog(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitProlog(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final PrologContext prolog() throws RecognitionException {
-		PrologContext _localctx = new PrologContext(_ctx, getState());
-		enterRule(_localctx, 2, RULE_prolog);
-		int _la;
+		PrologContext localctx = new PrologContext(_ctx, getState());
+		enterRule(localctx, 2, RULE_prolog);
+		int la;
 		try {
-			int _alt;
-			enterOuterAlt(_localctx, 1);
+			int alt;
+			enterOuterAlt(localctx, 1);
 			{
 			setState(39);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==SPECIAL_OPEN_XML) {
+			la = _input.LA(1);
+			if (la==SPECIAL_OPEN_XML) {
 				{
 				setState(38);
 				xmldecl();
@@ -242,8 +295,8 @@ public class XMLParser extends Parser {
 
 			setState(44);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 6146L) != 0) {
+			la = _input.LA(1);
+			while ((la & ~0x3f) == 0 && ((1L << la) & 6146L) != 0) {
 				{
 				{
 				setState(41);
@@ -252,13 +305,13 @@ public class XMLParser extends Parser {
 				}
 				setState(46);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(50);
 			_errHandler.sync(this);
-			_alt = getInterpreter().adaptivePredict(_input,3,_ctx);
-			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-				if ( _alt==1 ) {
+			alt = getInterpreter().adaptivePredict(_input,3,_ctx);
+			while ( alt!=2 && alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
+				if ( alt==1 ) {
 					{
 					{
 					setState(47);
@@ -268,19 +321,19 @@ public class XMLParser extends Parser {
 				}
 				setState(52);
 				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,3,_ctx);
+				alt = getInterpreter().adaptivePredict(_input,3,_ctx);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -299,32 +352,39 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_xmldecl; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterXmldecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterXmldecl(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitXmldecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitXmldecl(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitXmldecl(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitXmldecl(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final XmldeclContext xmldecl() throws RecognitionException {
-		XmldeclContext _localctx = new XmldeclContext(_ctx, getState());
-		enterRule(_localctx, 4, RULE_xmldecl);
-		int _la;
+		XmldeclContext localctx = new XmldeclContext(_ctx, getState());
+		enterRule(localctx, 4, RULE_xmldecl);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(53);
 			match(SPECIAL_OPEN_XML);
 			setState(57);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==Name) {
+			la = _input.LA(1);
+			while (la==Name) {
 				{
 				{
 				setState(54);
@@ -333,21 +393,21 @@ public class XMLParser extends Parser {
 				}
 				setState(59);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(60);
 			match(SPECIAL_CLOSE);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -365,24 +425,31 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_misc; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterMisc(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterMisc(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitMisc(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitMisc(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitMisc(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitMisc(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final MiscContext misc() throws RecognitionException {
-		MiscContext _localctx = new MiscContext(_ctx, getState());
-		enterRule(_localctx, 6, RULE_misc);
+		MiscContext localctx = new MiscContext(_ctx, getState());
+		enterRule(localctx, 6, RULE_misc);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(65);
 			_errHandler.sync(this);
@@ -411,14 +478,14 @@ public class XMLParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -445,25 +512,32 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_doctypedecl; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterDoctypedecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterDoctypedecl(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitDoctypedecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitDoctypedecl(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitDoctypedecl(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitDoctypedecl(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final DoctypedeclContext doctypedecl() throws RecognitionException {
-		DoctypedeclContext _localctx = new DoctypedeclContext(_ctx, getState());
-		enterRule(_localctx, 8, RULE_doctypedecl);
-		int _la;
+		DoctypedeclContext localctx = new DoctypedeclContext(_ctx, getState());
+		enterRule(localctx, 8, RULE_doctypedecl);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(67);
 			match(DTD_OPEN);
@@ -475,8 +549,8 @@ public class XMLParser extends Parser {
 			externalid();
 			setState(74);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==STRING) {
+			la = _input.LA(1);
+			while (la==STRING) {
 				{
 				{
 				setState(71);
@@ -485,12 +559,12 @@ public class XMLParser extends Parser {
 				}
 				setState(76);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(81);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==DTD_SUBSET_OPEN) {
+			la = _input.LA(1);
+			if (la==DTD_SUBSET_OPEN) {
 				{
 				setState(77);
 				match(DTD_SUBSET_OPEN);
@@ -506,14 +580,14 @@ public class XMLParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -536,30 +610,37 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_intsubset; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterIntsubset(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterIntsubset(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitIntsubset(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitIntsubset(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitIntsubset(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitIntsubset(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final IntsubsetContext intsubset() throws RecognitionException {
-		IntsubsetContext _localctx = new IntsubsetContext(_ctx, getState());
-		enterRule(_localctx, 10, RULE_intsubset);
-		int _la;
+		IntsubsetContext localctx = new IntsubsetContext(_ctx, getState());
+		enterRule(localctx, 10, RULE_intsubset);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(89);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 526346L) != 0) {
+			la = _input.LA(1);
+			while ((la & ~0x3f) == 0 && ((1L << la) & 526346L) != 0) {
 				{
 				setState(87);
 				_errHandler.sync(this);
@@ -584,19 +665,19 @@ public class XMLParser extends Parser {
 				}
 				setState(91);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -621,47 +702,50 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_markupdecl; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterMarkupdecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterMarkupdecl(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitMarkupdecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitMarkupdecl(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitMarkupdecl(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitMarkupdecl(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final MarkupdeclContext markupdecl() throws RecognitionException {
-		MarkupdeclContext _localctx = new MarkupdeclContext(_ctx, getState());
-		enterRule(_localctx, 12, RULE_markupdecl);
-		int _la;
+		MarkupdeclContext localctx = new MarkupdeclContext(_ctx, getState());
+		enterRule(localctx, 12, RULE_markupdecl);
+		int la;
 		try {
 			setState(108);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case MARKUP_OPEN:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				{
 				setState(92);
 				match(MARKUP_OPEN);
 				setState(94);
 				_errHandler.sync(this);
-				switch ( getInterpreter().adaptivePredict(_input,10,_ctx) ) {
-				case 1:
-					{
-					setState(93);
-					match(MARKUP_TEXT);
-					}
-					break;
-				}
+                    if (getInterpreter().adaptivePredict(_input, 10, _ctx) == 1) {
+                        setState(93);
+                        match(MARKUP_TEXT);
+                    }
 				setState(99);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==MARKUP_SUBSET) {
+				la = _input.LA(1);
+				while (la==MARKUP_SUBSET) {
 					{
 					{
 					setState(96);
@@ -670,12 +754,12 @@ public class XMLParser extends Parser {
 					}
 					setState(101);
 					_errHandler.sync(this);
-					_la = _input.LA(1);
+					la = _input.LA(1);
 				}
 				setState(103);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==MARKUP_TEXT) {
+				la = _input.LA(1);
+				if (la==MARKUP_TEXT) {
 					{
 					setState(102);
 					match(MARKUP_TEXT);
@@ -688,14 +772,14 @@ public class XMLParser extends Parser {
 				}
 				break;
 			case SPECIAL_OPEN:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(106);
 				processinginstruction();
 				}
 				break;
 			case COMMENT:
-				enterOuterAlt(_localctx, 3);
+				enterOuterAlt(localctx, 3);
 				{
 				setState(107);
 				match(COMMENT);
@@ -706,14 +790,14 @@ public class XMLParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -725,38 +809,45 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_declSep; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterDeclSep(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterDeclSep(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitDeclSep(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitDeclSep(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitDeclSep(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitDeclSep(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final DeclSepContext declSep() throws RecognitionException {
-		DeclSepContext _localctx = new DeclSepContext(_ctx, getState());
-		enterRule(_localctx, 14, RULE_declSep);
+		DeclSepContext localctx = new DeclSepContext(_ctx, getState());
+		enterRule(localctx, 14, RULE_declSep);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(110);
 			match(ParamEntityRef);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -768,30 +859,37 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_externalid; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterExternalid(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterExternalid(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitExternalid(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitExternalid(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitExternalid(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitExternalid(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ExternalidContext externalid() throws RecognitionException {
-		ExternalidContext _localctx = new ExternalidContext(_ctx, getState());
-		enterRule(_localctx, 16, RULE_externalid);
-		int _la;
+		ExternalidContext localctx = new ExternalidContext(_ctx, getState());
+		enterRule(localctx, 16, RULE_externalid);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(113);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==Name) {
+			la = _input.LA(1);
+			if (la==Name) {
 				{
 				setState(112);
 				match(Name);
@@ -801,14 +899,14 @@ public class XMLParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -825,31 +923,38 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_processinginstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterProcessinginstruction(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterProcessinginstruction(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitProcessinginstruction(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitProcessinginstruction(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitProcessinginstruction(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitProcessinginstruction(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ProcessinginstructionContext processinginstruction() throws RecognitionException {
-		ProcessinginstructionContext _localctx = new ProcessinginstructionContext(_ctx, getState());
-		enterRule(_localctx, 18, RULE_processinginstruction);
-		int _la;
+		ProcessinginstructionContext localctx = new ProcessinginstructionContext(_ctx, getState());
+		enterRule(localctx, 18, RULE_processinginstruction);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(115);
 			match(SPECIAL_OPEN);
 			setState(117); 
 			_errHandler.sync(this);
-			_la = _input.LA(1);
+			la = _input.LA(1);
 			do {
 				{
 				{
@@ -859,21 +964,21 @@ public class XMLParser extends Parser {
 				}
 				setState(119); 
 				_errHandler.sync(this);
-				_la = _input.LA(1);
-			} while ( _la==PI_TEXT );
+				la = _input.LA(1);
+			} while ( la==PI_TEXT );
 			setState(121);
 			match(SPECIAL_CLOSE);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -898,24 +1003,31 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_content; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterContent(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterContent(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitContent(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitContent(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitContent(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitContent(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ContentContext content() throws RecognitionException {
-		ContentContext _localctx = new ContentContext(_ctx, getState());
-		enterRule(_localctx, 20, RULE_content);
+		ContentContext localctx = new ContentContext(_ctx, getState());
+		enterRule(localctx, 20, RULE_content);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(129);
 			_errHandler.sync(this);
@@ -965,14 +1077,14 @@ public class XMLParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1009,113 +1121,113 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_element; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterElement(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterElement(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitElement(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitElement(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitElement(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitElement(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ElementContext element() throws RecognitionException {
-		ElementContext _localctx = new ElementContext(_ctx, getState());
-		enterRule(_localctx, 22, RULE_element);
-		int _la;
+		ElementContext localctx = new ElementContext(_ctx, getState());
+		enterRule(localctx, 22, RULE_element);
+		int la;
 		try {
-			int _alt;
+			int alt;
 			setState(159);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,20,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(131);
-				match(OPEN);
-				setState(132);
-				match(Name);
-				setState(136);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==Name) {
-					{
-					{
-					setState(133);
-					attribute();
-					}
-					}
-					setState(138);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				}
-				setState(139);
-				match(CLOSE);
-				setState(143);
-				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,18,_ctx);
-				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-					if ( _alt==1 ) {
-						{
-						{
-						setState(140);
-						content();
-						}
-						} 
-					}
-					setState(145);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,18,_ctx);
-				}
-				setState(146);
-				match(OPEN);
-				setState(147);
-				match(SLASH);
-				setState(148);
-				match(Name);
-				setState(149);
-				match(CLOSE);
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(150);
-				match(OPEN);
-				setState(151);
-				match(Name);
-				setState(155);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==Name) {
-					{
-					{
-					setState(152);
-					attribute();
-					}
-					}
-					setState(157);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				}
-				setState(158);
-				match(SLASH_CLOSE);
-				}
-				break;
-			}
+            if (getInterpreter().adaptivePredict(_input, 20, _ctx) == 1) {
+                enterOuterAlt(localctx, 1);
+                setState(131);
+                match(OPEN);
+                setState(132);
+                match(Name);
+                setState(136);
+                _errHandler.sync(this);
+                la = _input.LA(1);
+                while (la == Name) {
+                    {
+                        {
+                            setState(133);
+                            attribute();
+                        }
+                    }
+                    setState(138);
+                    _errHandler.sync(this);
+                    la = _input.LA(1);
+                }
+                setState(139);
+                match(CLOSE);
+                setState(143);
+                _errHandler.sync(this);
+                alt = getInterpreter().adaptivePredict(_input, 18, _ctx);
+                while (alt != 2 && alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
+                    if (alt == 1) {
+                        {
+                            {
+                                setState(140);
+                                content();
+                            }
+                        }
+                    }
+                    setState(145);
+                    _errHandler.sync(this);
+                    alt = getInterpreter().adaptivePredict(_input, 18, _ctx);
+                }
+                setState(146);
+                match(OPEN);
+                setState(147);
+                match(SLASH);
+                setState(148);
+                match(Name);
+                setState(149);
+                match(CLOSE);
+            } else if (getInterpreter().adaptivePredict(_input, 20, _ctx) == 2) {
+                enterOuterAlt(localctx, 2);
+                setState(150);
+                match(OPEN);
+                setState(151);
+                match(Name);
+                setState(155);
+                _errHandler.sync(this);
+                la = _input.LA(1);
+                while (la == Name) {
+                    {
+                        {
+                            setState(152);
+                            attribute();
+                        }
+                    }
+                    setState(157);
+                    _errHandler.sync(this);
+                    la = _input.LA(1);
+                }
+                setState(158);
+                match(SLASH_CLOSE);
+            }
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1137,25 +1249,32 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_jspdirective; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterJspdirective(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterJspdirective(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitJspdirective(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitJspdirective(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitJspdirective(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitJspdirective(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final JspdirectiveContext jspdirective() throws RecognitionException {
-		JspdirectiveContext _localctx = new JspdirectiveContext(_ctx, getState());
-		enterRule(_localctx, 24, RULE_jspdirective);
-		int _la;
+		JspdirectiveContext localctx = new JspdirectiveContext(_ctx, getState());
+		enterRule(localctx, 24, RULE_jspdirective);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(161);
 			match(OPEN);
@@ -1165,8 +1284,8 @@ public class XMLParser extends Parser {
 			match(Name);
 			setState(167);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==Name) {
+			la = _input.LA(1);
+			while (la==Name) {
 				{
 				{
 				setState(164);
@@ -1175,7 +1294,7 @@ public class XMLParser extends Parser {
 				}
 				setState(169);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(170);
 			match(DIRECTIVE_CLOSE);
@@ -1184,14 +1303,14 @@ public class XMLParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1204,47 +1323,56 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_reference; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterReference(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterReference(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitReference(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitReference(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitReference(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitReference(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ReferenceContext reference() throws RecognitionException {
-		ReferenceContext _localctx = new ReferenceContext(_ctx, getState());
-		enterRule(_localctx, 26, RULE_reference);
-		int _la;
+		ReferenceContext localctx = new ReferenceContext(_ctx, getState());
+		enterRule(localctx, 26, RULE_reference);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(173);
-			_la = _input.LA(1);
-			if ( !(_la==EntityRef || _la==CharRef) ) {
+			la = _input.LA(1);
+			if ( !(la==EntityRef || la==CharRef) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1258,24 +1386,31 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_attribute; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterAttribute(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterAttribute(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitAttribute(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitAttribute(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitAttribute(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitAttribute(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final AttributeContext attribute() throws RecognitionException {
-		AttributeContext _localctx = new AttributeContext(_ctx, getState());
-		enterRule(_localctx, 28, RULE_attribute);
+		AttributeContext localctx = new AttributeContext(_ctx, getState());
+		enterRule(localctx, 28, RULE_attribute);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(175);
 			match(Name);
@@ -1286,14 +1421,14 @@ public class XMLParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1307,47 +1442,56 @@ public class XMLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_chardata; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterChardata(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterChardata(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitChardata(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitChardata(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitChardata(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitChardata(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ChardataContext chardata() throws RecognitionException {
-		ChardataContext _localctx = new ChardataContext(_ctx, getState());
-		enterRule(_localctx, 30, RULE_chardata);
-		int _la;
+		ChardataContext localctx = new ChardataContext(_ctx, getState());
+		enterRule(localctx, 30, RULE_chardata);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(179);
-			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 8512L) != 0) ) {
+			la = _input.LA(1);
+			if ( !((la & ~0x3f) == 0 && ((1L << la) & 8512L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	public static final String _serializedATN =

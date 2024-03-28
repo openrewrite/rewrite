@@ -217,16 +217,16 @@ public class ChangePropertyKey extends Recipe {
     }
 
     private boolean matches(String string, String pattern) {
-        return !Boolean.FALSE.equals(relaxedBinding) ?
-                NameCaseConvention.matchesGlobRelaxedBinding(string, pattern) :
-                StringUtils.matchesGlob(string, pattern);
+        return Boolean.FALSE.equals(relaxedBinding) ?
+                StringUtils.matchesGlob(string, pattern) :
+                NameCaseConvention.matchesGlobRelaxedBinding(string, pattern);
     }
 
     private List<String> excludedSubKeys() {
         return except != null ? except : Collections.emptyList();
     }
 
-    private class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
+    private final class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
         private final Yaml.Mapping.Entry scope;
         private final String subproperty;
         private final Yaml.Mapping.Entry entryToReplace;
@@ -307,7 +307,7 @@ public class ChangePropertyKey extends Recipe {
         }
     }
 
-    private static class DeletePropertyVisitor<P> extends YamlIsoVisitor<P> {
+    private static final class DeletePropertyVisitor<P> extends YamlIsoVisitor<P> {
         private final Yaml.Mapping.Entry scope;
 
         private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {

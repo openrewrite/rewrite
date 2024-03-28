@@ -102,7 +102,7 @@ class FindTagsTest implements RewriteTest {
             """,
             spec -> spec.beforeRecipe(xml -> assertThat(FindTags.find(xml, "/dependencies/dependency"))
               .isNotEmpty()
-              .allMatch(tag -> tag instanceof Xml.Tag))
+              .allMatch(Xml.Tag.class::isInstance))
           )
         );
     }

@@ -82,8 +82,8 @@ public class FindGradleWrapper extends Recipe {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
-                return !equalIgnoringSeparators(file.getSourcePath(), WRAPPER_PROPERTIES_LOCATION) ? file :
-                        super.visitFile(file, ctx);
+                return equalIgnoringSeparators(file.getSourcePath(), WRAPPER_PROPERTIES_LOCATION) ?
+                        super.visitFile(file, ctx) : file;
             }
 
             @Override

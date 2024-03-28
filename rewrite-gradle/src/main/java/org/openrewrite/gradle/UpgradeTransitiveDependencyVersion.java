@@ -284,7 +284,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         .stream()
                         .filter(J.MethodInvocation.class::isInstance)
                         .map(J.MethodInvocation.class::cast)
-                        .filter(m2 -> m2.getSimpleName().equals("constraints"))
+                        .filter(m2 -> "constraints".equals(m2.getSimpleName()))
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException("Unable to find constraints block"))
                         .withMarkers(Markers.EMPTY);
@@ -377,7 +377,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     "}}",
                     config,
                     gav,
-                    because == null ? "" : String.format(" {\n   because '%s'\n}", because)
+                    because == null ? "" : String.format(" {%n   because '%s'%n}", because)
             )).findFirst().orElseThrow(() -> new IllegalStateException("Unable to parse constraint"));
 
             Statement constraint = FindMethods.find(withConstraint, CONSTRAINT_MATCHER, true)

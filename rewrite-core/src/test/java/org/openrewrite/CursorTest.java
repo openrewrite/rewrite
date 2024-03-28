@@ -61,7 +61,7 @@ class CursorTest {
           .text("test")
           .build();
         var cursor = new Cursor(new Cursor(new Cursor(null, 1), t), 2);
-        assertThat(cursor.getPath(v -> v instanceof PlainText).next()).isSameAs(t);
+        assertThat(cursor.getPath(PlainText.class::isInstance).next()).isSameAs(t);
     }
 
     @Test
@@ -71,6 +71,6 @@ class CursorTest {
           .text("test")
           .build();
         var cursor = new Cursor(new Cursor(new Cursor(null, 1), t), 2);
-        assertThat(cursor.getPathAsStream(v -> v instanceof PlainText).toList()).containsExactly(t);
+        assertThat(cursor.getPathAsStream(PlainText.class::isInstance).toList()).containsExactly(t);
     }
 }

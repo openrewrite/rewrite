@@ -129,8 +129,9 @@ public class MatchPatternsFileFilter implements FileFilter {
     }
 
     static List<String> processPatterns(List<String> patterns) {
-        if (patterns == null)
+        if (patterns == null) {
             return null;
+        }
         List<String> processed = new ArrayList<>();
         for (String pattern : patterns) {
             processed.add(processPattern(pattern));

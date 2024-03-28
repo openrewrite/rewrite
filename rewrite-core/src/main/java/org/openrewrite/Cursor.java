@@ -86,7 +86,7 @@ public class Cursor {
                 Spliterator.IMMUTABLE), false);
     }
 
-    private static class CursorPathIterator implements Iterator<Cursor> {
+    private static final class CursorPathIterator implements Iterator<Cursor> {
 
         private Predicate<Cursor> filter = c -> true;
         private Cursor cursor;
@@ -123,7 +123,7 @@ public class Cursor {
         }
     }
 
-    private static class CursorIterator implements Iterator<Object> {
+    private static final class CursorIterator implements Iterator<Object> {
         private Cursor cursor;
 
         private Predicate<Object> filter = v -> true;

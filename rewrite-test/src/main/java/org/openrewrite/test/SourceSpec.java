@@ -76,7 +76,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         this.before = before;
         this.after = after;
         this.validateSource = ValidateSource.noop;
-        this.customizeExecutionContext = (ctx) -> {
+        this.customizeExecutionContext = ctx -> {
         };
     }
 
@@ -101,9 +101,9 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     protected ThrowingConsumer<T> afterRecipe = t -> {
     };
 
-    protected boolean skip = false;
+    protected boolean skip;
 
-    protected boolean noTrim = false;
+    protected boolean noTrim;
 
     /**
      * @param sourcePath The source path after the recipe is run.

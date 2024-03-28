@@ -364,8 +364,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                           (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                            ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                           ("platform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()) ||
+                            "enforcedPlatform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
             }
@@ -395,7 +395,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         }
 
                         String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
-                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
+                        getCursor().dropParentUntil(SourceFile.class::isInstance)
                                 .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
                                 .computeIfAbsent(versionVariableName, it -> new HashMap<>())
                                 .computeIfAbsent(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), it -> new HashSet<>())
@@ -424,7 +424,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             if (selectedVersion == null || dep.getVersion().equals(selectedVersion)) {
                                 return arg;
                             }
-                            getCursor().dropParentUntil(p -> p instanceof SourceFile)
+                            getCursor().dropParentUntil(SourceFile.class::isInstance)
                                     .computeMessageIfAbsent(NEW_VERSION_KEY, it -> new HashMap<GroupArtifactVersion, Set<String>>())
                                     .computeIfAbsent(new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), selectedVersion), it -> new HashSet<>())
                                     .add(method.getSimpleName());
@@ -496,7 +496,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return m.withArguments(newArgs);
                 } else if (versionExp instanceof J.Identifier) {
                     String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
-                    getCursor().dropParentUntil(p -> p instanceof SourceFile)
+                    getCursor().dropParentUntil(SourceFile.class::isInstance)
                             .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
                             .computeIfAbsent(versionVariableName, it -> new HashMap<>())
                             .computeIfAbsent(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()), it -> new HashSet<>())
@@ -550,7 +550,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (selectedVersion == null) {
                         return v;
                     }
-                    getCursor().dropParentUntil(p -> p instanceof SourceFile)
+                    getCursor().dropParentUntil(SourceFile.class::isInstance)
                             .computeMessageIfAbsent(NEW_VERSION_KEY, m -> new HashMap<GroupArtifactVersion, Set<String>>())
                             .computeIfAbsent(new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), selectedVersion), it -> new HashSet<>())
                             .addAll(gaEntry.getValue());
@@ -605,7 +605,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (selectedVersion == null) {
                         return a;
                     }
-                    getCursor().dropParentUntil(p -> p instanceof SourceFile)
+                    getCursor().dropParentUntil(SourceFile.class::isInstance)
                             .computeMessageIfAbsent(NEW_VERSION_KEY, m -> new HashMap<GroupArtifactVersion, Set<String>>())
                             .computeIfAbsent(new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), selectedVersion), it -> new HashSet<>())
                             .addAll(gaEntry.getValue());

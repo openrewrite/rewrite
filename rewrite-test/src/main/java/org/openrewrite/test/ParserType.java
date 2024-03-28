@@ -21,7 +21,7 @@ import org.openrewrite.SourceFile;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
-class ParserTypeUtils {
+final class ParserTypeUtils {
     private ParserTypeUtils() {
     }
 

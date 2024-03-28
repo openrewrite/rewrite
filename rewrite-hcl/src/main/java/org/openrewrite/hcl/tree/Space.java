@@ -33,7 +33,7 @@ import static java.util.Collections.emptyList;
  */
 @EqualsAndHashCode
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public class Space {
+public final class Space {
     public static final Space EMPTY = new Space("", emptyList());
 
     private final List<Comment> comments;

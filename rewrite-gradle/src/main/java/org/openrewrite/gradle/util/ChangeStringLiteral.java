@@ -29,7 +29,7 @@ public class ChangeStringLiteral {
             return l;
         }
         String valueSource = l.getValueSource();
-        String delimiter = (valueSource == null) ? "'"
+        String delimiter = valueSource == null ? "'"
                 : valueSource.substring(0, valueSource.indexOf(oldValue));
         return l.withValue(newValue).withValueSource(delimiter + newValue + delimiter);
     }

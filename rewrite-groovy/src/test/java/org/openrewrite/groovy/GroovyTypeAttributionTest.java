@@ -195,7 +195,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 var m = (J.MethodInvocation) cu.getStatements().stream()
-                  .filter(s -> s instanceof J.MethodInvocation)
+                  .filter(J.MethodInvocation.class::isInstance)
                   .findFirst()
                   .get();
                 assertThat(m.getArguments()).hasSize(1);

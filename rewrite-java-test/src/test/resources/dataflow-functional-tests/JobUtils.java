@@ -63,7 +63,7 @@ public class JobUtils {
             for (File childFile : children) {
                 String childFileName = childFile.getName();
                 // TODO improve ?
-                if (childFileName.equals("target") || childFileName.equals("build")) {
+                if ("target".equals(childFileName) || "build".equals(childFileName)) {
                     continue;
                 }
                 if (level != 0) {

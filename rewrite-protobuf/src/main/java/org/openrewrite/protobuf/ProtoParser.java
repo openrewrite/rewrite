@@ -101,7 +101,7 @@ public class ProtoParser implements Parser {
         return prefix.resolve("file.proto");
     }
 
-    private static class ForwardingErrorListener extends BaseErrorListener {
+    private static final class ForwardingErrorListener extends BaseErrorListener {
         private final Path sourcePath;
         private final ExecutionContext ctx;
 

@@ -455,19 +455,19 @@ class AutodetectTest implements RewriteTest {
         assertThat(importLayout.getLayout().get(2))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("org\\.openrewrite\\.internal\\..+"));
+          .matches(b -> "org\\.openrewrite\\.internal\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(3)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(4))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
+          .matches(b -> "javax\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(5))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
+          .matches(b -> "java\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(6)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
@@ -511,7 +511,7 @@ class AutodetectTest implements RewriteTest {
         assertThat(importLayout.getLayout().get(0))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("com\\.example\\..+"));
+          .matches(b -> "com\\.example\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 

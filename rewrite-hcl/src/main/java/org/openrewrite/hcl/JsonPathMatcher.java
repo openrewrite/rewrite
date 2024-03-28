@@ -55,7 +55,7 @@ public class JsonPathMatcher {
 
     public <T> Optional<T> find(Cursor cursor) {
         LinkedList<Tree> cursorPath = cursor.getPathAsStream()
-                .filter(o -> o instanceof Tree)
+                .filter(Tree.class::isInstance)
                 .map(Tree.class::cast)
                 .collect(Collectors.toCollection(LinkedList::new));
         if (cursorPath.isEmpty()) {
@@ -118,17 +118,17 @@ public class JsonPathMatcher {
 
         @Override
         protected Object aggregateResult(Object aggregate, Object nextResult) {
-            return (scope = nextResult);
+            return scope = nextResult;
         }
 
         @Override
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
             if (ctx.ROOT() != null || "[".equals(ctx.start.getText())) {
                 scope = cursorPath.stream()
-                        .filter(t -> t instanceof Hcl.Block)
+                        .filter(Hcl.Block.class::isInstance)
                         .findFirst()
                         .orElseGet(() -> cursorPath.stream()
-                                .filter(t -> t instanceof Hcl.ConfigFile)
+                                .filter(Hcl.ConfigFile.class::isInstance)
                                 .findFirst()
                                 .orElse(null));
             }
@@ -514,10 +514,10 @@ public class JsonPathMatcher {
             if (ctx.LOGICAL_OPERATOR() != null) {
                 String operator;
                 switch (ctx.LOGICAL_OPERATOR().getText()) {
-                    case ("&&"):
+                    case "&&":
                         operator = "&&";
                         break;
-                    case ("||"):
+                    case "||":
                         operator = "||";
                         break;
                     default:
@@ -543,10 +543,10 @@ public class JsonPathMatcher {
                 rhs = getBinaryExpressionResult(rhs);
                 String operator;
                 switch (ctx.EQUALITY_OPERATOR().getText()) {
-                    case ("=="):
+                    case "==":
                         operator = "==";
                         break;
-                    case ("!="):
+                    case "!=":
                         operator = "!=";
                         break;
                     default:

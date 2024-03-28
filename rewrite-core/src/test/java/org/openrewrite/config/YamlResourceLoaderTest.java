@@ -171,7 +171,7 @@ class YamlResourceLoaderTest implements RewriteTest {
         Collection<Recipe> recipes = env.listRecipes();
         assertThat(recipes).hasSize(1);
         Recipe recipe = recipes.iterator().next();
-        Optional<Contributor> maybeJon = recipe.getContributors().stream().filter(c -> c.getName().equals("Jonathan Schneider")).findFirst();
+        Optional<Contributor> maybeJon = recipe.getContributors().stream().filter(c -> "Jonathan Schneider".equals(c.getName())).findFirst();
         assertThat(maybeJon).isPresent();
     }
 

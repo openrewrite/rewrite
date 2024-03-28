@@ -69,7 +69,7 @@ public class SemanticallyEqual {
         }
 
         protected boolean nullMissMatch(Object obj1, Object obj2) {
-            return (obj1 == null && obj2 != null || obj1 != null && obj2 == null);
+            return obj1 == null && obj2 != null || obj1 != null && obj2 == null;
         }
 
         protected boolean nullListSizeMissMatch(List<?> list1, List<?> list2) {

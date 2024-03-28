@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 
-public class PathUtils {
+public final class PathUtils {
     private PathUtils() {
     }
 
@@ -130,11 +130,11 @@ public class PathUtils {
             if (pattIdxStart > pattIdxEnd) {
                 return !isFileSeparator(pattern.charAt(pattern.length() - 1));
             }
-            if (pattIdxStart == pattIdxEnd && pattTokens[pattIdxStart].equals("*") && isFileSeparator(path.charAt(path.length() - 1))) {
+            if (pattIdxStart == pattIdxEnd && "*".equals(pattTokens[pattIdxStart]) && isFileSeparator(path.charAt(path.length() - 1))) {
                 return true;
             }
             for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
-                if (!pattTokens[i].equals("**")) {
+                if (!"**".equals(pattTokens[i])) {
                     return false;
                 }
             }
@@ -162,7 +162,7 @@ public class PathUtils {
         if (pathIdxStart > pathIdxEnd) {
             // Path exhausted
             for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
-                if (!pattTokens[i].equals("**")) {
+                if (!"**".equals(pattTokens[i])) {
                     return false;
                 }
             }
@@ -172,7 +172,7 @@ public class PathUtils {
         while (pattIdxStart != pattIdxEnd && pathIdxStart <= pathIdxEnd) {
             int patIdxTmp = -1;
             for (int i = pattIdxStart + 1; i <= pattIdxEnd; i++) {
-                if (pattTokens[i].equals("**")) {
+                if ("**".equals(pattTokens[i])) {
                     patIdxTmp = i;
                     break;
                 }
@@ -184,8 +184,8 @@ public class PathUtils {
             }
             // Find the pattern between pattIdxStart & pattIdxTmp in path between
             // pathIdxStart & pathIdxEnd
-            int patLength = (patIdxTmp - pattIdxStart - 1);
-            int strLength = (pathIdxEnd - pathIdxStart + 1);
+            int patLength = patIdxTmp - pattIdxStart - 1;
+            int strLength = pathIdxEnd - pathIdxStart + 1;
             int foundIdx = -1;
             strLoop:
             for (int i = 0; i <= strLength - patLength; i++) {
@@ -206,7 +206,7 @@ public class PathUtils {
         }
 
         for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
-            if (!pattTokens[i].equals("**")) {
+            if (!"**".equals(pattTokens[i])) {
                 return false;
             }
         }

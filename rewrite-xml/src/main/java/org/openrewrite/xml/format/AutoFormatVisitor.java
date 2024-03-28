@@ -44,7 +44,7 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visit(@Nullable Tree tree, P p, Cursor cursor) {
-        Xml.Document doc = (tree instanceof Xml.Document) ?
+        Xml.Document doc = tree instanceof Xml.Document ?
                 (Xml.Document) tree :
                 cursor.firstEnclosingOrThrow(Xml.Document.class);
 

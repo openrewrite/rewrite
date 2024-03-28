@@ -145,7 +145,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                         if (parsed instanceof ParseError) {
                             throw ((ParseError) parsed).toException();
                         }
-                        return ((G.CompilationUnit) parsed);
+                        return (G.CompilationUnit) parsed;
                     })
                     .map(parsed -> parsed.getStatements().get(0))
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
@@ -154,13 +154,13 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))
                     && !cu.getStatements().isEmpty()
                     && cu.getStatements().get(0) instanceof J.MethodInvocation
-                    && ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
+                    && "pluginManagement".equals(((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName())) {
                     return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), 1));
                 } else {
                     int insertAtIdx = 0;
                     for (int i = 0; i < cu.getStatements().size(); i++) {
                         Statement existingStatement = cu.getStatements().get(i);
-                        if (existingStatement instanceof J.MethodInvocation && ((J.MethodInvocation) existingStatement).getSimpleName().equals("buildscript")) {
+                        if (existingStatement instanceof J.MethodInvocation && "buildscript".equals(((J.MethodInvocation) existingStatement).getSimpleName())) {
                             insertAtIdx = i + 1;
                             break;
                         }

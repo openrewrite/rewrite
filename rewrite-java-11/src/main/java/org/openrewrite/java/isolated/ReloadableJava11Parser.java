@@ -63,7 +63,7 @@ import static java.util.stream.Collectors.toList;
  * This parser is NOT thread-safe, as the OpenJDK parser maintains in-memory caches in static state.
  */
 @NonNullApi
-public class ReloadableJava11Parser implements JavaParser {
+public final class ReloadableJava11Parser implements JavaParser {
     private final JavaTypeCache typeCache;
 
     @Nullable
@@ -300,7 +300,7 @@ public class ReloadableJava11Parser implements JavaParser {
         }
     }
 
-    private static class TimedTodo extends Todo {
+    private static final class TimedTodo extends Todo {
         @Nullable
         private Timer.Sample sample;
 
@@ -370,7 +370,7 @@ public class ReloadableJava11Parser implements JavaParser {
         }
     }
 
-    private static class PackageAwareJavaFileObject extends SimpleJavaFileObject {
+    private static final class PackageAwareJavaFileObject extends SimpleJavaFileObject {
         private final String pkg;
         private final String className;
         private final byte[] classBytes;

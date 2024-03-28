@@ -60,7 +60,7 @@ class QuarkParserTest implements RewriteTest {
     @Test
     void oneQuark() {
         rewriteRun(
-          spec -> spec.beforeRecipe(sources -> assertThat(sources.stream().filter(s -> s instanceof Quark)).hasSize(1)),
+          spec -> spec.beforeRecipe(sources -> assertThat(sources.stream().filter(Quark.class::isInstance)).hasSize(1)),
           text("hi"),
           other("jon")
         );

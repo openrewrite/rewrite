@@ -22,7 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.Scanner;
 import java.util.regex.Pattern;
 
-public class Semver {
+public final class Semver {
     private Semver() {
     }
 

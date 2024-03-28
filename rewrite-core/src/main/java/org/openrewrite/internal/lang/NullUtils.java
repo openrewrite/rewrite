@@ -112,8 +112,9 @@ public class NullUtils {
 
     private static boolean fieldIsRequiredOption(Field field) {
         Option annotation = field.getAnnotation(Option.class);
-        if (annotation != null)
+        if (annotation != null) {
             return annotation.required();
+        }
         return false;
     }
 

@@ -184,7 +184,7 @@ public class FindMethods extends Recipe {
                 )
                 .stream()
                 .filter(t -> t instanceof J.MethodInvocation || t instanceof J.MemberReference || t instanceof J.NewClass)
-                .map(t -> (J) t)
+                .map(J.class::cast)
                 .collect(Collectors.toSet());
     }
 

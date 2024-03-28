@@ -101,11 +101,11 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 } else if (currentNameScope.size() == 1 && isVariableName(parent.getValue(), ident)) {
                     if (parent.getValue() instanceof J.VariableDeclarations.NamedVariable) {
                         Tree variableDeclaration = parent.getParentTreeCursor().getValue();
-                        J maybeParameter = getCursor().dropParentUntil(is -> is instanceof JavaSourceFile || is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration).getValue();
+                        J maybeParameter = getCursor().dropParentUntil(is -> is instanceof JavaSourceFile).getValue();
                         if (maybeParameter instanceof J.MethodDeclaration) {
                             J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) maybeParameter;
                             if (methodDeclaration.getParameters().contains((Statement) variableDeclaration) &&
-                                methodDeclaration.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment) &&
+                                methodDeclaration.getComments().stream().anyMatch(Javadoc.DocComment.class::isInstance) &&
                                 ((J.MethodDeclaration) maybeParameter).getMethodType() != null) {
                                 doAfterVisit(new RenameJavaDocParamNameVisitor<>((J.MethodDeclaration) maybeParameter, renameVariable.getSimpleName(), newName));
                             }
@@ -145,7 +145,9 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             } else if(value instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) value;
                 return ident != v.getTypeExpression();
-            } else return !(value instanceof J.ParameterizedType);
+            } else {
+                return !(value instanceof J.ParameterizedType);
+            }
         }
 
         /**
@@ -258,16 +260,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
          */
         private Cursor getCursorToParentScope(Cursor cursor) {
             return cursor.dropParentUntil(is ->
-                    is instanceof JavaSourceFile ||
-                    is instanceof J.ClassDeclaration ||
-                    is instanceof J.MethodDeclaration ||
-                    is instanceof J.Block ||
-                    is instanceof J.ForLoop ||
-                    is instanceof J.ForEachLoop ||
-                    is instanceof J.Case ||
-                    is instanceof J.Try ||
-                    is instanceof J.Try.Catch ||
-                    is instanceof J.Lambda);
+                    is instanceof JavaSourceFile);
         }
     }
 

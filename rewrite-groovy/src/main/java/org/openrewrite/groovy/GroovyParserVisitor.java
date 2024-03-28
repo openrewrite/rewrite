@@ -72,7 +72,7 @@ public class GroovyParserVisitor {
     private final boolean charsetBomMarked;
     private final GroovyTypeMapping typeMapping;
 
-    private int cursor = 0;
+    private int cursor;
 
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     @SuppressWarnings("RegExpSimplifiable")
@@ -992,7 +992,7 @@ public class GroovyParserVisitor {
             queue.add(new J.Break(randomId(),
                     sourceBefore("break"),
                     Markers.EMPTY,
-                    (statement.getLabel() == null) ?
+                    statement.getLabel() == null ?
                             null :
                             new J.Identifier(randomId(),
                                     sourceBefore(statement.getLabel()),
@@ -1239,7 +1239,7 @@ public class GroovyParserVisitor {
             queue.add(new J.Continue(randomId(),
                     sourceBefore("continue"),
                     Markers.EMPTY,
-                    (statement.getLabel() == null) ?
+                    statement.getLabel() == null ?
                             null :
                             new J.Identifier(randomId(),
                                     sourceBefore(statement.getLabel()),
@@ -1889,8 +1889,8 @@ public class GroovyParserVisitor {
 
             // Strangely, groovy parses the finally's block as a BlockStatement which contains another BlockStatement
             // The true contents of the block are within the first statement of this apparently pointless enclosing BlockStatement
-            JLeftPadded<J.Block> finally_ = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
-                    padLeft(sourceBefore("finally"), visit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0)));
+            JLeftPadded<J.Block> finally_ = node.getFinallyStatement() instanceof BlockStatement ?
+                    padLeft(sourceBefore("finally"), visit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0))) : null;
 
             //noinspection ConstantConditions
             queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finally_));
@@ -1907,13 +1907,10 @@ public class GroovyParserVisitor {
             cursor += typeToken.length();
 
             J.Unary.Type operator = null;
-            switch (typeToken) {
-                case "++":
-                    operator = J.Unary.Type.PostIncrement;
-                    break;
-                case "--":
-                    operator = J.Unary.Type.PostDecrement;
-                    break;
+            if ("++".equals(typeToken)) {
+                operator = J.Unary.Type.PostIncrement;
+            } else if ("--".equals(typeToken)) {
+                operator = J.Unary.Type.PostDecrement;
             }
             assert operator != null;
 
@@ -2212,7 +2209,7 @@ public class GroovyParserVisitor {
                         Markers.EMPTY,
                         expr,
                         padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, emptyList(), part.trim(), null, null)),
-                        (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
+                        Character.isUpperCase(part.charAt(0)) || i == parts.length - 1 ?
                                 JavaType.ShallowClass.build(fullName) :
                                 null
                 );

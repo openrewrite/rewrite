@@ -210,8 +210,12 @@ public interface Parser {
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
             Input input = (Input) o;
             return Objects.equals(path, input.path);
         }

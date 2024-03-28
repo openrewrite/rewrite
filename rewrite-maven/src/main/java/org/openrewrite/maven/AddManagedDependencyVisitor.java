@@ -102,7 +102,7 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
                 for (Xml.Tag dependency : tag.getChildren()) {
-                    if (dependency.getName().equals("dependency")) {
+                    if ("dependency".equals(dependency.getName())) {
                         if (groupId.equals(dependency.getChildValue("groupId").orElse(null)) &&
                             artifactId.equals(dependency.getChildValue("artifactId").orElse(null))) {
                             return tag;
@@ -116,7 +116,7 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
                         "<version>" + version + "</version>\n" +
                         (classifier == null ? "" :
                                 "<classifier>" + classifier + "</classifier>\n") +
-                        (type == null || type.equals("jar") ? "" :
+                        (type == null || "jar".equals(type) ? "" :
                                 "<type>" + type + "</type>\n") +
                         (scope == null || "compile".equals(scope) ? "" :
                                 "<scope>" + scope + "</scope>\n") +

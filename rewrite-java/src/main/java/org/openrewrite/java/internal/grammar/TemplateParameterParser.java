@@ -31,13 +31,28 @@ public class TemplateParameterParser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8, 
-		Variance=9, FullyQualifiedName=10, Number=11, Identifier=12, S=13;
-	public static final int
-		RULE_matcherPattern = 0, RULE_typedPattern = 1, RULE_patternType = 2, 
-		RULE_type = 3, RULE_typeParameter = 4, RULE_variance = 5, RULE_parameterName = 6, 
-		RULE_typeName = 7, RULE_matcherName = 8;
+    public static final int LPAREN = 1;
+    public static final int RPAREN = 2;
+    public static final int DOT = 3;
+    public static final int COLON = 4;
+    public static final int COMMA = 5;
+    public static final int LBRACK = 6;
+    public static final int RBRACK = 7;
+    public static final int WILDCARD = 8;
+    public static final int Variance = 9;
+    public static final int FullyQualifiedName = 10;
+    public static final int Number = 11;
+    public static final int Identifier = 12;
+    public static final int S = 13;
+    public static final int RULE_matcherPattern = 0;
+    public static final int RULE_typedPattern = 1;
+    public static final int RULE_patternType = 2;
+    public static final int RULE_type = 3;
+    public static final int RULE_typeParameter = 4;
+    public static final int RULE_variance = 5;
+    public static final int RULE_parameterName = 6;
+    public static final int RULE_typeName = 7;
+    public static final int RULE_matcherName = 8;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"matcherPattern", "typedPattern", "patternType", "type", "typeParameter", 
@@ -124,51 +139,51 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_matcherPattern; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterMatcherPattern(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterMatcherPattern(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitMatcherPattern(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitMatcherPattern(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitMatcherPattern(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitMatcherPattern(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final MatcherPatternContext matcherPattern() throws RecognitionException {
-		MatcherPatternContext _localctx = new MatcherPatternContext(_ctx, getState());
-		enterRule(_localctx, 0, RULE_matcherPattern);
+		MatcherPatternContext localctx = new MatcherPatternContext(_ctx, getState());
+		enterRule(localctx, 0, RULE_matcherPattern);
 		try {
 			setState(20);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,0,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(18);
-				typedPattern();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(19);
-				parameterName();
-				}
-				break;
-			}
+            if (getInterpreter().adaptivePredict(_input, 0, _ctx) == 1) {
+                enterOuterAlt(localctx, 1);
+                setState(18);
+                typedPattern();
+            } else if (getInterpreter().adaptivePredict(_input, 0, _ctx) == 2) {
+                enterOuterAlt(localctx, 2);
+                setState(19);
+                parameterName();
+            }
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -186,50 +201,53 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_typedPattern; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterTypedPattern(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterTypedPattern(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitTypedPattern(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitTypedPattern(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypedPattern(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypedPattern(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final TypedPatternContext typedPattern() throws RecognitionException {
-		TypedPatternContext _localctx = new TypedPatternContext(_ctx, getState());
-		enterRule(_localctx, 2, RULE_typedPattern);
+		TypedPatternContext localctx = new TypedPatternContext(_ctx, getState());
+		enterRule(localctx, 2, RULE_typedPattern);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(25);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,1,_ctx) ) {
-			case 1:
-				{
-				setState(22);
-				parameterName();
-				setState(23);
-				match(COLON);
-				}
-				break;
-			}
+                if (getInterpreter().adaptivePredict(_input, 1, _ctx) == 1) {
+                    setState(22);
+                    parameterName();
+                    setState(23);
+                    match(COLON);
+                }
 			setState(27);
 			patternType();
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -248,25 +266,32 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_patternType; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterPatternType(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterPatternType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitPatternType(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitPatternType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitPatternType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitPatternType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final PatternTypeContext patternType() throws RecognitionException {
-		PatternTypeContext _localctx = new PatternTypeContext(_ctx, getState());
-		enterRule(_localctx, 4, RULE_patternType);
-		int _la;
+		PatternTypeContext localctx = new PatternTypeContext(_ctx, getState());
+		enterRule(localctx, 4, RULE_patternType);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(29);
 			matcherName();
@@ -274,8 +299,8 @@ public class TemplateParameterParser extends Parser {
 			match(LPAREN);
 			setState(32);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==FullyQualifiedName || _la==Identifier) {
+			la = _input.LA(1);
+			if (la==FullyQualifiedName || la==Identifier) {
 				{
 				setState(31);
 				type();
@@ -287,14 +312,14 @@ public class TemplateParameterParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -320,41 +345,48 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_type; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterType(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitType(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final TypeContext type() throws RecognitionException {
-		TypeContext _localctx = new TypeContext(_ctx, getState());
-		enterRule(_localctx, 6, RULE_type);
-		int _la;
+		TypeContext localctx = new TypeContext(_ctx, getState());
+		enterRule(localctx, 6, RULE_type);
+		int la;
 		try {
-			int _alt;
-			enterOuterAlt(_localctx, 1);
+			int alt;
+			enterOuterAlt(localctx, 1);
 			{
 			setState(36);
 			typeName();
 			setState(49);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==LBRACK) {
+			la = _input.LA(1);
+			if (la==LBRACK) {
 				{
 				setState(37);
 				match(LBRACK);
 				setState(43);
 				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,3,_ctx);
-				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-					if ( _alt==1 ) {
+				alt = getInterpreter().adaptivePredict(_input,3,_ctx);
+				while ( alt!=2 && alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
+					if ( alt==1 ) {
 						{
 						{
 						setState(38);
@@ -366,7 +398,7 @@ public class TemplateParameterParser extends Parser {
 					}
 					setState(45);
 					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,3,_ctx);
+					alt = getInterpreter().adaptivePredict(_input,3,_ctx);
 				}
 				setState(46);
 				typeParameter();
@@ -378,14 +410,14 @@ public class TemplateParameterParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -403,62 +435,62 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_typeParameter; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterTypeParameter(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterTypeParameter(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitTypeParameter(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitTypeParameter(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypeParameter(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypeParameter(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final TypeParameterContext typeParameter() throws RecognitionException {
-		TypeParameterContext _localctx = new TypeParameterContext(_ctx, getState());
-		enterRule(_localctx, 8, RULE_typeParameter);
-		int _la;
+		TypeParameterContext localctx = new TypeParameterContext(_ctx, getState());
+		enterRule(localctx, 8, RULE_typeParameter);
+		int la;
 		try {
 			setState(56);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,6,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(52);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==WILDCARD) {
-					{
-					setState(51);
-					variance();
-					}
-				}
+            if (getInterpreter().adaptivePredict(_input, 6, _ctx) == 1) {
+                enterOuterAlt(localctx, 1);
+                setState(52);
+                _errHandler.sync(this);
+                la = _input.LA(1);
+                if (la == WILDCARD) {
+                    {
+                        setState(51);
+                        variance();
+                    }
+                }
 
-				setState(54);
-				type();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(55);
-				match(WILDCARD);
-				}
-				break;
-			}
+                setState(54);
+                type();
+            } else if (getInterpreter().adaptivePredict(_input, 6, _ctx) == 2) {
+                enterOuterAlt(localctx, 2);
+                setState(55);
+                match(WILDCARD);
+            }
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -471,24 +503,31 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_variance; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterVariance(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterVariance(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitVariance(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitVariance(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitVariance(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitVariance(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final VarianceContext variance() throws RecognitionException {
-		VarianceContext _localctx = new VarianceContext(_ctx, getState());
-		enterRule(_localctx, 10, RULE_variance);
+		VarianceContext localctx = new VarianceContext(_ctx, getState());
+		enterRule(localctx, 10, RULE_variance);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(58);
 			match(WILDCARD);
@@ -497,14 +536,14 @@ public class TemplateParameterParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -516,38 +555,45 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_parameterName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterParameterName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterParameterName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitParameterName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitParameterName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitParameterName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitParameterName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ParameterNameContext parameterName() throws RecognitionException {
-		ParameterNameContext _localctx = new ParameterNameContext(_ctx, getState());
-		enterRule(_localctx, 12, RULE_parameterName);
+		ParameterNameContext localctx = new ParameterNameContext(_ctx, getState());
+		enterRule(localctx, 12, RULE_parameterName);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(61);
 			match(Identifier);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -560,47 +606,56 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_typeName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterTypeName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterTypeName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitTypeName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitTypeName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypeName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypeName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final TypeNameContext typeName() throws RecognitionException {
-		TypeNameContext _localctx = new TypeNameContext(_ctx, getState());
-		enterRule(_localctx, 14, RULE_typeName);
-		int _la;
+		TypeNameContext localctx = new TypeNameContext(_ctx, getState());
+		enterRule(localctx, 14, RULE_typeName);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(63);
-			_la = _input.LA(1);
-			if ( !(_la==FullyQualifiedName || _la==Identifier) ) {
+			la = _input.LA(1);
+			if ( !(la==FullyQualifiedName || la==Identifier) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -612,38 +667,45 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_matcherName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterMatcherName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterMatcherName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitMatcherName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitMatcherName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitMatcherName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitMatcherName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final MatcherNameContext matcherName() throws RecognitionException {
-		MatcherNameContext _localctx = new MatcherNameContext(_ctx, getState());
-		enterRule(_localctx, 16, RULE_matcherName);
+		MatcherNameContext localctx = new MatcherNameContext(_ctx, getState());
+		enterRule(localctx, 16, RULE_matcherName);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(65);
 			match(Identifier);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	public static final String _serializedATN =

@@ -122,7 +122,7 @@ public class PlainTextParser implements Parser {
 
         public Builder plainTextMasks(Path basePath, Iterable<String> plainTextMaskGlobs) {
             return plainTextMasks(StreamSupport.stream(plainTextMaskGlobs.spliterator(), false)
-                    .map((o) -> basePath.getFileSystem().getPathMatcher("glob:" + o))
+                    .map(o -> basePath.getFileSystem().getPathMatcher("glob:" + o))
                     .collect(Collectors.toList()));
         }
 

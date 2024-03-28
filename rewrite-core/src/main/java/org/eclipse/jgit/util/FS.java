@@ -712,11 +712,11 @@ public abstract class FS {
 			long minRacyThresholdValue = minRacyThresholdUnit
 					.convert(minRacyThreshold, TimeUnit.NANOSECONDS);
 
-			final int max_retries = 5;
+			final int maxRetries = 5;
 			int retries = 0;
 			boolean succeeded = false;
 			String key = getConfigKey(s);
-			while (!succeeded && retries < max_retries) {
+			while (!succeeded && retries < maxRetries) {
 				try {
 					jgitConfig.setString(
 							ConfigConstants.CONFIG_FILESYSTEM_SECTION, key,
@@ -736,11 +736,11 @@ public abstract class FS {
 					// race with another thread, wait a bit and try again
 					try {
 						retries++;
-						if (retries < max_retries) {
+						if (retries < maxRetries) {
 							Thread.sleep(100);
 							LOG.debug("locking {} failed, retries {}/{}", //$NON-NLS-1$
 									jgitConfig, Integer.valueOf(retries),
-									Integer.valueOf(max_retries));
+									Integer.valueOf(maxRetries));
 						} else {
 							LOG.warn(MessageFormat.format(
 									JGitText.get().lockFailedRetry, jgitConfig,
@@ -1158,8 +1158,9 @@ public abstract class FS {
 	 */
 	public File resolve(File dir, String name) {
 		File abspn = new File(name);
-		if (abspn.isAbsolute())
-			return abspn;
+        if (abspn.isAbsolute()) {
+            return abspn;
+        }
 		return new File(dir, name);
 	}
 
@@ -1253,8 +1254,9 @@ public abstract class FS {
 		String home = AccessController.doPrivileged(
 				(PrivilegedAction<String>) () -> System.getProperty("user.home") //$NON-NLS-1$
 		);
-		if (home == null || home.length() == 0)
-			return null;
+        if (home == null || home.length() == 0) {
+            return null;
+        }
 		return new File(home).getAbsoluteFile();
 	}
 
@@ -1625,8 +1627,9 @@ public abstract class FS {
 	protected static File resolveGrandparentFile(File grandchild) {
 		if (grandchild != null) {
 			File parent = grandchild.getParentFile();
-			if (parent != null)
-				return parent.getParentFile();
+            if (parent != null) {
+                return parent.getParentFile();
+            }
 		}
 		return null;
 	}
@@ -2118,7 +2121,7 @@ public abstract class FS {
 	public int runProcess(ProcessBuilder processBuilder,
 			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)
 			throws IOException, InterruptedException {
-		InputStream in = (stdinArgs == null) ? null : new ByteArrayInputStream(
+		InputStream in = stdinArgs == null ? null : new ByteArrayInputStream(
 						stdinArgs.getBytes(UTF_8));
 		return runProcess(processBuilder, outRedirect, errRedirect, in);
 	}
@@ -2247,9 +2250,10 @@ public abstract class FS {
 			// Wait a while for existing tasks to terminate
 			if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
 				pool.shutdownNow(); // Cancel currently executing tasks
-				// Wait a while for tasks to respond to being canceled
-				if (!pool.awaitTermination(60, TimeUnit.SECONDS))
-					hasShutdown = false;
+                // Wait a while for tasks to respond to being canceled
+                if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
+                    hasShutdown = false;
+                }
 			}
 		} catch (InterruptedException ie) {
 			// (Re-)Cancel if current thread also interrupted
@@ -2419,8 +2423,9 @@ public abstract class FS {
 		 * @return length of this file object
 		 */
 		public long getLength() {
-			if (length == -1)
-				return length = file.length();
+            if (length == -1) {
+                return length = file.length();
+            }
 			return length;
 		}
 

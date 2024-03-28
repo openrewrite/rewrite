@@ -140,7 +140,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         return a.withArguments(newArgs);
                     }
                     // There was no existing value to update, so add a new value into the argument list
-                    String effectiveName = (attributeName == null) ? "value" : attributeName;
+                    String effectiveName = attributeName == null ? "value" : attributeName;
                     //noinspection ConstantConditions
                     J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")
                             .contextSensitive()
@@ -167,7 +167,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     private static boolean attributeIsString(@Nullable String attributeName, J.Annotation annotation) {
-        String actualAttributeName = (attributeName == null) ? "value" : attributeName;
+        String actualAttributeName = attributeName == null ? "value" : attributeName;
         JavaType.Class annotationType = (JavaType.Class) annotation.getType();
         if (annotationType != null) {
             for (JavaType.Method m : annotationType.getMethods()) {

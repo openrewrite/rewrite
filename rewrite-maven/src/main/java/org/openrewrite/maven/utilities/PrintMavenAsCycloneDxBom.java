@@ -79,7 +79,7 @@ public final class PrintMavenAsCycloneDxBom {
         bom.append("        </tools>\n");
 
         //(Scope scope, String groupId, String artifactId, String version, String packaging, List<String> licenses, String bomReference, StringBuilder bom) {
-        String packaging = ("war".equals(pom.getPackaging()) || "ear".equals(pom.getPackaging())) ? "application" : "library";
+        String packaging = "war".equals(pom.getPackaging()) || "ear".equals(pom.getPackaging()) ? "application" : "library";
         writeComponent(
                 Scope.Compile,
                 pom.getValue(pom.getGroupId()),

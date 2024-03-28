@@ -208,7 +208,7 @@ class DeclarativeRecipeTest implements RewriteTest {
             return new TreeVisitor<>() {
                 @Override
                 public @Nullable @NonNull Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    PlainText text = ((PlainText) tree);
+                    PlainText text = (PlainText) tree;
                     assert text != null;
                     return text.withText(text.getText().replaceAll(find, replace));
                 }

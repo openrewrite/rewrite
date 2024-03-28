@@ -36,7 +36,7 @@ import java.io.IOException;
 
 import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 
-public class MavenXmlMapper {
+public final class MavenXmlMapper {
     private static final ObjectMapper readMapper;
     private static final ObjectMapper writeMapper;
 

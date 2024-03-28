@@ -152,7 +152,7 @@ public class GroovyParser implements Parser {
                                 ctx
                         );
                         G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
-                        if (warnings.size() > 0) {
+                        if (!warnings.isEmpty()) {
                             Markers m = gcu.getMarkers();
                             for (ParseWarning warning : warnings) {
                                 m = m.add(warning);
@@ -211,7 +211,7 @@ public class GroovyParser implements Parser {
         protected Collection<String> artifactNames = Collections.emptyList();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
-        private boolean logCompilationWarningsAndErrors = false;
+        private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
         private final List<Consumer<CompilerConfiguration>> compilerCustomizers = new ArrayList<>();
 

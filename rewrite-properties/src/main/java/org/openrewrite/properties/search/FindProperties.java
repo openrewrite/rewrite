@@ -70,8 +70,8 @@ public class FindProperties extends Recipe {
         PropertiesVisitor<Set<Properties.Entry>> findVisitor = new PropertiesVisitor<Set<Properties.Entry>>() {
             @Override
             public Properties visitEntry(Properties.Entry entry, Set<Properties.Entry> ps) {
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.matchesGlobRelaxedBinding(entry.getKey(), propertyKey) :
-                        StringUtils.matchesGlob(entry.getKey(), propertyKey)) {
+                if (Boolean.FALSE.equals(relaxedBinding) ?
+                        StringUtils.matchesGlob(entry.getKey(), propertyKey) : NameCaseConvention.matchesGlobRelaxedBinding(entry.getKey(), propertyKey)) {
                     ps.add(entry);
                 }
                 return super.visitEntry(entry, ps);
@@ -88,8 +88,8 @@ public class FindProperties extends Recipe {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.matchesGlobRelaxedBinding(entry.getKey(), propertyKey) :
-                        StringUtils.matchesGlob(entry.getKey(), propertyKey)) {
+                if (Boolean.FALSE.equals(relaxedBinding) ?
+                        StringUtils.matchesGlob(entry.getKey(), propertyKey) : NameCaseConvention.matchesGlobRelaxedBinding(entry.getKey(), propertyKey)) {
                     entry = entry.withValue(entry.getValue().withMarkers(entry.getValue().getMarkers()
                             .computeByType(new SearchResult(randomId(), null), (s1, s2) -> s1 == null ? s2 : s1)));
                 }

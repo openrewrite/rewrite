@@ -41,13 +41,13 @@ import java.util.function.Consumer;
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
     @Nullable
-    private static Path TEMPLATE_CLASSPATH_DIR;
+    private static Path templateClasspathDir;
 
     protected static Path getTemplateClasspathDir() {
-        if (TEMPLATE_CLASSPATH_DIR == null) {
+        if (templateClasspathDir == null) {
             try {
-                TEMPLATE_CLASSPATH_DIR = Files.createTempDirectory("java-template");
-                Path templateDir = Files.createDirectories(TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal/template"));
+                templateClasspathDir = Files.createTempDirectory("java-template");
+                Path templateDir = Files.createDirectories(templateClasspathDir.resolve("org/openrewrite/java/internal/template"));
                 try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__M__.class")) {
                     assert in != null;
                     Files.copy(in, templateDir.resolve("__M__.class"));
@@ -60,7 +60,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 throw new RuntimeException(e);
             }
         }
-        return TEMPLATE_CLASSPATH_DIR;
+        return templateClasspathDir;
     }
 
     @Getter

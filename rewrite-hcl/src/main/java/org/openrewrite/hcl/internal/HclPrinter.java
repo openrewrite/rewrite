@@ -374,13 +374,10 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitUnary(Hcl.Unary unary, PrintOutputCapture<P> p) {
         beforeSyntax(unary, Space.Location.UNARY, p);
-        switch (unary.getOperator()) {
-            case Negative:
-                p.append('-');
-                break;
-            case Not:
-                p.append('!');
-                break;
+        if (unary.getOperator() == Negative) {
+            p.append('-');
+        } else if (unary.getOperator() == Not) {
+            p.append('!');
         }
         visit(unary.getExpression(), p);
         afterSyntax(unary, p);

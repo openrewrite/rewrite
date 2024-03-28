@@ -81,15 +81,15 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifact, String> acc) {
-        final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
-        final Pattern SEMVER_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
+        final XPathMatcher projectMatcher = new XPathMatcher("/project");
+        final Pattern semverPattern = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
 
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if (!PROJECT_MATCHER.matches(getCursor())) {
+                if (!projectMatcher.matches(getCursor())) {
                     return t;
                 }
                 ResolvedPom resolvedPom = getResolutionResult().getPom();
@@ -117,7 +117,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
             }
 
             private String incrementSemverDigit(String oldVersion) {
-                Matcher m = SEMVER_PATTERN.matcher(oldVersion);
+                Matcher m = semverPattern.matcher(oldVersion);
                 if (!m.matches()) {
                     return oldVersion;
                 }

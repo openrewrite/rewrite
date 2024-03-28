@@ -556,7 +556,7 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
             private final MethodSignatureParser.FormalTypePatternContext ctx;
 
             @Setter
-            private boolean variableArgs = false;
+            private boolean variableArgs;
 
             public FormalType(MethodSignatureParser.FormalTypePatternContext ctx) {
                 this.ctx = ctx;

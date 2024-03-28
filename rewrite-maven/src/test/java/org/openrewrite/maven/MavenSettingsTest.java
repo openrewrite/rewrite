@@ -295,11 +295,11 @@ class MavenSettingsTest {
           .map(repo -> MavenRepositoryMirror.apply(ctx.getMirrors(), repo)))
           .hasSize(2)
           .haveAtLeastOne(
-            new Condition<>(repo -> repo.getUri().equals("https://internalartifactrepository.yourorg.com"),
+            new Condition<>(repo -> "https://internalartifactrepository.yourorg.com".equals(repo.getUri()),
               "Repository should-be-mirrored should have had its URL changed to https://internalartifactrepository.yourorg.com"
             )
           ).haveAtLeastOne(
-            new Condition<>(repo -> repo.getUri().equals("https://externalrepository.com") &&
+            new Condition<>(repo -> "https://externalrepository.com".equals(repo.getUri()) &&
                                     "should-not-be-mirrored".equals(repo.getId()),
               "Repository should-not-be-mirrored should have had its URL left unchanged"
             )
@@ -329,9 +329,9 @@ class MavenSettingsTest {
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
         assertThat(settings.getServers().getServers().get(0))
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
-          .matches(repo -> repo.getPassword().equals("my_password"));
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
+          .matches(repo -> "my_password".equals(repo.getPassword()));
     }
 
     @Nested

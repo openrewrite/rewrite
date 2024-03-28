@@ -138,7 +138,7 @@ class VariableNameUtilsTest implements RewriteTest {
 
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext p) {
-                  if (identifier.getSimpleName().equals("methodBlockA")) {
+                  if ("methodBlockA".equals(identifier.getSimpleName())) {
                       HashSet<String> variables = getCursor().getNearestMessage("variables", new HashSet<>());
                       variables.addAll(VariableNameUtils.findNamesInScope(getCursor().dropParentUntil(J.Block.class::isInstance)));
                       getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "variables", variables);
@@ -457,7 +457,7 @@ class VariableNameUtilsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
-                  if (identifier.getSimpleName().equals("name2")) {
+                  if ("name2".equals(identifier.getSimpleName())) {
                       return identifier.withSimpleName(VariableNameUtils.generateVariableName("name1", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
                   }
                   return identifier;
@@ -545,7 +545,7 @@ class VariableNameUtilsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
-                  if (identifier.getSimpleName().equals("ex")) {
+                  if ("ex".equals(identifier.getSimpleName())) {
                       return identifier.withSimpleName(VariableNameUtils.generateVariableName("ignored", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
                   }
                   return identifier;

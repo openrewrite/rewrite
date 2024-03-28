@@ -192,10 +192,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     private void recordSourceFileResult(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
-        String beforePath = (before == null) ? "" : before.getSourcePath().toString();
-        String afterPath = (after == null) ? "" : after.getSourcePath().toString();
+        String beforePath = before == null ? "" : before.getSourcePath().toString();
+        String afterPath = after == null ? "" : after.getSourcePath().toString();
         Recipe recipe = recipeStack.peek();
-        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null) ? 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
+        Long effortSeconds = recipe.getEstimatedEffortPerOccurrence() == null ? 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
         String parentName = "";
         boolean hierarchical = recipeStack.size() > 1;
         if (hierarchical) {

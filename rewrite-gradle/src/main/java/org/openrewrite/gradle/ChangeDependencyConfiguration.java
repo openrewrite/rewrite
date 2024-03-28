@@ -139,7 +139,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
                 } else if (args.get(0) instanceof J.MethodInvocation) {
                     J.MethodInvocation inner = (J.MethodInvocation) args.get(0);
-                    if (!(inner.getSimpleName().equals("project") || inner.getSimpleName().equals("platform") || inner.getSimpleName().equals("enforcedPlatform"))) {
+                    if (!("project".equals(inner.getSimpleName()) || "platform".equals(inner.getSimpleName()) || "enforcedPlatform".equals(inner.getSimpleName()))) {
                         return m;
                     }
                     List<Expression> innerArgs = inner.getArguments();
@@ -152,7 +152,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
 
                     Dependency dependency;
-                    if (inner.getSimpleName().equals("project")) {
+                    if ("project".equals(inner.getSimpleName())) {
                         dependency = new Dependency("", ((String) value.getValue()).substring(1), null, null, null);
                     } else {
                         dependency = DependencyStringNotationConverter.parse((String) value.getValue());

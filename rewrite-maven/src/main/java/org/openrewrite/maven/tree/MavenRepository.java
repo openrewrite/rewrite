@@ -105,7 +105,7 @@ public class MavenRepository implements Serializable {
     @Data
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Accessors(fluent = true, chain = true)
-    public static class Builder {
+    public static final class Builder {
         String id;
         String uri;
 

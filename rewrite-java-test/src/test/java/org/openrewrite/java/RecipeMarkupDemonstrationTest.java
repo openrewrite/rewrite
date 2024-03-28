@@ -36,7 +36,7 @@ class RecipeMarkupDemonstrationTest implements RewriteTest {
             String.format("""
               /*~~(This is a%s %s message.)~~>*/class Test {
               }
-              """, level.equals("error") || level.equals("info") ? "n" : "", level)
+              """, "error".equals(level) || "info".equals(level) ? "n" : "", level)
           )
         );
     }

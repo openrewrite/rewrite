@@ -198,7 +198,7 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
             .append(space.getWhitespace()).append("\"");
         sb.append(" comments=\"")
             .append(String.join(",", space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(Collectors.toList())))
-            .append("\"");;
+            .append("\"");
         return sb.toString().replace("\n", "\\s\n");
     }
 

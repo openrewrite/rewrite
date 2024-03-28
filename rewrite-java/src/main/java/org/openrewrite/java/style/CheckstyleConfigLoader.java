@@ -37,7 +37,7 @@ import static java.util.stream.Collectors.*;
 import static org.openrewrite.java.style.Checkstyle.defaultBlockPolicy;
 import static org.openrewrite.java.style.Checkstyle.defaultOperatorWrapStyleOption;
 
-public class CheckstyleConfigLoader {
+public final class CheckstyleConfigLoader {
     private CheckstyleConfigLoader() {
     }
 
@@ -596,7 +596,7 @@ public class CheckstyleConfigLoader {
                 name -> {
                     Object prop = properties.get(name);
                     return prop == null ?
-                            name.equals("config_loc") ? "config/checkstyle" : null :
+                            "config_loc".equals(name) ? "config/checkstyle" : null :
                             prop.toString();
                 },
                 ConfigurationLoader.IgnoredModulesOptions.OMIT);

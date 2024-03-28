@@ -157,7 +157,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     }
                     GradleSettings gradleSettings = maybeGradleSettings.get();
                     cu = withPlugin(cu, "com.gradle.enterprise", versionComparator, null, gradleSettings, ctx);
-                } else if (!gradleSixOrLater && cu.getSourcePath().toString().equals("build.gradle")) {
+                } else if (!gradleSixOrLater && "build.gradle".equals(cu.getSourcePath().toString())) {
                     // Older than 6.0 goes in root build.gradle only, not in build.gradle of subprojects
                     Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
                     if (!maybeGradleProject.isPresent()) {
@@ -209,7 +209,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
-                if (method.getSimpleName().equals("gradleEnterprise")) {
+                if ("gradleEnterprise".equals(method.getSimpleName())) {
                     atomicBoolean.set(true);
                 }
                 return super.visitMethodInvocation(method, atomicBoolean);
@@ -224,16 +224,16 @@ public class AddDevelocityGradlePlugin extends Recipe {
         if (server == null && allowUntrustedServer == null && captureTaskInputFiles == null && uploadInBackground == null && publishCriteria == null) {
             return null;
         }
-        boolean versionIsAtLeast3_2 = versionComparator.compare(null, newVersion, "3.2") >= 0;
-        boolean versionIsAtLeast3_7 = versionComparator.compare(null, newVersion, "3.7") >= 0;
+        boolean versionIsAtLeast32 = versionComparator.compare(null, newVersion, "3.2") >= 0;
+        boolean versionIsAtLeast37 = versionComparator.compare(null, newVersion, "3.7") >= 0;
         StringBuilder ge = new StringBuilder("\ngradleEnterprise {\n");
         if (server != null && !server.isEmpty()) {
             ge.append(indent).append("server = '").append(server).append("'\n");
         }
-        if (allowUntrustedServer != null && versionIsAtLeast3_2) {
+        if (allowUntrustedServer != null && versionIsAtLeast32) {
             ge.append(indent).append("allowUntrustedServer = ").append(allowUntrustedServer).append("\n");
         }
-        if (captureTaskInputFiles != null || uploadInBackground != null || (allowUntrustedServer != null && !versionIsAtLeast3_2) || publishCriteria != null) {
+        if (captureTaskInputFiles != null || uploadInBackground != null || (allowUntrustedServer != null && !versionIsAtLeast32) || publishCriteria != null) {
             ge.append(indent).append("buildScan {\n");
             if (publishCriteria != null) {
                 if (publishCriteria == PublishCriteria.Always) {
@@ -242,14 +242,14 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     ge.append(indent).append(indent).append("publishOnFailure()\n");
                 }
             }
-            if (allowUntrustedServer != null && !versionIsAtLeast3_2) {
+            if (allowUntrustedServer != null && !versionIsAtLeast32) {
                 ge.append(indent).append(indent).append("allowUntrustedServer = ").append(allowUntrustedServer).append("\n");
             }
             if (uploadInBackground != null) {
                 ge.append(indent).append(indent).append("uploadInBackground = ").append(uploadInBackground).append("\n");
             }
             if (captureTaskInputFiles != null) {
-                if (versionIsAtLeast3_7) {
+                if (versionIsAtLeast37) {
                     ge.append(indent).append(indent).append("capture {\n");
                     ge.append(indent).append(indent).append(indent).append("taskInputFiles = ").append(captureTaskInputFiles).append("\n");
                     ge.append(indent).append(indent).append("}\n");

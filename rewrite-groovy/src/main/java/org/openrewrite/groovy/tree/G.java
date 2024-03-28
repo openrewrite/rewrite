@@ -296,7 +296,7 @@ public interface G extends J {
                             break;
                         }
                     }
-                    return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                    return hasChanges ? new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof) : t;
                 }
             }
 
@@ -331,7 +331,7 @@ public interface G extends J {
                             break;
                         }
                     }
-                    return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                    return hasChanges ? new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof) : t;
                 }
             }
 

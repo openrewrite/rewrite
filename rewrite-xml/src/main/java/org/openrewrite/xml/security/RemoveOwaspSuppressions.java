@@ -63,7 +63,7 @@ public class RemoveOwaspSuppressions extends Recipe {
                     Xml.Tag child = (Xml.Tag) content;
                     if (child.getName().equals("suppress")) {
                         for (Xml.Attribute attribute : child.getAttributes()) {
-                            if (attribute.getKeyAsString().equals("until")) {
+                            if ("until".equals(attribute.getKeyAsString())) {
                                 String maybeDate = attribute.getValueAsString();
                                 if (maybeDate.endsWith("Z")) {
                                     maybeDate = maybeDate.substring(0, maybeDate.length() - 1);

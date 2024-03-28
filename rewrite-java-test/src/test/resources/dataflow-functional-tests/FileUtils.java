@@ -173,7 +173,7 @@ public class FileUtils {
             if (file.isDirectory()) {
                 throw new IOException("File '" + file + "' exists but is a directory");
             }
-            if (file.canRead() == false) {
+            if (!file.canRead()) {
                 throw new IOException("File '" + file + "' cannot be read");
             }
         } else {
@@ -208,13 +208,13 @@ public class FileUtils {
             if (file.isDirectory()) {
                 throw new IOException("File '" + file + "' exists but is a directory");
             }
-            if (file.canWrite() == false) {
+            if (!file.canWrite()) {
                 throw new IOException("File '" + file + "' cannot be written to");
             }
         } else {
             File parent = file.getParentFile();
-            if (parent != null && parent.exists() == false) {
-                if (parent.mkdirs() == false) {
+            if (parent != null && !parent.exists()) {
+                if (!parent.mkdirs()) {
                     throw new IOException("File '" + file + "' could not be created");
                 }
             }
@@ -240,13 +240,13 @@ public class FileUtils {
         String displaySize;
 
         if (size / ONE_GB > 0) {
-            displaySize = String.valueOf(size / ONE_GB) + " GB";
+            displaySize = size / ONE_GB + " GB";
         } else if (size / ONE_MB > 0) {
-            displaySize = String.valueOf(size / ONE_MB) + " MB";
+            displaySize = size / ONE_MB + " MB";
         } else if (size / ONE_KB > 0) {
-            displaySize = String.valueOf(size / ONE_KB) + " KB";
+            displaySize = size / ONE_KB + " KB";
         } else {
-            displaySize = String.valueOf(size) + " bytes";
+            displaySize = size + " bytes";
         }
         return displaySize;
     }
@@ -360,7 +360,7 @@ public class FileUtils {
         }
 
         //Find files
-        Collection<File> files = new java.util.LinkedList<File>();
+        Collection<File> files = new java.util.LinkedList<>();
         innerListFiles(files, directory,
                 FileFilterUtils.or(effFileFilter, effDirFilter));
         return files;
@@ -599,7 +599,7 @@ public class FileUtils {
         for (int i = 0; i < urls.length; i++) {
             URL url = urls[i];
             if (url != null) {
-                if (url.getProtocol().equals("file") == false) {
+                if (!"file".equals(url.getProtocol())) {
                     throw new IllegalArgumentException(
                             "URL could not be converted to a File: " + url);
                 }
@@ -683,7 +683,7 @@ public class FileUtils {
         if (destDir == null) {
             throw new NullPointerException("Destination must not be null");
         }
-        if (destDir.exists() && destDir.isDirectory() == false) {
+        if (destDir.exists() && !destDir.isDirectory()) {
             throw new IllegalArgumentException("Destination '" + destDir + "' is not a directory");
         }
         File destFile = new File(destDir, srcFile.getName());
@@ -747,7 +747,7 @@ public class FileUtils {
         if (destFile == null) {
             throw new NullPointerException("Destination must not be null");
         }
-        if (srcFile.exists() == false) {
+        if (!srcFile.exists()) {
             throw new FileNotFoundException("Source '" + srcFile + "' does not exist");
         }
         if (srcFile.isDirectory()) {
@@ -756,12 +756,12 @@ public class FileUtils {
         if (srcFile.getCanonicalPath().equals(destFile.getCanonicalPath())) {
             throw new IOException("Source '" + srcFile + "' and destination '" + destFile + "' are the same");
         }
-        if (destFile.getParentFile() != null && destFile.getParentFile().exists() == false) {
-            if (destFile.getParentFile().mkdirs() == false) {
+        if (destFile.getParentFile() != null && !destFile.getParentFile().exists()) {
+            if (!destFile.getParentFile().mkdirs()) {
                 throw new IOException("Destination '" + destFile + "' directory cannot be created");
             }
         }
-        if (destFile.exists() && destFile.canWrite() == false) {
+        if (destFile.exists() && !destFile.canWrite()) {
             throw new IOException("Destination '" + destFile + "' exists but is read-only");
         }
         doCopyFile(srcFile, destFile, preserveFileDate);
@@ -840,13 +840,13 @@ public class FileUtils {
         if (srcDir == null) {
             throw new NullPointerException("Source must not be null");
         }
-        if (srcDir.exists() && srcDir.isDirectory() == false) {
+        if (srcDir.exists() && !srcDir.isDirectory()) {
             throw new IllegalArgumentException("Source '" + destDir + "' is not a directory");
         }
         if (destDir == null) {
             throw new NullPointerException("Destination must not be null");
         }
-        if (destDir.exists() && destDir.isDirectory() == false) {
+        if (destDir.exists() && !destDir.isDirectory()) {
             throw new IllegalArgumentException("Destination '" + destDir + "' is not a directory");
         }
         copyDirectory(srcDir, new File(destDir, srcDir.getName()), true);
@@ -1014,10 +1014,10 @@ public class FileUtils {
         if (destDir == null) {
             throw new NullPointerException("Destination must not be null");
         }
-        if (srcDir.exists() == false) {
+        if (!srcDir.exists()) {
             throw new FileNotFoundException("Source '" + srcDir + "' does not exist");
         }
-        if (srcDir.isDirectory() == false) {
+        if (!srcDir.isDirectory()) {
             throw new IOException("Source '" + srcDir + "' exists but is not a directory");
         }
         if (srcDir.getCanonicalPath().equals(destDir.getCanonicalPath())) {
@@ -1030,7 +1030,7 @@ public class FileUtils {
         if (canonicalDestDir.startsWith(srcDir.getCanonicalPath())) {
             File[] srcFiles = filter == null ? srcDir.listFiles() : srcDir.listFiles(filter);
             if (srcFiles != null && srcFiles.length > 0) {
-                exclusionList = new ArrayList<String>(srcFiles.length);
+                exclusionList = new ArrayList<>(srcFiles.length);
                 for (File srcFile : srcFiles) {
                     File copiedFile = new File(destDir, srcFile.getName());
                     exclusionList.add(copiedFile.getCanonicalPath());
@@ -1059,15 +1059,15 @@ public class FileUtils {
             throw new IOException("Failed to list contents of " + srcDir);
         }
         if (destDir.exists()) {
-            if (destDir.isDirectory() == false) {
+            if (!destDir.isDirectory()) {
                 throw new IOException("Destination '" + destDir + "' exists but is not a directory");
             }
         } else {
-            if (destDir.mkdirs() == false) {
+            if (!destDir.mkdirs()) {
                 throw new IOException("Destination '" + destDir + "' directory cannot be created");
             }
         }
-        if (destDir.canWrite() == false) {
+        if (!destDir.canWrite()) {
             throw new IOException("Destination '" + destDir + "' cannot be written to");
         }
         for (File file : files) {
@@ -2190,10 +2190,6 @@ public class FileUtils {
             fileInCanonicalDir = new File(canonicalDir, file.getName());
         }
 
-        if (fileInCanonicalDir.getCanonicalFile().equals(fileInCanonicalDir.getAbsoluteFile())) {
-            return false;
-        } else {
-            return true;
-        }
+        return !fileInCanonicalDir.getCanonicalFile().equals(fileInCanonicalDir.getAbsoluteFile());
     }
 }

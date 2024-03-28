@@ -28,6 +28,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -84,10 +85,10 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 JavaType.Class t = asClass(cu.getClasses().get(0).getAllAnnotations().get(0).getType());
-                assertThat(t.getMethods().stream().filter(m -> m.getName().equals("scalar"))
+                assertThat(t.getMethods().stream().filter(m -> "scalar".equals(m.getName()))
                   .map(JavaType.Method::getDefaultValue).map(dv -> dv.get(0))).containsExactly("1");
-                assertThat(t.getMethods().stream().filter(m -> m.getName().equals("array"))
-                  .map(JavaType.Method::getDefaultValue).flatMap(dv -> dv.stream())).hasSize(2);
+                assertThat(t.getMethods().stream().filter(m -> "array".equals(m.getName()))
+                  .map(JavaType.Method::getDefaultValue).flatMap(Collection::stream)).hasSize(2);
             })
           )
         );
@@ -235,7 +236,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
 
               @Override
               public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
-                  if (variable.getSimpleName().equals("l")) {
+                  if ("l".equals(variable.getSimpleName())) {
                       assertThat(variable.getType().toString()).isEqualTo("java.lang.Long");
                   }
                   return super.visitVariable(variable, executionContext);

@@ -63,7 +63,7 @@ public class CategoryTree<G> {
         groups.add(group);
     }
 
-    public static class Root<G> extends CategoryTree<G> {
+    public static final class Root<G> extends CategoryTree<G> {
         private static final CategoryDescriptor ROOT_DESCRIPTOR = new CategoryDescriptor(
                 "ε", "", "", emptySet(), true,
                 CategoryDescriptor.LOWEST_PRECEDENCE, true);

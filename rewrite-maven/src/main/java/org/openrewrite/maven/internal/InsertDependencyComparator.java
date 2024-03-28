@@ -33,8 +33,8 @@ public class InsertDependencyComparator implements Comparator<Content> {
         // if everything were ideally sorted, which dependency would the addable dependency
         // come after?
         List<Xml.Tag> ideallySortedDependencies = existingDependencies.stream()
-                .filter(c -> c instanceof Xml.Tag)
-                .map(c -> (Xml.Tag) c)
+                .filter(Xml.Tag.class::isInstance)
+                .map(Xml.Tag.class::cast)
                 .collect(Collectors.toList());
 
         ideallySortedDependencies.add(dependencyTag);

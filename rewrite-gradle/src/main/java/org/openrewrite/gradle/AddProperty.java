@@ -125,19 +125,19 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
                 if (filePattern != null) {
                     if (new FindSourceFiles(filePattern).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile &&
                         sourceFile.getSourcePath().endsWith("gradle.properties")) {
-                        Tree t = !Boolean.TRUE.equals(overwrite) ?
-                                sourceFile :
+                        Tree t = Boolean.TRUE.equals(overwrite) ?
                                 new ChangePropertyValue(key, value, null, false, null)
-                                        .getVisitor().visitNonNull(sourceFile, ctx);
+                                        .getVisitor().visitNonNull(sourceFile, ctx) :
+                                sourceFile;
                         return new org.openrewrite.properties.AddProperty(key, value, null, null)
                                 .getVisitor()
                                 .visitNonNull(t, ctx);
                     }
                 } else if (sourceFile.getSourcePath().endsWith("gradle.properties")) {
-                    Tree t = !Boolean.TRUE.equals(overwrite) ?
-                            sourceFile :
+                    Tree t = Boolean.TRUE.equals(overwrite) ?
                             new ChangePropertyValue(key, value, null, false, null)
-                                    .getVisitor().visitNonNull(sourceFile, ctx);
+                                    .getVisitor().visitNonNull(sourceFile, ctx) :
+                            sourceFile;
                     return new org.openrewrite.properties.AddProperty(key, value, null, null)
                             .getVisitor()
                             .visitNonNull(t, ctx);

@@ -66,7 +66,7 @@ public class LatestIntegration extends LatestRelease {
     }
 
     public static Validated<LatestIntegration> build(String toVersion, @Nullable String metadataPattern) {
-        return ("latest.integration".equalsIgnoreCase(toVersion) || "latest.snapshot".equalsIgnoreCase(toVersion)) ?
+        return "latest.integration".equalsIgnoreCase(toVersion) || "latest.snapshot".equalsIgnoreCase(toVersion) ?
                 Validated.valid("latestIntegration", new LatestIntegration(metadataPattern)) :
                 Validated.invalid("latestIntegration", toVersion, "not latest integration");
     }

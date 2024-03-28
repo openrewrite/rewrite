@@ -35,12 +35,22 @@ public class VersionRangeParser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		COMMA=1, PROPERTY_OPEN=2, PROPERTY_CLOSE=3, OPEN_RANGE_OPEN=4, OPEN_RANGE_CLOSE=5, 
-		CLOSED_RANGE_OPEN=6, CLOSED_RANGE_CLOSE=7, Version=8, WS=9;
-	public static final int
-		RULE_versionRequirement = 0, RULE_range = 1, RULE_bounds = 2, RULE_exactly = 3, 
-		RULE_boundedLower = 4, RULE_unboundedLower = 5, RULE_version = 6;
+    public static final int COMMA = 1;
+    public static final int PROPERTY_OPEN = 2;
+    public static final int PROPERTY_CLOSE = 3;
+    public static final int OPEN_RANGE_OPEN = 4;
+    public static final int OPEN_RANGE_CLOSE = 5;
+    public static final int CLOSED_RANGE_OPEN = 6;
+    public static final int CLOSED_RANGE_CLOSE = 7;
+    public static final int Version = 8;
+    public static final int WS = 9;
+    public static final int RULE_versionRequirement = 0;
+    public static final int RULE_range = 1;
+    public static final int RULE_bounds = 2;
+    public static final int RULE_exactly = 3;
+    public static final int RULE_boundedLower = 4;
+    public static final int RULE_unboundedLower = 5;
+    public static final int RULE_version = 6;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"versionRequirement", "range", "bounds", "exactly", "boundedLower", "unboundedLower", 
@@ -131,32 +141,39 @@ public class VersionRangeParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_versionRequirement; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).enterVersionRequirement(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).enterVersionRequirement(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).exitVersionRequirement(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).exitVersionRequirement(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitVersionRequirement(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof VersionRangeParserVisitor) {
+                return ((VersionRangeParserVisitor<? extends T>) visitor).visitVersionRequirement(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final VersionRequirementContext versionRequirement() throws RecognitionException {
-		VersionRequirementContext _localctx = new VersionRequirementContext(_ctx, getState());
-		enterRule(_localctx, 0, RULE_versionRequirement);
-		int _la;
+		VersionRequirementContext localctx = new VersionRequirementContext(_ctx, getState());
+		enterRule(localctx, 0, RULE_versionRequirement);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(14);
 			range();
 			setState(19);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==COMMA) {
+			la = _input.LA(1);
+			while (la==COMMA) {
 				{
 				{
 				setState(15);
@@ -167,19 +184,19 @@ public class VersionRangeParser extends Parser {
 				}
 				setState(21);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -197,59 +214,70 @@ public class VersionRangeParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_range; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).enterRange(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).enterRange(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).exitRange(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).exitRange(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitRange(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof VersionRangeParserVisitor) {
+                return ((VersionRangeParserVisitor<? extends T>) visitor).visitRange(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final RangeContext range() throws RecognitionException {
-		RangeContext _localctx = new RangeContext(_ctx, getState());
-		enterRule(_localctx, 2, RULE_range);
-		int _la;
+		RangeContext localctx = new RangeContext(_ctx, getState());
+		enterRule(localctx, 2, RULE_range);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(22);
-			_la = _input.LA(1);
-			if ( !(_la==OPEN_RANGE_OPEN || _la==CLOSED_RANGE_OPEN) ) {
+			la = _input.LA(1);
+			if ( !(la==OPEN_RANGE_OPEN || la==CLOSED_RANGE_OPEN) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			setState(23);
 			bounds();
 			setState(24);
-			_la = _input.LA(1);
-			if ( !(_la==OPEN_RANGE_CLOSE || _la==CLOSED_RANGE_CLOSE) ) {
+			la = _input.LA(1);
+			if ( !(la==OPEN_RANGE_CLOSE || la==CLOSED_RANGE_CLOSE) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -269,42 +297,49 @@ public class VersionRangeParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_bounds; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).enterBounds(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).enterBounds(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).exitBounds(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).exitBounds(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitBounds(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof VersionRangeParserVisitor) {
+                return ((VersionRangeParserVisitor<? extends T>) visitor).visitBounds(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final BoundsContext bounds() throws RecognitionException {
-		BoundsContext _localctx = new BoundsContext(_ctx, getState());
-		enterRule(_localctx, 4, RULE_bounds);
+		BoundsContext localctx = new BoundsContext(_ctx, getState());
+		enterRule(localctx, 4, RULE_bounds);
 		try {
 			setState(29);
 			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,1,_ctx) ) {
 			case 1:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(26);
 				boundedLower();
 				}
 				break;
 			case 2:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(27);
 				unboundedLower();
 				}
 				break;
 			case 3:
-				enterOuterAlt(_localctx, 3);
+				enterOuterAlt(localctx, 3);
 				{
 				setState(28);
 				exactly();
@@ -313,14 +348,14 @@ public class VersionRangeParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -332,38 +367,45 @@ public class VersionRangeParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_exactly; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).enterExactly(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).enterExactly(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).exitExactly(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).exitExactly(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitExactly(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof VersionRangeParserVisitor) {
+                return ((VersionRangeParserVisitor<? extends T>) visitor).visitExactly(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ExactlyContext exactly() throws RecognitionException {
-		ExactlyContext _localctx = new ExactlyContext(_ctx, getState());
-		enterRule(_localctx, 6, RULE_exactly);
+		ExactlyContext localctx = new ExactlyContext(_ctx, getState());
+		enterRule(localctx, 6, RULE_exactly);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(31);
 			match(Version);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -379,25 +421,32 @@ public class VersionRangeParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_boundedLower; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).enterBoundedLower(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).enterBoundedLower(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).exitBoundedLower(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).exitBoundedLower(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitBoundedLower(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof VersionRangeParserVisitor) {
+                return ((VersionRangeParserVisitor<? extends T>) visitor).visitBoundedLower(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final BoundedLowerContext boundedLower() throws RecognitionException {
-		BoundedLowerContext _localctx = new BoundedLowerContext(_ctx, getState());
-		enterRule(_localctx, 8, RULE_boundedLower);
-		int _la;
+		BoundedLowerContext localctx = new BoundedLowerContext(_ctx, getState());
+		enterRule(localctx, 8, RULE_boundedLower);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			{
 			setState(33);
@@ -406,8 +455,8 @@ public class VersionRangeParser extends Parser {
 			match(COMMA);
 			setState(36);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==Version) {
+			la = _input.LA(1);
+			if (la==Version) {
 				{
 				setState(35);
 				match(Version);
@@ -418,14 +467,14 @@ public class VersionRangeParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -438,33 +487,40 @@ public class VersionRangeParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_unboundedLower; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).enterUnboundedLower(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).enterUnboundedLower(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).exitUnboundedLower(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).exitUnboundedLower(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitUnboundedLower(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof VersionRangeParserVisitor) {
+                return ((VersionRangeParserVisitor<? extends T>) visitor).visitUnboundedLower(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final UnboundedLowerContext unboundedLower() throws RecognitionException {
-		UnboundedLowerContext _localctx = new UnboundedLowerContext(_ctx, getState());
-		enterRule(_localctx, 10, RULE_unboundedLower);
-		int _la;
+		UnboundedLowerContext localctx = new UnboundedLowerContext(_ctx, getState());
+		enterRule(localctx, 10, RULE_unboundedLower);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			{
 			setState(38);
 			match(COMMA);
 			setState(40);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==Version) {
+			la = _input.LA(1);
+			if (la==Version) {
 				{
 				setState(39);
 				match(Version);
@@ -475,14 +531,14 @@ public class VersionRangeParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -496,35 +552,42 @@ public class VersionRangeParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_version; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).enterVersion(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).enterVersion(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof VersionRangeParserListener ) ((VersionRangeParserListener)listener).exitVersion(this);
+            if (listener instanceof VersionRangeParserListener) {
+                ((VersionRangeParserListener) listener).exitVersion(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitVersion(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof VersionRangeParserVisitor) {
+                return ((VersionRangeParserVisitor<? extends T>) visitor).visitVersion(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final VersionContext version() throws RecognitionException {
-		VersionContext _localctx = new VersionContext(_ctx, getState());
-		enterRule(_localctx, 12, RULE_version);
+		VersionContext localctx = new VersionContext(_ctx, getState());
+		enterRule(localctx, 12, RULE_version);
 		try {
 			setState(46);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case Version:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(42);
 				match(Version);
 				}
 				break;
 			case PROPERTY_OPEN:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				{
 				setState(43);
@@ -541,14 +604,14 @@ public class VersionRangeParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	public static final String _serializedATN =

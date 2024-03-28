@@ -27,7 +27,7 @@ import static java.lang.Integer.parseInt;
  * Allows patch-level changes if a minor version is specified on the comparator. Allows minor-level changes if not.
  * <a href="https://github.com/npm/node-semver#tilde-ranges-123-12-1">Tilde ranges</a>.
  */
-public class TildeRange extends LatestRelease {
+public final class TildeRange extends LatestRelease {
     private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?");
 
     private final String upperExclusive;

@@ -112,8 +112,8 @@ public class FindAnnotations extends Recipe {
                         new HashSet<>()
                 )
                 .stream()
-                .filter(a -> a instanceof J.Annotation)
-                .map(a -> (J.Annotation) a)
+                .filter(J.Annotation.class::isInstance)
+                .map(J.Annotation.class::cast)
                 .collect(toSet());
     }
 }

@@ -32,7 +32,7 @@ import java.nio.file.Path;
  * cross-contamination of the directory between recipes.
  */
 @Incubating(since = "8.12.0")
-public class WorkingDirectoryExecutionContextView extends DelegatingExecutionContext {
+public final class WorkingDirectoryExecutionContextView extends DelegatingExecutionContext {
     public static final String WORKING_DIRECTORY_ROOT = "org.openrewrite.scheduling.workingDirectory";
 
     private WorkingDirectoryExecutionContextView(ExecutionContext delegate) {

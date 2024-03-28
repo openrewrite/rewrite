@@ -149,7 +149,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     }
 
     static class MavenWrapperState {
-        boolean needsWrapperUpdate = false;
+        boolean needsWrapperUpdate;
         @Nullable BuildTool updatedMarker;
         boolean addMavenWrapperProperties = true;
         boolean addMavenWrapperDownloader = true;
@@ -197,7 +197,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             acc.needsWrapperUpdate = true;
                             acc.updatedMarker = buildTool.withVersion(mavenWrapper.getDistributionVersion());
                             return true;
-                        } else return compare == 0;
+                        } else {
+                            return compare == 0;
+                        }
                     }
 
                     @Override

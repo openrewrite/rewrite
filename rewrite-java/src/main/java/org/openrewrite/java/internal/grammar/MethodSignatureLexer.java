@@ -30,10 +30,22 @@ public class MethodSignatureLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7, 
-		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15, 
-		Identifier=16;
+    public static final int CONSTRUCTOR = 1;
+    public static final int LPAREN = 2;
+    public static final int RPAREN = 3;
+    public static final int LBRACK = 4;
+    public static final int RBRACK = 5;
+    public static final int COMMA = 6;
+    public static final int DOT = 7;
+    public static final int BANG = 8;
+    public static final int WILDCARD = 9;
+    public static final int AND = 10;
+    public static final int OR = 11;
+    public static final int ELLIPSIS = 12;
+    public static final int DOTDOT = 13;
+    public static final int POUND = 14;
+    public static final int SPACE = 15;
+    public static final int Identifier = 16;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};
@@ -125,30 +137,27 @@ public class MethodSignatureLexer extends Lexer {
 
 	@Override
 	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
-		switch (ruleIndex) {
-		case 16:
-			return JavaLetter_sempred((RuleContext)_localctx, predIndex);
-		case 17:
-			return JavaLetterOrDigit_sempred((RuleContext)_localctx, predIndex);
-		}
+        if (ruleIndex == 16) {
+            return JavaLetter_sempred((RuleContext) _localctx, predIndex);
+        } else if (ruleIndex == 17) {
+            return JavaLetterOrDigit_sempred((RuleContext) _localctx, predIndex);
+        }
 		return true;
 	}
 	private boolean JavaLetter_sempred(RuleContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 0:
-			return Character.isJavaIdentifierStart(_input.LA(-1));
-		case 1:
-			return Character.isJavaIdentifierStart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)));
-		}
+        if (predIndex == 0) {
+            return Character.isJavaIdentifierStart(_input.LA(-1));
+        } else if (predIndex == 1) {
+            return Character.isJavaIdentifierStart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1)));
+        }
 		return true;
 	}
 	private boolean JavaLetterOrDigit_sempred(RuleContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 2:
-			return Character.isJavaIdentifierPart(_input.LA(-1));
-		case 3:
-			return Character.isJavaIdentifierPart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)));
-		}
+        if (predIndex == 2) {
+            return Character.isJavaIdentifierPart(_input.LA(-1));
+        } else if (predIndex == 3) {
+            return Character.isJavaIdentifierPart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1)));
+        }
 		return true;
 	}
 

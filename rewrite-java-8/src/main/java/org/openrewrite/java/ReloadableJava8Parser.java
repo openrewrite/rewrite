@@ -261,7 +261,7 @@ class ReloadableJava8Parser implements JavaParser {
         }
     }
 
-    private static class TimedTodo extends Todo {
+    private static final class TimedTodo extends Todo {
         private final Todo todo;
         private @Nullable Timer.Sample sample;
 
@@ -330,7 +330,7 @@ class ReloadableJava8Parser implements JavaParser {
         }
     }
 
-    private static class PackageAwareJavaFileObject extends SimpleJavaFileObject {
+    private static final class PackageAwareJavaFileObject extends SimpleJavaFileObject {
         private final String pkg;
         private final String className;
         private final byte[] classBytes;

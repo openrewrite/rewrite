@@ -50,7 +50,7 @@ public interface VersionComparator extends Comparator<String> {
                 }
             }
         }
-        return (seen ? Optional.of(best) : Optional.<String>empty())
+        return (seen ? Optional.of(best) : Optional.empty())
                 .filter(v -> !v.equals(currentVersion));
     }
 }

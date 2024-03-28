@@ -49,7 +49,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     private final Charset charset;
     private final boolean charsetBomMarked;
 
-    private int cursor = 0;
+    private int cursor;
 
     public XmlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;

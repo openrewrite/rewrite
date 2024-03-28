@@ -75,12 +75,12 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
                     boolean hasUntil = false;
                     List<Xml.Attribute> attributes = t.getAttributes();
                     for (Xml.Attribute attribute : attributes) {
-                        if (attribute.getKeyAsString().equals("until")) {
+                        if ("until".equals(attribute.getKeyAsString())) {
                             hasUntil = true;
                         }
                     }
                     if (!hasUntil) {
-                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plusDays(30).toString();
+                        String date = untilDate != null && !untilDate.isEmpty() ? untilDate : LocalDate.now().plusDays(30).toString();
                         return t.withAttributes(ListUtils.concat(attributes, autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
                                 new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
                                 "",

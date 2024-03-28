@@ -82,7 +82,7 @@ public class ChangeMethodTargetToVariable extends Recipe {
         );
     }
 
-    private class ChangeMethodTargetToVariableVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private final class ChangeMethodTargetToVariableVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
         private final JavaType.Class variableType;
 

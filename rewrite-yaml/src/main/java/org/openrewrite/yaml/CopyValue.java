@@ -62,9 +62,9 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Override
     public String getInstanceNameSuffix() {
         return String.format("%s`%s` to %s`%s`",
-                (oldFilePath == null) ? "" : oldFilePath + ":",
+                oldFilePath == null ? "" : oldFilePath + ":",
                 oldKeyPath,
-                (newFilePath == null) ? "" : newFilePath + ":",
+                newFilePath == null ? "" : newFilePath + ":",
                 newKey);
     }
 

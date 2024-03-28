@@ -35,19 +35,62 @@ public class JsonPathParser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		WS=1, UTF_8_BOM=2, MATCHES_REGEX_OPEN=3, LBRACE=4, RBRACE=5, LBRACK=6, 
-		RBRACK=7, LPAREN=8, RPAREN=9, AT=10, DOT=11, DOT_DOT=12, ROOT=13, WILDCARD=14, 
-		COLON=15, QUESTION=16, CONTAINS=17, Identifier=18, StringLiteral=19, PositiveNumber=20, 
-		NegativeNumber=21, NumericLiteral=22, COMMA=23, TICK=24, QUOTE=25, MATCHES=26, 
-		LOGICAL_OPERATOR=27, AND=28, OR=29, EQUALITY_OPERATOR=30, EQ=31, NE=32, 
-		TRUE=33, FALSE=34, NULL=35, MATCHES_REGEX_CLOSE=36, S=37, REGEX=38;
-	public static final int
-		RULE_jsonPath = 0, RULE_expression = 1, RULE_dotOperator = 2, RULE_recursiveDecent = 3, 
-		RULE_bracketOperator = 4, RULE_filter = 5, RULE_filterExpression = 6, 
-		RULE_binaryExpression = 7, RULE_containsExpression = 8, RULE_regexExpression = 9, 
-		RULE_unaryExpression = 10, RULE_literalExpression = 11, RULE_property = 12, 
-		RULE_wildcard = 13, RULE_slice = 14, RULE_start = 15, RULE_end = 16, RULE_indexes = 17;
+    public static final int WS = 1;
+    public static final int UTF_8_BOM = 2;
+    public static final int MATCHES_REGEX_OPEN = 3;
+    public static final int LBRACE = 4;
+    public static final int RBRACE = 5;
+    public static final int LBRACK = 6;
+    public static final int RBRACK = 7;
+    public static final int LPAREN = 8;
+    public static final int RPAREN = 9;
+    public static final int AT = 10;
+    public static final int DOT = 11;
+    public static final int DOT_DOT = 12;
+    public static final int ROOT = 13;
+    public static final int WILDCARD = 14;
+    public static final int COLON = 15;
+    public static final int QUESTION = 16;
+    public static final int CONTAINS = 17;
+    public static final int Identifier = 18;
+    public static final int StringLiteral = 19;
+    public static final int PositiveNumber = 20;
+    public static final int NegativeNumber = 21;
+    public static final int NumericLiteral = 22;
+    public static final int COMMA = 23;
+    public static final int TICK = 24;
+    public static final int QUOTE = 25;
+    public static final int MATCHES = 26;
+    public static final int LOGICAL_OPERATOR = 27;
+    public static final int AND = 28;
+    public static final int OR = 29;
+    public static final int EQUALITY_OPERATOR = 30;
+    public static final int EQ = 31;
+    public static final int NE = 32;
+    public static final int TRUE = 33;
+    public static final int FALSE = 34;
+    public static final int NULL = 35;
+    public static final int MATCHES_REGEX_CLOSE = 36;
+    public static final int S = 37;
+    public static final int REGEX = 38;
+    public static final int RULE_jsonPath = 0;
+    public static final int RULE_expression = 1;
+    public static final int RULE_dotOperator = 2;
+    public static final int RULE_recursiveDecent = 3;
+    public static final int RULE_bracketOperator = 4;
+    public static final int RULE_filter = 5;
+    public static final int RULE_filterExpression = 6;
+    public static final int RULE_binaryExpression = 7;
+    public static final int RULE_containsExpression = 8;
+    public static final int RULE_regexExpression = 9;
+    public static final int RULE_unaryExpression = 10;
+    public static final int RULE_literalExpression = 11;
+    public static final int RULE_property = 12;
+    public static final int RULE_wildcard = 13;
+    public static final int RULE_slice = 14;
+    public static final int RULE_start = 15;
+    public static final int RULE_end = 16;
+    public static final int RULE_indexes = 17;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"jsonPath", "expression", "dotOperator", "recursiveDecent", "bracketOperator", 
@@ -143,31 +186,38 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_jsonPath; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterJsonPath(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterJsonPath(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitJsonPath(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitJsonPath(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitJsonPath(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitJsonPath(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final JsonPathContext jsonPath() throws RecognitionException {
-		JsonPathContext _localctx = new JsonPathContext(_ctx, getState());
-		enterRule(_localctx, 0, RULE_jsonPath);
-		int _la;
+		JsonPathContext localctx = new JsonPathContext(_ctx, getState());
+		enterRule(localctx, 0, RULE_jsonPath);
+		int la;
 		try {
-			int _alt;
-			enterOuterAlt(_localctx, 1);
+			int alt;
+			enterOuterAlt(localctx, 1);
 			{
 			setState(37);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==ROOT) {
+			la = _input.LA(1);
+			if (la==ROOT) {
 				{
 				setState(36);
 				match(ROOT);
@@ -176,35 +226,31 @@ public class JsonPathParser extends Parser {
 
 			setState(40); 
 			_errHandler.sync(this);
-			_alt = 1;
+			alt = 1;
 			do {
-				switch (_alt) {
-				case 1:
-					{
-					{
-					setState(39);
-					expression();
-					}
-					}
-					break;
-				default:
-					throw new NoViableAltException(this);
-				}
+                if (alt == 1) {
+                    {
+                        setState(39);
+                        expression();
+                    }
+                } else {
+                    throw new NoViableAltException(this);
+                }
 				setState(42); 
 				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
-			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
+				alt = getInterpreter().adaptivePredict(_input,1,_ctx);
+			} while ( alt!=2 && alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -225,28 +271,35 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_expression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ExpressionContext expression() throws RecognitionException {
-		ExpressionContext _localctx = new ExpressionContext(_ctx, getState());
-		enterRule(_localctx, 2, RULE_expression);
+		ExpressionContext localctx = new ExpressionContext(_ctx, getState());
+		enterRule(localctx, 2, RULE_expression);
 		try {
 			setState(48);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case DOT:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(44);
 				match(DOT);
@@ -255,14 +308,14 @@ public class JsonPathParser extends Parser {
 				}
 				break;
 			case DOT_DOT:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(46);
 				recursiveDecent();
 				}
 				break;
 			case LBRACK:
-				enterOuterAlt(_localctx, 3);
+				enterOuterAlt(localctx, 3);
 				{
 				setState(47);
 				bracketOperator();
@@ -273,14 +326,14 @@ public class JsonPathParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -300,28 +353,35 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_dotOperator; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterDotOperator(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterDotOperator(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitDotOperator(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitDotOperator(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitDotOperator(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitDotOperator(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final DotOperatorContext dotOperator() throws RecognitionException {
-		DotOperatorContext _localctx = new DotOperatorContext(_ctx, getState());
-		enterRule(_localctx, 4, RULE_dotOperator);
+		DotOperatorContext localctx = new DotOperatorContext(_ctx, getState());
+		enterRule(localctx, 4, RULE_dotOperator);
 		try {
 			setState(53);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case LBRACK:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(50);
 				bracketOperator();
@@ -329,14 +389,14 @@ public class JsonPathParser extends Parser {
 				break;
 			case Identifier:
 			case StringLiteral:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(51);
 				property();
 				}
 				break;
 			case WILDCARD:
-				enterOuterAlt(_localctx, 3);
+				enterOuterAlt(localctx, 3);
 				{
 				setState(52);
 				wildcard();
@@ -347,14 +407,14 @@ public class JsonPathParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -369,24 +429,31 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_recursiveDecent; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterRecursiveDecent(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterRecursiveDecent(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitRecursiveDecent(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitRecursiveDecent(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitRecursiveDecent(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitRecursiveDecent(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final RecursiveDecentContext recursiveDecent() throws RecognitionException {
-		RecursiveDecentContext _localctx = new RecursiveDecentContext(_ctx, getState());
-		enterRule(_localctx, 6, RULE_recursiveDecent);
+		RecursiveDecentContext localctx = new RecursiveDecentContext(_ctx, getState());
+		enterRule(localctx, 6, RULE_recursiveDecent);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(55);
 			match(DOT_DOT);
@@ -395,14 +462,14 @@ public class JsonPathParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -430,25 +497,32 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_bracketOperator; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterBracketOperator(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterBracketOperator(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitBracketOperator(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitBracketOperator(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitBracketOperator(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitBracketOperator(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final BracketOperatorContext bracketOperator() throws RecognitionException {
-		BracketOperatorContext _localctx = new BracketOperatorContext(_ctx, getState());
-		enterRule(_localctx, 8, RULE_bracketOperator);
-		int _la;
+		BracketOperatorContext localctx = new BracketOperatorContext(_ctx, getState());
+		enterRule(localctx, 8, RULE_bracketOperator);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(58);
 			match(LBRACK);
@@ -477,7 +551,7 @@ public class JsonPathParser extends Parser {
 				{
 				setState(63); 
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 				do {
 					{
 					{
@@ -487,8 +561,8 @@ public class JsonPathParser extends Parser {
 					}
 					setState(65); 
 					_errHandler.sync(this);
-					_la = _input.LA(1);
-				} while ( _la==Identifier || _la==StringLiteral );
+					la = _input.LA(1);
+				} while ( la==Identifier || la==StringLiteral );
 				}
 				break;
 			}
@@ -497,14 +571,14 @@ public class JsonPathParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -524,25 +598,32 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_filter; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterFilter(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterFilter(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitFilter(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitFilter(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitFilter(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitFilter(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final FilterContext filter() throws RecognitionException {
-		FilterContext _localctx = new FilterContext(_ctx, getState());
-		enterRule(_localctx, 10, RULE_filter);
-		int _la;
+		FilterContext localctx = new FilterContext(_ctx, getState());
+		enterRule(localctx, 10, RULE_filter);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(71);
 			match(QUESTION);
@@ -550,7 +631,7 @@ public class JsonPathParser extends Parser {
 			match(LPAREN);
 			setState(74); 
 			_errHandler.sync(this);
-			_la = _input.LA(1);
+			la = _input.LA(1);
 			do {
 				{
 				{
@@ -560,21 +641,21 @@ public class JsonPathParser extends Parser {
 				}
 				setState(76); 
 				_errHandler.sync(this);
-				_la = _input.LA(1);
-			} while ( ((_la) & ~0x3f) == 0 && ((1L << _la) & 60137421888L) != 0 );
+				la = _input.LA(1);
+			} while ( (la & ~0x3f) == 0 && ((1L << la) & 60137421888L) != 0 );
 			setState(78);
 			match(RPAREN);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -597,49 +678,56 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_filterExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterFilterExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterFilterExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitFilterExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitFilterExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitFilterExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitFilterExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final FilterExpressionContext filterExpression() throws RecognitionException {
-		FilterExpressionContext _localctx = new FilterExpressionContext(_ctx, getState());
-		enterRule(_localctx, 12, RULE_filterExpression);
+		FilterExpressionContext localctx = new FilterExpressionContext(_ctx, getState());
+		enterRule(localctx, 12, RULE_filterExpression);
 		try {
 			setState(84);
 			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,7,_ctx) ) {
 			case 1:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(80);
 				binaryExpression(0);
 				}
 				break;
 			case 2:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(81);
 				regexExpression();
 				}
 				break;
 			case 3:
-				enterOuterAlt(_localctx, 3);
+				enterOuterAlt(localctx, 3);
 				{
 				setState(82);
 				containsExpression();
 				}
 				break;
 			case 4:
-				enterOuterAlt(_localctx, 4);
+				enterOuterAlt(localctx, 4);
 				{
 				setState(83);
 				unaryExpression();
@@ -648,14 +736,14 @@ public class JsonPathParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -692,16 +780,23 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_binaryExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterBinaryExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterBinaryExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitBinaryExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitBinaryExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitBinaryExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitBinaryExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -710,15 +805,15 @@ public class JsonPathParser extends Parser {
 	}
 
 	private BinaryExpressionContext binaryExpression(int _p) throws RecognitionException {
-		ParserRuleContext _parentctx = _ctx;
-		int _parentState = getState();
-		BinaryExpressionContext _localctx = new BinaryExpressionContext(_ctx, _parentState);
-		BinaryExpressionContext _prevctx = _localctx;
-		int _startState = 14;
-		enterRecursionRule(_localctx, 14, RULE_binaryExpression, _p);
+		ParserRuleContext parentctx = _ctx;
+		int parentState = getState();
+		BinaryExpressionContext localctx = new BinaryExpressionContext(_ctx, parentState);
+		BinaryExpressionContext prevctx = localctx;
+		int startState = 14;
+		enterRecursionRule(localctx, 14, RULE_binaryExpression, _p);
 		try {
-			int _alt;
-			enterOuterAlt(_localctx, 1);
+			int alt;
+			enterOuterAlt(localctx, 1);
 			{
 			setState(119);
 			_errHandler.sync(this);
@@ -807,21 +902,25 @@ public class JsonPathParser extends Parser {
 			_ctx.stop = _input.LT(-1);
 			setState(132);
 			_errHandler.sync(this);
-			_alt = getInterpreter().adaptivePredict(_input,10,_ctx);
-			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-				if ( _alt==1 ) {
-					if ( _parseListeners!=null ) triggerExitRuleEvent();
-					_prevctx = _localctx;
+			alt = getInterpreter().adaptivePredict(_input,10,_ctx);
+			while ( alt!=2 && alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
+				if ( alt==1 ) {
+                    if (_parseListeners != null) {
+                        triggerExitRuleEvent();
+                    }
+					prevctx = localctx;
 					{
 					setState(130);
 					_errHandler.sync(this);
 					switch ( getInterpreter().adaptivePredict(_input,9,_ctx) ) {
 					case 1:
 						{
-						_localctx = new BinaryExpressionContext(_parentctx, _parentState);
-						pushNewRecursionContext(_localctx, _startState, RULE_binaryExpression);
+						localctx = new BinaryExpressionContext(parentctx, parentState);
+						pushNewRecursionContext(localctx, startState, RULE_binaryExpression);
 						setState(121);
-						if (!(precpred(_ctx, 11))) throw new FailedPredicateException(this, "precpred(_ctx, 11)");
+                            if (!precpred(_ctx, 11)) {
+                                throw new FailedPredicateException(this, "precpred(_ctx, 11)");
+                            }
 						setState(122);
 						match(LOGICAL_OPERATOR);
 						setState(123);
@@ -830,10 +929,12 @@ public class JsonPathParser extends Parser {
 						break;
 					case 2:
 						{
-						_localctx = new BinaryExpressionContext(_parentctx, _parentState);
-						pushNewRecursionContext(_localctx, _startState, RULE_binaryExpression);
+						localctx = new BinaryExpressionContext(parentctx, parentState);
+						pushNewRecursionContext(localctx, startState, RULE_binaryExpression);
 						setState(124);
-						if (!(precpred(_ctx, 10))) throw new FailedPredicateException(this, "precpred(_ctx, 10)");
+                            if (!precpred(_ctx, 10)) {
+                                throw new FailedPredicateException(this, "precpred(_ctx, 10)");
+                            }
 						setState(125);
 						match(LOGICAL_OPERATOR);
 						setState(126);
@@ -842,10 +943,12 @@ public class JsonPathParser extends Parser {
 						break;
 					case 3:
 						{
-						_localctx = new BinaryExpressionContext(_parentctx, _parentState);
-						pushNewRecursionContext(_localctx, _startState, RULE_binaryExpression);
+						localctx = new BinaryExpressionContext(parentctx, parentState);
+						pushNewRecursionContext(localctx, startState, RULE_binaryExpression);
 						setState(127);
-						if (!(precpred(_ctx, 9))) throw new FailedPredicateException(this, "precpred(_ctx, 9)");
+                            if (!precpred(_ctx, 9)) {
+                                throw new FailedPredicateException(this, "precpred(_ctx, 9)");
+                            }
 						setState(128);
 						match(LOGICAL_OPERATOR);
 						setState(129);
@@ -857,19 +960,19 @@ public class JsonPathParser extends Parser {
 				}
 				setState(134);
 				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,10,_ctx);
+				alt = getInterpreter().adaptivePredict(_input,10,_ctx);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
-			unrollRecursionContexts(_parentctx);
+			unrollRecursionContexts(parentctx);
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -887,22 +990,29 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_containsExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterContainsExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterContainsExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitContainsExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitContainsExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitContainsExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitContainsExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ContainsExpressionContext containsExpression() throws RecognitionException {
-		ContainsExpressionContext _localctx = new ContainsExpressionContext(_ctx, getState());
-		enterRule(_localctx, 16, RULE_containsExpression);
+		ContainsExpressionContext localctx = new ContainsExpressionContext(_ctx, getState());
+		enterRule(localctx, 16, RULE_containsExpression);
 		try {
 			setState(143);
 			_errHandler.sync(this);
@@ -912,7 +1022,7 @@ public class JsonPathParser extends Parser {
 			case DOT:
 			case DOT_DOT:
 			case ROOT:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(135);
 				unaryExpression();
@@ -929,7 +1039,7 @@ public class JsonPathParser extends Parser {
 			case TRUE:
 			case FALSE:
 			case NULL:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(139);
 				literalExpression();
@@ -944,14 +1054,14 @@ public class JsonPathParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -968,24 +1078,31 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_regexExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterRegexExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterRegexExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitRegexExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitRegexExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitRegexExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitRegexExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final RegexExpressionContext regexExpression() throws RecognitionException {
-		RegexExpressionContext _localctx = new RegexExpressionContext(_ctx, getState());
-		enterRule(_localctx, 18, RULE_regexExpression);
+		RegexExpressionContext localctx = new RegexExpressionContext(_ctx, getState());
+		enterRule(localctx, 18, RULE_regexExpression);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(145);
 			unaryExpression();
@@ -998,14 +1115,14 @@ public class JsonPathParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1025,71 +1142,71 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_unaryExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterUnaryExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterUnaryExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitUnaryExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitUnaryExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitUnaryExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitUnaryExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final UnaryExpressionContext unaryExpression() throws RecognitionException {
-		UnaryExpressionContext _localctx = new UnaryExpressionContext(_ctx, getState());
-		enterRule(_localctx, 20, RULE_unaryExpression);
-		int _la;
+		UnaryExpressionContext localctx = new UnaryExpressionContext(_ctx, getState());
+		enterRule(localctx, 20, RULE_unaryExpression);
+		int la;
 		try {
 			setState(162);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case AT:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(150);
 				match(AT);
 				setState(159);
 				_errHandler.sync(this);
-				switch ( getInterpreter().adaptivePredict(_input,13,_ctx) ) {
-				case 1:
-					{
-					setState(151);
-					match(DOT);
-					setState(152);
-					match(Identifier);
-					}
-					break;
-				case 2:
-					{
-					setState(154);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-					if (_la==DOT) {
-						{
-						setState(153);
-						match(DOT);
-						}
-					}
+                    if (getInterpreter().adaptivePredict(_input, 13, _ctx) == 1) {
+                        setState(151);
+                        match(DOT);
+                        setState(152);
+                        match(Identifier);
+                    } else if (getInterpreter().adaptivePredict(_input, 13, _ctx) == 2) {
+                        setState(154);
+                        _errHandler.sync(this);
+                        la = _input.LA(1);
+                        if (la == DOT) {
+                            {
+                                setState(153);
+                                match(DOT);
+                            }
+                        }
 
-					setState(156);
-					match(LBRACK);
-					setState(157);
-					match(StringLiteral);
-					setState(158);
-					match(RBRACK);
-					}
-					break;
-				}
+                        setState(156);
+                        match(LBRACK);
+                        setState(157);
+                        match(StringLiteral);
+                        setState(158);
+                        match(RBRACK);
+                    }
 				}
 				break;
 			case LBRACK:
 			case DOT:
 			case DOT_DOT:
 			case ROOT:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(161);
 				jsonPath();
@@ -1100,14 +1217,14 @@ public class JsonPathParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1125,47 +1242,56 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_literalExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterLiteralExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterLiteralExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitLiteralExpression(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitLiteralExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitLiteralExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitLiteralExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final LiteralExpressionContext literalExpression() throws RecognitionException {
-		LiteralExpressionContext _localctx = new LiteralExpressionContext(_ctx, getState());
-		enterRule(_localctx, 22, RULE_literalExpression);
-		int _la;
+		LiteralExpressionContext localctx = new LiteralExpressionContext(_ctx, getState());
+		enterRule(localctx, 22, RULE_literalExpression);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(164);
-			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 60137406464L) != 0) ) {
+			la = _input.LA(1);
+			if ( !((la & ~0x3f) == 0 && ((1L << la) & 60137406464L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1178,47 +1304,56 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_property; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterProperty(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterProperty(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitProperty(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitProperty(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitProperty(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitProperty(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final PropertyContext property() throws RecognitionException {
-		PropertyContext _localctx = new PropertyContext(_ctx, getState());
-		enterRule(_localctx, 24, RULE_property);
-		int _la;
+		PropertyContext localctx = new PropertyContext(_ctx, getState());
+		enterRule(localctx, 24, RULE_property);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(166);
-			_la = _input.LA(1);
-			if ( !(_la==Identifier || _la==StringLiteral) ) {
+			la = _input.LA(1);
+			if ( !(la==Identifier || la==StringLiteral) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1230,38 +1365,45 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_wildcard; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterWildcard(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterWildcard(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitWildcard(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitWildcard(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitWildcard(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitWildcard(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final WildcardContext wildcard() throws RecognitionException {
-		WildcardContext _localctx = new WildcardContext(_ctx, getState());
-		enterRule(_localctx, 26, RULE_wildcard);
+		WildcardContext localctx = new WildcardContext(_ctx, getState());
+		enterRule(localctx, 26, RULE_wildcard);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(168);
 			match(WILDCARD);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1284,29 +1426,36 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_slice; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterSlice(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterSlice(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitSlice(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitSlice(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitSlice(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitSlice(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final SliceContext slice() throws RecognitionException {
-		SliceContext _localctx = new SliceContext(_ctx, getState());
-		enterRule(_localctx, 28, RULE_slice);
-		int _la;
+		SliceContext localctx = new SliceContext(_ctx, getState());
+		enterRule(localctx, 28, RULE_slice);
+		int la;
 		try {
 			setState(180);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case PositiveNumber:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(170);
 				start();
@@ -1314,8 +1463,8 @@ public class JsonPathParser extends Parser {
 				match(COLON);
 				setState(173);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==PositiveNumber) {
+				la = _input.LA(1);
+				if (la==PositiveNumber) {
 					{
 					setState(172);
 					end();
@@ -1325,7 +1474,7 @@ public class JsonPathParser extends Parser {
 				}
 				break;
 			case COLON:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(175);
 				match(COLON);
@@ -1334,7 +1483,7 @@ public class JsonPathParser extends Parser {
 				}
 				break;
 			case NegativeNumber:
-				enterOuterAlt(_localctx, 3);
+				enterOuterAlt(localctx, 3);
 				{
 				setState(177);
 				match(NegativeNumber);
@@ -1343,7 +1492,7 @@ public class JsonPathParser extends Parser {
 				}
 				break;
 			case WILDCARD:
-				enterOuterAlt(_localctx, 4);
+				enterOuterAlt(localctx, 4);
 				{
 				setState(179);
 				wildcard();
@@ -1354,14 +1503,14 @@ public class JsonPathParser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1373,38 +1522,45 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_start; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterStart(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterStart(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitStart(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitStart(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitStart(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitStart(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final StartContext start() throws RecognitionException {
-		StartContext _localctx = new StartContext(_ctx, getState());
-		enterRule(_localctx, 30, RULE_start);
+		StartContext localctx = new StartContext(_ctx, getState());
+		enterRule(localctx, 30, RULE_start);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(182);
 			match(PositiveNumber);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1416,38 +1572,45 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_end; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterEnd(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterEnd(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitEnd(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitEnd(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitEnd(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitEnd(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final EndContext end() throws RecognitionException {
-		EndContext _localctx = new EndContext(_ctx, getState());
-		enterRule(_localctx, 32, RULE_end);
+		EndContext localctx = new EndContext(_ctx, getState());
+		enterRule(localctx, 32, RULE_end);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(184);
 			match(PositiveNumber);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1462,29 +1625,36 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_indexes; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterIndexes(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).enterIndexes(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitIndexes(this);
+            if (listener instanceof JsonPathParserListener) {
+                ((JsonPathParserListener) listener).exitIndexes(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitIndexes(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JsonPathParserVisitor) {
+                return ((JsonPathParserVisitor<? extends T>) visitor).visitIndexes(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final IndexesContext indexes() throws RecognitionException {
-		IndexesContext _localctx = new IndexesContext(_ctx, getState());
-		enterRule(_localctx, 34, RULE_indexes);
-		int _la;
+		IndexesContext localctx = new IndexesContext(_ctx, getState());
+		enterRule(localctx, 34, RULE_indexes);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(187); 
 			_errHandler.sync(this);
-			_la = _input.LA(1);
+			la = _input.LA(1);
 			do {
 				{
 				{
@@ -1494,26 +1664,25 @@ public class JsonPathParser extends Parser {
 				}
 				setState(189); 
 				_errHandler.sync(this);
-				_la = _input.LA(1);
-			} while ( _la==PositiveNumber );
+				la = _input.LA(1);
+			} while ( la==PositiveNumber );
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
-		switch (ruleIndex) {
-		case 7:
-			return binaryExpression_sempred((BinaryExpressionContext)_localctx, predIndex);
-		}
+        if (ruleIndex == 7) {
+            return binaryExpression_sempred((BinaryExpressionContext) _localctx, predIndex);
+        }
 		return true;
 	}
 	private boolean binaryExpression_sempred(BinaryExpressionContext _localctx, int predIndex) {

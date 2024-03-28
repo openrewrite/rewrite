@@ -178,8 +178,8 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
         final LinkedList<File> pending = new LinkedList<>();
         pending.add(parent);
 
-        final int MAX_SEARCH_RESULTS = 50;
-        while (!pending.isEmpty() && result.getCount() < MAX_SEARCH_RESULTS) {
+        final int maxSearchResults = 50;
+        while (!pending.isEmpty() && result.getCount() < maxSearchResults) {
             final File file = pending.removeFirst();
             // Avoid directories outside the HOME directory linked with symlinks (to avoid e.g. search
             // through the whole SD card).
@@ -223,7 +223,9 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
      */
     private static File getFileForDocId(String docId) throws FileNotFoundException {
         final File f = new File(docId);
-        if (!f.exists()) throw new FileNotFoundException(f.getAbsolutePath() + " not found");
+        if (!f.exists()) {
+            throw new FileNotFoundException(f.getAbsolutePath() + " not found");
+        }
         return f;
     }
 
@@ -236,7 +238,9 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
             if (lastDot >= 0) {
                 final String extension = name.substring(lastDot + 1).toLowerCase();
                 final String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
-                if (mime != null) return mime;
+                if (mime != null) {
+                    return mime;
+                }
             }
             return "application/octet-stream";
         }
@@ -259,15 +263,21 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
 
         int flags = 0;
         if (file.isDirectory()) {
-            if (file.canWrite()) flags |= Document.FLAG_DIR_SUPPORTS_CREATE;
+            if (file.canWrite()) {
+                flags |= Document.FLAG_DIR_SUPPORTS_CREATE;
+            }
         } else if (file.canWrite()) {
             flags |= Document.FLAG_SUPPORTS_WRITE;
         }
-        if (file.getParentFile().canWrite()) flags |= Document.FLAG_SUPPORTS_DELETE;
+        if (file.getParentFile().canWrite()) {
+            flags |= Document.FLAG_SUPPORTS_DELETE;
+        }
 
         final String displayName = file.getName();
         final String mimeType = getMimeType(file);
-        if (mimeType.startsWith("image/")) flags |= Document.FLAG_SUPPORTS_THUMBNAIL;
+        if (mimeType.startsWith("image/")) {
+            flags |= Document.FLAG_SUPPORTS_THUMBNAIL;
+        }
 
         final MatrixCursor.RowBuilder row = result.newRow();
         row.add(Document.COLUMN_DOCUMENT_ID, docId);

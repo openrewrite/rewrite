@@ -253,7 +253,7 @@ public class ChangeParentPom extends Recipe {
 
             private Optional<String> findAcceptableVersion(String groupId, String artifactId, String currentVersion,
                                                                 ExecutionContext ctx) throws MavenDownloadingException {
-                String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
+                String finalCurrentVersion = Semver.isVersion(currentVersion) ? currentVersion : "0.0.0";
 
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));

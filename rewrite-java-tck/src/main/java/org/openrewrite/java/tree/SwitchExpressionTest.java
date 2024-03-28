@@ -155,7 +155,7 @@ class SwitchExpressionTest implements RewriteTest {
                   J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
                   assert md.getBody() != null;
 
-                  J.SwitchExpression s = ((J.SwitchExpression) ((J.Return) md.getBody().getStatements().get(0)).getExpression());
+                  J.SwitchExpression s = (J.SwitchExpression) ((J.Return) md.getBody().getStatements().get(0)).getExpression();
                   assert s != null;
 
                   JavaType type = s.getType();

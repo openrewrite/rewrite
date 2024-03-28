@@ -96,7 +96,7 @@ public class ChangeType extends Recipe {
         return Preconditions.check(condition, new ChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition));
     }
 
-    private static class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
+    private static final class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
         @Nullable
@@ -327,7 +327,7 @@ public class ChangeType extends Recipe {
                                 JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
 
                                 addImport(targetFqn);
-                                maybeAddImport((targetFqn).getFullyQualifiedName(), method.getName().getSimpleName());
+                                maybeAddImport(targetFqn.getFullyQualifiedName(), method.getName().getSimpleName());
                                 break;
                             }
                         }
@@ -487,7 +487,7 @@ public class ChangeType extends Recipe {
         }
     }
 
-    private static class ChangeClassDefinition extends JavaIsoVisitor<ExecutionContext> {
+    private static final class ChangeClassDefinition extends JavaIsoVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType.Class targetType;
         private final MethodMatcher originalConstructor;

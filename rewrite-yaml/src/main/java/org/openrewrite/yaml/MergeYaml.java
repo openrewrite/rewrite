@@ -76,7 +76,7 @@ public class MergeYaml extends Recipe {
         return "Merge a YAML snippet with an existing YAML document.";
     }
 
-    final static String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
+    static final String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -1268,8 +1268,8 @@ class AddDependencyTest implements RewriteTest {
     private AddDependency addDependency(String gav, String onlyIfUsing, @Nullable String configuration) {
         String[] gavParts = gav.split(":");
         return new AddDependency(
-          gavParts[0], gavParts[1], (gavParts.length < 3) ? null : gavParts[2], null, configuration, onlyIfUsing,
-          (gavParts.length < 4) ? null : gavParts[3], null, null, null
+          gavParts[0], gavParts[1], gavParts.length < 3 ? null : gavParts[2], null, configuration, onlyIfUsing,
+          gavParts.length < 4 ? null : gavParts[3], null, null, null
         );
     }
 }

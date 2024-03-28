@@ -105,7 +105,7 @@ public class AddPluginDependency extends Recipe {
                     plugins = addToTag(plugins, plugin, dependencies, getCursor().getParentOrThrow());
                 }
                 Xml.Tag newDependencyTag = Xml.Tag.build("<dependency>\n<groupId>" + groupId + "</groupId>\n<artifactId>"
-                                + artifactId + "</artifactId>" + ((version == null) ? "\n" : "\n<version>" + version + "</version>\n") + "</dependency>")
+                                + artifactId + "</artifactId>" + (version == null ? "\n" : "\n<version>" + version + "</version>\n") + "</dependency>")
                         .withPrefix("\n");
 
                 // The dependency being added may already exist and may or may not need its version updated

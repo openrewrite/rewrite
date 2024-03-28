@@ -27,7 +27,7 @@ import static java.lang.Integer.parseInt;
  * Allows changes that do not modify the left-most non-zero element in the [major, minor, patch] tuple.
  * <a href="https://github.com/npm/node-semver#caret-ranges-123-025-004">Caret ranges</a>.
  */
-public class CaretRange extends LatestRelease {
+public final class CaretRange extends LatestRelease {
     private static final Pattern CARET_RANGE_PATTERN = Pattern.compile("\\^(\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?");
 
     private final String upperExclusive;

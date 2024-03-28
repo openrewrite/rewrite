@@ -35,28 +35,104 @@ public class Protobuf2Parser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		SEMI=1, COLON=2, BOOL=3, BYTES=4, DOUBLE=5, ENUM=6, EXTEND=7, FIXED32=8, 
-		FIXED64=9, FLOAT=10, IMPORT=11, INT32=12, INT64=13, MAP=14, MESSAGE=15, 
-		ONEOF=16, OPTION=17, PACKAGE=18, PUBLIC=19, REPEATED=20, REQUIRED=21, 
-		RESERVED=22, RETURNS=23, RPC=24, SERVICE=25, SFIXED32=26, SFIXED64=27, 
-		SINT32=28, SINT64=29, STREAM=30, STRING=31, SYNTAX=32, TO=33, UINT32=34, 
-		UINT64=35, WEAK=36, OPTIONAL=37, Ident=38, IntegerLiteral=39, NumericLiteral=40, 
-		FloatLiteral=41, BooleanLiteral=42, StringLiteral=43, Quote=44, LPAREN=45, 
-		RPAREN=46, LBRACE=47, RBRACE=48, LBRACK=49, RBRACK=50, LCHEVR=51, RCHEVR=52, 
-		COMMA=53, DOT=54, MINUS=55, PLUS=56, ASSIGN=57, WS=58, UTF_8_BOM=59, COMMENT=60, 
-		LINE_COMMENT=61;
-	public static final int
-		RULE_proto = 0, RULE_stringLiteral = 1, RULE_identOrReserved = 2, RULE_syntax = 3, 
-		RULE_importStatement = 4, RULE_packageStatement = 5, RULE_optionName = 6, 
-		RULE_option = 7, RULE_optionDef = 8, RULE_optionList = 9, RULE_topLevelDef = 10, 
-		RULE_ident = 11, RULE_message = 12, RULE_messageField = 13, RULE_messageBody = 14, 
-		RULE_extend = 15, RULE_enumDefinition = 16, RULE_enumBody = 17, RULE_enumField = 18, 
-		RULE_service = 19, RULE_serviceBody = 20, RULE_rpc = 21, RULE_rpcInOut = 22, 
-		RULE_rpcBody = 23, RULE_reserved = 24, RULE_ranges = 25, RULE_range = 26, 
-		RULE_fieldNames = 27, RULE_type = 28, RULE_field = 29, RULE_oneOf = 30, 
-		RULE_mapField = 31, RULE_keyType = 32, RULE_reservedWord = 33, RULE_fullIdent = 34, 
-		RULE_emptyStatement = 35, RULE_constant = 36;
+    public static final int SEMI = 1;
+    public static final int COLON = 2;
+    public static final int BOOL = 3;
+    public static final int BYTES = 4;
+    public static final int DOUBLE = 5;
+    public static final int ENUM = 6;
+    public static final int EXTEND = 7;
+    public static final int FIXED32 = 8;
+    public static final int FIXED64 = 9;
+    public static final int FLOAT = 10;
+    public static final int IMPORT = 11;
+    public static final int INT32 = 12;
+    public static final int INT64 = 13;
+    public static final int MAP = 14;
+    public static final int MESSAGE = 15;
+    public static final int ONEOF = 16;
+    public static final int OPTION = 17;
+    public static final int PACKAGE = 18;
+    public static final int PUBLIC = 19;
+    public static final int REPEATED = 20;
+    public static final int REQUIRED = 21;
+    public static final int RESERVED = 22;
+    public static final int RETURNS = 23;
+    public static final int RPC = 24;
+    public static final int SERVICE = 25;
+    public static final int SFIXED32 = 26;
+    public static final int SFIXED64 = 27;
+    public static final int SINT32 = 28;
+    public static final int SINT64 = 29;
+    public static final int STREAM = 30;
+    public static final int STRING = 31;
+    public static final int SYNTAX = 32;
+    public static final int TO = 33;
+    public static final int UINT32 = 34;
+    public static final int UINT64 = 35;
+    public static final int WEAK = 36;
+    public static final int OPTIONAL = 37;
+    public static final int Ident = 38;
+    public static final int IntegerLiteral = 39;
+    public static final int NumericLiteral = 40;
+    public static final int FloatLiteral = 41;
+    public static final int BooleanLiteral = 42;
+    public static final int StringLiteral = 43;
+    public static final int Quote = 44;
+    public static final int LPAREN = 45;
+    public static final int RPAREN = 46;
+    public static final int LBRACE = 47;
+    public static final int RBRACE = 48;
+    public static final int LBRACK = 49;
+    public static final int RBRACK = 50;
+    public static final int LCHEVR = 51;
+    public static final int RCHEVR = 52;
+    public static final int COMMA = 53;
+    public static final int DOT = 54;
+    public static final int MINUS = 55;
+    public static final int PLUS = 56;
+    public static final int ASSIGN = 57;
+    public static final int WS = 58;
+    public static final int UTF_8_BOM = 59;
+    public static final int COMMENT = 60;
+    public static final int LINE_COMMENT = 61;
+    public static final int RULE_proto = 0;
+    public static final int RULE_stringLiteral = 1;
+    public static final int RULE_identOrReserved = 2;
+    public static final int RULE_syntax = 3;
+    public static final int RULE_importStatement = 4;
+    public static final int RULE_packageStatement = 5;
+    public static final int RULE_optionName = 6;
+    public static final int RULE_option = 7;
+    public static final int RULE_optionDef = 8;
+    public static final int RULE_optionList = 9;
+    public static final int RULE_topLevelDef = 10;
+    public static final int RULE_ident = 11;
+    public static final int RULE_message = 12;
+    public static final int RULE_messageField = 13;
+    public static final int RULE_messageBody = 14;
+    public static final int RULE_extend = 15;
+    public static final int RULE_enumDefinition = 16;
+    public static final int RULE_enumBody = 17;
+    public static final int RULE_enumField = 18;
+    public static final int RULE_service = 19;
+    public static final int RULE_serviceBody = 20;
+    public static final int RULE_rpc = 21;
+    public static final int RULE_rpcInOut = 22;
+    public static final int RULE_rpcBody = 23;
+    public static final int RULE_reserved = 24;
+    public static final int RULE_ranges = 25;
+    public static final int RULE_range = 26;
+    public static final int RULE_fieldNames = 27;
+    public static final int RULE_type = 28;
+    public static final int RULE_field = 29;
+    public static final int RULE_oneOf = 30;
+    public static final int RULE_mapField = 31;
+    public static final int RULE_keyType = 32;
+    public static final int RULE_reservedWord = 33;
+    public static final int RULE_fullIdent = 34;
+    public static final int RULE_emptyStatement = 35;
+    public static final int RULE_constant = 36;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"proto", "stringLiteral", "identOrReserved", "syntax", "importStatement", 
@@ -189,32 +265,39 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_proto; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterProto(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterProto(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitProto(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitProto(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitProto(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitProto(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ProtoContext proto() throws RecognitionException {
-		ProtoContext _localctx = new ProtoContext(_ctx, getState());
-		enterRule(_localctx, 0, RULE_proto);
-		int _la;
+		ProtoContext localctx = new ProtoContext(_ctx, getState());
+		enterRule(localctx, 0, RULE_proto);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(74);
 			syntax();
 			setState(82);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 33982658L) != 0) {
+			la = _input.LA(1);
+			while ((la & ~0x3f) == 0 && ((1L << la) & 33982658L) != 0) {
 				{
 				setState(80);
 				_errHandler.sync(this);
@@ -258,21 +341,21 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(84);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(85);
 			match(EOF);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -284,38 +367,45 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_stringLiteral; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterStringLiteral(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterStringLiteral(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitStringLiteral(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitStringLiteral(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitStringLiteral(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitStringLiteral(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final StringLiteralContext stringLiteral() throws RecognitionException {
-		StringLiteralContext _localctx = new StringLiteralContext(_ctx, getState());
-		enterRule(_localctx, 2, RULE_stringLiteral);
+		StringLiteralContext localctx = new StringLiteralContext(_ctx, getState());
+		enterRule(localctx, 2, RULE_stringLiteral);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(87);
 			match(StringLiteral);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -332,28 +422,35 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_identOrReserved; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterIdentOrReserved(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterIdentOrReserved(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitIdentOrReserved(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitIdentOrReserved(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitIdentOrReserved(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitIdentOrReserved(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final IdentOrReservedContext identOrReserved() throws RecognitionException {
-		IdentOrReservedContext _localctx = new IdentOrReservedContext(_ctx, getState());
-		enterRule(_localctx, 4, RULE_identOrReserved);
+		IdentOrReservedContext localctx = new IdentOrReservedContext(_ctx, getState());
+		enterRule(localctx, 4, RULE_identOrReserved);
 		try {
 			setState(91);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case Ident:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(89);
 				ident();
@@ -368,7 +465,7 @@ public class Protobuf2Parser extends Parser {
 			case STRING:
 			case SYNTAX:
 			case WEAK:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(90);
 				reservedWord();
@@ -379,14 +476,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -403,24 +500,31 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_syntax; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterSyntax(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterSyntax(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitSyntax(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitSyntax(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitSyntax(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitSyntax(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final SyntaxContext syntax() throws RecognitionException {
-		SyntaxContext _localctx = new SyntaxContext(_ctx, getState());
-		enterRule(_localctx, 6, RULE_syntax);
+		SyntaxContext localctx = new SyntaxContext(_ctx, getState());
+		enterRule(localctx, 6, RULE_syntax);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(93);
 			match(SYNTAX);
@@ -433,14 +537,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -458,40 +562,49 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_importStatement; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterImportStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterImportStatement(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitImportStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitImportStatement(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitImportStatement(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitImportStatement(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ImportStatementContext importStatement() throws RecognitionException {
-		ImportStatementContext _localctx = new ImportStatementContext(_ctx, getState());
-		enterRule(_localctx, 8, RULE_importStatement);
-		int _la;
+		ImportStatementContext localctx = new ImportStatementContext(_ctx, getState());
+		enterRule(localctx, 8, RULE_importStatement);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(98);
 			match(IMPORT);
 			setState(100);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==PUBLIC || _la==WEAK) {
+			la = _input.LA(1);
+			if (la==PUBLIC || la==WEAK) {
 				{
 				setState(99);
-				_la = _input.LA(1);
-				if ( !(_la==PUBLIC || _la==WEAK) ) {
+				la = _input.LA(1);
+				if ( !(la==PUBLIC || la==WEAK) ) {
 				_errHandler.recoverInline(this);
 				}
 				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                    if (_input.LA(1) == Token.EOF) {
+                        matchedEOF = true;
+                    }
 					_errHandler.reportMatch(this);
 					consume();
 				}
@@ -505,14 +618,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -528,24 +641,31 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_packageStatement; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterPackageStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterPackageStatement(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitPackageStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitPackageStatement(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitPackageStatement(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitPackageStatement(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final PackageStatementContext packageStatement() throws RecognitionException {
-		PackageStatementContext _localctx = new PackageStatementContext(_ctx, getState());
-		enterRule(_localctx, 10, RULE_packageStatement);
+		PackageStatementContext localctx = new PackageStatementContext(_ctx, getState());
+		enterRule(localctx, 10, RULE_packageStatement);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(105);
 			match(PACKAGE);
@@ -556,14 +676,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -592,25 +712,32 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_optionName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOptionName(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterOptionName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOptionName(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitOptionName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOptionName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOptionName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final OptionNameContext optionName() throws RecognitionException {
-		OptionNameContext _localctx = new OptionNameContext(_ctx, getState());
-		enterRule(_localctx, 12, RULE_optionName);
-		int _la;
+		OptionNameContext localctx = new OptionNameContext(_ctx, getState());
+		enterRule(localctx, 12, RULE_optionName);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(114);
 			_errHandler.sync(this);
@@ -636,8 +763,8 @@ public class Protobuf2Parser extends Parser {
 			}
 			setState(120);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==DOT) {
+			la = _input.LA(1);
+			while (la==DOT) {
 				{
 				{
 				setState(116);
@@ -648,19 +775,19 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(122);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -678,24 +805,31 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_option; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOption(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterOption(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOption(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitOption(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOption(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOption(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final OptionContext option() throws RecognitionException {
-		OptionContext _localctx = new OptionContext(_ctx, getState());
-		enterRule(_localctx, 14, RULE_option);
+		OptionContext localctx = new OptionContext(_ctx, getState());
+		enterRule(localctx, 14, RULE_option);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(123);
 			optionName();
@@ -706,14 +840,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -729,24 +863,31 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_optionDef; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOptionDef(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterOptionDef(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOptionDef(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitOptionDef(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOptionDef(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOptionDef(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final OptionDefContext optionDef() throws RecognitionException {
-		OptionDefContext _localctx = new OptionDefContext(_ctx, getState());
-		enterRule(_localctx, 16, RULE_optionDef);
+		OptionDefContext localctx = new OptionDefContext(_ctx, getState());
+		enterRule(localctx, 16, RULE_optionDef);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(127);
 			match(OPTION);
@@ -757,14 +898,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -787,25 +928,32 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_optionList; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOptionList(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterOptionList(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOptionList(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitOptionList(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOptionList(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOptionList(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final OptionListContext optionList() throws RecognitionException {
-		OptionListContext _localctx = new OptionListContext(_ctx, getState());
-		enterRule(_localctx, 18, RULE_optionList);
-		int _la;
+		OptionListContext localctx = new OptionListContext(_ctx, getState());
+		enterRule(localctx, 18, RULE_optionList);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			{
 			setState(131);
@@ -814,8 +962,8 @@ public class Protobuf2Parser extends Parser {
 			option();
 			setState(137);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==COMMA) {
+			la = _input.LA(1);
+			while (la==COMMA) {
 				{
 				{
 				setState(133);
@@ -826,7 +974,7 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(139);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(140);
 			match(RBRACK);
@@ -834,14 +982,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -864,49 +1012,56 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_topLevelDef; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterTopLevelDef(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterTopLevelDef(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitTopLevelDef(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitTopLevelDef(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitTopLevelDef(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitTopLevelDef(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final TopLevelDefContext topLevelDef() throws RecognitionException {
-		TopLevelDefContext _localctx = new TopLevelDefContext(_ctx, getState());
-		enterRule(_localctx, 20, RULE_topLevelDef);
+		TopLevelDefContext localctx = new TopLevelDefContext(_ctx, getState());
+		enterRule(localctx, 20, RULE_topLevelDef);
 		try {
 			setState(146);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case MESSAGE:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(142);
 				message();
 				}
 				break;
 			case ENUM:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(143);
 				enumDefinition();
 				}
 				break;
 			case SERVICE:
-				enterOuterAlt(_localctx, 3);
+				enterOuterAlt(localctx, 3);
 				{
 				setState(144);
 				service();
 				}
 				break;
 			case EXTEND:
-				enterOuterAlt(_localctx, 4);
+				enterOuterAlt(localctx, 4);
 				{
 				setState(145);
 				extend();
@@ -917,14 +1072,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -936,38 +1091,45 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_ident; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterIdent(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterIdent(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitIdent(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitIdent(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitIdent(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitIdent(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final IdentContext ident() throws RecognitionException {
-		IdentContext _localctx = new IdentContext(_ctx, getState());
-		enterRule(_localctx, 22, RULE_ident);
+		IdentContext localctx = new IdentContext(_ctx, getState());
+		enterRule(localctx, 22, RULE_ident);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(148);
 			match(Ident);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -985,24 +1147,31 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_message; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterMessage(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterMessage(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitMessage(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitMessage(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMessage(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMessage(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final MessageContext message() throws RecognitionException {
-		MessageContext _localctx = new MessageContext(_ctx, getState());
-		enterRule(_localctx, 24, RULE_message);
+		MessageContext localctx = new MessageContext(_ctx, getState());
+		enterRule(localctx, 24, RULE_message);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(150);
 			match(MESSAGE);
@@ -1013,14 +1182,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1037,33 +1206,42 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_messageField; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterMessageField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterMessageField(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitMessageField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitMessageField(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMessageField(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMessageField(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final MessageFieldContext messageField() throws RecognitionException {
-		MessageFieldContext _localctx = new MessageFieldContext(_ctx, getState());
-		enterRule(_localctx, 26, RULE_messageField);
-		int _la;
+		MessageFieldContext localctx = new MessageFieldContext(_ctx, getState());
+		enterRule(localctx, 26, RULE_messageField);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(154);
-			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 137442099200L) != 0) ) {
+			la = _input.LA(1);
+			if ( !((la & ~0x3f) == 0 && ((1L << la) & 137442099200L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -1072,14 +1250,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1146,32 +1324,39 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_messageBody; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterMessageBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterMessageBody(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitMessageBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitMessageBody(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMessageBody(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMessageBody(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final MessageBodyContext messageBody() throws RecognitionException {
-		MessageBodyContext _localctx = new MessageBodyContext(_ctx, getState());
-		enterRule(_localctx, 28, RULE_messageBody);
-		int _la;
+		MessageBodyContext localctx = new MessageBodyContext(_ctx, getState());
+		enterRule(localctx, 28, RULE_messageBody);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(157);
 			match(LBRACE);
 			setState(169);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 137446539458L) != 0) {
+			la = _input.LA(1);
+			while ((la & ~0x3f) == 0 && ((1L << la) & 137446539458L) != 0) {
 				{
 				setState(167);
 				_errHandler.sync(this);
@@ -1238,21 +1423,21 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(171);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(172);
 			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1281,25 +1466,32 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_extend; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterExtend(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterExtend(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitExtend(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitExtend(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitExtend(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitExtend(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ExtendContext extend() throws RecognitionException {
-		ExtendContext _localctx = new ExtendContext(_ctx, getState());
-		enterRule(_localctx, 30, RULE_extend);
-		int _la;
+		ExtendContext localctx = new ExtendContext(_ctx, getState());
+		enterRule(localctx, 30, RULE_extend);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(174);
 			match(EXTEND);
@@ -1309,8 +1501,8 @@ public class Protobuf2Parser extends Parser {
 			match(LBRACE);
 			setState(181);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 137442099202L) != 0) {
+			la = _input.LA(1);
+			while ((la & ~0x3f) == 0 && ((1L << la) & 137442099202L) != 0) {
 				{
 				setState(179);
 				_errHandler.sync(this);
@@ -1335,21 +1527,21 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(183);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(184);
 			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1367,24 +1559,31 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_enumDefinition; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterEnumDefinition(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterEnumDefinition(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitEnumDefinition(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitEnumDefinition(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEnumDefinition(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEnumDefinition(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final EnumDefinitionContext enumDefinition() throws RecognitionException {
-		EnumDefinitionContext _localctx = new EnumDefinitionContext(_ctx, getState());
-		enterRule(_localctx, 32, RULE_enumDefinition);
+		EnumDefinitionContext localctx = new EnumDefinitionContext(_ctx, getState());
+		enterRule(localctx, 32, RULE_enumDefinition);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(186);
 			match(ENUM);
@@ -1395,14 +1594,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1433,32 +1632,39 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_enumBody; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterEnumBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterEnumBody(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitEnumBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitEnumBody(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEnumBody(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEnumBody(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final EnumBodyContext enumBody() throws RecognitionException {
-		EnumBodyContext _localctx = new EnumBodyContext(_ctx, getState());
-		enterRule(_localctx, 34, RULE_enumBody);
-		int _la;
+		EnumBodyContext localctx = new EnumBodyContext(_ctx, getState());
+		enterRule(localctx, 34, RULE_enumBody);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(190);
 			match(LBRACE);
 			setState(196);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 274878038018L) != 0) {
+			la = _input.LA(1);
+			while ((la & ~0x3f) == 0 && ((1L << la) & 274878038018L) != 0) {
 				{
 				setState(194);
 				_errHandler.sync(this);
@@ -1487,21 +1693,21 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(198);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(199);
 			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1522,25 +1728,32 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_enumField; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterEnumField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterEnumField(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitEnumField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitEnumField(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEnumField(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEnumField(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final EnumFieldContext enumField() throws RecognitionException {
-		EnumFieldContext _localctx = new EnumFieldContext(_ctx, getState());
-		enterRule(_localctx, 36, RULE_enumField);
-		int _la;
+		EnumFieldContext localctx = new EnumFieldContext(_ctx, getState());
+		enterRule(localctx, 36, RULE_enumField);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(201);
 			ident();
@@ -1548,8 +1761,8 @@ public class Protobuf2Parser extends Parser {
 			match(ASSIGN);
 			setState(204);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==MINUS) {
+			la = _input.LA(1);
+			if (la==MINUS) {
 				{
 				setState(203);
 				match(MINUS);
@@ -1560,8 +1773,8 @@ public class Protobuf2Parser extends Parser {
 			match(IntegerLiteral);
 			setState(208);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==LBRACK) {
+			la = _input.LA(1);
+			if (la==LBRACK) {
 				{
 				setState(207);
 				optionList();
@@ -1573,14 +1786,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1598,24 +1811,31 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_service; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterService(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterService(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitService(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitService(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitService(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitService(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ServiceContext service() throws RecognitionException {
-		ServiceContext _localctx = new ServiceContext(_ctx, getState());
-		enterRule(_localctx, 38, RULE_service);
+		ServiceContext localctx = new ServiceContext(_ctx, getState());
+		enterRule(localctx, 38, RULE_service);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(212);
 			match(SERVICE);
@@ -1626,14 +1846,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1664,32 +1884,39 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_serviceBody; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterServiceBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterServiceBody(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitServiceBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitServiceBody(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitServiceBody(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitServiceBody(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ServiceBodyContext serviceBody() throws RecognitionException {
-		ServiceBodyContext _localctx = new ServiceBodyContext(_ctx, getState());
-		enterRule(_localctx, 40, RULE_serviceBody);
-		int _la;
+		ServiceBodyContext localctx = new ServiceBodyContext(_ctx, getState());
+		enterRule(localctx, 40, RULE_serviceBody);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(216);
 			match(LBRACE);
 			setState(222);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 16908290L) != 0) {
+			la = _input.LA(1);
+			while ((la & ~0x3f) == 0 && ((1L << la) & 16908290L) != 0) {
 				{
 				setState(220);
 				_errHandler.sync(this);
@@ -1718,21 +1945,21 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(224);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(225);
 			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1758,24 +1985,31 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_rpc; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterRpc(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterRpc(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitRpc(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitRpc(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRpc(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRpc(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final RpcContext rpc() throws RecognitionException {
-		RpcContext _localctx = new RpcContext(_ctx, getState());
-		enterRule(_localctx, 42, RULE_rpc);
+		RpcContext localctx = new RpcContext(_ctx, getState());
+		enterRule(localctx, 42, RULE_rpc);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(227);
 			match(RPC);
@@ -1808,14 +2042,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1833,52 +2067,55 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_rpcInOut; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterRpcInOut(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterRpcInOut(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitRpcInOut(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitRpcInOut(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRpcInOut(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRpcInOut(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final RpcInOutContext rpcInOut() throws RecognitionException {
-		RpcInOutContext _localctx = new RpcInOutContext(_ctx, getState());
-		enterRule(_localctx, 44, RULE_rpcInOut);
+		RpcInOutContext localctx = new RpcInOutContext(_ctx, getState());
+		enterRule(localctx, 44, RULE_rpcInOut);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(236);
 			match(LPAREN);
 			setState(238);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,19,_ctx) ) {
-			case 1:
-				{
-				setState(237);
-				match(STREAM);
-				}
-				break;
-			}
+                if (getInterpreter().adaptivePredict(_input, 19, _ctx) == 1) {
+                    setState(237);
+                    match(STREAM);
+                }
 			setState(240);
-			((RpcInOutContext)_localctx).messageType = fullIdent();
+			((RpcInOutContext)localctx).messageType = fullIdent();
 			setState(241);
 			match(RPAREN);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1903,32 +2140,39 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_rpcBody; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterRpcBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterRpcBody(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitRpcBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitRpcBody(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRpcBody(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRpcBody(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final RpcBodyContext rpcBody() throws RecognitionException {
-		RpcBodyContext _localctx = new RpcBodyContext(_ctx, getState());
-		enterRule(_localctx, 46, RULE_rpcBody);
-		int _la;
+		RpcBodyContext localctx = new RpcBodyContext(_ctx, getState());
+		enterRule(localctx, 46, RULE_rpcBody);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(243);
 			match(LBRACE);
 			setState(248);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==SEMI || _la==OPTION) {
+			la = _input.LA(1);
+			while (la==SEMI || la==OPTION) {
 				{
 				setState(246);
 				_errHandler.sync(this);
@@ -1951,21 +2195,21 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(250);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(251);
 			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -1984,24 +2228,31 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_reserved; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterReserved(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterReserved(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitReserved(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitReserved(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitReserved(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitReserved(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ReservedContext reserved() throws RecognitionException {
-		ReservedContext _localctx = new ReservedContext(_ctx, getState());
-		enterRule(_localctx, 48, RULE_reserved);
+		ReservedContext localctx = new ReservedContext(_ctx, getState());
+		enterRule(localctx, 48, RULE_reserved);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(253);
 			match(RESERVED);
@@ -2028,14 +2279,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2056,32 +2307,39 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_ranges; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterRanges(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterRanges(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitRanges(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitRanges(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRanges(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRanges(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final RangesContext ranges() throws RecognitionException {
-		RangesContext _localctx = new RangesContext(_ctx, getState());
-		enterRule(_localctx, 50, RULE_ranges);
-		int _la;
+		RangesContext localctx = new RangesContext(_ctx, getState());
+		enterRule(localctx, 50, RULE_ranges);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(260);
 			range();
 			setState(265);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==COMMA) {
+			la = _input.LA(1);
+			while (la==COMMA) {
 				{
 				{
 				setState(261);
@@ -2092,19 +2350,19 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(267);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2120,32 +2378,39 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_range; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterRange(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterRange(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitRange(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitRange(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRange(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRange(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final RangeContext range() throws RecognitionException {
-		RangeContext _localctx = new RangeContext(_ctx, getState());
-		enterRule(_localctx, 52, RULE_range);
-		int _la;
+		RangeContext localctx = new RangeContext(_ctx, getState());
+		enterRule(localctx, 52, RULE_range);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(268);
 			match(IntegerLiteral);
 			setState(271);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==TO) {
+			la = _input.LA(1);
+			if (la==TO) {
 				{
 				setState(269);
 				match(TO);
@@ -2157,14 +2422,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2185,32 +2450,39 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_fieldNames; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterFieldNames(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterFieldNames(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitFieldNames(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitFieldNames(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitFieldNames(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitFieldNames(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final FieldNamesContext fieldNames() throws RecognitionException {
-		FieldNamesContext _localctx = new FieldNamesContext(_ctx, getState());
-		enterRule(_localctx, 54, RULE_fieldNames);
-		int _la;
+		FieldNamesContext localctx = new FieldNamesContext(_ctx, getState());
+		enterRule(localctx, 54, RULE_fieldNames);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(273);
 			stringLiteral();
 			setState(278);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==COMMA) {
+			la = _input.LA(1);
+			while (la==COMMA) {
 				{
 				{
 				setState(274);
@@ -2221,19 +2493,19 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(280);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2256,16 +2528,23 @@ public class Protobuf2Parser extends Parser {
 		public FullyQualifiedTypeContext(TypeContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterFullyQualifiedType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterFullyQualifiedType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitFullyQualifiedType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitFullyQualifiedType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitFullyQualifiedType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitFullyQualifiedType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 	@SuppressWarnings("CheckReturnValue")
@@ -2288,62 +2567,63 @@ public class Protobuf2Parser extends Parser {
 		public PrimitiveTypeContext(TypeContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterPrimitiveType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterPrimitiveType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitPrimitiveType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitPrimitiveType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitPrimitiveType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitPrimitiveType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final TypeContext type() throws RecognitionException {
-		TypeContext _localctx = new TypeContext(_ctx, getState());
-		enterRule(_localctx, 56, RULE_type);
-		int _la;
+		TypeContext localctx = new TypeContext(_ctx, getState());
+		enterRule(localctx, 56, RULE_type);
+		int la;
 		try {
 			setState(283);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,26,_ctx) ) {
-			case 1:
-				_localctx = new PrimitiveTypeContext(_localctx);
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(281);
-				_la = _input.LA(1);
-				if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 54693738296L) != 0) ) {
-				_errHandler.recoverInline(this);
-				}
-				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
-					_errHandler.reportMatch(this);
-					consume();
-				}
-				}
-				break;
-			case 2:
-				_localctx = new FullyQualifiedTypeContext(_localctx);
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(282);
-				fullIdent();
-				}
-				break;
-			}
+            if (getInterpreter().adaptivePredict(_input, 26, _ctx) == 1) {
+                localctx = new PrimitiveTypeContext(localctx);
+                enterOuterAlt(localctx, 1);
+                setState(281);
+                la = _input.LA(1);
+                if (!((la & ~0x3f) == 0 && ((1L << la) & 54693738296L) != 0)) {
+                    _errHandler.recoverInline(this);
+                } else {
+                    if (_input.LA(1) == Token.EOF) {
+                        matchedEOF = true;
+                    }
+                    _errHandler.reportMatch(this);
+                    consume();
+                }
+            } else if (getInterpreter().adaptivePredict(_input, 26, _ctx) == 2) {
+                localctx = new FullyQualifiedTypeContext(localctx);
+                enterOuterAlt(localctx, 2);
+                setState(282);
+                fullIdent();
+            }
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2367,38 +2647,45 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_field; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterField(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitField(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitField(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitField(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final FieldContext field() throws RecognitionException {
-		FieldContext _localctx = new FieldContext(_ctx, getState());
-		enterRule(_localctx, 58, RULE_field);
-		int _la;
+		FieldContext localctx = new FieldContext(_ctx, getState());
+		enterRule(localctx, 58, RULE_field);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(285);
 			type();
 			setState(286);
-			((FieldContext)_localctx).fieldName = identOrReserved();
+			((FieldContext)localctx).fieldName = identOrReserved();
 			setState(287);
 			match(ASSIGN);
 			setState(288);
 			match(IntegerLiteral);
 			setState(290);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==LBRACK) {
+			la = _input.LA(1);
+			if (la==LBRACK) {
 				{
 				setState(289);
 				optionList();
@@ -2410,14 +2697,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2446,25 +2733,32 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_oneOf; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOneOf(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterOneOf(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOneOf(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitOneOf(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOneOf(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOneOf(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final OneOfContext oneOf() throws RecognitionException {
-		OneOfContext _localctx = new OneOfContext(_ctx, getState());
-		enterRule(_localctx, 60, RULE_oneOf);
-		int _la;
+		OneOfContext localctx = new OneOfContext(_ctx, getState());
+		enterRule(localctx, 60, RULE_oneOf);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(294);
 			match(ONEOF);
@@ -2474,8 +2768,8 @@ public class Protobuf2Parser extends Parser {
 			match(LBRACE);
 			setState(301);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 18014802220070714L) != 0) {
+			la = _input.LA(1);
+			while ((la & ~0x3f) == 0 && ((1L << la) & 18014802220070714L) != 0) {
 				{
 				setState(299);
 				_errHandler.sync(this);
@@ -2522,21 +2816,21 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(303);
 				_errHandler.sync(this);
-				_la = _input.LA(1);
+				la = _input.LA(1);
 			}
 			setState(304);
 			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2566,25 +2860,32 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_mapField; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterMapField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterMapField(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitMapField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitMapField(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMapField(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMapField(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final MapFieldContext mapField() throws RecognitionException {
-		MapFieldContext _localctx = new MapFieldContext(_ctx, getState());
-		enterRule(_localctx, 62, RULE_mapField);
-		int _la;
+		MapFieldContext localctx = new MapFieldContext(_ctx, getState());
+		enterRule(localctx, 62, RULE_mapField);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(306);
 			match(MAP);
@@ -2606,8 +2907,8 @@ public class Protobuf2Parser extends Parser {
 			match(IntegerLiteral);
 			setState(316);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==LBRACK) {
+			la = _input.LA(1);
+			if (la==LBRACK) {
 				{
 				setState(315);
 				optionList();
@@ -2619,14 +2920,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2649,47 +2950,56 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_keyType; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterKeyType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterKeyType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitKeyType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitKeyType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitKeyType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitKeyType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final KeyTypeContext keyType() throws RecognitionException {
-		KeyTypeContext _localctx = new KeyTypeContext(_ctx, getState());
-		enterRule(_localctx, 64, RULE_keyType);
-		int _la;
+		KeyTypeContext localctx = new KeyTypeContext(_ctx, getState());
+		enterRule(localctx, 64, RULE_keyType);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(320);
-			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 54693737224L) != 0) ) {
+			la = _input.LA(1);
+			if ( !((la & ~0x3f) == 0 && ((1L << la) & 54693737224L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2709,47 +3019,56 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_reservedWord; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterReservedWord(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterReservedWord(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitReservedWord(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitReservedWord(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitReservedWord(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitReservedWord(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ReservedWordContext reservedWord() throws RecognitionException {
-		ReservedWordContext _localctx = new ReservedWordContext(_ctx, getState());
-		enterRule(_localctx, 66, RULE_reservedWord);
-		int _la;
+		ReservedWordContext localctx = new ReservedWordContext(_ctx, getState());
+		enterRule(localctx, 66, RULE_reservedWord);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(322);
-			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 76286427136L) != 0) ) {
+			la = _input.LA(1);
+			if ( !((la & ~0x3f) == 0 && ((1L << la) & 76286427136L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2770,31 +3089,38 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_fullIdent; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterFullIdent(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterFullIdent(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitFullIdent(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitFullIdent(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitFullIdent(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitFullIdent(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final FullIdentContext fullIdent() throws RecognitionException {
-		FullIdentContext _localctx = new FullIdentContext(_ctx, getState());
-		enterRule(_localctx, 68, RULE_fullIdent);
-		int _la;
+		FullIdentContext localctx = new FullIdentContext(_ctx, getState());
+		enterRule(localctx, 68, RULE_fullIdent);
+		int la;
 		try {
-			int _alt;
-			enterOuterAlt(_localctx, 1);
+			int alt;
+			enterOuterAlt(localctx, 1);
 			{
 			setState(325);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==DOT) {
+			la = _input.LA(1);
+			if (la==DOT) {
 				{
 				setState(324);
 				match(DOT);
@@ -2803,9 +3129,9 @@ public class Protobuf2Parser extends Parser {
 
 			setState(332);
 			_errHandler.sync(this);
-			_alt = getInterpreter().adaptivePredict(_input,32,_ctx);
-			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-				if ( _alt==1 ) {
+			alt = getInterpreter().adaptivePredict(_input,32,_ctx);
+			while ( alt!=2 && alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
+				if ( alt==1 ) {
 					{
 					{
 					setState(327);
@@ -2817,21 +3143,21 @@ public class Protobuf2Parser extends Parser {
 				}
 				setState(334);
 				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,32,_ctx);
+				alt = getInterpreter().adaptivePredict(_input,32,_ctx);
 			}
 			setState(335);
 			identOrReserved();
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2843,38 +3169,45 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_emptyStatement; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterEmptyStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterEmptyStatement(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitEmptyStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitEmptyStatement(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEmptyStatement(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEmptyStatement(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final EmptyStatementContext emptyStatement() throws RecognitionException {
-		EmptyStatementContext _localctx = new EmptyStatementContext(_ctx, getState());
-		enterRule(_localctx, 70, RULE_emptyStatement);
+		EmptyStatementContext localctx = new EmptyStatementContext(_ctx, getState());
+		enterRule(localctx, 70, RULE_emptyStatement);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(337);
 			match(SEMI);
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2892,22 +3225,29 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_constant; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterConstant(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterConstant(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitConstant(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitConstant(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitConstant(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitConstant(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ConstantContext constant() throws RecognitionException {
-		ConstantContext _localctx = new ConstantContext(_ctx, getState());
-		enterRule(_localctx, 72, RULE_constant);
+		ConstantContext localctx = new ConstantContext(_ctx, getState());
+		enterRule(localctx, 72, RULE_constant);
 		try {
 			setState(344);
 			_errHandler.sync(this);
@@ -2923,35 +3263,35 @@ public class Protobuf2Parser extends Parser {
 			case WEAK:
 			case Ident:
 			case DOT:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(339);
 				fullIdent();
 				}
 				break;
 			case IntegerLiteral:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(340);
 				match(IntegerLiteral);
 				}
 				break;
 			case NumericLiteral:
-				enterOuterAlt(_localctx, 3);
+				enterOuterAlt(localctx, 3);
 				{
 				setState(341);
 				match(NumericLiteral);
 				}
 				break;
 			case StringLiteral:
-				enterOuterAlt(_localctx, 4);
+				enterOuterAlt(localctx, 4);
 				{
 				setState(342);
 				match(StringLiteral);
 				}
 				break;
 			case BooleanLiteral:
-				enterOuterAlt(_localctx, 5);
+				enterOuterAlt(localctx, 5);
 				{
 				setState(343);
 				match(BooleanLiteral);
@@ -2962,14 +3302,14 @@ public class Protobuf2Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	public static final String _serializedATN =

@@ -277,8 +277,9 @@ public interface HttpSender {
              * @throws IOException If compression fails.
              */
             public final Builder compressWhen(Supplier<Boolean> when) throws IOException {
-                if (when.get())
+                if (when.get()) {
                     return compress();
+                }
                 return this;
             }
 

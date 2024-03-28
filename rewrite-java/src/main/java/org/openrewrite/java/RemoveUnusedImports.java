@@ -146,7 +146,7 @@ public class RemoveUnusedImports extends Recipe {
                     // see https://github.com/openrewrite/rewrite/issues/1698 for more detail
                     String target = qualid.getTarget().toString();
                     String modifiedTarget = methodsAndFieldsByTypeName.keySet().stream()
-                            .filter((fqn) -> fullyQualifiedNamesAreEqual(target, fqn))
+                            .filter(fqn -> fullyQualifiedNamesAreEqual(target, fqn))
                             .findFirst()
                             .orElse(target);
                     SortedSet<String> targetMethodsAndFields = methodsAndFieldsByTypeName.get(modifiedTarget);

@@ -136,7 +136,7 @@ public class ChangePackage extends Recipe {
                 if (parent != null &&
                     // Ensure the parent isn't a J.FieldAccess OR the parent doesn't match the target package name.
                     (!(parent.getValue() instanceof J.FieldAccess) ||
-                     (!(((J.FieldAccess) parent.getValue()).isFullyQualifiedClassReference(newPackageName))))) {
+                     (!((J.FieldAccess) parent.getValue()).isFullyQualifiedClassReference(newPackageName)))) {
 
                     f = TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
                             .withPrefix(f.getPrefix());

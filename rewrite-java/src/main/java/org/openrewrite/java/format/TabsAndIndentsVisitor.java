@@ -67,7 +67,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
         Iterator<Object> itr = parent.getPath(J.class::isInstance);
-        J next = (itr.hasNext()) ? (J) itr.next() : null;
+        J next = itr.hasNext() ? (J) itr.next() : null;
         if (next != null) {
             preVisit(next, p);
         }
@@ -78,13 +78,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     @Nullable
     public J preVisit(@Nullable J tree, P p) {
-        if (tree instanceof JavaSourceFile ||
-                tree instanceof J.Package ||
-                tree instanceof J.Import ||
-                tree instanceof J.Label ||
-                tree instanceof J.DoWhileLoop ||
-                tree instanceof J.ArrayDimension ||
-                tree instanceof J.ClassDeclaration) {
+        if (tree instanceof JavaSourceFile) {
             getCursor().putMessage("indentType", IndentType.ALIGN);
         } else if (tree instanceof J.Block ||
                 tree instanceof J.If ||
@@ -200,8 +194,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (right.getElement() instanceof J) {
             J elem = (J) right.getElement();
-            if ((right.getAfter().getLastWhitespace().contains("\n") ||
-                    elem.getPrefix().getLastWhitespace().contains("\n"))) {
+            if (right.getAfter().getLastWhitespace().contains("\n") ||
+                    elem.getPrefix().getLastWhitespace().contains("\n")) {
                 switch (loc) {
                     case FOR_CONDITION:
                     case FOR_UPDATE: {
@@ -352,7 +346,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         setCursor(getCursor().getParent());
-        return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
+        return after == right.getAfter() && t == right.getElement() ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
     @Override

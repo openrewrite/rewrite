@@ -69,7 +69,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations vd, ExecutionContext ctx) {
-                  if (vd.getVariables().size() == 1 && vd.getVariables().get(0).getSimpleName().equals("i")) {
+                  if (vd.getVariables().size() == 1 && "i".equals(vd.getVariables().get(0).getSimpleName())) {
                       return JavaTemplate.apply("Integer i = 2;", getCursor(), vd.getCoordinates().replace());
                   }
                   return super.visitVariableDeclarations(vd, ctx);

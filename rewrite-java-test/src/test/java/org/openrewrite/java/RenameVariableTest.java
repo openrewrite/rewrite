@@ -36,7 +36,7 @@ class RenameVariableTest implements RewriteTest {
         return toRecipe(() -> new JavaVisitor<>() {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                if (classDecl.getSimpleName().equals("A")) {
+                if ("A".equals(classDecl.getSimpleName())) {
                     List<J.VariableDeclarations> variableDecls = classDecl.getBody().getStatements().stream()
                       .filter(J.VariableDeclarations.class::isInstance)
                       .map(J.VariableDeclarations.class::cast)

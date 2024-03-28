@@ -95,7 +95,7 @@ public class DeleteProperty extends Recipe {
                         .map(e2 -> e2.getKey().getValue())
                         .collect(Collectors.joining("."));
 
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
+                if (Boolean.FALSE.equals(relaxedBinding) ? prop.equals(propertyKey) : NameCaseConvention.equalsRelaxedBinding(prop, propertyKey)) {
                     doAfterVisit(new DeletePropertyVisitor<>(entry));
                     if (Boolean.TRUE.equals(coalesce)) {
                         maybeCoalesceProperties();
@@ -107,7 +107,7 @@ public class DeleteProperty extends Recipe {
         };
     }
 
-    private static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
+    private static final class DeletePropertyVisitor<P> extends YamlVisitor<P> {
         private final Yaml.Mapping.Entry scope;
 
         private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {

@@ -113,7 +113,7 @@ public class MavenSettings {
 
     public static boolean readFromDiskEnabled() {
         final String propertyValue = System.getProperty("org.openrewrite.test.readMavenSettingsFromDisk");
-        return propertyValue != null && !propertyValue.equalsIgnoreCase("false");
+        return propertyValue != null && !"false".equalsIgnoreCase(propertyValue);
     }
 
     private static Path userSettingsPath() {
@@ -213,13 +213,17 @@ public class MavenSettings {
 
         @Nullable
         private ActiveProfiles interpolate(@Nullable ActiveProfiles activeProfiles) {
-            if (activeProfiles == null) return null;
+            if (activeProfiles == null) {
+                return null;
+            }
             return new ActiveProfiles(ListUtils.map(activeProfiles.getActiveProfiles(), this::interpolate));
         }
 
         @Nullable
         private Mirrors interpolate(@Nullable Mirrors mirrors) {
-            if (mirrors == null) return null;
+            if (mirrors == null) {
+                return null;
+            }
             return new Mirrors(ListUtils.map(mirrors.getMirrors(), this::interpolate));
         }
 
@@ -229,7 +233,9 @@ public class MavenSettings {
 
         @Nullable
         private Servers interpolate(@Nullable Servers servers) {
-            if (servers == null) return null;
+            if (servers == null) {
+                return null;
+            }
             return new Servers(ListUtils.map(servers.getServers(), this::interpolate));
         }
 

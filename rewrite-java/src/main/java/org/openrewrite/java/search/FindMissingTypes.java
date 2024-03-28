@@ -267,7 +267,7 @@ public class FindMissingTypes extends Recipe {
             Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.FieldAccess
                     && (ident == ((J.FieldAccess) value).getName() ||
-                        ident == ((J.FieldAccess) value).getTarget() && !((J.FieldAccess) value).getSimpleName().equals("class"));
+                        ident == ((J.FieldAccess) value).getTarget() && !"class".equals(((J.FieldAccess) value).getSimpleName()));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {

@@ -24,7 +24,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.function.Consumer;
 
-public class Assertions {
+public final class Assertions {
     private Assertions() {
     }
     static void customizeExecutionContext(ExecutionContext ctx) {

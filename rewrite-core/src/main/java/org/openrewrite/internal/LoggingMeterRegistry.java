@@ -79,7 +79,9 @@ public class LoggingMeterRegistry extends MeterRegistry {
                             gauge -> loggingSink.accept(print.id() + "\n    value=" + print.value(gauge.value())),
                             counter -> {
                                 double count = counter.count();
-                                if (count == 0) return;
+                                if (count == 0) {
+                                    return;
+                                }
                                 loggingSink.accept(print.id() +
                                         "\n    sum=" + print.value(count) +
                                         "\n    rate=" + print.rate(count));
@@ -87,7 +89,9 @@ public class LoggingMeterRegistry extends MeterRegistry {
                             timer -> {
                                 HistogramSnapshot snapshot = timer.takeSnapshot();
                                 long count = snapshot.count();
-                                if (count == 0) return;
+                                if (count == 0) {
+                                    return;
+                                }
                                 loggingSink.accept(print.id() +
                                         "\n    sum=" + count +
                                         "\n    rate=" + print.unitlessRate(count) +
@@ -97,7 +101,9 @@ public class LoggingMeterRegistry extends MeterRegistry {
                             summary -> {
                                 HistogramSnapshot snapshot = summary.takeSnapshot();
                                 long count = snapshot.count();
-                                if (count == 0) return;
+                                if (count == 0) {
+                                    return;
+                                }
                                 loggingSink.accept(print.id() +
                                         "\n    sum=" + count +
                                         "\n    rate=" + print.unitlessRate(count) +
@@ -106,26 +112,34 @@ public class LoggingMeterRegistry extends MeterRegistry {
                             },
                             longTaskTimer -> {
                                 int activeTasks = longTaskTimer.activeTasks();
-                                if (activeTasks == 0) return;
+                                if (activeTasks == 0) {
+                                    return;
+                                }
                                 loggingSink.accept(print.id() +
                                         "\n    active=" + print.value(activeTasks) +
                                         "\n    duration=" + print.time(longTaskTimer.duration(getBaseTimeUnit())));
                             },
                             timeGauge -> {
                                 double value = timeGauge.value(getBaseTimeUnit());
-                                if (value == 0) return;
+                                if (value == 0) {
+                                    return;
+                                }
                                 loggingSink.accept(print.id() + "\n    value=" + print.time(value));
                             },
                             counter -> {
                                 double count = counter.count();
-                                if (count == 0) return;
+                                if (count == 0) {
+                                    return;
+                                }
                                 loggingSink.accept(print.id() +
                                         "\n    sum=" + print.value(count) +
                                         "\n    rate=" + print.rate(count));
                             },
                             timer -> {
                                 double count = timer.count();
-                                if (count == 0) return;
+                                if (count == 0) {
+                                    return;
+                                }
                                 loggingSink.accept(print.id() +
                                         "\n    sum=" + print.value(count) +
                                         "\n    rate=" + print.rate(count) +
@@ -190,7 +204,9 @@ public class LoggingMeterRegistry extends MeterRegistry {
         // see https://stackoverflow.com/a/3758880/510017
         String humanReadableByteCount(double bytes) {
             int unit = 1024;
-            if (bytes < unit || Double.isNaN(bytes)) return decimalOrNan(bytes) + " B";
+            if (bytes < unit || Double.isNaN(bytes)) {
+                return decimalOrNan(bytes) + " B";
+            }
             int exp = (int) (Math.log(bytes) / Math.log(unit));
             String pre = "KMGTPE".charAt(exp - 1) + "i";
             return decimalOrNan(bytes / Math.pow(unit, exp)) + " " + pre + "B";

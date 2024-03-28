@@ -77,7 +77,7 @@ public class DeclarativeRecipe extends Recipe {
     @JsonIgnore
     private Validated<Object> validation = Validated.none();
     @JsonIgnore
-    private Validated<Object> initValidation = null;
+    private Validated<Object> initValidation;
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
@@ -317,7 +317,7 @@ public class DeclarativeRecipe extends Recipe {
     public Validated<Object> validate() {
         return Validated.<Object>test("initialization",
                         "initialize(..) must be called on DeclarativeRecipe prior to use.",
-                        this, r -> initValidation != null)
+                        this, Objects::nonNull)
                 .and(validation)
                 .and(initValidation);
     }

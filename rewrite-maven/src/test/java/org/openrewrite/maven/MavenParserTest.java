@@ -885,7 +885,7 @@ class MavenParserTest implements RewriteTest {
                 public MockResponse dispatch(RecordedRequest request) {
                     MockResponse resp = new MockResponse();
                     if (StreamSupport.stream(request.getHeaders().spliterator(), false)
-                      .noneMatch(it -> it.getFirst().equals("Authorization") &&
+                      .noneMatch(it -> "Authorization".equals(it.getFirst()) &&
                                        it.getSecond().equals("Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes())))) {
                         return resp.setResponseCode(401);
                     } else {
@@ -963,8 +963,8 @@ class MavenParserTest implements RewriteTest {
 
             assertThat(maven.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
               .hasSize(1)
-              .matches(deps -> deps.get(0).getGroupId().equals("com.foo") &&
-                               deps.get(0).getArtifactId().equals("bar"));
+              .matches(deps -> "com.foo".equals(deps.get(0).getGroupId()) &&
+                               "bar".equals(deps.get(0).getArtifactId()));
         }
     }
 
@@ -1371,8 +1371,8 @@ class MavenParserTest implements RewriteTest {
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
                   .hasSize(7)
-                  .matches(deps -> deps.get(0).getArtifactId().equals("guava") &&
-                                   deps.get(0).getVersion().equals("29.0-jre"))
+                  .matches(deps -> "guava".equals(deps.get(0).getArtifactId()) &&
+                                   "29.0-jre".equals(deps.get(0).getVersion()))
               )
             )
           )
@@ -1445,10 +1445,10 @@ class MavenParserTest implements RewriteTest {
                     var compileDependencies = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                       .getDependencies().get(Scope.Compile);
                     assertThat(compileDependencies).hasSize(2);
-                    assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("b") &&
-                                                                   it.getVersion().equals("0.1.0-SNAPSHOT"));
-                    assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("d") &&
-                                                                   it.getVersion().equals("0.1.0-SNAPSHOT"));
+                    assertThat(compileDependencies).anyMatch(it -> "b".equals(it.getArtifactId()) &&
+                                                                   "0.1.0-SNAPSHOT".equals(it.getVersion()));
+                    assertThat(compileDependencies).anyMatch(it -> "d".equals(it.getArtifactId()) &&
+                                                                   "0.1.0-SNAPSHOT".equals(it.getVersion()));
                 })
               ),
               mavenProject("b-parent",
@@ -1588,9 +1588,9 @@ class MavenParserTest implements RewriteTest {
               spec -> spec.afterRecipe(pomXml -> {
                   var compileDependencies = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                     .getDependencies().get(Scope.Compile);
-                  assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("junit") &&
-                                                                 it.getVersion().equals("4.11"));
-                  assertThat(compileDependencies).noneMatch(it -> it.getArtifactId().equals("hamcrest-core"));
+                  assertThat(compileDependencies).anyMatch(it -> "junit".equals(it.getArtifactId()) &&
+                                                                 "4.11".equals(it.getVersion()));
+                  assertThat(compileDependencies).noneMatch(it -> "hamcrest-core".equals(it.getArtifactId()));
               })
             )
           )
@@ -2237,9 +2237,9 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(afterDoc -> assertThat(afterDoc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                 .getDependencies().get(Scope.Compile))
-                .noneMatch(dep -> dep.getGav().getArtifactId().equals("a"))
-                .anyMatch(dep -> dep.getGav().getArtifactId().equals("b"))
-                .anyMatch(dep -> dep.getGav().getArtifactId().equals("junit")))
+                .noneMatch(dep -> "a".equals(dep.getGav().getArtifactId()))
+                .anyMatch(dep -> "b".equals(dep.getGav().getArtifactId()))
+                .anyMatch(dep -> "junit".equals(dep.getGav().getArtifactId())))
             ))
         );
     }
@@ -2294,7 +2294,7 @@ class MavenParserTest implements RewriteTest {
                 .singleElement()
                 .satisfies(aDep -> assertThat(aDep.getEffectiveExclusions())
                   .singleElement()
-                  .matches(ga -> ga.getArtifactId().equals("junit")))
+                  .matches(ga -> "junit".equals(ga.getArtifactId())))
               ))),
           mavenProject("c",
             pomXml("""
@@ -2319,7 +2319,7 @@ class MavenParserTest implements RewriteTest {
                   .singleElement()
                   .satisfies(aDep -> assertThat(aDep.getEffectiveExclusions())
                     .singleElement()
-                    .matches(ga -> ga.getArtifactId().equals("junit"))))
+                    .matches(ga -> "junit".equals(ga.getArtifactId()))))
                 .satisfies(mavenResolutionResult -> assertThat(mavenResolutionResult
                   .findDependencies("org.sample", "b", Scope.Compile))
                   .singleElement()
@@ -2660,8 +2660,8 @@ class MavenParserTest implements RewriteTest {
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0).getConfiguration())
                   .hasSize(2)
-                  .anyMatch(elem -> elem.asText().equals("11"))
-                  .anyMatch(elem -> elem.asText().equals("17"))
+                  .anyMatch(elem -> "11".equals(elem.asText()))
+                  .anyMatch(elem -> "17".equals(elem.asText()))
               )
             )
           )

@@ -44,7 +44,7 @@ class TreeObserverTest implements RewriteTest {
             .executionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
                 @Override
                 public Tree propertyChanged(String property, Cursor cursor, Tree newTree, Object oldValue, Object newValue) {
-                    if (property.equals("text")) {
+                    if ("text".equals(property)) {
                         observed.incrementAndGet();
                     }
                     return newTree;

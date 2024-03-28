@@ -1150,15 +1150,12 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         p.append('?');
         if (wildcard.getPadding().getBound() != null) {
             //noinspection ConstantConditions
-            switch (wildcard.getBound()) {
-                case Extends:
-                    visitSpace(wildcard.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
-                    p.append("extends");
-                    break;
-                case Super:
-                    visitSpace(wildcard.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
-                    p.append("super");
-                    break;
+            if (wildcard.getBound() == J.Wildcard.Bound.Extends) {
+                visitSpace(wildcard.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
+                p.append("extends");
+            } else if (wildcard.getBound() == J.Wildcard.Bound.Super) {
+                visitSpace(wildcard.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
+                p.append("super");
             }
         }
         visit(wildcard.getBoundedType(), p);

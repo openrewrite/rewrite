@@ -55,7 +55,7 @@ public class JsonPathMatcher {
 
     public <T> Optional<T> find(Cursor cursor) {
         LinkedList<Tree> cursorPath = cursor.getPathAsStream()
-                .filter(o -> o instanceof Tree)
+                .filter(Tree.class::isInstance)
                 .map(Tree.class::cast)
                 .map(t -> new ReplaceAliasWithAnchorValueVisitor<Integer>()
                         .visitNonNull(t, 0))
@@ -128,14 +128,14 @@ public class JsonPathMatcher {
 
         @Override
         protected Object aggregateResult(Object aggregate, Object nextResult) {
-            return (scope = nextResult);
+            return scope = nextResult;
         }
 
         @Override
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
             if (ctx.ROOT() != null || "[".equals(ctx.start.getText())) {
                 scope = cursorPath.stream()
-                        .filter(t -> t instanceof Yaml.Mapping)
+                        .filter(Yaml.Mapping.class::isInstance)
                         .findFirst()
                         .orElseGet(() -> cursorPath.stream()
                                 .filter(t -> t instanceof Yaml.Document && ((Yaml.Document) t).getBlock() instanceof Yaml.Mapping)
@@ -318,7 +318,7 @@ public class JsonPathMatcher {
                         }
                     }
                     return getResultFromList(matches);
-                } else if (((member.getValue() instanceof Yaml.Scalar))) {
+                } else if (member.getValue() instanceof Yaml.Scalar) {
                     return key.equals(name) ? member : null;
                 }
 
@@ -569,10 +569,10 @@ public class JsonPathMatcher {
             if (ctx.LOGICAL_OPERATOR() != null) {
                 String operator;
                 switch (ctx.LOGICAL_OPERATOR().getText()) {
-                    case ("&&"):
+                    case "&&":
                         operator = "&&";
                         break;
-                    case ("||"):
+                    case "||":
                         operator = "||";
                         break;
                     default:
@@ -611,10 +611,10 @@ public class JsonPathMatcher {
                 rhs = getBinaryExpressionResult(rhs);
                 String operator;
                 switch (ctx.EQUALITY_OPERATOR().getText()) {
-                    case ("=="):
+                    case "==":
                         operator = "==";
                         break;
-                    case ("!="):
+                    case "!=":
                         operator = "!=";
                         break;
                     default:

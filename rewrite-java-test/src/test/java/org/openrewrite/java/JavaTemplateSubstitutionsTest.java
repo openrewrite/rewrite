@@ -36,7 +36,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("test")) {
+                  if ("test".equals(method.getSimpleName())) {
                       var s = method.getBody().getStatements().get(0);
                       return JavaTemplate.builder("test(#{any()})")
                         .contextSensitive()
@@ -80,7 +80,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("test")) {
+                  if ("test".equals(method.getSimpleName())) {
                       var s = method.getBody().getStatements().get(0);
                       return JavaTemplate.builder("test(#{anyArray()})")
                         .contextSensitive()
@@ -123,7 +123,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("test")) {
+                  if ("test".equals(method.getSimpleName())) {
                       return JavaTemplate.builder("#{} void test2() {}")
                         .contextSensitive()
                         .build()

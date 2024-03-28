@@ -31,11 +31,28 @@ public class AnnotationSignatureLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4, 
-		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11, 
-		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19, 
-		DOTDOT=20, SPACE=21, Identifier=22;
+    public static final int IntegerLiteral = 1;
+    public static final int FloatingPointLiteral = 2;
+    public static final int BooleanLiteral = 3;
+    public static final int CharacterLiteral = 4;
+    public static final int StringLiteral = 5;
+    public static final int LPAREN = 6;
+    public static final int RPAREN = 7;
+    public static final int LBRACK = 8;
+    public static final int RBRACK = 9;
+    public static final int COMMA = 10;
+    public static final int DOT = 11;
+    public static final int ASSIGN = 12;
+    public static final int COLON = 13;
+    public static final int ADD = 14;
+    public static final int SUB = 15;
+    public static final int AND = 16;
+    public static final int OR = 17;
+    public static final int AT = 18;
+    public static final int ELLIPSIS = 19;
+    public static final int DOTDOT = 20;
+    public static final int SPACE = 21;
+    public static final int Identifier = 22;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};
@@ -139,30 +156,27 @@ public class AnnotationSignatureLexer extends Lexer {
 
 	@Override
 	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
-		switch (ruleIndex) {
-		case 62:
-			return JavaLetter_sempred((RuleContext)_localctx, predIndex);
-		case 63:
-			return JavaLetterOrDigit_sempred((RuleContext)_localctx, predIndex);
-		}
+        if (ruleIndex == 62) {
+            return JavaLetter_sempred((RuleContext) _localctx, predIndex);
+        } else if (ruleIndex == 63) {
+            return JavaLetterOrDigit_sempred((RuleContext) _localctx, predIndex);
+        }
 		return true;
 	}
 	private boolean JavaLetter_sempred(RuleContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 0:
-			return Character.isJavaIdentifierStart(_input.LA(-1));
-		case 1:
-			return Character.isJavaIdentifierStart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)));
-		}
+        if (predIndex == 0) {
+            return Character.isJavaIdentifierStart(_input.LA(-1));
+        } else if (predIndex == 1) {
+            return Character.isJavaIdentifierStart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1)));
+        }
 		return true;
 	}
 	private boolean JavaLetterOrDigit_sempred(RuleContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 2:
-			return Character.isJavaIdentifierPart(_input.LA(-1));
-		case 3:
-			return Character.isJavaIdentifierPart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)));
-		}
+        if (predIndex == 2) {
+            return Character.isJavaIdentifierPart(_input.LA(-1));
+        } else if (predIndex == 3) {
+            return Character.isJavaIdentifierPart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1)));
+        }
 		return true;
 	}
 

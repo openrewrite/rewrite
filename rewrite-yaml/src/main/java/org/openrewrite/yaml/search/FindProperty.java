@@ -63,9 +63,9 @@ public class FindProperty extends Recipe {
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
-                if (!Boolean.FALSE.equals(relaxedBinding) ?
-                        NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
-                        StringUtils.matchesGlob(prop, propertyKey)) {
+                if (Boolean.FALSE.equals(relaxedBinding) ?
+                        StringUtils.matchesGlob(prop, propertyKey) :
+                        NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey)) {
                     e = e.withValue(SearchResult.found(e.getValue()));
                 }
                 return e;
@@ -79,9 +79,9 @@ public class FindProperty extends Recipe {
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml.Block> values) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, values);
                 String prop = getProperty(getCursor());
-                if (!Boolean.FALSE.equals(relaxedBinding) ?
-                        NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
-                        StringUtils.matchesGlob(prop, propertyKey)) {
+                if (Boolean.FALSE.equals(relaxedBinding) ?
+                        StringUtils.matchesGlob(prop, propertyKey) :
+                        NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey)) {
                     values.add(entry.getValue());
                 }
                 return e;
@@ -95,9 +95,9 @@ public class FindProperty extends Recipe {
 
     public static boolean matches(Cursor cursor, String propertyKey, @Nullable Boolean relaxedBinding) {
         String prop = getProperty(cursor);
-        return !Boolean.FALSE.equals(relaxedBinding) ?
-                NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
-                StringUtils.matchesGlob(prop, propertyKey);
+        return Boolean.FALSE.equals(relaxedBinding) ?
+                StringUtils.matchesGlob(prop, propertyKey) :
+                NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey);
     }
 
     private static String getProperty(Cursor cursor) {

@@ -458,7 +458,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 )
         );
         int updateStatementsSize = f.getControl().getUpdate().size();
-        Boolean padEmptyForIterator = (emptyForIteratorPadStyle == null) ? null : emptyForIteratorPadStyle.getSpace();
+        Boolean padEmptyForIterator = emptyForIteratorPadStyle == null ? null : emptyForIteratorPadStyle.getSpace();
         if (padEmptyForIterator != null && updateStatementsSize == 1 && f.getControl().getUpdate().get(0) instanceof J.Empty) {
             control = control.getPadding().withUpdate(
                     ListUtils.map(control.getPadding().getUpdate(), (index, elemContainer) -> {

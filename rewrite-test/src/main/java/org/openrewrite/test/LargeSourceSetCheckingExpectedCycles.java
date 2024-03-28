@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.fail;
 
 class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private final int expectedCyclesThatMakeChanges;
-    private int cyclesThatResultedInChanges = 0;
+    private int cyclesThatResultedInChanges;
 
     private Map<SourceFile, SourceFile> lastCycleEdits = emptyMap();
     private Map<Path, SourceFile> lastCycleGenerated = emptyMap();

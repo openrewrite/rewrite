@@ -29,7 +29,7 @@ import static java.util.Collections.emptyList;
  * So whitespace and comments are like peanut butter and jelly.
  */
 @EqualsAndHashCode
-public class Space {
+public final class Space {
     public static final Space EMPTY = new Space("", emptyList());
     public static final Space SINGLE_SPACE = new Space(" ", emptyList());
 

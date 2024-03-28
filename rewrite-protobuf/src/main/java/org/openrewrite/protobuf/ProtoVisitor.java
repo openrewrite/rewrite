@@ -301,7 +301,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
             return null;
         }
 
-        return (before == left.getBefore() && t == left.getElement()) ? left : new ProtoLeftPadded<>(before, t, left.getMarkers());
+        return before == left.getBefore() && t == left.getElement() ? left : new ProtoLeftPadded<>(before, t, left.getMarkers());
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -325,6 +325,6 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
             return null;
         }
         Space after = visitSpace(right.getAfter(), p);
-        return (after == right.getAfter() && t == right.getElement()) ? right : new ProtoRightPadded<>(t, after, right.getMarkers());
+        return after == right.getAfter() && t == right.getElement() ? right : new ProtoRightPadded<>(t, after, right.getMarkers());
     }
 }

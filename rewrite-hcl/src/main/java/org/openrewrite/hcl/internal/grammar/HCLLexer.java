@@ -32,16 +32,56 @@ public class HCLLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		FOR_BRACE=1, FOR_BRACK=2, IF=3, IN=4, LBRACE=5, RBRACE=6, ASSIGN=7, Identifier=8, 
-		WS=9, COMMENT=10, LINE_COMMENT=11, NEWLINE=12, NumericLiteral=13, BooleanLiteral=14, 
-		QUOTE=15, NULL=16, HEREDOC_START=17, PLUS=18, AND=19, EQ=20, LT=21, COLON=22, 
-		LBRACK=23, LPAREN=24, MINUS=25, OR=26, NEQ=27, GT=28, QUESTION=29, RBRACK=30, 
-		RPAREN=31, MUL=32, NOT=33, LEQ=34, DOT=35, DIV=36, GEQ=37, ARROW=38, COMMA=39, 
-		MOD=40, ELLIPSIS=41, TILDE=42, TEMPLATE_INTERPOLATION_START=43, TemplateStringLiteral=44, 
-		TemplateStringLiteralChar=45, HTemplateLiteral=46, HTemplateLiteralChar=47;
-	public static final int
-		TEMPLATE=1, HEREDOC_PREAMBLE=2, HEREDOC=3;
+    public static final int FOR_BRACE = 1;
+    public static final int FOR_BRACK = 2;
+    public static final int IF = 3;
+    public static final int IN = 4;
+    public static final int LBRACE = 5;
+    public static final int RBRACE = 6;
+    public static final int ASSIGN = 7;
+    public static final int Identifier = 8;
+    public static final int WS = 9;
+    public static final int COMMENT = 10;
+    public static final int LINE_COMMENT = 11;
+    public static final int NEWLINE = 12;
+    public static final int NumericLiteral = 13;
+    public static final int BooleanLiteral = 14;
+    public static final int QUOTE = 15;
+    public static final int NULL = 16;
+    public static final int HEREDOC_START = 17;
+    public static final int PLUS = 18;
+    public static final int AND = 19;
+    public static final int EQ = 20;
+    public static final int LT = 21;
+    public static final int COLON = 22;
+    public static final int LBRACK = 23;
+    public static final int LPAREN = 24;
+    public static final int MINUS = 25;
+    public static final int OR = 26;
+    public static final int NEQ = 27;
+    public static final int GT = 28;
+    public static final int QUESTION = 29;
+    public static final int RBRACK = 30;
+    public static final int RPAREN = 31;
+    public static final int MUL = 32;
+    public static final int NOT = 33;
+    public static final int LEQ = 34;
+    public static final int DOT = 35;
+    public static final int DIV = 36;
+    public static final int GEQ = 37;
+    public static final int ARROW = 38;
+    public static final int COMMA = 39;
+    public static final int MOD = 40;
+    public static final int ELLIPSIS = 41;
+    public static final int TILDE = 42;
+    public static final int TEMPLATE_INTERPOLATION_START = 43;
+    public static final int TemplateStringLiteral = 44;
+    public static final int TemplateStringLiteralChar = 45;
+    public static final int HTemplateLiteral = 46;
+    public static final int HTemplateLiteralChar = 47;
+    public static final int TEMPLATE = 1;
+    public static final int HEREDOC_PREAMBLE = 2;
+    public static final int HEREDOC = 3;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};
@@ -128,8 +168,8 @@ public class HCLLexer extends Lexer {
 	        OBJECT
 	    }
 
-	    private Stack<CurlyType> leftCurlyStack = new Stack<CurlyType>();
-	    private Stack<String> heredocIdentifier = new Stack<String>();
+	    private Stack<CurlyType> leftCurlyStack = new Stack<>();
+	    private Stack<String> heredocIdentifier = new Stack<>();
 
 
 	public HCLLexer(CharStream input) {
@@ -179,64 +219,48 @@ public class HCLLexer extends Lexer {
 		}
 	}
 	private void LBRACE_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 0:
+        if (actionIndex == 0) {
 
-			    leftCurlyStack.push(CurlyType.OBJECT);
-
-			break;
-		}
+            leftCurlyStack.push(CurlyType.OBJECT);
+        }
 	}
 	private void RBRACE_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 1:
+        if (actionIndex == 1) {
 
-			    if(!leftCurlyStack.isEmpty()) {
-			        if(leftCurlyStack.pop() == CurlyType.INTERPOLATION) {
-			            popMode();
-			        } else {
-			            // closing an object, stay in the default mode
-			        }
-			    }
-
-			break;
-		}
+            if (!leftCurlyStack.isEmpty()) {
+                if (leftCurlyStack.pop() == CurlyType.INTERPOLATION) {
+                    popMode();
+                } else {
+                    // closing an object, stay in the default mode
+                }
+            }
+        }
 	}
 	private void TEMPLATE_INTERPOLATION_START_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 2:
-			leftCurlyStack.push(CurlyType.INTERPOLATION);
-			break;
-		}
+        if (actionIndex == 2) {
+            leftCurlyStack.push(CurlyType.INTERPOLATION);
+        }
 	}
 	private void HPIdentifier_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 3:
+        if (actionIndex == 3) {
 
-			    heredocIdentifier.push(getText());
-
-			break;
-		}
+            heredocIdentifier.push(getText());
+        }
 	}
 	private void H_TEMPLATE_INTERPOLATION_START_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 4:
-			leftCurlyStack.push(CurlyType.INTERPOLATION);
-			break;
-		}
+        if (actionIndex == 4) {
+            leftCurlyStack.push(CurlyType.INTERPOLATION);
+        }
 	}
 	private void HTemplateLiteral_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 5:
+        if (actionIndex == 5) {
 
-			  if(!heredocIdentifier.isEmpty() && getText().endsWith(heredocIdentifier.peek())) {
-			      setType(Identifier);
-			      heredocIdentifier.pop();
-			      popMode();
-			  }
-
-			break;
-		}
+            if (!heredocIdentifier.isEmpty() && getText().endsWith(heredocIdentifier.peek())) {
+                setType(Identifier);
+                heredocIdentifier.pop();
+                popMode();
+            }
+        }
 	}
 
 	public static final String _serializedATN =

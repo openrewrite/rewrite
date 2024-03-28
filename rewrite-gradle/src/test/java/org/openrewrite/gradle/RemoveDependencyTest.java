@@ -78,13 +78,13 @@ class RemoveDependencyTest implements RewriteTest {
                 GradleDependencyConfiguration compileClasspath = gp.getConfiguration("compileClasspath");
                 assertThat(
                   compileClasspath.getRequested().stream()
-                    .filter(dep -> dep.getGroupId().equals("org.springframework.boot") && dep.getArtifactId().equals("spring-boot-starter-web"))
+                    .filter(dep -> "org.springframework.boot".equals(dep.getGroupId()) && "spring-boot-starter-web".equals(dep.getArtifactId()))
                     .findAny())
                   .as("GradleProject requested dependencies should have been updated to remove `spring-boot-starter-web`")
                   .isNotPresent();
                 assertThat(
                   compileClasspath.getResolved().stream()
-                    .filter(dep -> dep.getGroupId().equals("org.springframework.boot") && dep.getArtifactId().equals("spring-boot-starter-web"))
+                    .filter(dep -> "org.springframework.boot".equals(dep.getGroupId()) && "spring-boot-starter-web".equals(dep.getArtifactId()))
                     .findAny())
                   .as("GradleProject resolved dependencies should have been updated to remove `spring-boot-starter-web`")
                   .isNotPresent();

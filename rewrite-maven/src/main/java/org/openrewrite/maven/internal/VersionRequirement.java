@@ -49,7 +49,7 @@ public class VersionRequirement {
     private final VersionSpec versionSpec;
 
     @Nullable
-    private volatile transient String selected;
+    private transient volatile String selected;
 
     @Override
     public String toString() {
@@ -107,7 +107,8 @@ public class VersionRequirement {
                     public VersionSpec visitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx) {
                         return new RangeSet(ctx.range().stream()
                                 .map(range -> {
-                                    Version lower, upper;
+                                    Version lower;
+                                    Version upper;
                                     if (range.bounds().boundedLower() != null) {
                                         Iterator<TerminalNode> versionIter = range.bounds().boundedLower().Version().iterator();
                                         lower = versionIter.hasNext() ? toVersion(versionIter.next()) : null;
@@ -142,7 +143,7 @@ public class VersionRequirement {
 
     @Value
     @EqualsAndHashCode(callSuper = true)
-    private static class DirectRequirement extends SoftRequirement {
+    private static final class DirectRequirement extends SoftRequirement {
         private DirectRequirement(String version) {
             super(version);
         }

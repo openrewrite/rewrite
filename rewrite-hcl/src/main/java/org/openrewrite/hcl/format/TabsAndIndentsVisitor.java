@@ -111,12 +111,9 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
             indentType = IndentType.ALIGN;
         }
 
-        switch (indentType) {
-            case ALIGN:
-                break;
-            case INDENT:
-                indent += style.getIndentSize();
-                break;
+        if (indentType == org.openrewrite.hcl.format.TabsAndIndentsVisitor.IndentType.ALIGN) {
+        } else if (indentType == org.openrewrite.hcl.format.TabsAndIndentsVisitor.IndentType.INDENT) {
+            indent += style.getIndentSize();
         }
 
         Space s = indentTo(space, indent, loc);
@@ -141,8 +138,8 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (right.getElement() instanceof Hcl) {
             Hcl elem = (Hcl) right.getElement();
-            if ((right.getAfter().getLastWhitespace().contains("\n") ||
-                 elem.getPrefix().getLastWhitespace().contains("\n"))) {
+            if (right.getAfter().getLastWhitespace().contains("\n") ||
+                 elem.getPrefix().getLastWhitespace().contains("\n")) {
                 switch (loc) {
                     case FUNCTION_CALL_ARGUMENT:
                     case PARENTHESES: {
@@ -155,36 +152,34 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
                 }
             } else {
-                switch (loc) {
-                    case FUNCTION_CALL_ARGUMENT:
-                        if (!elem.getPrefix().getLastWhitespace().contains("\n")) {
-                            HclContainer<Expression> args = getCursor().getParentOrThrow().getValue();
-                            boolean seenArg = false;
-                            boolean anyOtherArgOnOwnLine = false;
-                            for (HclRightPadded<Expression> arg : args.getPadding().getElements()) {
-                                if (arg == getCursor().getValue()) {
-                                    seenArg = true;
-                                    continue;
-                                }
-                                if (seenArg) {
-                                    if (arg.getElement().getPrefix().getLastWhitespace().contains("\n")) {
-                                        anyOtherArgOnOwnLine = true;
-                                        break;
-                                    }
-                                }
+                if (loc == HclRightPadded.Location.FUNCTION_CALL_ARGUMENT) {
+                    if (!elem.getPrefix().getLastWhitespace().contains("\n")) {
+                        HclContainer<Expression> args = getCursor().getParentOrThrow().getValue();
+                        boolean seenArg = false;
+                        boolean anyOtherArgOnOwnLine = false;
+                        for (HclRightPadded<Expression> arg : args.getPadding().getElements()) {
+                            if (arg == getCursor().getValue()) {
+                                seenArg = true;
+                                continue;
                             }
-                            if (!anyOtherArgOnOwnLine) {
-                                elem = visitAndCast(elem, p);
-                                after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
-                                break;
+                            if (seenArg) {
+                                if (arg.getElement().getPrefix().getLastWhitespace().contains("\n")) {
+                                    anyOtherArgOnOwnLine = true;
+                                    break;
+                                }
                             }
                         }
-                        elem = visitAndCast(elem, p);
-                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-                        break;
-                    default:
-                        elem = visitAndCast(elem, p);
-                        after = right.getAfter();
+                        if (!anyOtherArgOnOwnLine) {
+                            elem = visitAndCast(elem, p);
+                            after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
+                            break;
+                        }
+                    }
+                    elem = visitAndCast(elem, p);
+                    after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                } else {
+                    elem = visitAndCast(elem, p);
+                    after = right.getAfter();
                 }
             }
 
@@ -195,7 +190,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         }
 
         setCursor(getCursor().getParent());
-        return (after == right.getAfter() && t == right.getElement()) ? right : new HclRightPadded<>(t, after, right.getMarkers());
+        return after == right.getAfter() && t == right.getElement() ? right : new HclRightPadded<>(t, after, right.getMarkers());
     }
 
     @Override
@@ -391,6 +386,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                         whitespace.append(c);
                         continue;
                     }
+                    break;
 
                 case '\n':
                     if (isFirstLine) {
@@ -431,6 +427,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                         }
                         currentText.append(' ');
                     }
+                    break;
 
                 default:
                     if (!isFirstLine && isWhitespace) {

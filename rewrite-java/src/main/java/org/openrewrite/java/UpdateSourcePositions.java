@@ -102,9 +102,9 @@ public class UpdateSourcePositions extends Recipe {
     }
 
     private static class PositionPrintOutputCapture extends PrintOutputCapture<ExecutionContext> {
-        int pos = 0;
+        int pos;
         int line = 1;
-        int column = 0;
+        int column;
         private boolean lineBoundary;
 
         public PositionPrintOutputCapture() {

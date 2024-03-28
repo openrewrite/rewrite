@@ -65,7 +65,7 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
     @Override
     public String constructorSignature() {
         return signatureBuilder().methodSignature(goatCuType.getType().getMethods().stream()
-          .filter(m -> m.getName().equals("<constructor>"))
+          .filter(m -> "<constructor>".equals(m.getName()))
           .findAny()
           .orElseThrow());
     }
@@ -83,8 +83,8 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
     public JavaType innerClassSignature(String innerClassSimpleName) {
         return requireNonNull(goatCu.getClasses().get(0).getBody().getStatements()
           .stream()
-          .filter(it -> it instanceof J.ClassDeclaration)
-          .map(it -> (J.ClassDeclaration) it)
+          .filter(J.ClassDeclaration.class::isInstance)
+          .map(J.ClassDeclaration.class::cast)
           .filter(cd -> requireNonNull(cd.getType()).getFullyQualifiedName().endsWith("$" + innerClassSimpleName))
           .findAny()
           .orElseThrow()

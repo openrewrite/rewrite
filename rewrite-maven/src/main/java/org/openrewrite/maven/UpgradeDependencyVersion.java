@@ -328,7 +328,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
 
             @Nullable
             private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) throws MavenDownloadingException {
-                String finalVersion = !Semver.isVersion(version) ? "0.0.0" : version;
+                String finalVersion = Semver.isVersion(version) ? version : "0.0.0";
 
                 // in the case of "latest.patch", a new version can only be derived if the
                 // current version is a semantic version

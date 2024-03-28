@@ -31,17 +31,49 @@ public class XMLLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		COMMENT=1, CDATA=2, ParamEntityRef=3, EntityRef=4, CharRef=5, SEA_WS=6, 
-		UTF_ENCODING_BOM=7, QUESTION_MARK=8, SPECIAL_OPEN_XML=9, OPEN=10, SPECIAL_OPEN=11, 
-		DTD_OPEN=12, TEXT=13, DTD_CLOSE=14, DTD_SUBSET_OPEN=15, DTD_S=16, DOCTYPE=17, 
-		DTD_SUBSET_CLOSE=18, MARKUP_OPEN=19, DTS_SUBSET_S=20, MARK_UP_CLOSE=21, 
-		MARKUP_S=22, MARKUP_TEXT=23, MARKUP_SUBSET=24, PI_S=25, PI_TEXT=26, CLOSE=27, 
-		SPECIAL_CLOSE=28, SLASH_CLOSE=29, S=30, DIRECTIVE_OPEN=31, DIRECTIVE_CLOSE=32, 
-		SLASH=33, EQUALS=34, STRING=35, Name=36;
-	public static final int
-		INSIDE_DTD=1, INSIDE_DTD_SUBSET=2, INSIDE_MARKUP=3, INSIDE_MARKUP_SUBSET=4, 
-		INSIDE_PROCESS_INSTRUCTION=5, INSIDE_PI_TEXT=6, INSIDE=7;
+    public static final int COMMENT = 1;
+    public static final int CDATA = 2;
+    public static final int ParamEntityRef = 3;
+    public static final int EntityRef = 4;
+    public static final int CharRef = 5;
+    public static final int SEA_WS = 6;
+    public static final int UTF_ENCODING_BOM = 7;
+    public static final int QUESTION_MARK = 8;
+    public static final int SPECIAL_OPEN_XML = 9;
+    public static final int OPEN = 10;
+    public static final int SPECIAL_OPEN = 11;
+    public static final int DTD_OPEN = 12;
+    public static final int TEXT = 13;
+    public static final int DTD_CLOSE = 14;
+    public static final int DTD_SUBSET_OPEN = 15;
+    public static final int DTD_S = 16;
+    public static final int DOCTYPE = 17;
+    public static final int DTD_SUBSET_CLOSE = 18;
+    public static final int MARKUP_OPEN = 19;
+    public static final int DTS_SUBSET_S = 20;
+    public static final int MARK_UP_CLOSE = 21;
+    public static final int MARKUP_S = 22;
+    public static final int MARKUP_TEXT = 23;
+    public static final int MARKUP_SUBSET = 24;
+    public static final int PI_S = 25;
+    public static final int PI_TEXT = 26;
+    public static final int CLOSE = 27;
+    public static final int SPECIAL_CLOSE = 28;
+    public static final int SLASH_CLOSE = 29;
+    public static final int S = 30;
+    public static final int DIRECTIVE_OPEN = 31;
+    public static final int DIRECTIVE_CLOSE = 32;
+    public static final int SLASH = 33;
+    public static final int EQUALS = 34;
+    public static final int STRING = 35;
+    public static final int Name = 36;
+    public static final int INSIDE_DTD = 1;
+    public static final int INSIDE_DTD_SUBSET = 2;
+    public static final int INSIDE_MARKUP = 3;
+    public static final int INSIDE_MARKUP_SUBSET = 4;
+    public static final int INSIDE_PROCESS_INSTRUCTION = 5;
+    public static final int INSIDE_PI_TEXT = 6;
+    public static final int INSIDE = 7;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};

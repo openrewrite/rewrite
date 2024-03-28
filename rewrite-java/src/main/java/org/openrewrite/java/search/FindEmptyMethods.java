@@ -102,8 +102,8 @@ public class FindEmptyMethods extends Recipe {
 
             private boolean hasSinglePublicNoArgsConstructor(List<Statement> classStatements) {
                 List<J.MethodDeclaration> constructors = classStatements.stream()
-                        .filter(o -> o instanceof J.MethodDeclaration)
-                        .map(o -> (J.MethodDeclaration) o)
+                        .filter(J.MethodDeclaration.class::isInstance)
+                        .map(J.MethodDeclaration.class::cast)
                         .filter(J.MethodDeclaration::isConstructor)
                         .collect(Collectors.toList());
                 return constructors.size() == 1 &&

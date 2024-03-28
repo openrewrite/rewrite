@@ -120,12 +120,12 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
         j = firstClass ?
                 (hasImports ? minimumLines(j, style.getMinimum().getAfterImports()) : j) :
                 // Apply `style.getMinimum().getAroundClass()` to classes declared in the SourceFile.
-                (classes.contains(j)) ? minimumLines(j, style.getMinimum().getAroundClass()) : j;
+                classes.contains(j) ? minimumLines(j, style.getMinimum().getAroundClass()) : j;
 
         // style.getKeepMaximum().getInDeclarations() also sets the maximum new lines of class declaration prefixes.
         j = firstClass ?
                 (hasImports ? keepMaximumLines(j, Math.max(style.getKeepMaximum().getInDeclarations(), style.getMinimum().getAfterImports())) : j) :
-                (classes.contains(j)) ? keepMaximumLines(j, style.getKeepMaximum().getInDeclarations()) : j;
+                classes.contains(j) ? keepMaximumLines(j, style.getKeepMaximum().getInDeclarations()) : j;
 
         if (!hasImports && firstClass) {
             if (cu.getPackageDeclaration() == null) {

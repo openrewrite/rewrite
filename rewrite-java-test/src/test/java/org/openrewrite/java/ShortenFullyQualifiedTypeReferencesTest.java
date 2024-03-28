@@ -229,7 +229,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               @Override
               @SuppressWarnings("DataFlowIssue")
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  if (method.getSimpleName().equals("m1")) {
+                  if ("m1".equals(method.getSimpleName())) {
                       return (J.MethodDeclaration) ShortenFullyQualifiedTypeReferences.modifyOnly(method).visit(method, ctx, getCursor().getParent());
                   }
                   return super.visitMethodDeclaration(method, ctx);
@@ -430,7 +430,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  if (method.getSimpleName().equals("m1")) {
+                  if ("m1".equals(method.getSimpleName())) {
                       doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(method));
                   }
                   return super.visitMethodDeclaration(method, ctx);

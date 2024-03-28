@@ -30,17 +30,67 @@ public class Protobuf2Lexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		SEMI=1, COLON=2, BOOL=3, BYTES=4, DOUBLE=5, ENUM=6, EXTEND=7, FIXED32=8, 
-		FIXED64=9, FLOAT=10, IMPORT=11, INT32=12, INT64=13, MAP=14, MESSAGE=15, 
-		ONEOF=16, OPTION=17, PACKAGE=18, PUBLIC=19, REPEATED=20, REQUIRED=21, 
-		RESERVED=22, RETURNS=23, RPC=24, SERVICE=25, SFIXED32=26, SFIXED64=27, 
-		SINT32=28, SINT64=29, STREAM=30, STRING=31, SYNTAX=32, TO=33, UINT32=34, 
-		UINT64=35, WEAK=36, OPTIONAL=37, Ident=38, IntegerLiteral=39, NumericLiteral=40, 
-		FloatLiteral=41, BooleanLiteral=42, StringLiteral=43, Quote=44, LPAREN=45, 
-		RPAREN=46, LBRACE=47, RBRACE=48, LBRACK=49, RBRACK=50, LCHEVR=51, RCHEVR=52, 
-		COMMA=53, DOT=54, MINUS=55, PLUS=56, ASSIGN=57, WS=58, UTF_8_BOM=59, COMMENT=60, 
-		LINE_COMMENT=61;
+    public static final int SEMI = 1;
+    public static final int COLON = 2;
+    public static final int BOOL = 3;
+    public static final int BYTES = 4;
+    public static final int DOUBLE = 5;
+    public static final int ENUM = 6;
+    public static final int EXTEND = 7;
+    public static final int FIXED32 = 8;
+    public static final int FIXED64 = 9;
+    public static final int FLOAT = 10;
+    public static final int IMPORT = 11;
+    public static final int INT32 = 12;
+    public static final int INT64 = 13;
+    public static final int MAP = 14;
+    public static final int MESSAGE = 15;
+    public static final int ONEOF = 16;
+    public static final int OPTION = 17;
+    public static final int PACKAGE = 18;
+    public static final int PUBLIC = 19;
+    public static final int REPEATED = 20;
+    public static final int REQUIRED = 21;
+    public static final int RESERVED = 22;
+    public static final int RETURNS = 23;
+    public static final int RPC = 24;
+    public static final int SERVICE = 25;
+    public static final int SFIXED32 = 26;
+    public static final int SFIXED64 = 27;
+    public static final int SINT32 = 28;
+    public static final int SINT64 = 29;
+    public static final int STREAM = 30;
+    public static final int STRING = 31;
+    public static final int SYNTAX = 32;
+    public static final int TO = 33;
+    public static final int UINT32 = 34;
+    public static final int UINT64 = 35;
+    public static final int WEAK = 36;
+    public static final int OPTIONAL = 37;
+    public static final int Ident = 38;
+    public static final int IntegerLiteral = 39;
+    public static final int NumericLiteral = 40;
+    public static final int FloatLiteral = 41;
+    public static final int BooleanLiteral = 42;
+    public static final int StringLiteral = 43;
+    public static final int Quote = 44;
+    public static final int LPAREN = 45;
+    public static final int RPAREN = 46;
+    public static final int LBRACE = 47;
+    public static final int RBRACE = 48;
+    public static final int LBRACK = 49;
+    public static final int RBRACK = 50;
+    public static final int LCHEVR = 51;
+    public static final int RCHEVR = 52;
+    public static final int COMMA = 53;
+    public static final int DOT = 54;
+    public static final int MINUS = 55;
+    public static final int PLUS = 56;
+    public static final int ASSIGN = 57;
+    public static final int WS = 58;
+    public static final int UTF_8_BOM = 59;
+    public static final int COMMENT = 60;
+    public static final int LINE_COMMENT = 61;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};

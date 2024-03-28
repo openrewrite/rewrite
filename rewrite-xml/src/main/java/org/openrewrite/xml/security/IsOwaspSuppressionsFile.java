@@ -52,7 +52,7 @@ public class IsOwaspSuppressionsFile extends Recipe {
                 // check that root xmlns matches
                 boolean isOwaspSuppressionFile = false;
                 for (Xml.Attribute attribute : root.getAttributes()) {
-                    if (attribute.getKeyAsString().equals("xmlns")) {
+                    if ("xmlns".equals(attribute.getKeyAsString())) {
                         if (attribute.getValueAsString().matches("https://jeremylong.github.io/DependencyCheck/dependency-suppression(.*?).xsd")) {
                             isOwaspSuppressionFile = true;
                         }

@@ -200,8 +200,8 @@ public class DependencyInsight extends Recipe {
     private static class MarkIndividualDependency extends JavaIsoVisitor<ExecutionContext> {
         private final Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency;
         private final Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
-        private boolean attachToDependencyClosure = false;
-        private boolean hasMarker = false;
+        private boolean attachToDependencyClosure;
+        private boolean hasMarker;
 
         public Tree attachMarkers(Tree before, ExecutionContext ctx) {
             Tree after = super.visitNonNull(before, ctx);

@@ -30,10 +30,22 @@ public class JSON5Lexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7, 
-		MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12, 
-		SYMBOL=13, IDENTIFIER=14, WS=15, UTF_8_BOM=16;
+    public static final int T__0 = 1;
+    public static final int T__1 = 2;
+    public static final int T__2 = 3;
+    public static final int T__3 = 4;
+    public static final int T__4 = 5;
+    public static final int T__5 = 6;
+    public static final int SINGLE_LINE_COMMENT = 7;
+    public static final int MULTI_LINE_COMMENT = 8;
+    public static final int LITERAL = 9;
+    public static final int STRING = 10;
+    public static final int NUMBER = 11;
+    public static final int NUMERIC_LITERAL = 12;
+    public static final int SYMBOL = 13;
+    public static final int IDENTIFIER = 14;
+    public static final int WS = 15;
+    public static final int UTF_8_BOM = 16;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};

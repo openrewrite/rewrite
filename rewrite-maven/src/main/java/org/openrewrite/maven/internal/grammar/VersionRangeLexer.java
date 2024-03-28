@@ -30,9 +30,15 @@ public class VersionRangeLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		COMMA=1, PROPERTY_OPEN=2, PROPERTY_CLOSE=3, OPEN_RANGE_OPEN=4, OPEN_RANGE_CLOSE=5, 
-		CLOSED_RANGE_OPEN=6, CLOSED_RANGE_CLOSE=7, Version=8, WS=9;
+    public static final int COMMA = 1;
+    public static final int PROPERTY_OPEN = 2;
+    public static final int PROPERTY_CLOSE = 3;
+    public static final int OPEN_RANGE_OPEN = 4;
+    public static final int OPEN_RANGE_CLOSE = 5;
+    public static final int CLOSED_RANGE_OPEN = 6;
+    public static final int CLOSED_RANGE_CLOSE = 7;
+    public static final int Version = 8;
+    public static final int WS = 9;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};

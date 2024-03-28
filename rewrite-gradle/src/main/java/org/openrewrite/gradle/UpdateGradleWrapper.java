@@ -124,7 +124,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     }
 
     public static class GradleWrapperState {
-        boolean needsWrapperUpdate = false;
+        boolean needsWrapperUpdate;
         BuildTool updatedMarker;
         boolean addGradleWrapperProperties = true;
         boolean addGradleWrapperJar = true;
@@ -171,7 +171,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             acc.needsWrapperUpdate = true;
                             acc.updatedMarker = buildTool.withVersion(gradleWrapper.getVersion());
                             return true;
-                        } else return compare == 0;
+                        } else {
+                            return compare == 0;
+                        }
                     }
 
                     @Override

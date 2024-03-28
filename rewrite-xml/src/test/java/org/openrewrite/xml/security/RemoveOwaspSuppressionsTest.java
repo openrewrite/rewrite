@@ -65,7 +65,7 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
         String dayBeforeYesterdayString = dayBeforeYesterday.toString().substring(0, 10);
 
         rewriteRun(
-                xml(("""
+                xml("""
                                 <?xml version="1.0" encoding="UTF-8" ?>
                                 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
                                     <suppress until="%s">
@@ -76,7 +76,7 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                         <notes>
                                         </notes>
                                     </suppress>
-                                </suppressions>""")
+                                </suppressions>"""
                                 .formatted(tomorrowString, dayBeforeYesterdayString),
                         """
                                 <?xml version="1.0" encoding="UTF-8" ?>
@@ -99,7 +99,7 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
         String dayBeforeYesterdayStringNoZ = dayBeforeYesterday.toString();
 
         rewriteRun(
-                xml(("""
+                xml("""
                                 <?xml version="1.0" encoding="UTF-8" ?>
                                 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
                                     <suppress until="%s">
@@ -110,7 +110,7 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                         <notes>
                                         </notes>
                                     </suppress>
-                                </suppressions>""")
+                                </suppressions>"""
                                 .formatted(dayBeforeYesterdayString, dayBeforeYesterdayStringNoZ),
                         """
                                 <?xml version="1.0" encoding="UTF-8" ?>
@@ -127,7 +127,7 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
         String dayBeforeYesterdayString = dayBeforeYesterday.toString().substring(0, 10);
 
         rewriteRun(
-                xml(("""
+                xml("""
                                 <?xml version="1.0" encoding="UTF-8" ?>
                                 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
                                     <suppress until="blah">
@@ -142,7 +142,7 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                         <notes>
                                         </notes>
                                     </suppress>
-                                </suppressions>""")
+                                </suppressions>"""
                                 .formatted(dayBeforeYesterdayString),
                         """
                                 <?xml version="1.0" encoding="UTF-8" ?>

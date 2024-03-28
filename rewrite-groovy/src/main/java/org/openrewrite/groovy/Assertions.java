@@ -28,7 +28,7 @@ import java.util.function.Consumer;
 import static org.openrewrite.java.Assertions.sourceSet;
 import static org.openrewrite.test.SourceSpecs.dir;
 
-public class Assertions {
+public final class Assertions {
 
     private Assertions() {
     }

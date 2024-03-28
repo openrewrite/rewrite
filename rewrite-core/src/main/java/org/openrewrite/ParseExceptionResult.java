@@ -47,7 +47,7 @@ public class ParseExceptionResult implements Marker {
         return new ParseExceptionResult(
                 randomId(),
                 parserClass.getSimpleName(),
-                !StringUtils.isBlank(simpleName) ? simpleName : t.getClass().getName(),
+                StringUtils.isBlank(simpleName) ? t.getClass().getName() : simpleName,
                 (message != null ? message : "") + ExceptionUtils.sanitizeStackTrace(t, parserClass),
                 null
         );

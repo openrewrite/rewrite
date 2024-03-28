@@ -139,8 +139,8 @@ public class RemoveDependency extends Recipe {
                     if (firstArgument instanceof J.Literal || firstArgument instanceof G.GString || firstArgument instanceof G.MapEntry) {
                         return maybeRemoveDependency(m);
                     } else if (firstArgument instanceof J.MethodInvocation &&
-                            (((J.MethodInvocation) firstArgument).getSimpleName().equals("platform")
-                                    || ((J.MethodInvocation) firstArgument).getSimpleName().equals("enforcedPlatform"))) {
+                            ("platform".equals(((J.MethodInvocation) firstArgument).getSimpleName())
+                                    || "enforcedPlatform".equals(((J.MethodInvocation) firstArgument).getSimpleName()))) {
                         J after = maybeRemoveDependency((J.MethodInvocation) firstArgument);
                         if (after == null) {
                             return null;

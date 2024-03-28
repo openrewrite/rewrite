@@ -392,7 +392,7 @@ public class YamlParser implements org.openrewrite.Parser {
         int prefixStart = commentAwareIndexOf(':', eventPrefix);
         String prefix = "";
         if (!isForScalar) {
-            prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
+            prefix = prefixStart > -1 && eventPrefix.length() > prefixStart + 1 ? eventPrefix.substring(prefixStart + 1) : "";
         }
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
     }
@@ -436,7 +436,7 @@ public class YamlParser implements org.openrewrite.Parser {
         void push(Yaml.Block block);
     }
 
-    private static class MappingBuilder implements BlockBuilder {
+    private static final class MappingBuilder implements BlockBuilder {
         private final String prefix;
 
         @Nullable
@@ -490,7 +490,7 @@ public class YamlParser implements org.openrewrite.Parser {
         }
     }
 
-    private static class SequenceBuilder implements BlockBuilder {
+    private static final class SequenceBuilder implements BlockBuilder {
         private final String prefix;
         @Nullable
         private final String startBracketPrefix;

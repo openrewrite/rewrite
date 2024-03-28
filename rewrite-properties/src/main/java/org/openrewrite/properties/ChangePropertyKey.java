@@ -74,16 +74,16 @@ public class ChangePropertyKey extends Recipe {
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
             if (Boolean.TRUE.equals(regex)) {
-                if (!Boolean.FALSE.equals(relaxedBinding)
-                        ? NameCaseConvention.matchesRegexRelaxedBinding(entry.getKey(), oldPropertyKey)
-                        : entry.getKey().matches(oldPropertyKey)) {
+                if (Boolean.FALSE.equals(relaxedBinding)
+                        ? entry.getKey().matches(oldPropertyKey)
+                        : NameCaseConvention.matchesRegexRelaxedBinding(entry.getKey(), oldPropertyKey)) {
                     entry = entry.withKey(entry.getKey().replaceFirst(oldPropertyKey, newPropertyKey))
                             .withPrefix(entry.getPrefix());
                 }
             } else {
-                if (!Boolean.FALSE.equals(relaxedBinding)
-                        ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), oldPropertyKey)
-                        : entry.getKey().equals(oldPropertyKey)) {
+                if (Boolean.FALSE.equals(relaxedBinding)
+                        ? entry.getKey().equals(oldPropertyKey)
+                        : NameCaseConvention.equalsRelaxedBinding(entry.getKey(), oldPropertyKey)) {
                     entry = entry.withKey(newPropertyKey)
                             .withPrefix(entry.getPrefix());
                 }

@@ -75,7 +75,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
     /**
      * The parent directory for the individual directories per archive.
      */
-    private File tempFileLocation = null;
+    private File tempFileLocation;
     /**
      * The max scan depth that the analyzer will recursively extract nested
      * archives.
@@ -84,7 +84,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
     /**
      * The file filter used to filter supported files.
      */
-    private FileFilter fileFilter = null;
+    private FileFilter fileFilter;
     /**
      * The set of things we can handle with Zip methods
      */
@@ -296,7 +296,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
                         extractAndAnalyze(d, engine, scanDepth + 1);
                     }
                 } else {
-                    dependencySet.stream().filter((sub) -> sub.getFilePath().startsWith(tmpDir.getAbsolutePath())).forEach((sub) -> {
+                    dependencySet.stream().filter(sub -> sub.getFilePath().startsWith(tmpDir.getAbsolutePath())).forEach(sub -> {
                         final String displayPath = String.format("%s%s",
                                 dependency.getFilePath(),
                                 sub.getActualFilePath().substring(tmpDir.getAbsolutePath().length()));
@@ -342,13 +342,13 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
                 org.apache.commons.io.FileUtils.copyFile(dependency.getActualFile(), tmpLoc);
                 final List<Dependency> dependencySet = findMoreDependencies(engine, tmpLoc);
                 if (dependencySet != null && !dependencySet.isEmpty()) {
-                    dependencySet.forEach((d) -> {
+                    dependencySet.forEach(d -> {
                         //fix the dependency's display name and path
                         if (d.getActualFile().equals(tmpLoc)) {
                             d.setFilePath(dependency.getFilePath());
                             d.setDisplayFileName(dependency.getFileName());
                         } else {
-                            d.getRelatedDependencies().stream().filter((rel) -> rel.getActualFile().equals(tmpLoc)).forEach((rel) -> {
+                            d.getRelatedDependencies().stream().filter(rel -> rel.getActualFile().equals(tmpLoc)).forEach(rel -> {
                                 rel.setFilePath(dependency.getFilePath());
                                 rel.setDisplayFileName(dependency.getFileName());
                             });

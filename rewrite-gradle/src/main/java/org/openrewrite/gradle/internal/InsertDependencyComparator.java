@@ -81,7 +81,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
         return beforeDependency;
     }
 
-    private static Comparator<Statement> dependenciesComparator = (s1, s2) -> {
+    private static final Comparator<Statement> dependenciesComparator = (s1, s2) -> {
         J.MethodInvocation d1;
         if (s1 instanceof J.Return) {
             d1 = (J.MethodInvocation) ((J.Return) s1).getExpression();

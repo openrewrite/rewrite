@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
+public final class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
     private final String code;
     private final int parameterCount;
     private final Consumer<String> onAfterVariableSubstitution;

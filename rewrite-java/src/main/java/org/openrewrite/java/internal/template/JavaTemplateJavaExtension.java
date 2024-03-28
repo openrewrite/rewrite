@@ -337,7 +337,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                         // Try to find an appropriate type from the method itself
                                         J.Identifier declTypeIdent = (J.Identifier) decl.getTypeExpression();
                                         String typeParameterName = declTypeIdent.getSimpleName();
-                                        List<J.TypeParameter> typeParameters = (method.getTypeParameters() == null) ? emptyList() : method.getTypeParameters();
+                                        List<J.TypeParameter> typeParameters = method.getTypeParameters() == null ? emptyList() : method.getTypeParameters();
                                         for (J.TypeParameter typeParameter : typeParameters) {
                                             J.Identifier typeParamIdent = (J.Identifier) typeParameter.getName();
                                             if (typeParamIdent.getSimpleName().equals(typeParameterName)) {
@@ -374,7 +374,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             JavaType.Method type = m.getMethodType();
                             if (type != null) {
                                 List<JavaType.FullyQualified> newThrows = new ArrayList<>();
-                                List<NameTree> throws_ = (m.getThrows() == null) ? emptyList() : m.getThrows();
+                                List<NameTree> throws_ = m.getThrows() == null ? emptyList() : m.getThrows();
                                 for (NameTree t : throws_) {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());

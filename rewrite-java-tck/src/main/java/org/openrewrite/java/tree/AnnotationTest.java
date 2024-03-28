@@ -204,7 +204,7 @@ class AnnotationTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
-                  if (annotation.getSimpleName().equals("A")) {
+                  if ("A".equals(annotation.getSimpleName())) {
                       //noinspection ConstantConditions
                       return null;
                   }

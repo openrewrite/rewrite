@@ -84,7 +84,7 @@ public class BlockStatementTemplateGenerator {
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
-                if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile && (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile && ("__P__".equals(classDecl.getSimpleName()) || "__M__".equals(classDecl.getSimpleName()))) {
                     // don't visit the __P__ and __M__ classes declaring stubs
                     return classDecl;
                 }
@@ -365,7 +365,7 @@ public class BlockStatementTemplateGenerator {
                         }
                         beforeSegments.append(valueOfType(arg.getType())).append(",");
                     } else {
-                        afterSegments.append(",/*" + STOP_COMMENT + "*/").append(valueOfType(arg.getType()));
+                        afterSegments.append(",/*").append(STOP_COMMENT).append("*/").append(valueOfType(arg.getType()));
                     }
                 }
                 afterSegments.append(")");
@@ -373,7 +373,7 @@ public class BlockStatementTemplateGenerator {
                     if (isEnum) {
                         afterSegments.append(";");
                     }
-                    afterSegments.append("/*" + STOP_COMMENT + "*/");
+                    afterSegments.append("/*").append(STOP_COMMENT).append("*/");
                 }
                 before.insert(0, beforeSegments);
                 after.append(afterSegments);
@@ -404,7 +404,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
             if (referToSameElement(prior, c.getVariable())) {
-                after.append(" = /*" + STOP_COMMENT + "/*").append(c.getIterable().printTrimmed(cursor));
+                after.append(" = /*").append(STOP_COMMENT).append("/*").append(c.getIterable().printTrimmed(cursor));
             } else if (referToSameElement(prior, c.getIterable())) {
                 before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");

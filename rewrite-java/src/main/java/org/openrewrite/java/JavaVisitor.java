@@ -1383,7 +1383,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
         Markers markers = visitMarkers(right.getMarkers(), p);
-        return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
+        return after == right.getAfter() && t == right.getElement() && markers == right.getMarkers() ?
                 right : new JRightPadded<>(t, after, markers);
     }
 
@@ -1413,7 +1413,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             return null;
         }
 
-        return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
+        return before == left.getBefore() && t == left.getElement() ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
     public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
@@ -1467,7 +1467,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             Object childScope = it.next();
             if (childScope instanceof J.ClassDeclaration) {
                 J.ClassDeclaration childClass = (J.ClassDeclaration) childScope;
-                if (!(childClass.getKind().equals(J.ClassDeclaration.Kind.Type.Class)) ||
+                if (!childClass.getKind().equals(J.ClassDeclaration.Kind.Type.Class) ||
                     childClass.hasModifier(J.Modifier.Type.Static)) {
                     //Short circuit the search if a terminating element is encountered.
                     return false;

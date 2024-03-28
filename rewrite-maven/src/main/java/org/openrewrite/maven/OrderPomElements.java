@@ -77,7 +77,7 @@ public class OrderPomElements extends Recipe {
                             groupSizes.put(groupedContent.get(0).getId(), groupedContent.size());
                             groupedContent = new ArrayList<>();
                         } else {
-                            groupedContent.add((content));
+                            groupedContent.add(content);
                             otherContent.addAll(groupedContent);
 
                             groupSizes.put(groupedContent.get(0).getId(), groupedContent.size());
@@ -186,8 +186,8 @@ public class OrderPomElements extends Recipe {
                         }
                     }
 
-                    if ((groupPos > artifactPos ||
-                         (versionPos > -1 && (artifactPos > versionPos)))) {
+                    if (groupPos > artifactPos ||
+                         (versionPos > -1 && (artifactPos > versionPos))) {
                         List<Content> orderedContents = new ArrayList<>();
                         for (String type : new String[]{"groupId", "artifactId", "version"}) {
                             List<Content> gavContents = gavGroups.get(type);

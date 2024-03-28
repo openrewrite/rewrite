@@ -31,9 +31,19 @@ public class TemplateParameterLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8, 
-		Variance=9, FullyQualifiedName=10, Number=11, Identifier=12, S=13;
+    public static final int LPAREN = 1;
+    public static final int RPAREN = 2;
+    public static final int DOT = 3;
+    public static final int COLON = 4;
+    public static final int COMMA = 5;
+    public static final int LBRACK = 6;
+    public static final int RBRACK = 7;
+    public static final int WILDCARD = 8;
+    public static final int Variance = 9;
+    public static final int FullyQualifiedName = 10;
+    public static final int Number = 11;
+    public static final int Identifier = 12;
+    public static final int S = 13;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};
@@ -124,30 +134,27 @@ public class TemplateParameterLexer extends Lexer {
 
 	@Override
 	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
-		switch (ruleIndex) {
-		case 12:
-			return JavaLetter_sempred((RuleContext)_localctx, predIndex);
-		case 13:
-			return JavaLetterOrDigit_sempred((RuleContext)_localctx, predIndex);
-		}
+        if (ruleIndex == 12) {
+            return JavaLetter_sempred((RuleContext) _localctx, predIndex);
+        } else if (ruleIndex == 13) {
+            return JavaLetterOrDigit_sempred((RuleContext) _localctx, predIndex);
+        }
 		return true;
 	}
 	private boolean JavaLetter_sempred(RuleContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 0:
-			return Character.isJavaIdentifierStart(_input.LA(-1));
-		case 1:
-			return Character.isJavaIdentifierStart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)));
-		}
+        if (predIndex == 0) {
+            return Character.isJavaIdentifierStart(_input.LA(-1));
+        } else if (predIndex == 1) {
+            return Character.isJavaIdentifierStart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1)));
+        }
 		return true;
 	}
 	private boolean JavaLetterOrDigit_sempred(RuleContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 2:
-			return Character.isJavaIdentifierPart(_input.LA(-1));
-		case 3:
-			return Character.isJavaIdentifierPart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)));
-		}
+        if (predIndex == 2) {
+            return Character.isJavaIdentifierPart(_input.LA(-1));
+        } else if (predIndex == 3) {
+            return Character.isJavaIdentifierPart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1)));
+        }
 		return true;
 	}
 

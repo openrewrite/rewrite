@@ -192,7 +192,7 @@ public interface JavaTypeMappingTest {
     default void enumTypeA() {
         JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeA");
         JavaType.Method type = clazz.getMethods().stream()
-                .filter(m -> m.getName().equals("<constructor>"))
+                .filter(m -> "<constructor>".equals(m.getName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No constructor found"));
         assertThat(type.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat$EnumTypeA{name=<constructor>,return=org.openrewrite.java.JavaTypeGoat$EnumTypeA,parameters=[]}");
@@ -208,7 +208,7 @@ public interface JavaTypeMappingTest {
     default void enumTypeB() {
         JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeB");
         JavaType.Method type = clazz.getMethods().stream()
-                .filter(m -> m.getName().equals("<constructor>"))
+                .filter(m -> "<constructor>".equals(m.getName()))
                 .findFirst()
                 .get();
         assertThat(type.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat$EnumTypeB{name=<constructor>,return=org.openrewrite.java.JavaTypeGoat$EnumTypeB,parameters=[org.openrewrite.java.JavaTypeGoat$TypeA]}");

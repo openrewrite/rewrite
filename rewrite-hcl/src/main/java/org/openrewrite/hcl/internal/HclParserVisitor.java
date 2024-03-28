@@ -48,7 +48,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Nullable
     private final FileAttributes fileAttributes;
 
-    private int cursor = 0;
+    private int cursor;
 
     public HclParserVisitor(Path path, String source, Charset charset, boolean charsetBomMarked, @Nullable FileAttributes fileAttributes) {
         this.path = path;
@@ -93,7 +93,8 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Override
     public Hcl visitBinaryOp(HCLParser.BinaryOpContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            Expression left, right;
+            Expression left;
+            Expression right;
 
             // left can be unaryOp or exprTerm, right can be another operation or exprTerm
             if (c.unaryOp() != null) {
@@ -739,23 +740,26 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                     if ('#' == source.charAt(delimIndex)) {
                         inSingleLineComment = true;
                         delimIndex++;
-                    } else switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex = delimIndex + 2;
-                            break;
+                    } else {
+                        switch (source.substring(delimIndex, delimIndex + 2)) {
+                            case "//":
+                            case "/*":
+                                inMultiLineComment = true;
+                                delimIndex++;
+                                break;
+                            case "*/":
+                                inMultiLineComment = false;
+                                delimIndex = delimIndex + 2;
+                                break;
+                        }
                     }
                 }
 
                 if (!inMultiLineComment && !inSingleLineComment) {
-                    if (stop != null && source.charAt(delimIndex) == stop)
+                    if (stop != null && source.charAt(delimIndex) == stop) {
                         return -1; // reached stop word before finding the delimiter
 
+                    }
                     if (source.startsWith(untilDelim, delimIndex)) {
                         break; // found it!
                     }

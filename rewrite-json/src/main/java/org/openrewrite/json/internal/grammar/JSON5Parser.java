@@ -35,13 +35,29 @@ public class JSON5Parser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7, 
-		MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12, 
-		SYMBOL=13, IDENTIFIER=14, WS=15, UTF_8_BOM=16;
-	public static final int
-		RULE_json5 = 0, RULE_obj = 1, RULE_member = 2, RULE_key = 3, RULE_value = 4, 
-		RULE_arr = 5, RULE_number = 6;
+    public static final int T__0 = 1;
+    public static final int T__1 = 2;
+    public static final int T__2 = 3;
+    public static final int T__3 = 4;
+    public static final int T__4 = 5;
+    public static final int T__5 = 6;
+    public static final int SINGLE_LINE_COMMENT = 7;
+    public static final int MULTI_LINE_COMMENT = 8;
+    public static final int LITERAL = 9;
+    public static final int STRING = 10;
+    public static final int NUMBER = 11;
+    public static final int NUMERIC_LITERAL = 12;
+    public static final int SYMBOL = 13;
+    public static final int IDENTIFIER = 14;
+    public static final int WS = 15;
+    public static final int UTF_8_BOM = 16;
+    public static final int RULE_json5 = 0;
+    public static final int RULE_obj = 1;
+    public static final int RULE_member = 2;
+    public static final int RULE_key = 3;
+    public static final int RULE_value = 4;
+    public static final int RULE_arr = 5;
+    public static final int RULE_number = 6;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"json5", "obj", "member", "key", "value", "arr", "number"
@@ -126,30 +142,37 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_json5; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterJson5(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterJson5(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitJson5(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitJson5(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitJson5(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitJson5(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final Json5Context json5() throws RecognitionException {
-		Json5Context _localctx = new Json5Context(_ctx, getState());
-		enterRule(_localctx, 0, RULE_json5);
-		int _la;
+		Json5Context localctx = new Json5Context(_ctx, getState());
+		enterRule(localctx, 0, RULE_json5);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(15);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (((_la) & ~0x3f) == 0 && ((1L << _la) & 15906L) != 0) {
+			la = _input.LA(1);
+			if ((la & ~0x3f) == 0 && ((1L << la) & 15906L) != 0) {
 				{
 				setState(14);
 				value();
@@ -161,14 +184,14 @@ public class JSON5Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -185,87 +208,87 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_obj; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterObj(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterObj(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitObj(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitObj(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitObj(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitObj(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ObjContext obj() throws RecognitionException {
-		ObjContext _localctx = new ObjContext(_ctx, getState());
-		enterRule(_localctx, 2, RULE_obj);
-		int _la;
+		ObjContext localctx = new ObjContext(_ctx, getState());
+		enterRule(localctx, 2, RULE_obj);
+		int la;
 		try {
-			int _alt;
+			int alt;
 			setState(35);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,3,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(19);
-				match(T__0);
-				setState(20);
-				member();
-				setState(25);
-				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
-				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-					if ( _alt==1 ) {
-						{
-						{
-						setState(21);
-						match(T__1);
-						setState(22);
-						member();
-						}
-						} 
-					}
-					setState(27);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
-				}
-				setState(29);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==T__1) {
-					{
-					setState(28);
-					match(T__1);
-					}
-				}
+            if (getInterpreter().adaptivePredict(_input, 3, _ctx) == 1) {
+                enterOuterAlt(localctx, 1);
+                setState(19);
+                match(T__0);
+                setState(20);
+                member();
+                setState(25);
+                _errHandler.sync(this);
+                alt = getInterpreter().adaptivePredict(_input, 1, _ctx);
+                while (alt != 2 && alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
+                    if (alt == 1) {
+                        {
+                            {
+                                setState(21);
+                                match(T__1);
+                                setState(22);
+                                member();
+                            }
+                        }
+                    }
+                    setState(27);
+                    _errHandler.sync(this);
+                    alt = getInterpreter().adaptivePredict(_input, 1, _ctx);
+                }
+                setState(29);
+                _errHandler.sync(this);
+                la = _input.LA(1);
+                if (la == T__1) {
+                    {
+                        setState(28);
+                        match(T__1);
+                    }
+                }
 
-				setState(31);
-				match(T__2);
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(33);
-				match(T__0);
-				setState(34);
-				match(T__2);
-				}
-				break;
-			}
+                setState(31);
+                match(T__2);
+            } else if (getInterpreter().adaptivePredict(_input, 3, _ctx) == 2) {
+                enterOuterAlt(localctx, 2);
+                setState(33);
+                match(T__0);
+                setState(34);
+                match(T__2);
+            }
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -282,24 +305,31 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_member; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterMember(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterMember(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitMember(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitMember(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitMember(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitMember(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final MemberContext member() throws RecognitionException {
-		MemberContext _localctx = new MemberContext(_ctx, getState());
-		enterRule(_localctx, 4, RULE_member);
+		MemberContext localctx = new MemberContext(_ctx, getState());
+		enterRule(localctx, 4, RULE_member);
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(37);
 			key();
@@ -310,14 +340,14 @@ public class JSON5Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -330,47 +360,56 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_key; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterKey(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterKey(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitKey(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitKey(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitKey(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitKey(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final KeyContext key() throws RecognitionException {
-		KeyContext _localctx = new KeyContext(_ctx, getState());
-		enterRule(_localctx, 6, RULE_key);
-		int _la;
+		KeyContext localctx = new KeyContext(_ctx, getState());
+		enterRule(localctx, 6, RULE_key);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(41);
-			_la = _input.LA(1);
-			if ( !(_la==STRING || _la==IDENTIFIER) ) {
+			la = _input.LA(1);
+			if ( !(la==STRING || la==IDENTIFIER) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -392,28 +431,35 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_value; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterValue(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterValue(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitValue(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitValue(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitValue(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitValue(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ValueContext value() throws RecognitionException {
-		ValueContext _localctx = new ValueContext(_ctx, getState());
-		enterRule(_localctx, 8, RULE_value);
+		ValueContext localctx = new ValueContext(_ctx, getState());
+		enterRule(localctx, 8, RULE_value);
 		try {
 			setState(48);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case STRING:
-				enterOuterAlt(_localctx, 1);
+				enterOuterAlt(localctx, 1);
 				{
 				setState(43);
 				match(STRING);
@@ -422,28 +468,28 @@ public class JSON5Parser extends Parser {
 			case NUMBER:
 			case NUMERIC_LITERAL:
 			case SYMBOL:
-				enterOuterAlt(_localctx, 2);
+				enterOuterAlt(localctx, 2);
 				{
 				setState(44);
 				number();
 				}
 				break;
 			case T__0:
-				enterOuterAlt(_localctx, 3);
+				enterOuterAlt(localctx, 3);
 				{
 				setState(45);
 				obj();
 				}
 				break;
 			case T__4:
-				enterOuterAlt(_localctx, 4);
+				enterOuterAlt(localctx, 4);
 				{
 				setState(46);
 				arr();
 				}
 				break;
 			case LITERAL:
-				enterOuterAlt(_localctx, 5);
+				enterOuterAlt(localctx, 5);
 				{
 				setState(47);
 				match(LITERAL);
@@ -454,14 +500,14 @@ public class JSON5Parser extends Parser {
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -478,87 +524,87 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_arr; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterArr(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterArr(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitArr(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitArr(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitArr(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitArr(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final ArrContext arr() throws RecognitionException {
-		ArrContext _localctx = new ArrContext(_ctx, getState());
-		enterRule(_localctx, 10, RULE_arr);
-		int _la;
+		ArrContext localctx = new ArrContext(_ctx, getState());
+		enterRule(localctx, 10, RULE_arr);
+		int la;
 		try {
-			int _alt;
+			int alt;
 			setState(66);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,7,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(50);
-				match(T__4);
-				setState(51);
-				value();
-				setState(56);
-				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,5,_ctx);
-				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-					if ( _alt==1 ) {
-						{
-						{
-						setState(52);
-						match(T__1);
-						setState(53);
-						value();
-						}
-						} 
-					}
-					setState(58);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,5,_ctx);
-				}
-				setState(60);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==T__1) {
-					{
-					setState(59);
-					match(T__1);
-					}
-				}
+            if (getInterpreter().adaptivePredict(_input, 7, _ctx) == 1) {
+                enterOuterAlt(localctx, 1);
+                setState(50);
+                match(T__4);
+                setState(51);
+                value();
+                setState(56);
+                _errHandler.sync(this);
+                alt = getInterpreter().adaptivePredict(_input, 5, _ctx);
+                while (alt != 2 && alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
+                    if (alt == 1) {
+                        {
+                            {
+                                setState(52);
+                                match(T__1);
+                                setState(53);
+                                value();
+                            }
+                        }
+                    }
+                    setState(58);
+                    _errHandler.sync(this);
+                    alt = getInterpreter().adaptivePredict(_input, 5, _ctx);
+                }
+                setState(60);
+                _errHandler.sync(this);
+                la = _input.LA(1);
+                if (la == T__1) {
+                    {
+                        setState(59);
+                        match(T__1);
+                    }
+                }
 
-				setState(62);
-				match(T__5);
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(64);
-				match(T__4);
-				setState(65);
-				match(T__5);
-				}
-				break;
-			}
+                setState(62);
+                match(T__5);
+            } else if (getInterpreter().adaptivePredict(_input, 7, _ctx) == 2) {
+                enterOuterAlt(localctx, 2);
+                setState(64);
+                match(T__4);
+                setState(65);
+                match(T__5);
+            }
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -572,30 +618,37 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_number; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterNumber(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterNumber(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitNumber(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitNumber(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitNumber(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitNumber(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
 	public final NumberContext number() throws RecognitionException {
-		NumberContext _localctx = new NumberContext(_ctx, getState());
-		enterRule(_localctx, 12, RULE_number);
-		int _la;
+		NumberContext localctx = new NumberContext(_ctx, getState());
+		enterRule(localctx, 12, RULE_number);
+		int la;
 		try {
-			enterOuterAlt(_localctx, 1);
+			enterOuterAlt(localctx, 1);
 			{
 			setState(69);
 			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==SYMBOL) {
+			la = _input.LA(1);
+			if (la==SYMBOL) {
 				{
 				setState(68);
 				match(SYMBOL);
@@ -603,26 +656,28 @@ public class JSON5Parser extends Parser {
 			}
 
 			setState(71);
-			_la = _input.LA(1);
-			if ( !(_la==NUMBER || _la==NUMERIC_LITERAL) ) {
+			la = _input.LA(1);
+			if ( !(la==NUMBER || la==NUMERIC_LITERAL) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
 			}
 		}
 		catch (RecognitionException re) {
-			_localctx.exception = re;
+			localctx.exception = re;
 			_errHandler.reportError(this, re);
 			_errHandler.recover(this, re);
 		}
 		finally {
 			exitRule();
 		}
-		return _localctx;
+		return localctx;
 	}
 
 	public static final String _serializedATN =

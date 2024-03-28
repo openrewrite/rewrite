@@ -269,7 +269,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     if (elem instanceof Symbol.VarSymbol &&
                         (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                              Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                        if (fqn.equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
+                        if ("java.lang.String".equals(fqn) && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
                             // serialization and is intentionally filtered to prevent errors.

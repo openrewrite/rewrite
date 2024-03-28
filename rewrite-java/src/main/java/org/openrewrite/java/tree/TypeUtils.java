@@ -25,7 +25,7 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
-public class TypeUtils {
+public final class TypeUtils {
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
 
     private TypeUtils() {
@@ -214,7 +214,7 @@ public class TypeUtils {
                     JavaType.Primitive toPrimitive = JavaType.Primitive.fromClassName(toFq.getFullyQualifiedName());
                     if (toPrimitive != null) {
                         return isAssignableTo(toPrimitive, from);
-                    } else if (toFq.getFullyQualifiedName().equals("java.lang.Object")) {
+                    } else if ("java.lang.Object".equals(toFq.getFullyQualifiedName())) {
                         return true;
                     }
                 } else if (from instanceof JavaType.Intersection) {

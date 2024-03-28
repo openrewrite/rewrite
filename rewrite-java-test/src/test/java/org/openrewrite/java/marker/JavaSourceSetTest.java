@@ -81,7 +81,7 @@ class JavaSourceSetTest {
         var classpathGoat = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeCache, true)
           .getClasspath()
           .stream()
-          .filter(t -> t.getClassName().equals("JavaTypeGoat"))
+          .filter(t -> "JavaTypeGoat".equals(t.getClassName()))
           .findAny()
           .orElseThrow(() -> new IllegalStateException("Could not find JavaTypeGoat in classpath"));
 

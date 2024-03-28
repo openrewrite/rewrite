@@ -40,9 +40,9 @@ public class EncodingDetectingInputStream extends InputStream {
     private int prev2;
     private int prev3;
 
-    boolean maybeTwoByteSequence = false;
-    boolean maybeThreeByteSequence = false;
-    boolean maybeFourByteSequence = false;
+    boolean maybeTwoByteSequence;
+    boolean maybeThreeByteSequence;
+    boolean maybeFourByteSequence;
 
     public EncodingDetectingInputStream(InputStream inputStream) {
         this.inputStream = inputStream;
@@ -80,7 +80,7 @@ public class EncodingDetectingInputStream extends InputStream {
         } else {
             if (aByte == -1 || !(prev2 == 0 && prev == 0xC3 || prev3 == 0 && prev2 == 0xC3)) {
                 if (maybeTwoByteSequence) {
-                    if (aByte == -1 && !utf8SequenceEnd(prev) || aByte != -1 && !(utf8SequenceEnd(aByte))) {
+                    if (aByte == -1 && !utf8SequenceEnd(prev) || aByte != -1 && !utf8SequenceEnd(aByte)) {
                         charset = WINDOWS_1252;
                     } else {
                         maybeTwoByteSequence = false;
@@ -89,7 +89,7 @@ public class EncodingDetectingInputStream extends InputStream {
                     }
                 } else if (maybeThreeByteSequence) {
                     if (aByte == -1 ||
-                            utf8SequenceEnd(prev) && !(utf8SequenceEnd(aByte)) ||
+                            utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) ||
                             !utf8SequenceEnd(aByte)) {
                         charset = WINDOWS_1252;
                     }
@@ -103,7 +103,7 @@ public class EncodingDetectingInputStream extends InputStream {
                     if (aByte == -1 ||
                             utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) ||
                             utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) ||
-                            !(utf8SequenceEnd(aByte))) {
+                            !utf8SequenceEnd(aByte)) {
                         charset = WINDOWS_1252;
                     }
 

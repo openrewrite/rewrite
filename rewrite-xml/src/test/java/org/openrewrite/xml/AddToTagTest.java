@@ -38,7 +38,7 @@ class AddToTagTest implements RewriteTest {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
                   if (x.getRoot().getChildren().stream().noneMatch(c -> c.getAttributes().stream()
-                    .anyMatch(attr -> attr.getKey().getName().equals("id") && attr.getValueAsString().equals("myBean2")))) {
+                    .anyMatch(attr -> "id".equals(attr.getKey().getName()) && "myBean2".equals(attr.getValueAsString())))) {
                       doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<bean id=\"myBean2\"/>")));
                   }
                   return super.visitDocument(x, ctx);
@@ -66,7 +66,7 @@ class AddToTagTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  if (x.getRoot().getChildren().get(0).getChildren().size() == 0) {
+                  if (x.getRoot().getChildren().get(0).getChildren().isEmpty()) {
                       doAfterVisit(new AddToTagVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
                         Xml.Tag.build("<property name=\"myprop\" ref=\"collaborator\"/>")));
                   }
@@ -121,7 +121,7 @@ class AddToTagTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  if (x.getRoot().getChildren().stream().noneMatch(c -> c.getName().equals("apple"))) {
+                  if (x.getRoot().getChildren().stream().noneMatch(c -> "apple".equals(c.getName()))) {
                       doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<apple/>"), new TagNameComparator()));
                   }
                   return super.visitDocument(x, ctx);
@@ -150,7 +150,7 @@ class AddToTagTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  if (x.getRoot().getChildren().stream().noneMatch(c -> c.getName().equals("apple"))) {
+                  if (x.getRoot().getChildren().stream().noneMatch(c -> "apple".equals(c.getName()))) {
                       doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<apple/>"), new TagNameComparator()));
                   }
                   return super.visitDocument(x, ctx);
