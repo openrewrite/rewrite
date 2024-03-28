@@ -30,8 +30,6 @@ import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -54,7 +52,6 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.invalid;
 
 public class YamlResourceLoader implements ResourceLoader {
-    private static final Logger logger = LoggerFactory.getLogger(YamlResourceLoader.class);
     int refCount = 0;
 
     private static final PropertyPlaceholderHelper propertyPlaceholderHelper =
@@ -170,17 +167,13 @@ public class YamlResourceLoader implements ResourceLoader {
     private Collection<Map<String, Object>> loadResources(ResourceType resourceType) {
         Collection<Map<String, Object>> resources = new ArrayList<>();
         Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
-        try {
-            for (Object resource : yaml.loadAll(yamlSource)) {
-                if (resource instanceof Map) {
-                    @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
-                    if (resourceType.equals(ResourceType.fromSpec((String) resourceMap.get("type")))) {
-                        resources.add(resourceMap);
-                    }
+        for (Object resource : yaml.loadAll(yamlSource)) {
+            if (resource instanceof Map) {
+                @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
+                if (resourceType.equals(ResourceType.fromSpec((String) resourceMap.get("type")))) {
+                    resources.add(resourceMap);
                 }
             }
-        } catch (Exception e) {
-            logger.error("Loading yaml {} type failed, yaml source: {}", resourceType, yamlSource, e);
         }
         return resources;
     }

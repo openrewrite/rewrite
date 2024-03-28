@@ -31,8 +31,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.net.URI;
@@ -59,8 +57,6 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescrip
 @JsonPropertyOrder({"@c"}) // serialize type info first
 public abstract class Recipe implements Cloneable {
     public static final String PANIC = "__AHHH_PANIC!!!__";
-
-    private static final Logger logger = LoggerFactory.getLogger(Recipe.class);
 
     @SuppressWarnings("unused")
     @JsonProperty("@c")
@@ -369,7 +365,7 @@ public abstract class Recipe implements Cloneable {
             try {
                 validated = validated.and(Validated.required(clazz.getSimpleName() + '.' + field.getName(), field.get(this)));
             } catch (IllegalAccessException e) {
-                logger.warn("Unable to validate the field [{}] on the class [{}]", field.getName(), clazz.getName());
+                validated = Validated.invalid(field.getName(), null, "Unable to access " + clazz.getName() + "." + field.getName(), e);
             }
         }
         for (Recipe recipe : getRecipeList()) {

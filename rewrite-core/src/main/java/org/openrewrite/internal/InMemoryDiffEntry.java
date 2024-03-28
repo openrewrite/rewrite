@@ -15,12 +15,12 @@
  */
 package org.openrewrite.internal;
 
-import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.diff.RawTextComparator;
-import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
-import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.lib.*;
+import org.openrewrite.jgit.diff.DiffEntry;
+import org.openrewrite.jgit.diff.DiffFormatter;
+import org.openrewrite.jgit.diff.RawTextComparator;
+import org.openrewrite.jgit.internal.storage.dfs.DfsRepositoryDescription;
+import org.openrewrite.jgit.internal.storage.dfs.InMemoryRepository;
+import org.openrewrite.jgit.lib.*;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 
