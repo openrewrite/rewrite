@@ -764,6 +764,7 @@ public interface Xml extends Tree {
         @With
         Markers markers;
 
+        @With
         String beforeTypePrefix;
 
         String type;
