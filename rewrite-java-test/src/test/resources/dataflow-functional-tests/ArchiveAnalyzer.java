@@ -450,7 +450,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
                     final File f = new File(destination, uncompressedName);
                     if (engine.accept(f)) {
                         final String destPath = destination.getCanonicalPath();
-                        if (!f.getCanonicalPath().startsWith(destPath)) {
+                        if (!f.getCanonicalFile().toPath().startsWith(destPath)) {
                             final String msg = String.format(
                                     "Archive (%s) contains a file that would be written outside of the destination directory",
                                     archive.getPath());
@@ -465,7 +465,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
                     final File f = new File(destination, uncompressedName);
                     if (engine.accept(f)) {
                         final String destPath = destination.getCanonicalPath();
-                        if (!f.getCanonicalPath().startsWith(destPath)) {
+                        if (!f.getCanonicalFile().toPath().startsWith(destPath)) {
                             final String msg = String.format(
                                     "Archive (%s) contains a file that would be written outside of the destination directory",
                                     archive.getPath());
