@@ -109,8 +109,8 @@ public class MavenPomDownloader {
      */
     public MavenPomDownloader(ExecutionContext ctx) {
         this(emptyMap(), HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-        this.addCentralRepository = MavenExecutionContextView.view(ctx).getAddCentralRepository() == Boolean.TRUE;
-        this.addLocalRepository = MavenExecutionContextView.view(ctx).getAddLocalRepository() == Boolean.TRUE;
+        this.addCentralRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
+        this.addLocalRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
     }
 
     /**
@@ -135,8 +135,8 @@ public class MavenPomDownloader {
         this.httpSender = httpSender;
         this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenCache = this.ctx.getPomCache();
-        this.addCentralRepository = MavenExecutionContextView.view(ctx).getAddCentralRepository() != Boolean.FALSE;
-        this.addLocalRepository = MavenExecutionContextView.view(ctx).getAddLocalRepository() != Boolean.FALSE;
+        this.addCentralRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
+        this.addLocalRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
     }
 
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
