@@ -25,10 +25,7 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
@@ -59,10 +56,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     protected MavenResolutionResult getResolutionResult() {
-        //noinspection ConstantConditions
-        if (resolutionResult == null) {
-            resolutionResult = ((Xml.Document) getCursor()
-                    .getPath(Xml.Document.class::isInstance)
+        final Iterator<Object> instanceInterator = getCursor()
+                .getPath(Xml.Document.class::isInstance);
+        if(instanceInterator.hasNext() ){
+            resolutionResult = ((Xml.Document) instanceInterator
                     .next())
                     .getMarkers().findFirst(MavenResolutionResult.class)
                     .orElseThrow(() -> new IllegalStateException("Maven visitors should not be visiting XML documents without a Maven marker"));
