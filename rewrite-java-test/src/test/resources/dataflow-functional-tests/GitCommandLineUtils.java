@@ -79,7 +79,7 @@ public final class GitCommandLineUtils
                 String relativeFile = file.getPath();
 
                 final String canonicalFile = file.getCanonicalPath();
-                if ( canonicalFile.startsWith( canonicalWorkingDirectory ) )
+                if ( file.getCanonicalFile().toPath().startsWith(canonicalWorkingDirectory) )
                 {
                     // so we can omit the starting characters
                     relativeFile = canonicalFile.substring( canonicalWorkingDirectory.length() );
