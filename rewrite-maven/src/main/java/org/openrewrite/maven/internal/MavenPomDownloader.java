@@ -80,8 +80,6 @@ public class MavenPomDownloader {
     @Nullable
     private List<String> activeProfiles;
 
-    private boolean addDefaultRepositories = true;
-
     /**
      * @param projectPoms    Other POMs in this project.
      * @param ctx            The execution context, which potentially contain Maven settings customization
@@ -97,8 +95,6 @@ public class MavenPomDownloader {
         this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
         this.mavenSettings = mavenSettings;
         this.activeProfiles = activeProfiles;
-        Boolean enableDefaultRepositories = MavenExecutionContextView.view(ctx).isEnableDefaultRepositories();
-        this.addDefaultRepositories = enableDefaultRepositories == null || enableDefaultRepositories;
     }
 
     /**
@@ -110,8 +106,8 @@ public class MavenPomDownloader {
      */
     public MavenPomDownloader(ExecutionContext ctx) {
         this(emptyMap(), HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-        Boolean enableDefaultRepositories = MavenExecutionContextView.view(ctx).isEnableDefaultRepositories();
-        this.addDefaultRepositories = enableDefaultRepositories != null && enableDefaultRepositories;
+        MavenExecutionContextView.view(ctx).setAddCentralRepository(false);
+        MavenExecutionContextView.view(ctx).setAddLocalRepository(false);
     }
 
     /**
@@ -665,7 +661,7 @@ public class MavenPomDownloader {
             @Nullable ResolvedPom containingPom,
             @Nullable String acceptsVersion) {
         LinkedHashMap<String, MavenRepository> normalizedRepositories = new LinkedHashMap<>();
-        if (addDefaultRepositories) {
+        if (ctx.getAddLocalRepository()) {
             normalizedRepositories.put(ctx.getLocalRepository().getId(), ctx.getLocalRepository());
         }
 
@@ -683,7 +679,7 @@ public class MavenPomDownloader {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
         }
-        if (addDefaultRepositories && !normalizedRepositories.containsKey(MavenRepository.MAVEN_CENTRAL.getId())) {
+        if (!normalizedRepositories.containsKey(MavenRepository.MAVEN_CENTRAL.getId()) && ctx.getAddCentralRepository()) {
             MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, ctx, containingPom);
             if (normalizedRepo != null) {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
