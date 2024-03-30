@@ -35,9 +35,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
 
         boolean first = c.getLeadingAnnotations().isEmpty();
-        if (!first) {
-            c = c.withLeadingAnnotations(spaceBetweenAnnotations(c.getLeadingAnnotations()));
-        }
         if (!c.getModifiers().isEmpty()) {
             if (!first && Space.firstPrefix(c.getModifiers()).getWhitespace().isEmpty()) {
                 c = c.withModifiers(Space.formatFirstPrefix(c.getModifiers(),
@@ -102,9 +99,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
 
         boolean first = m.getLeadingAnnotations().isEmpty();
-        if (!first) {
-            m = m.withLeadingAnnotations(spaceBetweenAnnotations(m.getLeadingAnnotations()));
-        }
         if (!m.getModifiers().isEmpty()) {
             if (!first && Space.firstPrefix(m.getModifiers()).getWhitespace().isEmpty()) {
                 m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(),
@@ -142,12 +136,12 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
                 if (returnTypeExpression instanceof J.AnnotatedType) {
                     J.AnnotatedType annotatedType = (J.AnnotatedType) returnTypeExpression;
                     List<J.Annotation> annotations = ListUtils.mapFirst(annotatedType.getAnnotations(), annotation ->
-                        annotation.withPrefix(annotation.getPrefix().withWhitespace(" "))
+                            annotation.withPrefix(annotation.getPrefix().withWhitespace(" "))
                     );
                     m = m.withReturnTypeExpression(annotatedType.withAnnotations(annotations));
                 } else {
                     m = m.withReturnTypeExpression(returnTypeExpression
-                        .withPrefix(returnTypeExpression.getPrefix().withWhitespace(" ")));
+                            .withPrefix(returnTypeExpression.getPrefix().withWhitespace(" ")));
                 }
             }
             first = false;
@@ -181,9 +175,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, p);
 
         boolean first = v.getLeadingAnnotations().isEmpty();
-        if (!first) {
-            v = v.withLeadingAnnotations(spaceBetweenAnnotations(v.getLeadingAnnotations()));
-        }
 
         /*
          * We need at least one space between multiple modifiers, otherwise we could get a run-on like "publicstaticfinal".
@@ -218,24 +209,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return v;
-    }
-
-    @Override
-    public J.AnnotatedType visitAnnotatedType(J.AnnotatedType annotatedType, P p) {
-        J.AnnotatedType at = super.visitAnnotatedType(annotatedType, p);
-        if (at.getAnnotations().isEmpty()) {
-            at = at.withAnnotations(spaceBetweenAnnotations(at.getAnnotations()));
-        }
-        return at;
-    }
-
-    private static List<J.Annotation> spaceBetweenAnnotations(List<J.Annotation> annotations) {
-        return ListUtils.map(annotations, (i, ann) -> {
-            if (i > 0 && ann.getPrefix().isEmpty()) {
-                return ann.withPrefix(Space.SINGLE_SPACE);
-            }
-            return ann;
-        });
     }
 
     @Nullable
