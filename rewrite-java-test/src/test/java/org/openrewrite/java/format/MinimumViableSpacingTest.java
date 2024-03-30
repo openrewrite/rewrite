@@ -223,4 +223,22 @@ class MinimumViableSpacingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void spaceBetweenAnnotations() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              class A {
+                  void m(@Deprecated @SuppressWarnings int a) {
+                  }
+              }
+              """,
+            """
+              class A{void m(@Deprecated @SuppressWarnings int a){}}
+              """
+          )
+        );
+    }
 }
