@@ -230,7 +230,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private static List<J.Annotation> spaceBetweenAnnotations(List<J.Annotation> annotations) {
-//        if (true) return annotations;
         return ListUtils.map(annotations, (i, ann) -> {
             if (i > 0 && ann.getPrefix().isEmpty()) {
                 return ann.withPrefix(Space.SINGLE_SPACE);
