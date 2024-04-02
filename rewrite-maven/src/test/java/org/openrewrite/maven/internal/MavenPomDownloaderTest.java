@@ -160,8 +160,8 @@ class MavenPomDownloaderTest {
         } catch (Exception e) {
             // not expected to succeed
         }
-//        assertThat(attemptedUris)
-//          .containsExactly("http://internalartifactrepository.yourorg.com/org/openrewrite/rewrite-core/7.0.0/rewrite-core-7.0.0.pom");
+        assertThat(attemptedUris)
+          .containsExactly("http://internalartifactrepository.yourorg.com/org/openrewrite/rewrite-core/7.0.0/rewrite-core-7.0.0.pom");
         assertThat(discoveredRepositories)
           .containsExactly(nonexistentRepo);
     }
