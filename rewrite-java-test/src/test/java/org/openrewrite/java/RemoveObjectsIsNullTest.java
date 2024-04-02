@@ -47,7 +47,6 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               }
               """,
             """
-              import static java.util.Objects.isNull;
               public class A {
                   public void test() {
                       boolean a = true;
@@ -78,7 +77,6 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               }
               """,
             """
-              import static java.util.Objects.isNull;
               public class A {
                   public void test() {
                       boolean a = true, b = false;
@@ -109,7 +107,6 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               }
               """,
             """
-              import static java.util.Objects.nonNull;
               public class A {
                   public void test() {
                       boolean a = true;
@@ -140,7 +137,6 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               }
               """,
             """
-              import static java.util.Objects.nonNull;
               public class A {
                   public void test() {
                       boolean a = true, b = false;
@@ -148,6 +144,129 @@ class RemoveObjectsIsNullTest implements RewriteTest {
                           System.out.println("a || b is non-null");
                       }
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1547")
+    @Test
+    void dontTransformNonNullInStreams() {
+        rewriteRun(
+          java("""
+              import java.util.ArrayList;
+              import java.util.List;
+              import java.util.Objects;
+              import java.util.Set;
+              import java.util.stream.Collectors;
+              public class A {
+                  public void test() {
+                      List<String> elements = new ArrayList<>();
+                      elements.add("hello");
+                      elements.add(null);
+                      
+                      Set<String> nonNullList = elements.stream().filter(Objects::nonNull).collect(Collectors.toSet());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dontRemoveImportIfOtherMethodsAreUsed() {
+        rewriteRun(java("""
+              import java.util.ArrayList;
+              import java.util.List;
+              import java.util.Objects;
+              import java.util.Set;
+              import java.util.stream.Collectors;
+              public class A {
+                  public void test() {
+                      boolean a = true;
+                      if (Objects.isNull(a)) {
+                          System.out.println("a is null");
+                      }
+
+                      List<String> elements = new ArrayList<>();
+                      elements.add("hello");
+                      elements.add(null);
+              
+                      Set<String> nonNullList = elements.stream().filter(Objects::nonNull).collect(Collectors.toSet());
+                  }
+              }
+              """,
+              """
+              import java.util.ArrayList;
+              import java.util.List;
+              import java.util.Objects;
+              import java.util.Set;
+              import java.util.stream.Collectors;
+              public class A {
+                  public void test() {
+                      boolean a = true;
+                      if (a == null) {
+                          System.out.println("a is null");
+                      }
+        
+                      List<String> elements = new ArrayList<>();
+                      elements.add("hello");
+                      elements.add(null);
+        
+                      Set<String> nonNullList = elements.stream().filter(Objects::nonNull).collect(Collectors.toSet());
+                  }
+              }
+              """)
+        );
+    }
+
+    @Test
+    void doRemoveStaticImports() {
+        rewriteRun(
+          java("""
+              import java.util.ArrayList;
+              import java.util.List;
+              import java.util.Objects;
+              import java.util.Set;
+              import java.util.stream.Collectors;
+              
+              import static java.util.Objects.isNull;
+              
+              public class A {
+                 public void test() {
+                     boolean a = true;
+                     if (isNull(a)) {
+                         System.out.println("a is null");
+                     }
+              
+                     List<String> elements = new ArrayList<>();
+                     elements.add("hello");
+                     elements.add(null);
+              
+                     Set<String> nullList = elements.stream().filter(Objects::isNull).collect(Collectors.toSet());
+                 }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+              import java.util.Objects;
+              import java.util.Set;
+              import java.util.stream.Collectors;
+              public class A {
+                 public void test() {
+                     boolean a = true;
+                     if (a == null) {
+                         System.out.println("a is null");
+                     }
+              
+                     List<String> elements = new ArrayList<>();
+                     elements.add("hello");
+                     elements.add(null);
+              
+                     Set<String> nullList = elements.stream().filter(Objects::isNull).collect(Collectors.toSet());
+                 }
               }
               """
           )
