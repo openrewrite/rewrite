@@ -85,7 +85,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isDependencyTag() {
-        return DEPENDENCY_MATCHER.matches(getCursor());
+        return isTag("dependency") && DEPENDENCY_MATCHER.matches(getCursor());
     }
 
     /**
@@ -142,7 +142,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isManagedDependencyTag() {
-        return MANAGED_DEPENDENCY_MATCHER.matches(getCursor());
+        return isTag("dependency") && MANAGED_DEPENDENCY_MATCHER.matches(getCursor());
     }
 
     /**
@@ -200,7 +200,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isPluginTag() {
-        return PLUGIN_MATCHER.matches(getCursor()) || PROFILE_PLUGIN_MATCHER.matches(getCursor());
+        return isTag("plugin") &&
+               (PLUGIN_MATCHER.matches(getCursor()) || PROFILE_PLUGIN_MATCHER.matches(getCursor()));
     }
 
     public boolean isPluginTag(String groupId, @Nullable String artifactId) {
@@ -237,7 +238,12 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
 
     public boolean isParentTag() {
-        return PARENT_MATCHER.matches(getCursor());
+        return isTag("parent") && PARENT_MATCHER.matches(getCursor());
+    }
+
+    private boolean isTag(String name) {
+        // `XPathMatcher` is still a bit expensive
+        return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
     }
 
     @Nullable
@@ -375,7 +381,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     @Nullable
     public Plugin findPlugin(Xml.Tag tag) {
         List<Plugin> plugins = getResolutionResult().getPom().getPlugins();
-        if(plugins != null) {
+        if (plugins != null) {
             for (Plugin resolvedPlugin : plugins) {
                 String reqGroup = resolvedPlugin.getGroupId();
                 String reqVersion = resolvedPlugin.getVersion();
