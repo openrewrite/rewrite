@@ -32,7 +32,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
-@SuppressWarnings("NotNullFieldNotInitialized")
 public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
     static final XPathMatcher PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("/project/*/plugins/plugin/dependencies/dependency");
@@ -360,6 +359,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getRepositories());
     }
 
+    @SuppressWarnings("unused")
     public boolean isManagedPluginTag() {
         return MANAGED_PLUGIN_MATCHER.matches(getCursor());
     }
@@ -367,6 +367,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     /**
      * Does the current tag can contain groupId, artifactId and version?
      */
+    @SuppressWarnings("unused")
     public boolean isDependencyLikeTag() {
         return isManagedDependencyTag() || isDependencyTag() || isPluginTag();
     }
