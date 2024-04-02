@@ -42,6 +42,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
     static final XPathMatcher PROFILE_PLUGIN_MATCHER = new XPathMatcher("/project/profiles/*/build/plugins/plugin");
+
+    @Nullable
+    private transient Xml.Document document;
+
+    @Nullable
     private transient MavenResolutionResult resolutionResult;
 
     @Override
@@ -56,12 +61,21 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     protected MavenResolutionResult getResolutionResult() {
-        final Iterator<Object> instanceInterator = getCursor()
+        Iterator<Object> itr = getCursor()
                 .getPath(Xml.Document.class::isInstance);
-        if(instanceInterator.hasNext() ){
-            resolutionResult = ((Xml.Document) instanceInterator
-                    .next())
-                    .getMarkers().findFirst(MavenResolutionResult.class)
+        if(itr.hasNext()) {
+            Xml.Document newDocument = (Xml.Document) itr.next();
+            if(document != null && document != newDocument) {
+                throw new IllegalStateException(
+                        "The same MavenVisitor instance has been used on two different XML documents. " +
+                        "This violates the Recipe contract that they will return a unique visitor instance every time getVisitor() is called.");
+            }
+            document = newDocument;
+        }
+        if (resolutionResult == null) {
+            resolutionResult = Optional.ofNullable(document)
+                    .map(Xml.Document::getMarkers)
+                    .flatMap(markers -> markers.findFirst(MavenResolutionResult.class))
                     .orElseThrow(() -> new IllegalStateException("Maven visitors should not be visiting XML documents without a Maven marker"));
         }
         return resolutionResult;
