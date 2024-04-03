@@ -69,8 +69,8 @@ public class LatestRelease implements VersionComparator {
             for (; versionParts <= 2; versionParts++) {
                 versionAndMetadata[0] += ".0";
             }
-            version = versionAndMetadata[0] + (versionAndMetadata.length > 1 ?
-                    versionAndMetadata[1] : "");
+            version = versionAndMetadata.length > 1 ? versionAndMetadata[0] + versionAndMetadata[1] :
+                    versionAndMetadata[0];
         }
 
         return version;

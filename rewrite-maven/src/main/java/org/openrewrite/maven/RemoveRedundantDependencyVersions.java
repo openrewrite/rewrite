@@ -199,7 +199,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             private boolean matchesVersion(ResolvedDependency d) {
-                if (d.getRequested().getVersion() == null || d.getVersion().contains("${")) {
+                if (d.getRequested().getVersion() == null || d.getRequested().getVersion().contains("${")) {
                     return false;
                 }
                 String managedVersion = getResolutionResult().getPom().getManagedVersion(d.getGroupId(),
