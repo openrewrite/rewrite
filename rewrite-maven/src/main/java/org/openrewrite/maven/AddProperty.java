@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.TagNameComparator;
@@ -41,14 +40,14 @@ public class AddProperty extends Recipe {
             example = "4.13")
     String value;
 
-    @Option(displayName = "Preserve value if property exists",
+    @Option(displayName = "Preserve existing value",
             description = "Preserve previous value if the property already exists in the pom file.",
             required = false)
     @Nullable
     Boolean preserveExistingValue;
 
     @Option(displayName = "Trust parent POM",
-            description = "Even if the parent defines a property with the same key, trust it even if the value isn't the same. " +
+            description = "If the parent defines a property with the same key, trust it even if the value isn't the same. " +
                           "Useful when you want to wait for the parent to have its value changed first. The parent is not trusted by default.",
             required = false)
     @Nullable
@@ -66,48 +65,52 @@ public class AddProperty extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add a new property to the Maven project property.";
+        return "Add a new property to the Maven project property. " +
+               "Prefers to add the property to the parent if the project has multiple modules.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new MavenVisitor<ExecutionContext>() {
-            @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                String currentValue = getResolutionResult().getPom().getProperties().get(key);
-                boolean trust = Boolean.TRUE.equals(trustParent);
-                if (!trust && !value.equals(currentValue)) {
-                    return SearchResult.found(document);
-                } else if (trust) {
-                    String myValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
-                    if (myValue != null && !myValue.equals(value)) {
-                        return SearchResult.found(document);
-                    }
-                }
-                return document;
-            }
-        }, new AddPropertyVisitor(key.replace("${", "").replace("}", ""), value, preserveExistingValue, trustParent));
+        return new AddPropertyVisitor(key.replace("${", "").replace("}", ""),
+                value, preserveExistingValue, trustParent);
     }
 }
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
-    String propertyName;
+    String key;
     String value;
     @Nullable Boolean preserveExistingValue;
     @Nullable Boolean trustParent;
 
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+        // If there is a parent pom in the same project, update the property there instead
+        if (document.getRoot().getChild("parent")
+                .flatMap(tag -> tag.getChild("relativePath"))
+                .isPresent()) {
+            if (Boolean.TRUE.equals(preserveExistingValue)) {
+                return document;
+            }
+            // If the property is expected to be in the parent, there's no need for it in the child pom
+            return (Xml.Document) new RemoveProperty(key).getVisitor()
+                    .visitNonNull(document, ctx);
+        }
+        String parentValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
+        if ((Boolean.TRUE.equals(trustParent) && (parentValue == null || value.equals(parentValue)))
+            || value.equals(getResolutionResult().getPom().getProperties().get(key))) {
+            return document;
+        }
+
         Xml.Document d = super.visitDocument(document, ctx);
         Xml.Tag root = d.getRoot();
         Optional<Xml.Tag> properties = root.getChild("properties");
         if (!properties.isPresent()) {
-            Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + propertyName + ">" + value + "</" + propertyName + ">\n</properties>");
+            Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + value + "</" + key + ">\n</properties>");
             d = (Xml.Document) new AddToTagVisitor<ExecutionContext>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())).visitNonNull(d, ctx);
-        } else if (!properties.get().getChildValue(propertyName).isPresent()) {
-            Xml.Tag propertyTag = Xml.Tag.build("<" + propertyName + ">" + value + "</" + propertyName + ">");
+        } else if (!properties.get().getChildValue(key).isPresent()) {
+            Xml.Tag propertyTag = Xml.Tag.build("<" + key + ">" + value + "</" + key + ">");
             d = (Xml.Document) new AddToTagVisitor<>(properties.get(), propertyTag, new TagNameComparator()).visitNonNull(d, ctx);
         }
         if (d != document) {
@@ -119,7 +122,7 @@ class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
     @Override
     public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
         if (!Boolean.TRUE.equals(preserveExistingValue)
-            && isPropertyTag() && propertyName.equals(tag.getName())
+            && isPropertyTag() && key.equals(tag.getName())
             && !value.equals(tag.getValue().orElse(null))) {
             doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
         }

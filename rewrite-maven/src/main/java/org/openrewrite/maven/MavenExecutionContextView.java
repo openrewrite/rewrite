@@ -149,17 +149,19 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return this;
     }
 
-    public boolean getAddLocalRepository() {
-        return getMessage(MAVEN_ADD_LOCAL_REPOSITORY, true);
+    @Nullable
+    public Boolean getAddLocalRepository() {
+        return getMessage(MAVEN_ADD_LOCAL_REPOSITORY, null);
     }
 
-    public MavenExecutionContextView setAddCentralRepository(boolean useLocalRepository) {
-        putMessage(MAVEN_ADD_CENTRAL_REPOSITORY, useLocalRepository);
+    public MavenExecutionContextView setAddCentralRepository(boolean useCentralRepository) {
+        putMessage(MAVEN_ADD_CENTRAL_REPOSITORY, useCentralRepository);
         return this;
     }
 
-    public boolean getAddCentralRepository() {
-        return getMessage(MAVEN_ADD_CENTRAL_REPOSITORY, true);
+    @Nullable
+    public Boolean getAddCentralRepository() {
+        return getMessage(MAVEN_ADD_CENTRAL_REPOSITORY);
     }
 
     public MavenExecutionContextView setRepositories(List<MavenRepository> repositories) {
