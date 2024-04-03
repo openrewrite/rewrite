@@ -180,9 +180,21 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         return onlySpaces(str) && !" ".equals(str);
     }
 
+    private static List<J.Annotation> spaceBetweenAnnotations(List<J.Annotation> annotations) {
+        return ListUtils.map(annotations, (i, ann) -> {
+            if (i > 0 && ann.getPrefix().isEmpty()) {
+                return ann.withPrefix(Space.SINGLE_SPACE);
+            }
+            return ann;
+        });
+    }
+
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
+        if (c.getLeadingAnnotations().size() > 1) {
+            c = c.withLeadingAnnotations(spaceBetweenAnnotations(c.getLeadingAnnotations()));
+        }
         if (c.getBody() != null) {
             c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().getClassLeftBrace()));
             if (c.getBody().getStatements().isEmpty()) {
@@ -242,6 +254,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
+        if (m.getLeadingAnnotations().size() > 1) {
+            m = m.withLeadingAnnotations(spaceBetweenAnnotations(m.getLeadingAnnotations()));
+        }
         m = m.getPadding().withParameters(
                 spaceBefore(m.getPadding().getParameters(), style.getBeforeParentheses().getMethodDeclaration()));
         if (m.getBody() != null) {
@@ -704,6 +719,15 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         a = padding.withOperator(operator.withBefore(updateSpace(operator.getBefore(), style.getAroundOperators().getAssignment())));
         a = a.withAssignment(spaceBefore(a.getAssignment(), style.getAroundOperators().getAssignment()));
         return a;
+    }
+
+    @Override
+    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+        J.VariableDeclarations vd = super.visitVariableDeclarations(multiVariable, p);
+        if (vd.getLeadingAnnotations().size() > 1) {
+            vd = vd.withLeadingAnnotations(spaceBetweenAnnotations(vd.getLeadingAnnotations()));
+        }
+        return vd;
     }
 
     @Override
