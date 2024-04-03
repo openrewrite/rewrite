@@ -136,12 +136,12 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
                 if (returnTypeExpression instanceof J.AnnotatedType) {
                     J.AnnotatedType annotatedType = (J.AnnotatedType) returnTypeExpression;
                     List<J.Annotation> annotations = ListUtils.mapFirst(annotatedType.getAnnotations(), annotation ->
-                        annotation.withPrefix(annotation.getPrefix().withWhitespace(" "))
+                            annotation.withPrefix(annotation.getPrefix().withWhitespace(" "))
                     );
                     m = m.withReturnTypeExpression(annotatedType.withAnnotations(annotations));
                 } else {
                     m = m.withReturnTypeExpression(returnTypeExpression
-                        .withPrefix(returnTypeExpression.getPrefix().withWhitespace(" ")));
+                            .withPrefix(returnTypeExpression.getPrefix().withWhitespace(" ")));
                 }
             }
             first = false;
