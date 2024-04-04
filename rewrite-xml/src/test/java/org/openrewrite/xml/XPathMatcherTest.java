@@ -147,6 +147,8 @@ class XPathMatcherTest {
           pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='maven-compiler-plugin']/configuration/source",
           pomXml1)).isTrue();
+        assertThat(match("//plugin[artifactId='maven-compiler-plugin']/configuration/source",
+          pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[groupId='org.apache.maven.plugins']/configuration/source",
           pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='somethingElse']/configuration/source",
@@ -171,6 +173,8 @@ class XPathMatcherTest {
         assertThat(match("/root/element1[@foo='baz']", xml)).isFalse();
         assertThat(match("/root/element1[foo='bar']", xml)).isFalse();
         assertThat(match("/root/element1[foo='baz']", xml)).isTrue();
+        assertThat(match("//element1[foo='bar']", xml)).isFalse();
+        assertThat(match("//element1[foo='baz']", xml)).isTrue();
     }
 
     @Test
