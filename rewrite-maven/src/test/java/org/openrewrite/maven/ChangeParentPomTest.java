@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
@@ -994,7 +993,6 @@ class ChangeParentPomTest implements RewriteTest {
 
 
         @Test
-        @Disabled("failure needs to be investigated")
         void bringsDownRemovedProperty() {
             rewriteRun(
               spec -> spec.recipe(new ChangeParentPom(
