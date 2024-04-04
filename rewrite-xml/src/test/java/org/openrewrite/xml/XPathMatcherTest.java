@@ -173,8 +173,24 @@ class XPathMatcherTest {
         assertThat(match("/root/element1[@foo='baz']", xml)).isFalse();
         assertThat(match("/root/element1[foo='bar']", xml)).isFalse();
         assertThat(match("/root/element1[foo='baz']", xml)).isTrue();
-        assertThat(match("//element1[foo='bar']", xml)).isFalse();
+    }
+
+    @Test
+    void relativePathsWithConditions(){
+        SourceFile xml = new XmlParser().parse(
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <root>
+              <element1 foo="bar">
+                <foo>baz</foo>
+                <test>asdf</test>
+              </element1>
+            </root>
+            """
+        ).toList().get(0);
         assertThat(match("//element1[foo='baz']", xml)).isTrue();
+        assertThat(match("//element1[foo='baz']/test", xml)).isTrue();
+        assertThat(match("//element1[foo='bar']/test", xml)).isFalse();
     }
 
     @Test
