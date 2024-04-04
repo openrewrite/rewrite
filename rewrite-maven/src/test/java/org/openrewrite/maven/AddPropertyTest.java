@@ -107,7 +107,7 @@ class AddPropertyTest implements RewriteTest {
                  <artifactId>my-app</artifactId>
                  <version>1</version>
                  <properties>
-                  <key>value</key>
+                  <key>oldValue</key>
                  </properties>
                </project>
                """,

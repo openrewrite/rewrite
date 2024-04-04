@@ -28,6 +28,7 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.TagNameComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -203,11 +204,7 @@ public class ChangeParentPom extends Recipe {
                             Map<String, String> newParentProps = newParentPom.getProperties();
                             for (Map.Entry<String, String> propInUse : propertiesInUse.entrySet()) {
                                 if(!newParentProps.containsKey(propInUse.getKey())) {
-                                    // AddProperty recipe will try to avoid adding a redundant property
-                                    // But it doesn't know the property will soon no longer be redundant
-                                    // So use just its visitor without the precondition
-                                    changeParentTagVisitors.add(
-                                            new AddPropertyVisitor(propInUse.getKey(), propInUse.getValue(), false, false));
+                                    changeParentTagVisitors.add(new UnconditionalAddProperty(propInUse.getKey(), propInUse.getValue()));
                                 }
                             }
 
@@ -314,5 +311,40 @@ public class ChangeParentPom extends Recipe {
         return resolvedPom.getDependencyManagement().stream()
                 .filter(dep -> requestedWithoutExplicitVersion.contains(dep.getGav().withVersion(null)))
                 .collect(Collectors.toList());
+    }
+
+
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class UnconditionalAddProperty extends MavenIsoVisitor<ExecutionContext> {
+        String key;
+        String value;
+        @Override
+        public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+            Xml.Document d = super.visitDocument(document, ctx);
+            Xml.Tag root = d.getRoot();
+            Optional<Xml.Tag> properties = root.getChild("properties");
+            if (!properties.isPresent()) {
+                Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + value + "</" + key + ">\n</properties>");
+                d = (Xml.Document) new AddToTagVisitor<ExecutionContext>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())).visitNonNull(d, ctx);
+            } else if (!properties.get().getChildValue(key).isPresent()) {
+                Xml.Tag propertyTag = Xml.Tag.build("<" + key + ">" + value + "</" + key + ">");
+                d = (Xml.Document) new AddToTagVisitor<>(properties.get(), propertyTag, new TagNameComparator()).visitNonNull(d, ctx);
+            }
+            if (d != document) {
+                maybeUpdateModel();
+            }
+            return d;
+        }
+
+        @Override
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            Xml.Tag t = super.visitTag(tag, ctx);
+            if (isPropertyTag() && key.equals(tag.getName())
+                && !value.equals(tag.getValue().orElse(null))) {
+                t = (Xml.Tag) new ChangeTagValueVisitor<>(tag, value).visitNonNull(t, ctx);
+            }
+            return t;
+        }
     }
 }
