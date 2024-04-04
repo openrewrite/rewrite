@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.TagNameComparator;
@@ -71,8 +72,8 @@ public class AddProperty extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AddPropertyVisitor(key.replace("${", "").replace("}", ""),
-                value, preserveExistingValue, trustParent);
+        return new AddPropertyVisitor(
+                key.replace("${", "").replace("}", ""), value, preserveExistingValue, trustParent);
     }
 }
 
@@ -86,6 +87,12 @@ class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+        String parentValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
+        if ((Boolean.TRUE.equals(trustParent) && (parentValue == null || value.equals(parentValue)))
+            || value.equals(getResolutionResult().getPom().getProperties().get(key))) {
+            return document;
+        }
+
         // If there is a parent pom in the same project, update the property there instead
         if (document.getRoot().getChild("parent")
                 .flatMap(tag -> tag.getChild("relativePath"))
@@ -96,11 +103,6 @@ class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
             // If the property is expected to be in the parent, there's no need for it in the child pom
             return (Xml.Document) new RemoveProperty(key).getVisitor()
                     .visitNonNull(document, ctx);
-        }
-        String parentValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
-        if ((Boolean.TRUE.equals(trustParent) && (parentValue == null || value.equals(parentValue)))
-            || value.equals(getResolutionResult().getPom().getProperties().get(key))) {
-            return document;
         }
 
         Xml.Document d = super.visitDocument(document, ctx);
