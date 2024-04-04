@@ -75,23 +75,20 @@ public class XPathMatcher {
             for (int i = parts.length - 1; i >= 0; i--, pathIndex++) {
                 String part = parts[i];
 
-                //todo check if part contains condition --> if it does check if its true
-
-                String partBefore = i > 0 ? parts[i - 1] : null;
-                Tag tagBefore = i < path.size() ? path.get(path.size() - 1 - i) : null;
+                String partBefore = i > 0 ? parts[i - 1] : parts[0];
+                Tag tagBefore = partBefore.endsWith("]") && i < path.size() ? path.get(path.size() - 1 - i) : null;
                 //getPath beforeElement
                 String partName;
 
-                Matcher matcher = partBefore != null ? PATTERN.matcher(partBefore) : null;
-                if (tagBefore != null && partBefore != null && partBefore.endsWith("]")
-                        && matcher.matches()) {
+                Matcher matcher = PATTERN.matcher(partBefore);
+                if (tagBefore != null && matcher.matches()) {
                     String optionalPartName = matchesCondition(matcher, tagBefore);
                     if (optionalPartName == null) {
                         return false;
                     }
                     partName = optionalPartName;
                 } else {
-                    partName = part;
+                    partName = null;
                 }
 
                 if (part.startsWith("@")) {
@@ -106,7 +103,8 @@ public class XPathMatcher {
                 }
 
                 if (path.size() < i + 1 || (
-                        !path.get(pathIndex).getName().equals(part) && (tagBefore != null && !part.equals(partName) && !tagBefore.getName()
+                        !path.get(pathIndex).getName().equals(part) && (tagBefore != null
+                                && !part.equals(partName) && !tagBefore.getName()
                                 .equals(partName)) && !"*".equals(part))) {
                     return false;
                 }
