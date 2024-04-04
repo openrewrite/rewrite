@@ -188,7 +188,7 @@ class XPathMatcherTest {
             </root>
             """
         ).toList().get(0);
-        assertThat(match("//element1[foo='baz']", xml)).isTrue();
+        assertThat(match("//element1[@foo='bar']", xml)).isTrue();
         assertThat(match("//element1[foo='baz']/test", xml)).isTrue();
         assertThat(match("//element1[foo='bar']/test", xml)).isFalse();
     }

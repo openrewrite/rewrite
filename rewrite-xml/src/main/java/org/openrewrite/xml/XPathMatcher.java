@@ -76,12 +76,12 @@ public class XPathMatcher {
                 String part = parts[i];
 
                 String partBefore = i > 0 ? parts[i - 1] : parts[0];
-                Tag tagBefore = partBefore.endsWith("]") && i < path.size() ? path.get(path.size() - 1 - i) : null;
+                Tag tagBefore = i < path.size() ? path.get(path.size() - 1 - i) : null;
                 //getPath beforeElement
                 String partName;
 
                 Matcher matcher = PATTERN.matcher(partBefore);
-                if (tagBefore != null && matcher.matches()) {
+                if (tagBefore != null && partBefore.endsWith("]") && matcher.matches()) {
                     String optionalPartName = matchesCondition(matcher, tagBefore);
                     if (optionalPartName == null) {
                         return false;
