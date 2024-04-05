@@ -15,20 +15,15 @@
  */
 package org.openrewrite.xml;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.search.FindTags;
 import org.openrewrite.xml.tree.Xml;
-import org.openrewrite.xml.tree.Xml.Attribute;
-import org.openrewrite.xml.tree.Xml.Tag;
+
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Supports a limited set of XPath expressions, specifically those documented on <a
@@ -63,9 +58,9 @@ public class XPathMatcher {
      * @return true if the expression matches the cursor, false otherwise
      */
     public boolean matches(Cursor cursor) {
-        List<Tag> path = new ArrayList<>();
+        List<Xml.Tag> path = new ArrayList<>();
         for (Cursor c = cursor; c != null; c = c.getParent()) {
-            if (c.getValue() instanceof Tag) {
+            if (c.getValue() instanceof Xml.Tag) {
                 path.add(c.getValue());
             }
         }
@@ -76,7 +71,7 @@ public class XPathMatcher {
                 String part = parts[i];
 
                 String partWithCondition = null;
-                Tag tagForCondition = null;
+                Xml.Tag tagForCondition = null;
                 if (part.endsWith("]") && i < path.size()) {
                     int index = part.indexOf("[");
                     if (index < 0) {
@@ -101,8 +96,8 @@ public class XPathMatcher {
 
                 String partName;
 
-                Matcher matcher = partWithCondition != null ? PATTERN.matcher(partWithCondition) : null;
-                if (tagForCondition != null && partWithCondition.endsWith("]") && matcher.matches()) {
+                Matcher matcher;
+                if (tagForCondition != null && partWithCondition.endsWith("]") && (matcher = PATTERN.matcher(partWithCondition)).matches()) {
                     String optionalPartName = matchesCondition(matcher, tagForCondition);
                     if (optionalPartName == null) {
                         return false;
@@ -113,8 +108,8 @@ public class XPathMatcher {
                 }
 
                 if (part.startsWith("@")) {
-                    if (!(cursor.getValue() instanceof Attribute &&
-                            (((Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
+                    if (!(cursor.getValue() instanceof Xml.Attribute &&
+                            (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
                             "*".equals(part.substring(1)))) {
                         return false;
                     }
@@ -173,11 +168,11 @@ public class XPathMatcher {
             for (int i = 0; i < parts.length; i++) {
                 String part = parts[i];
 
-                Tag tag = i < path.size() ? path.get(i) : null;
+                Xml.Tag tag = i < path.size() ? path.get(i) : null;
                 String partName;
 
-                Matcher matcher = PATTERN.matcher(part);
-                if (tag != null && part.endsWith("]") && matcher.matches()) {
+                Matcher matcher;
+                if (tag != null && part.endsWith("]") && (matcher = PATTERN.matcher(part)).matches()) {
                     String optionalPartName = matchesCondition(matcher, tag);
                     if (optionalPartName == null) {
                         return false;
@@ -188,8 +183,8 @@ public class XPathMatcher {
                 }
 
                 if (part.startsWith("@")) {
-                    return cursor.getValue() instanceof Attribute &&
-                            (((Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
+                    return cursor.getValue() instanceof Xml.Attribute &&
+                            (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
                                     "*".equals(part.substring(1)));
                 }
 
@@ -198,7 +193,7 @@ public class XPathMatcher {
                 }
             }
 
-            return cursor.getValue() instanceof Tag && path.size() == parts.length;
+            return cursor.getValue() instanceof Xml.Tag && path.size() == parts.length;
         }
     }
 
