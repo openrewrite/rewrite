@@ -197,7 +197,6 @@ public class XPathMatcher {
         }
     }
 
-    //nullable because Optional API is not available
     @Nullable
     private String matchesCondition(Matcher matcher, Xml.Tag tag) {
         String name = matcher.group(1);
