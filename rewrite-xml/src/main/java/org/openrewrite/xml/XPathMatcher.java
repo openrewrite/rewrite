@@ -125,10 +125,11 @@ public class XPathMatcher {
                     continue;
                 }
 
+                boolean conditionNotFulfilled = (tagForCondition != null
+                        && !part.equals(partName) && !tagForCondition.getName()
+                        .equals(partName)) && !"*".equals(part);
                 if (path.size() < i + 1 || (
-                        !path.get(pathIndex).getName().equals(part) && (tagForCondition != null
-                                && !part.equals(partName) && !tagForCondition.getName()
-                                .equals(partName)) && !"*".equals(part))) {
+                        !path.get(pathIndex).getName().equals(part) && conditionNotFulfilled)) {
                     return false;
                 }
             }
