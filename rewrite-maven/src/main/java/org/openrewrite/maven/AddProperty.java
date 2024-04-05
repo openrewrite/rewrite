@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.TagNameComparator;
@@ -96,6 +95,7 @@ class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
         // If there is a parent pom in the same project, update the property there instead
         if (document.getRoot().getChild("parent")
                 .flatMap(tag -> tag.getChild("relativePath"))
+                .flatMap(Xml.Tag::getValue)
                 .isPresent()) {
             if (Boolean.TRUE.equals(preserveExistingValue)) {
                 return document;
