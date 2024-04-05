@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.search.FindTags;
 import org.openrewrite.xml.tree.Xml;
 
@@ -25,15 +26,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Supports a limited set of XPath expressions, specifically those
- * documented on <a href="https://www.w3schools.com/xml/xpath_syntax.asp">this page</a>.
+ * Supports a limited set of XPath expressions, specifically those documented on <a
+ * href="https://www.w3schools.com/xml/xpath_syntax.asp">this page</a>.
  * <p>
  * Used for checking whether a visitor's cursor meets a certain XPath expression.
  * <p>
- * The "current node" for XPath evaluation is always the root node of the document.
- * As a result, '.' and '..' are not recognized.
+ * The "current node" for XPath evaluation is always the root node of the document. As a result, '.' and '..' are not
+ * recognized.
  */
 public class XPathMatcher {
+
     // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']` or foo[@bar='baz']
     private static final Pattern PATTERN = Pattern.compile("([-\\w]+)\\[(@)?([-\\w]+)='([-\\w.]+)']");
 
@@ -67,6 +69,44 @@ public class XPathMatcher {
             int pathIndex = 0;
             for (int i = parts.length - 1; i >= 0; i--, pathIndex++) {
                 String part = parts[i];
+
+                String partWithCondition = null;
+                Xml.Tag tagForCondition = null;
+                if (part.endsWith("]") && i < path.size()) {
+                    int index = part.indexOf("[");
+                    if (index < 0) {
+                        return false;
+                    }
+                    //if is Attribute
+                    if (part.charAt(index + 1) == '@') {
+                        partWithCondition = part;
+                        tagForCondition = path.get(i);
+                    }
+                } else if (i < path.size() && i > 0 && parts[i - 1].endsWith("]")) {
+                    String partBefore = parts[i - 1];
+                    int index = partBefore.indexOf("[");
+                    if (index < 0) {
+                        return false;
+                    }
+                    if (!partBefore.contains("@")) {
+                        partWithCondition = partBefore;
+                        tagForCondition = path.get(parts.length - i);
+                    }
+                }
+
+                String partName;
+
+                Matcher matcher;
+                if (tagForCondition != null && partWithCondition.endsWith("]") && (matcher = PATTERN.matcher(partWithCondition)).matches()) {
+                    String optionalPartName = matchesCondition(matcher, tagForCondition);
+                    if (optionalPartName == null) {
+                        return false;
+                    }
+                    partName = optionalPartName;
+                } else {
+                    partName = null;
+                }
+
                 if (part.startsWith("@")) {
                     if (!(cursor.getValue() instanceof Xml.Attribute &&
                           (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
@@ -78,7 +118,16 @@ public class XPathMatcher {
                     continue;
                 }
 
-                if (path.size() < i + 1 || (!path.get(pathIndex).getName().equals(part) && !"*".equals(part))) {
+                boolean conditionNotFulfilled =
+                        tagForCondition == null || (!part.equals(partName) && !tagForCondition.getName()
+                                .equals(partName));
+
+                int idx = part.indexOf("[");
+                if (idx > 0) {
+                    part = part.substring(0, idx);
+                }
+                if (path.size() < i + 1 || (
+                                                   !(path.get(pathIndex).getName().equals(part)) && !"*".equals(part)) && conditionNotFulfilled) {
                     return false;
                 }
             }
@@ -124,20 +173,11 @@ public class XPathMatcher {
 
                 Matcher matcher;
                 if (tag != null && part.endsWith("]") && (matcher = PATTERN.matcher(part)).matches()) {
-                    String name = matcher.group(1);
-                    boolean isAttribute = Objects.equals(matcher.group(2), "@");
-                    String selector = matcher.group(3);
-                    String value = matcher.group(4);
-
-                    boolean matchCondition = isAttribute ? tag.getAttributes().stream().anyMatch(a ->
-                            a.getKeyAsString().equals(selector) && a.getValueAsString().equals(value)) :
-                            FindTags.find(tag, selector).stream().anyMatch(t ->
-                                    t.getValue().map(v -> v.equals(value)).orElse(false)
-                            );
-                    if (!matchCondition) {
+                    String optionalPartName = matchesCondition(matcher, tag);
+                    if (optionalPartName == null) {
                         return false;
                     }
-                    partName = name;
+                    partName = optionalPartName;
                 } else {
                     partName = part;
                 }
@@ -155,5 +195,32 @@ public class XPathMatcher {
 
             return cursor.getValue() instanceof Xml.Tag && path.size() == parts.length;
         }
+    }
+
+    @Nullable
+    private String matchesCondition(Matcher matcher, Xml.Tag tag) {
+        String name = matcher.group(1);
+        boolean isAttribute = Objects.equals(matcher.group(2), "@");
+        String selector = matcher.group(3);
+        String value = matcher.group(4);
+
+        boolean matchCondition = false;
+        if (isAttribute) {
+            for (Xml.Attribute a : tag.getAttributes()) {
+                if (a.getKeyAsString().equals(selector) && a.getValueAsString().equals(value)) {
+                    matchCondition = true;
+                    break;
+                }
+            }
+        } else {
+            for (Xml.Tag t : FindTags.find(tag, selector)) {
+                if (t.getValue().map(v -> v.equals(value)).orElse(false)) {
+                    matchCondition = true;
+                    break;
+                }
+            }
+        }
+
+        return matchCondition ? name : null;
     }
 }

@@ -147,6 +147,8 @@ class XPathMatcherTest {
           pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='maven-compiler-plugin']/configuration/source",
           pomXml1)).isTrue();
+        assertThat(match("//plugin[artifactId='maven-compiler-plugin']/configuration/source",
+          pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[groupId='org.apache.maven.plugins']/configuration/source",
           pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='somethingElse']/configuration/source",
@@ -171,6 +173,24 @@ class XPathMatcherTest {
         assertThat(match("/root/element1[@foo='baz']", xml)).isFalse();
         assertThat(match("/root/element1[foo='bar']", xml)).isFalse();
         assertThat(match("/root/element1[foo='baz']", xml)).isTrue();
+    }
+
+    @Test
+    void relativePathsWithConditions() {
+        SourceFile xml = new XmlParser().parse(
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <root>
+              <element1 foo="bar">
+                <foo>baz</foo>
+                <test>asdf</test>
+              </element1>
+            </root>
+            """
+        ).toList().get(0);
+        assertThat(match("//element1[@foo='bar']", xml)).isTrue();
+        assertThat(match("//element1[foo='baz']/test", xml)).isTrue();
+        assertThat(match("//element1[foo='bar']/test", xml)).isFalse();
     }
 
     @Test
