@@ -75,8 +75,6 @@ public class XPathMatcher {
             for (int i = parts.length - 1; i >= 0; i--, pathIndex++) {
                 String part = parts[i];
 
-                //todo anpassen --> attribute und normale conditions
-
                 String partWithCondition = null;
                 Tag tagForCondition = null;
                 if (part.endsWith("]") && i < path.size()) {
@@ -125,11 +123,15 @@ public class XPathMatcher {
                     continue;
                 }
 
-                boolean conditionNotFulfilled = (tagForCondition != null
-                        && !part.equals(partName) && !tagForCondition.getName()
-                        .equals(partName)) && !"*".equals(part);
+                boolean conditionNotFulfilled = tagForCondition == null || (!part.equals(partName) && !tagForCondition.getName()
+                        .equals(partName));
+
+                int idx = part.indexOf("[");
+                if(idx > 0){
+                    part = part.substring(0, idx);
+                }
                 if (path.size() < i + 1 || (
-                        !path.get(pathIndex).getName().equals(part) && conditionNotFulfilled)) {
+                        !(path.get(pathIndex).getName().equals(part)) && !"*".equals(part)) && conditionNotFulfilled) {
                     return false;
                 }
             }
