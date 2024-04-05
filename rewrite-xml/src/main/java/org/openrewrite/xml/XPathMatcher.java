@@ -75,14 +75,37 @@ public class XPathMatcher {
             for (int i = parts.length - 1; i >= 0; i--, pathIndex++) {
                 String part = parts[i];
 
-                String partBefore = i > 0 ? parts[i - 1] : parts[0];
-                Tag tagBefore = i < path.size() ? path.get(path.size() - 1 - i) : null;
-                //getPath beforeElement
+                //todo anpassen --> attribute und normale conditions
+
+                String partWithCondition = null;
+                Tag tagForCondition = null;
+                if (part.endsWith("]") && i < path.size()) {
+                    int index = part.indexOf("[");
+                    if (index < 0) {
+                        return false;
+                    }
+                    //if is Attribute
+                    if (part.charAt(index + 1) == '@') {
+                        partWithCondition = part;
+                        tagForCondition = path.get(i);
+                    }
+                } else if (i < path.size() && i > 0 && parts[i - 1].endsWith("]")) {
+                    String partBefore = parts[i - 1];
+                    int index = partBefore.indexOf("[");
+                    if (index < 0) {
+                        return false;
+                    }
+                    if (!partBefore.contains("@")) {
+                        partWithCondition = partBefore;
+                        tagForCondition = path.get(path.size() - 1 - i);
+                    }
+                }
+
                 String partName;
 
-                Matcher matcher = PATTERN.matcher(partBefore);
-                if (tagBefore != null && partBefore.endsWith("]") && matcher.matches()) {
-                    String optionalPartName = matchesCondition(matcher, tagBefore);
+                Matcher matcher = partWithCondition != null ? PATTERN.matcher(partWithCondition) : null;
+                if (tagForCondition != null && partWithCondition.endsWith("]") && matcher.matches()) {
+                    String optionalPartName = matchesCondition(matcher, tagForCondition);
                     if (optionalPartName == null) {
                         return false;
                     }
@@ -103,8 +126,8 @@ public class XPathMatcher {
                 }
 
                 if (path.size() < i + 1 || (
-                        !path.get(pathIndex).getName().equals(part) && (tagBefore != null
-                                && !part.equals(partName) && !tagBefore.getName()
+                        !path.get(pathIndex).getName().equals(part) && (tagForCondition != null
+                                && !part.equals(partName) && !tagForCondition.getName()
                                 .equals(partName)) && !"*".equals(part))) {
                     return false;
                 }
