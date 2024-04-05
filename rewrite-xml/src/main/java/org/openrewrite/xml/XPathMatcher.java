@@ -95,7 +95,7 @@ public class XPathMatcher {
                     }
                     if (!partBefore.contains("@")) {
                         partWithCondition = partBefore;
-                        tagForCondition = path.get(path.size() - 1 - i);
+                        tagForCondition = path.get(parts.length - i);
                     }
                 }
 
