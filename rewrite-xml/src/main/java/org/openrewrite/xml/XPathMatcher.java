@@ -123,11 +123,12 @@ public class XPathMatcher {
                     continue;
                 }
 
-                boolean conditionNotFulfilled = tagForCondition == null || (!part.equals(partName) && !tagForCondition.getName()
-                        .equals(partName));
+                boolean conditionNotFulfilled =
+                        tagForCondition == null || (!part.equals(partName) && !tagForCondition.getName()
+                                .equals(partName));
 
                 int idx = part.indexOf("[");
-                if(idx > 0){
+                if (idx > 0) {
                     part = part.substring(0, idx);
                 }
                 if (path.size() < i + 1 || (
