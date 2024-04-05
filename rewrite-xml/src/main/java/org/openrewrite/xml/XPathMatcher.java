@@ -109,8 +109,8 @@ public class XPathMatcher {
 
                 if (part.startsWith("@")) {
                     if (!(cursor.getValue() instanceof Xml.Attribute &&
-                            (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
-                            "*".equals(part.substring(1)))) {
+                          (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
+                          "*".equals(part.substring(1)))) {
                         return false;
                     }
 
@@ -127,7 +127,7 @@ public class XPathMatcher {
                     part = part.substring(0, idx);
                 }
                 if (path.size() < i + 1 || (
-                        !(path.get(pathIndex).getName().equals(part)) && !"*".equals(part)) && conditionNotFulfilled) {
+                                                   !(path.get(pathIndex).getName().equals(part)) && !"*".equals(part)) && conditionNotFulfilled) {
                     return false;
                 }
             }
@@ -184,8 +184,8 @@ public class XPathMatcher {
 
                 if (part.startsWith("@")) {
                     return cursor.getValue() instanceof Xml.Attribute &&
-                            (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
-                                    "*".equals(part.substring(1)));
+                           (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
+                            "*".equals(part.substring(1)));
                 }
 
                 if (path.size() < i + 1 || (tag != null && !tag.getName().equals(partName) && !"*".equals(part))) {
@@ -204,14 +204,23 @@ public class XPathMatcher {
         String selector = matcher.group(3);
         String value = matcher.group(4);
 
-        boolean matchCondition = isAttribute ? tag.getAttributes().stream().anyMatch(a ->
-                a.getKeyAsString().equals(selector) && a.getValueAsString().equals(value)) :
-                FindTags.find(tag, selector).stream().anyMatch(t ->
-                        t.getValue().map(v -> v.equals(value)).orElse(false)
-                );
-        if (!matchCondition) {
-            return null;
+        boolean matchCondition = false;
+        if (isAttribute) {
+            for (Xml.Attribute a : tag.getAttributes()) {
+                if (a.getKeyAsString().equals(selector) && a.getValueAsString().equals(value)) {
+                    matchCondition = true;
+                    break;
+                }
+            }
+        } else {
+            for (Xml.Tag t : FindTags.find(tag, selector)) {
+                if (t.getValue().map(v -> v.equals(value)).orElse(false)) {
+                    matchCondition = true;
+                    break;
+                }
+            }
         }
-        return name;
+
+        return matchCondition ? name : null;
     }
 }
