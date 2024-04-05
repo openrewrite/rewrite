@@ -80,7 +80,8 @@ public class XmlParser implements Parser {
                p.endsWith(".xslt") ||
                p.endsWith(".tld") ||
                p.endsWith(".xjb") ||
-               p.endsWith(".jsp");
+               p.endsWith(".jsp") ||
+               p.endsWith(".csproj");
     }
 
     @Override
