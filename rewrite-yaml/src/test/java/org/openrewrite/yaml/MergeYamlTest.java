@@ -912,4 +912,41 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addNewEntryToSequence() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups",
+              // language=yaml
+              """
+                - name: newName
+                  jobs:
+                    - newJob
+                """,
+              false, "name")),
+          yaml(
+            """
+             groups:
+               - name: analysis
+                 jobs:
+                   - analysis
+               - name: update
+                 jobs:
+                   - update
+             """,
+            """
+             groups:
+               - name: analysis
+                 jobs:
+                   - analysis
+               - name: update
+                 jobs:
+                   - update
+               - name: newName
+                 jobs:
+                   - newJob
+             """)
+        );
+    }
 }
