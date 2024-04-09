@@ -103,7 +103,7 @@ public class MergeYaml extends Recipe {
                         return d;
                     }
                     // If there is no space between the colon and the value it will not be interpreted as a mapping
-                    String snippet;
+                    @Language("yml") String snippet;
                     if (incoming instanceof Yaml.Mapping) {
                         snippet = valueKey + ":\n" + indent(yaml);
                     } else {
@@ -158,17 +158,10 @@ public class MergeYaml extends Recipe {
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
-                    // this tests for an awkward case that will be better handled by JsonPathMatcher.
-                    // if it is a sequence, we want to insert into every sequence entry for now.
-                    if (!(entry.getValue() instanceof Yaml.Sequence)) {
-                        Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
-                                Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visitNonNull(entry.getValue(),
-                                ctx, getCursor());
-                        if (value instanceof Yaml.Scalar && value.getPrefix().isEmpty()) {
-                            value = value.withPrefix(" ");
-                        }
-                        return entry.withValue(value);
-                    }
+                    Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
+                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visitNonNull(entry.getValue(),
+                            ctx, getCursor());
+                    return entry.withValue(value);
                 }
                 return super.visitMappingEntry(entry, ctx);
             }
