@@ -99,7 +99,14 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
     }
 
     public Xml visitAttribute(Xml.Attribute attribute, P p) {
-        return attribute.withMarkers(visitMarkers(attribute.getMarkers(), p));
+        Xml.Attribute a = attribute;
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withValue(visitAndCast(a.getValue(), p));
+        return a;
+    }
+
+    public Xml visitAttributeValue(Xml.Attribute.Value value, P p) {
+        return value.withMarkers(visitMarkers(value.getMarkers(), p));
     }
 
     public Xml visitCharData(Xml.CharData charData, P p) {

@@ -49,6 +49,11 @@ public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
+    public Xml.Attribute.Value visitAttributeValue(Xml.Attribute.Value value, P p) {
+        return (Xml.Attribute.Value) super.visitAttributeValue(value, p);
+    }
+
+    @Override
     public Xml.CharData visitCharData(Xml.CharData charData, P p) {
         return (Xml.CharData) super.visitCharData(charData, p);
     }

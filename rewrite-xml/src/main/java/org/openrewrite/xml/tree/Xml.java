@@ -541,6 +541,11 @@ public interface Xml extends Tree {
             Markers markers;
             Quote quote;
             String value;
+
+            @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitAttributeValue(this, p);
+            }
         }
 
         public String getKeyAsString() {

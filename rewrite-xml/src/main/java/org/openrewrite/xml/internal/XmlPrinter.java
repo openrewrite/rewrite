@@ -89,25 +89,30 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Xml visitAttribute(Xml.Attribute attribute, PrintOutputCapture<P> p) {
-        char valueDelim;
-        if (Xml.Attribute.Value.Quote.Double.equals(attribute.getValue().getQuote())) {
-            valueDelim = '"';
-        } else {
-            valueDelim = '\'';
-        }
         beforeSyntax(attribute, p);
         p.append(attribute.getKey().getPrefix())
                 .append(attribute.getKeyAsString())
                 .append(attribute.getBeforeEquals())
-                .append('=')
-                .append(attribute.getValue().getPrefix())
-                .append(valueDelim)
-                .append(attribute.getValueAsString())
-                .append(valueDelim);
-
-
+                .append('=');
+        visit(attribute.getValue(), p);
         afterSyntax(attribute, p);
         return attribute;
+    }
+
+    @Override
+    public Xml visitAttributeValue(Xml.Attribute.Value value, PrintOutputCapture<P> p) {
+        beforeSyntax(value, p);
+        char valueDelim;
+        if (Xml.Attribute.Value.Quote.Double.equals(value.getQuote())) {
+            valueDelim = '"';
+        } else {
+            valueDelim = '\'';
+        }
+        p.append(valueDelim)
+                .append(value.getValue())
+                .append(valueDelim);
+        afterSyntax(value, p);
+        return value;
     }
 
     @Override
