@@ -36,6 +36,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
@@ -87,6 +89,21 @@ public class GradleWrapper {
         }
     }
 
+    private static final Pattern GRADLE_VERSION_PATTERN = Pattern.compile("gradle-([0-9.]+)");
+
+    // Supports org.openrewrite.gradle.toolingapi.Assertions.withToolingApi(URI)
+    // This method is provided to support recipe development at organizations which require gradle to come from
+    // internal repositories. This is not used in contexts where services.gradle.org is accessible
+    @SuppressWarnings("unused")
+    public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
+        String version = "";
+        Matcher matcher = GRADLE_VERSION_PATTERN.matcher(fullDistributionUri.toString());
+        if(matcher.find()) {
+            version = matcher.group(1);
+        }
+        return new GradleWrapper(version, new DistributionInfos(fullDistributionUri.toString(), null, null));
+    }
+
     public String getDistributionUrl() {
         return distributionInfos.getDownloadUrl();
     }
@@ -95,6 +112,7 @@ public class GradleWrapper {
         return formatUriForPropertiesFile(getDistributionUrl());
     }
 
+    @Nullable
     public Checksum getDistributionChecksum() {
         return distributionInfos.getChecksum();
     }
