@@ -39,6 +39,11 @@ public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
+    public Xml.Tag.Closing visitTagClosing(Xml.Tag.Closing closing, P p) {
+        return (Xml.Tag.Closing) super.visitTagClosing(closing, p);
+    }
+
+    @Override
     public Xml.Attribute visitAttribute(Xml.Attribute attribute, P p) {
         return (Xml.Attribute) super.visitAttribute(attribute, p);
     }

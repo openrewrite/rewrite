@@ -94,6 +94,10 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         return t;
     }
 
+    public Xml visitTagClosing(Xml.Tag.Closing closing, P p) {
+        return closing.withMarkers(visitMarkers(closing.getMarkers(), p));
+    }
+
     public Xml visitAttribute(Xml.Attribute attribute, P p) {
         return attribute.withMarkers(visitMarkers(attribute.getMarkers(), p));
     }

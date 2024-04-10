@@ -479,6 +479,11 @@ public interface Xml extends Tree {
             String beforeTagDelimiterPrefix;
 
             @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitTagClosing(this, p);
+            }
+
+            @Override
             public String toString() {
                 return "</" + name + ">";
             }

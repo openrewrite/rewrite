@@ -70,15 +70,21 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         } else {
             p.append('>');
             visit(tag.getContent(), p);
-            p.append(tag.getClosing().getPrefix())
-                    .append("</")
-                    .append(tag.getClosing().getName())
-                    .append(tag.getClosing().getBeforeTagDelimiterPrefix())
-                    .append(">");
-
+            visit(tag.getClosing(), p);
         }
         afterSyntax(tag, p);
         return tag;
+    }
+
+    @Override
+    public Xml visitTagClosing(Xml.Tag.Closing closing, PrintOutputCapture<P> p) {
+        beforeSyntax(closing, p);
+        p.append("</")
+                .append(closing.getName())
+                .append(closing.getBeforeTagDelimiterPrefix())
+                .append(">");
+        afterSyntax(closing, p);
+        return closing;
     }
 
     @Override
