@@ -88,6 +88,7 @@ public interface Xml extends Tree {
         @With
         Path sourcePath;
 
+        @Getter
         @With
         String prefixUnsafe;
 
