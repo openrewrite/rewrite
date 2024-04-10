@@ -104,6 +104,7 @@ public interface Xml extends Tree {
         @With
         Markers markers;
 
+        @Getter
         @Nullable // for backwards compatibility
         @With(AccessLevel.PRIVATE)
         String charsetName;
