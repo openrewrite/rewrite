@@ -479,6 +479,11 @@ public interface Xml extends Tree {
             String beforeTagDelimiterPrefix;
 
             @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitTagClosing(this, p);
+            }
+
+            @Override
             public String toString() {
                 return "</" + name + ">";
             }
@@ -536,6 +541,11 @@ public interface Xml extends Tree {
             Markers markers;
             Quote quote;
             String value;
+
+            @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitAttributeValue(this, p);
+            }
         }
 
         public String getKeyAsString() {
@@ -673,6 +683,12 @@ public interface Xml extends Tree {
 
             Markers markers;
             List<Element> elements;
+
+            @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitDocTypeDeclExternalSubsets(this, p);
+            }
+
         }
 
         @Override
