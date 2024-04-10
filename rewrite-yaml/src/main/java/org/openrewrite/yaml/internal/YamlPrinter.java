@@ -26,28 +26,32 @@ import java.util.function.UnaryOperator;
 public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
+    public Yaml visitDocuments(Yaml.Documents documents, PrintOutputCapture<P> p) {
+        visitMarkers(documents.getMarkers(), p);
+        visit(documents.getDocuments(), p);
+        afterSyntax(documents, p);
+        return documents;
+    }
+
+    @Override
     public Yaml visitDocument(Yaml.Document document, PrintOutputCapture<P> p) {
         beforeSyntax(document, p);
         if (document.isExplicit()) {
             p.append("---");
         }
         visit(document.getBlock(), p);
-        if (document.getEnd() != null) {
-            p.append(document.getEnd().getPrefix());
-            if (document.getEnd().isExplicit()) {
-                p.append("...");
-            }
-        }
+        visit(document.getEnd(), p);
         afterSyntax(document, p);
         return document;
     }
 
     @Override
-    public Yaml visitDocuments(Yaml.Documents documents, PrintOutputCapture<P> p) {
-        visitMarkers(documents.getMarkers(), p);
-        visit(documents.getDocuments(), p);
-        afterSyntax(documents, p);
-        return documents;
+    public Yaml visitDocumentEnd(Yaml.Document.End end, PrintOutputCapture<P> p) {
+        beforeSyntax(end, p);
+        if (end.isExplicit()) {
+            p.append("...");
+        }
+        return end;
     }
 
     @Override
