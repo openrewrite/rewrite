@@ -159,16 +159,21 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         visit(docTypeDecl.getName(), p);
         visit(docTypeDecl.getExternalId(), p);
         visit(docTypeDecl.getInternalSubset(), p);
-        if (docTypeDecl.getExternalSubsets() != null) {
-            p.append(docTypeDecl.getExternalSubsets().getPrefix())
-                    .append('[');
-            visit(docTypeDecl.getExternalSubsets().getElements(), p);
-            p.append(']');
-        }
+        visit(docTypeDecl.getExternalSubsets(), p);
         p.append(docTypeDecl.getBeforeTagDelimiterPrefix());
         p.append('>');
         afterSyntax(docTypeDecl, p);
         return docTypeDecl;
+    }
+
+    @Override
+    public Xml visitDocTypeDeclExternalSubsets(Xml.DocTypeDecl.ExternalSubsets externalSubsets, PrintOutputCapture<P> p) {
+        beforeSyntax(externalSubsets, p);
+        p.append('[');
+        visit(externalSubsets.getElements(), p);
+        p.append(']');
+        afterSyntax(externalSubsets, p);
+        return externalSubsets;
     }
 
     @Override

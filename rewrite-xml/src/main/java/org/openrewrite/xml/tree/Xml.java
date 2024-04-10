@@ -683,6 +683,12 @@ public interface Xml extends Tree {
 
             Markers markers;
             List<Element> elements;
+
+            @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitDocTypeDeclExternalSubsets(this, p);
+            }
+
         }
 
         @Override

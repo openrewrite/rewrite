@@ -125,6 +125,13 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         return d;
     }
 
+    public Xml visitDocTypeDeclExternalSubsets(Xml.DocTypeDecl.ExternalSubsets externalSubsets, P p) {
+        Xml.DocTypeDecl.ExternalSubsets e = externalSubsets;
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withElements(ListUtils.map(e.getElements(), i -> visitAndCast(i, p)));
+        return e;
+    }
+
     public Xml visitProlog(Xml.Prolog prolog, P p) {
         Xml.Prolog pl = prolog;
         pl = pl.withMarkers(visitMarkers(pl.getMarkers(), p));

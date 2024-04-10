@@ -69,6 +69,11 @@ public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
+    public Xml.DocTypeDecl.ExternalSubsets visitDocTypeDeclExternalSubsets(Xml.DocTypeDecl.ExternalSubsets externalSubsets, P p) {
+        return (Xml.DocTypeDecl.ExternalSubsets) super.visitDocTypeDeclExternalSubsets(externalSubsets, p);
+    }
+
+    @Override
     public Xml.Prolog visitProlog(Xml.Prolog prolog, P p) {
         return (Xml.Prolog) super.visitProlog(prolog, p);
     }
