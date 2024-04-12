@@ -1283,6 +1283,8 @@ class ChangeParentPomTest implements RewriteTest {
           pomXml(
           """
             <project>
+                <artifactId>example</artifactId>
+                <modelVersion>4.0.0</modelVersion>
                 <parent>
                     <groupId>org.jenkins-ci.plugins</groupId>
                     <artifactId>plugin</artifactId>
@@ -1298,6 +1300,12 @@ class ChangeParentPomTest implements RewriteTest {
                         <url>https://repo.jenkins-ci.org/public/</url>
                     </repository>
                 </repositories>
+                <pluginRepositories>
+                    <pluginRepository>
+                        <id>repo.jenkins-ci.org</id>
+                        <url>https://repo.jenkins-ci.org/public/</url>
+                    </pluginRepository>
+                </pluginRepositories>
                 <dependencyManagement>
                   <dependencies>
                       <dependency>
@@ -1319,6 +1327,8 @@ class ChangeParentPomTest implements RewriteTest {
             """,
           """
             <project>
+                <artifactId>example</artifactId>
+                <modelVersion>4.0.0</modelVersion>
                 <parent>
                     <groupId>org.jenkins-ci.plugins</groupId>
                     <artifactId>plugin</artifactId>
@@ -1334,6 +1344,12 @@ class ChangeParentPomTest implements RewriteTest {
                         <url>https://repo.jenkins-ci.org/public/</url>
                     </repository>
                 </repositories>
+                <pluginRepositories>
+                    <pluginRepository>
+                        <id>repo.jenkins-ci.org</id>
+                        <url>https://repo.jenkins-ci.org/public/</url>
+                    </pluginRepository>
+                </pluginRepositories>
                 <dependencyManagement>
                   <dependencies>
                       <dependency>
