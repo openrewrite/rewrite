@@ -27,6 +27,9 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -113,11 +116,20 @@ public class Pom {
      * @throws MavenDownloadingException When problems are encountered downloading dependencies or parents.
      */
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles).resolve(ctx, downloader);
+        List<MavenRepository> repositories = Stream.concat(
+                        getRepositories().stream(),
+                        Stream.of(getRepository())
+                )
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), repositories, emptyList(), emptyList(), emptyList(), emptyList())
+                .resolve(ctx, downloader);
     }
 
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, List<MavenRepository> initialRepositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList()).resolve(ctx, downloader);
+        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList())
+                .resolve(ctx, downloader);
     }
 
     @Nullable
