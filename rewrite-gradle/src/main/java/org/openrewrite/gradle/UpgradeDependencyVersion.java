@@ -146,7 +146,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         return new GroovyVisitor<ExecutionContext>() {
             GradleProject gradleProject;
-            final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
 
             @Override
             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
@@ -214,9 +213,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             return m;
                         }
 
-                        if (!dependencyMatcher.matches(groupId, artifactId)) {
-                            return m;
-                        }
                         String versionVariableName = version;
                         GroupArtifact ga = new GroupArtifact(groupId, artifactId);
                         if (acc.gaToNewVersion.containsKey(ga)) {
@@ -245,9 +241,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     continue;
                                 }
                                 Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                                if (!dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
-                                    continue;
-                                }
+
                                 String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
                                 GroupArtifact ga = new GroupArtifact(dep.getGroupId(), dep.getArtifactId());
                                 if (acc.gaToNewVersion.containsKey(ga)) {
