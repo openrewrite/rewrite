@@ -21,6 +21,7 @@ import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 @Value
 @With
@@ -42,5 +43,16 @@ public class ResolvedGroupArtifactVersion implements Serializable {
     @Override
     public String toString() {
         return groupId + ":" + artifactId + ":" + (datedSnapshotVersion == null ? version : datedSnapshotVersion);
+    }
+
+    public GroupArtifact asGroupArtifact() {
+        return new GroupArtifact(groupId, artifactId);
+    }
+
+    public ResolvedGroupArtifactVersion withGroupArtifact(GroupArtifact ga) {
+        if(Objects.equals(ga.getGroupId(), groupId) && Objects.equals(ga.getArtifactId(), artifactId)) {
+            return this;
+        }
+        return new ResolvedGroupArtifactVersion(repository, ga.getGroupId(), ga.getArtifactId(), version, datedSnapshotVersion);
     }
 }
