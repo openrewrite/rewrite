@@ -94,8 +94,19 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         return t;
     }
 
+    public Xml visitTagClosing(Xml.Tag.Closing closing, P p) {
+        return closing.withMarkers(visitMarkers(closing.getMarkers(), p));
+    }
+
     public Xml visitAttribute(Xml.Attribute attribute, P p) {
-        return attribute.withMarkers(visitMarkers(attribute.getMarkers(), p));
+        Xml.Attribute a = attribute;
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withValue(visitAndCast(a.getValue(), p));
+        return a;
+    }
+
+    public Xml visitAttributeValue(Xml.Attribute.Value value, P p) {
+        return value.withMarkers(visitMarkers(value.getMarkers(), p));
     }
 
     public Xml visitCharData(Xml.CharData charData, P p) {
@@ -112,6 +123,13 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         d = d.withInternalSubset(ListUtils.map(d.getInternalSubset(), i -> visitAndCast(i, p)));
         d = d.withExternalSubsets(visitAndCast(d.getExternalSubsets(), p));
         return d;
+    }
+
+    public Xml visitDocTypeDeclExternalSubsets(Xml.DocTypeDecl.ExternalSubsets externalSubsets, P p) {
+        Xml.DocTypeDecl.ExternalSubsets e = externalSubsets;
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withElements(ListUtils.map(e.getElements(), i -> visitAndCast(i, p)));
+        return e;
     }
 
     public Xml visitProlog(Xml.Prolog prolog, P p) {

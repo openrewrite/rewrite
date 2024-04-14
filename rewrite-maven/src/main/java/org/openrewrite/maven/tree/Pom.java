@@ -28,8 +28,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
 
 /**
  * The minimum information required about a POM to resolve it.
@@ -113,11 +112,14 @@ public class Pom {
      * @throws MavenDownloadingException When problems are encountered downloading dependencies or parents.
      */
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles).resolve(ctx, downloader);
+        List<MavenRepository> repositories = getRepository() == null ? emptyList() : singletonList(getRepository());
+        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), repositories, emptyList(), emptyList(), emptyList(), emptyList())
+                .resolve(ctx, downloader);
     }
 
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, List<MavenRepository> initialRepositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList()).resolve(ctx, downloader);
+        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList())
+                .resolve(ctx, downloader);
     }
 
     @Nullable
