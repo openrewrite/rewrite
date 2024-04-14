@@ -124,7 +124,7 @@ public interface JavaParser extends Parser {
             File[] extracted = resourceTarget.listFiles();
             if (extracted != null) {
                 for (File file : extracted) {
-                    if (jarPattern.matcher(file.getName()).find()) {
+                    if (jarPattern.matcher(file.getPath()).find()) {
                         artifacts.add(file.toPath());
                         continue nextArtifact;
                     }
