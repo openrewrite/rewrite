@@ -92,7 +92,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
     @Override
     public Json.Document visitJson5(JSON5Parser.Json5Context ctx) {
-        return !ctx.children.isEmpty() && "<EOF>".equals(ctx.children.get(0).getText()) ? new Json.Document(
+        return !ctx.children.isEmpty() && ctx.children.get(0) instanceof TerminalNode && ((TerminalNode) ctx.children.get(0)).getSymbol().getType() == JSON5Parser.EOF ? new Json.Document(
                 randomId(),
                 path,
                 Space.EMPTY,
