@@ -62,10 +62,11 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     public Json visitArr(JSON5Parser.ArrContext ctx) {
         return convert(ctx, (arr, prefix) -> {
             sourceBefore("[");
-            List<JsonRightPadded<JsonValue>> converted = new ArrayList<>(ctx.value().size());
-            for (int i = 0; i < ctx.value().size(); i++) {
-                JSON5Parser.ValueContext value = ctx.value().get(i);
-                if (i == ctx.value().size() - 1) {
+            List<JSON5Parser.ValueContext> values = ctx.value();
+            List<JsonRightPadded<JsonValue>> converted = new ArrayList<>(values.size());
+            for (int i = 0; i < values.size(); i++) {
+                JSON5Parser.ValueContext value = values.get(i);
+                if (i == values.size() - 1) {
                     JsonRightPadded<JsonValue> unpadded = JsonRightPadded.build((JsonValue) visit(value));
                     if (positionOfNext(",", ']') >= 0) {
                         converted.add(unpadded.withAfter(sourceBefore(",")));
@@ -80,7 +81,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 }
             }
 
-            if (ctx.value().isEmpty()) {
+            if (values.isEmpty()) {
                 converted.add(JsonRightPadded.build((JsonValue) new Json.Empty(randomId(), Space.EMPTY, Markers.EMPTY))
                         .withAfter(sourceBefore("]")));
             }
