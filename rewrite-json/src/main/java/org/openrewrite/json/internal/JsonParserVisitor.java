@@ -112,7 +112,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 null,
                 fileAttributes,
                 visitValue(c.value()),
-                Space.format(source.substring(cursor))
+                Space.format(source, cursor, source.length())
         ));
     }
 
@@ -145,10 +145,11 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     public Json visitObj(JSON5Parser.ObjContext ctx) {
         return convert(ctx, (arr, prefix) -> {
             sourceBefore("{");
-            List<JsonRightPadded<Json>> converted = new ArrayList<>(ctx.member().size());
-            for (int i = 0; i < ctx.member().size(); i++) {
-                JSON5Parser.MemberContext member = ctx.member().get(i);
-                if (i == ctx.member().size() - 1) {
+            List<JSON5Parser.MemberContext> members = ctx.member();
+            List<JsonRightPadded<Json>> converted = new ArrayList<>(members.size());
+            for (int i = 0; i < members.size(); i++) {
+                JSON5Parser.MemberContext member = members.get(i);
+                if (i == members.size() - 1) {
                     JsonRightPadded<Json> unpadded = JsonRightPadded.build(visit(member));
                     if (positionOfNext(",", '}') >= 0) {
                         converted.add(unpadded.withAfter(sourceBefore(",")));
@@ -163,7 +164,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 }
             }
 
-            if (ctx.member().isEmpty()) {
+            if (members.isEmpty()) {
                 converted.add(JsonRightPadded.build((Json) new Json.Empty(randomId(), Space.EMPTY, Markers.EMPTY))
                         .withAfter(sourceBefore("}")));
             }
@@ -269,8 +270,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
         if (start < codePointCursor) {
             return Space.EMPTY;
         }
-        String prefix = source.substring(cursor, advanceCursor(start));
-        return Space.format(prefix);
+        return Space.format(source, cursor, advanceCursor(start));
     }
 
     public int advanceCursor(int newCodePointIndex) {
@@ -315,9 +315,9 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
             return Space.EMPTY; // unable to find this delimiter
         }
 
-        String prefix = source.substring(cursor, delimIndex);
-        advanceCursor(codePointCursor + Character.codePointCount(prefix, 0, prefix.length()) + untilDelim.length());
-        return Space.format(prefix);
+        Space space = Space.format(source, cursor, delimIndex);
+        advanceCursor(codePointCursor + Character.codePointCount(source, cursor, delimIndex) + untilDelim.length());
+        return space;
     }
 
     private int positionOfNext(String untilDelim, @Nullable Character stop) {
