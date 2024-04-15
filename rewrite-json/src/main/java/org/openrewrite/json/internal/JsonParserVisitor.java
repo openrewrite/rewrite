@@ -332,20 +332,19 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                     inSingleLineComment = false;
                 }
             } else {
-                if (source.length() - untilDelim.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex = delimIndex + 2;
-                            break;
+                if (inMultiLineComment) {
+                    if (source.charAt(delimIndex) == '*' && source.charAt(delimIndex + 1) == '/') {
+                        inMultiLineComment = false;
+                        delimIndex += 2;
+                    }
+                } else if (source.charAt(delimIndex) == '/' && source.length() - untilDelim.length() > delimIndex + 1) {
+                    int next = source.charAt(delimIndex + 1);
+                    if (next == '/') {
+                        inSingleLineComment = true;
+                        delimIndex++;
+                    } else if (next == '*') {
+                        inMultiLineComment = true;
+                        delimIndex++;
                     }
                 }
 
