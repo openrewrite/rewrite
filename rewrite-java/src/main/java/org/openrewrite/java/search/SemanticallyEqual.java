@@ -38,31 +38,15 @@ public class SemanticallyEqual {
     }
 
     public static boolean areEqual(J firstElem, J secondElem) {
-        SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor(true);
+        SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor();
         semanticallyEqualVisitor.visit(firstElem, secondElem);
         return semanticallyEqualVisitor.isEqual();
     }
 
-    /**
-     * Compares method invocations and new class constructors based on the `JavaType.Method` instead of checking
-     * each types of each parameter.
-     * I.E. void foo(Object obj) {} invoked with `java.lang.String` or `java.lang.Integer` will return true.
-     */
-    public static boolean areSemanticallyEqual(J firstElem, J secondElem) {
-        SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor(false);
-        semanticallyEqualVisitor.visit(firstElem, secondElem);
-        return semanticallyEqualVisitor.isEqual.get();
-    }
-
     @SuppressWarnings("ConstantConditions")
     protected static class SemanticallyEqualVisitor extends JavaIsoVisitor<J> {
-        private final boolean compareMethodArguments;
 
         protected final AtomicBoolean isEqual = new AtomicBoolean(true);
-
-        public SemanticallyEqualVisitor(boolean compareMethodArguments) {
-            this.compareMethodArguments = compareMethodArguments;
-        }
 
         public boolean isEqual() {
             return isEqual.get();
@@ -879,10 +863,26 @@ public class SemanticallyEqual {
             return method;
         }
 
+        /**
+         * Special case where we will consider a J.NewClass to be equal to a method that returns an object of the same type.
+         * The intention is to consider a method returning a builder to be equal to direct instantiation of the same builder.
+         * So new A.Bulider() will be considered equal to A.builder().
+         */
+        private void methodEqualsNewClass(J.MethodInvocation method, J.NewClass newClass) {
+            if(method.getMethodType() == null || newClass.getMethodType() == null || !TypeUtils.isOfType(newClass.getMethodType().getReturnType(), method.getMethodType().getReturnType())) {
+                isEqual.set(false);
+            }
+            visitList(method.getArguments(), newClass.getArguments());
+        }
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, J j) {
             if (isEqual.get()) {
-                if (!(j instanceof J.MethodInvocation)) {
+                if (j instanceof J.NewClass) {
+                    J.NewClass newClass = (J.NewClass) j;
+                    methodEqualsNewClass(method, newClass);
+                    return method;
+                } else if (!(j instanceof J.MethodInvocation)) {
                     isEqual.set(false);
                     return method;
                 }
@@ -919,25 +919,7 @@ public class SemanticallyEqual {
                         return method;
                     }
                 }
-                boolean containsLiteral = false;
-                if (!compareMethodArguments) {
-                    for (int i = 0; i < method.getArguments().size(); i++) {
-                        if (method.getArguments().get(i) instanceof J.Literal || compareTo.getArguments().get(i) instanceof J.Literal) {
-                            containsLiteral = true;
-                            break;
-                        }
-                    }
-                    if (!containsLiteral) {
-                        if (nullMissMatch(method.getMethodType(), compareTo.getMethodType()) ||
-                            !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType())) {
-                            isEqual.set(false);
-                            return method;
-                        }
-                    }
-                }
-                if (compareMethodArguments || containsLiteral) {
-                    this.visitList(method.getArguments(), compareTo.getArguments());
-                }
+                this.visitList(method.getArguments(), compareTo.getArguments());
                 this.visitList(method.getTypeParameters(), compareTo.getTypeParameters());
             }
             return method;
@@ -1003,7 +985,11 @@ public class SemanticallyEqual {
         @Override
         public J.NewClass visitNewClass(J.NewClass newClass, J j) {
             if (isEqual.get()) {
-                if (!(j instanceof J.NewClass)) {
+                if (j instanceof J.MethodInvocation) {
+                    J.MethodInvocation method = (J.MethodInvocation) j;
+                    methodEqualsNewClass(method, newClass);
+                    return newClass;
+                } else if (!(j instanceof J.NewClass)) {
                     isEqual.set(false);
                     return newClass;
                 }
@@ -1029,27 +1015,7 @@ public class SemanticallyEqual {
                 if (newClass.getBody() != null && compareTo.getBody() != null) {
                     visit(newClass.getBody(), compareTo.getBody());
                 }
-                if (newClass.getArguments() != null && compareTo.getArguments() != null) {
-                    boolean containsLiteral = false;
-                    if (!compareMethodArguments) {
-                        for (int i = 0; i < newClass.getArguments().size(); i++) {
-                            if (newClass.getArguments().get(i) instanceof J.Literal || compareTo.getArguments().get(i) instanceof J.Literal) {
-                                containsLiteral = true;
-                                break;
-                            }
-                        }
-                        if (!containsLiteral) {
-                            if (nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
-                                newClass.getConstructorType() != null && compareTo.getConstructorType() != null && !TypeUtils.isOfType(newClass.getConstructorType(), compareTo.getConstructorType())) {
-                                isEqual.set(false);
-                                return newClass;
-                            }
-                        }
-                    }
-                    if (compareMethodArguments || containsLiteral) {
-                        this.visitList(newClass.getArguments(), compareTo.getArguments());
-                    }
-                }
+                visitList(newClass.getArguments(), compareTo.getArguments());
             }
             return newClass;
         }
