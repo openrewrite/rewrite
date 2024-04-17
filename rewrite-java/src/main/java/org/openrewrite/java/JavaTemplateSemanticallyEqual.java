@@ -149,10 +149,6 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     private static class JavaTemplateSemanticallyEqualVisitor extends SemanticallyEqualVisitor {
         final Map<J, String> matchedParameters = new LinkedHashMap<>();
 
-        public JavaTemplateSemanticallyEqualVisitor() {
-            super(true);
-        }
-
         private boolean matchTemplateParameterPlaceholder(J.Empty empty, J j) {
             if (j instanceof TypedTree) {
                 if (j instanceof J.Primitive || j instanceof J.Identifier && ((J.Identifier) j).getFieldType() == null) {

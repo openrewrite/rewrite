@@ -30,6 +30,7 @@ import java.util.Objects;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@SuppressWarnings({"UnnecessaryCallToStringValueOf", "AccessStaticViaInstance", "UnnecessaryLocalVariable"})
 class SemanticallyEqualTest {
 
     private final JavaParser javaParser = JavaParser.fromJavaVersion().build();
@@ -298,6 +299,74 @@ class SemanticallyEqualTest {
         );
     }
 
+    @Test
+    void newBuilderEqualsBuildMethod() {
+        assertExpressionsEqual("""
+          public class A {
+              public static class Builder {
+                  public A build() {
+                      return new A();
+                  }
+              }
+              public static Builder builder() {
+                  return new Builder();
+              }
+          
+              void foo() {
+                  Object a = A.builder();
+                  Object b = new A.Builder();
+              }
+          }
+          """);
+    }
+
+    @Test
+    void newBuilderWithArguments() {
+        assertExpressionsEqual("""
+          public class A {
+               public A (int i) {
+               }
+               public static class Builder {
+                   public Builder(int i) {
+                   }
+                   public A build(int i) {
+                       return new A(i);
+                   }
+               }
+               public static Builder builder(int i) {
+                   return new Builder(i);
+               }
+           
+               void foo() {
+                   Object a = A.builder(1);
+                   Object b = new A.Builder(1);
+               }
+          }
+          """);
+        assertExpressionsNotEqual("""
+          public class A {
+               public A (int i) {
+               }
+               public static class Builder {
+                   public Builder(int i) {
+                   }
+                   public A build(int i) {
+                       return new A(i);
+                   }
+               }
+               public static Builder builder(int i) {
+                   return new Builder(i);
+               }
+           
+               void foo() {
+                   Object a = A.builder(1);
+                   Object b = new A.Builder(2);
+               }
+          }
+          """);
+    }
+
+    @SuppressWarnings("SameParameterValue")
     private void assertEqualToSelf(@Language("java") String a) {
         assertEqual(a, a);
     }
@@ -329,6 +398,13 @@ class SemanticallyEqualTest {
           Objects.requireNonNull(result.get("a").getInitializer()),
           Objects.requireNonNull(result.get("b").getInitializer()))
         ).isTrue();
+
+        assertThat(SemanticallyEqual.areEqual(
+          Objects.requireNonNull(result.get("b").getInitializer()),
+          Objects.requireNonNull(result.get("a").getInitializer()))
+        )
+          .as("Equality is commutative, a == b implies b == a")
+          .isTrue();
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
@@ -349,6 +425,13 @@ class SemanticallyEqualTest {
           Objects.requireNonNull(result.get("a").getInitializer()),
           Objects.requireNonNull(result.get("b").getInitializer()))
         ).isFalse();
+
+        assertThat(SemanticallyEqual.areEqual(
+          Objects.requireNonNull(result.get("b").getInitializer()),
+          Objects.requireNonNull(result.get("a").getInitializer()))
+        )
+          .as("Inequality is commutative, a != b implies b != a")
+          .isFalse();
     }
 
     private void assertEqual(J a, J b) {
