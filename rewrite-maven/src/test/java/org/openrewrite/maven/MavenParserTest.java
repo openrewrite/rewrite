@@ -907,7 +907,6 @@ class MavenParserTest implements RewriteTest {
             });
 
             mockRepo.start();
-
             var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
                 throw new RuntimeException(t);
             }));
@@ -965,6 +964,7 @@ class MavenParserTest implements RewriteTest {
               .hasSize(1)
               .matches(deps -> deps.get(0).getGroupId().equals("com.foo") &&
                                deps.get(0).getArtifactId().equals("bar"));
+            mockRepo.shutdown();
         }
     }
 
