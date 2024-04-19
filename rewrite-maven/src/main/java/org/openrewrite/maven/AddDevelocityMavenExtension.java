@@ -149,7 +149,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     }
 
     @Data
-    static class Accumulator {
+    public static class Accumulator {
         boolean mavenProject;
         boolean useCRLFNewLines;
         Path matchingExtensionsXmlFile;
@@ -344,7 +344,8 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     }
 
     private String getLatestVersion(ExecutionContext ctx) {
-        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, null, null);
+        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, mctx.getSettings(), mctx.getActiveProfiles());
         VersionComparator versionComparator = new LatestRelease(null);
         GroupArtifact gradleEnterpriseExtension = new GroupArtifact("com.gradle", "gradle-enterprise-maven-extension");
         try {

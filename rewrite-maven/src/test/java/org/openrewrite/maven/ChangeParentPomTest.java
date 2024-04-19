@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
@@ -1276,7 +1275,6 @@ class ChangeParentPomTest implements RewriteTest {
         );
     }
 
-    @Disabled("Failing in CI but not locally")
     @Test
     void shouldNotAddToDependencyManagement() {
         rewriteRun(
