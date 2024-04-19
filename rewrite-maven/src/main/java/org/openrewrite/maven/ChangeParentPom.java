@@ -191,7 +191,7 @@ public class ChangeParentPom extends Recipe {
                             }
 
                             // Retain managed versions from the old parent that are not managed in the new parent
-                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, null, null);
+                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
                             Pom newParentPom = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, null, resolvedPom.getRepositories());
                             List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, ctx);
                             for (ResolvedManagedDependency dep : dependenciesWithoutExplicitVersions) {
@@ -338,7 +338,8 @@ public class ChangeParentPom extends Recipe {
         String artifactId = newArtifactId == null ? oldArtifactId : newArtifactId;
         try {
             GroupArtifactVersion newParentGav = new GroupArtifactVersion(groupId, artifactId, newVersion);
-            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, null, null);
+            MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), mctx, mctx.getSettings(), mctx.getActiveProfiles());
             ResolvedPom newParent = mpd.download(newParentGav, null, resolvedPom, resolvedPom.getRepositories())
                     .resolve(emptyList(), mpd, ctx);
             Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
