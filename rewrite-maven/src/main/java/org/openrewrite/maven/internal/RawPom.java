@@ -66,6 +66,12 @@ public class RawPom {
     @Nullable
     String version;
 
+    // This is an obsolete field that is no longer used, but it is present in some particularly old POMs
+    @EqualsAndHashCode.Include
+    @ToString.Include
+    @Nullable
+    String currentVersion;
+
     @EqualsAndHashCode.Include
     @ToString.Include
     @Nullable
@@ -330,7 +336,9 @@ public class RawPom {
 
     @Nullable
     public String getVersion() {
-        return version == null && parent != null ? parent.getVersion() : version;
+        return version == null ?
+                (parent == null ? currentVersion : parent.getVersion()) :
+                version;
     }
 
     public Pom toPom(@Nullable Path inputPath, @Nullable MavenRepository repo) {

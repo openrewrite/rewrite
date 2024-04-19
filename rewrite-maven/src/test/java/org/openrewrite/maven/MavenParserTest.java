@@ -2331,7 +2331,6 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     void malformedPom() {
-        @Language("xml")
         String malformedPomXml = """
           <project>
             <groupId>com.mycompany.app</groupId>
@@ -2346,6 +2345,7 @@ class MavenParserTest implements RewriteTest {
               </dependency>
           </project>
           """;
+        //noinspection LanguageMismatch
         assertThat(MavenParser.builder().build().parse(malformedPomXml))
           .singleElement()
           .isInstanceOf(ParseError.class);
@@ -2933,6 +2933,45 @@ class MavenParserTest implements RewriteTest {
                 </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void problematicPoms() {
+        // stax-ex-1.0.pom has <currentVersion> instead of <version> and <pomVersion>3</pomVersion> instead of <modelVersion>3.0.0</modelVersion>
+        // It also depends on activation:activation:1.0 which is not published to maven central (presumably it was at one point?)
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!-- the pom for this dependency is invalid under current versions of maven -->
+                  <dependency>
+                    <groupId>org.jvnet.staxex</groupId>
+                    <artifactId>stax-ex</artifactId>
+                    <version>1.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pom ->
+              assertThat(pom.getMarkers().findFirst(MavenResolutionResult.class))
+                .as("Dependency resolution should have at least partially succeeded")
+                .hasValueSatisfying(mrr ->
+                  assertThat(mrr.findDependencies("org.jvnet.staxex", "stax-ex", null))
+                    .isNotEmpty())
+                .map(mrr -> mrr.findDependencies("activation", "activation", null))
+                .as("activation:activation:1.0 is a dependency of org.jvnet.staxex:stax-ex:1.0")
+                .isNotEmpty()
+                .map(it -> it.get(0).getException())
+                .as("activation:activation:1.0 is not published to maven central so there must have been an exception resolving it")
+                .containsInstanceOf(MavenDownloadingException.class)
+            )
           )
         );
     }

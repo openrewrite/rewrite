@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -55,33 +54,17 @@ public class ResolvedPom {
     public static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
-    private static final ResolvedPom SUPER_POM = new ResolvedPom(
-            new Pom(null, null, null, null, null, null, emptyMap(), emptyList(), emptyList(), singletonList(MavenRepository.MAVEN_CENTRAL), emptyList(), emptyList(), null, null),
-            emptyList()
-    );
+    private static final ResolvedPom SUPER_POM = ResolvedPom.builder()
+            .requested(Pom.builder()
+                    .repositories(singletonList(MavenRepository.MAVEN_CENTRAL))
+                    .build())
+            .build();
 
     @With
     Pom requested;
 
     @With
     Iterable<String> activeProfiles;
-
-    public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList());
-    }
-
-    @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement) {
-        this.requested = requested;
-        this.activeProfiles = activeProfiles;
-        this.properties = properties;
-        this.dependencyManagement = dependencyManagement;
-        this.initialRepositories = initialRepositories;
-        this.repositories = repositories;
-        this.requestedDependencies = requestedDependencies;
-        this.plugins = plugins;
-        this.pluginManagement = pluginManagement;
-    }
 
     @NonFinal
     @Builder.Default
@@ -111,6 +94,9 @@ public class ResolvedPom {
     @Builder.Default
     List<Plugin> pluginManagement = emptyList();
 
+    @NonFinal
+    @Nullable
+    MavenDownloadingException exception;
 
     /**
      * Deduplicate dependencies and dependency management dependencies
@@ -156,17 +142,13 @@ public class ResolvedPom {
      */
     @SuppressWarnings("DuplicatedCode")
     public ResolvedPom resolve(ExecutionContext ctx, MavenPomDownloader downloader) throws MavenDownloadingException {
-        ResolvedPom resolved = new ResolvedPom(
-                requested,
-                activeProfiles,
-                emptyMap(),
-                emptyList(),
-                initialRepositories,
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList()
-        ).resolver(ctx, downloader).resolve();
+        ResolvedPom resolved = ResolvedPom.builder()
+                .requested(requested)
+                .activeProfiles(activeProfiles)
+                .initialRepositories(initialRepositories)
+                .build()
+                .resolver(ctx, downloader)
+                .resolve();
 
         for (Map.Entry<String, String> property : resolved.getProperties().entrySet()) {
             if (properties == null || (property.getValue() != null && !property.getValue().equals(properties.get(property.getKey())))) {
@@ -830,13 +812,31 @@ public class ResolvedPom {
                         throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
                     }
 
-                    Pom dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories());
-
                     MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
-                    ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
+                    ResolvedPom resolvedPom;
+                    Pom dPom;
+                    try {
+                        dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories());
+                        resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
+                    } catch  (MavenDownloadingException e) {
+                        ResolvedGroupArtifactVersion gav = new ResolvedGroupArtifactVersion(null, d.getGroupId(), d.getArtifactId(), d.getVersion(), null);
+                        dPom = Pom.builder()
+                                .gav(gav)
+                                .build();
+                        resolvedPom = ResolvedPom.builder()
+                                .requested(dPom)
+                                .activeProfiles(activeProfiles)
+                                .properties(properties)
+                                .exception(e)
+                                .build();
+                    }
+
                     if (resolvedPom == null) {
-                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList());
+                        resolvedPom = ResolvedPom.builder()
+                                .requested(dPom)
+                                .activeProfiles(getActiveProfiles())
+                                .initialRepositories(initialRepositories)
+                                .build();
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
@@ -848,7 +848,8 @@ public class ResolvedPom {
                             resolvedPom.getValue(dd.getDependency().getClassifier()),
                             Boolean.valueOf(resolvedPom.getValue(dd.getDependency().getOptional())),
                             depth,
-                            emptyList());
+                            emptyList(),
+                            resolvedPom.getException());
 
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()

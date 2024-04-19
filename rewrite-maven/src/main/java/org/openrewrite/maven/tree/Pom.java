@@ -113,12 +113,12 @@ public class Pom {
      */
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
         List<MavenRepository> repositories = getRepository() == null ? emptyList() : singletonList(getRepository());
-        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), repositories, emptyList(), emptyList(), emptyList(), emptyList())
+        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), repositories, emptyList(), emptyList(), emptyList(), emptyList(), null)
                 .resolve(ctx, downloader);
     }
 
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, List<MavenRepository> initialRepositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList())
+        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList(), null)
                 .resolve(ctx, downloader);
     }
 

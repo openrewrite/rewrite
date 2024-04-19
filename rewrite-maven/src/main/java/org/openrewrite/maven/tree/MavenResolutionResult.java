@@ -65,6 +65,10 @@ public class MavenResolutionResult implements Marker {
     @With
     List<String> activeProfiles;
 
+    @With
+    @Nullable
+    MavenDownloadingExceptions exceptions;
+
     public List<String> getActiveProfiles() {
         // for backwards compatibility with ASTs that were serialized before activeProfiles was added
         return activeProfiles == null ? emptyList() : activeProfiles;
@@ -181,10 +185,11 @@ public class MavenResolutionResult implements Marker {
                 }
             }
         }
+        MavenResolutionResult result = withDependencies(dependencies);
         if (exceptions != null) {
-            throw exceptions;
+            result = result.withExceptions(exceptions);
         }
-        return withDependencies(dependencies);
+        return result;
     }
 
     public Map<Path, Pom> getProjectPoms() {
