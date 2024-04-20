@@ -149,6 +149,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                     if (familyRegex != null) {
                         versionToUse = findDependencies(d -> familyRegex.matcher(d.getGroupId()).matches()).stream()
                                 .max(Comparator.comparing(d -> new Version(d.getVersion())))
+                                .filter(dep -> dep.getException() == null)
                                 .map(d -> d.getRequested().getVersion())
                                 .orElse(null);
                     }

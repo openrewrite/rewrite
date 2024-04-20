@@ -67,8 +67,6 @@ public class RawPom {
     String version;
 
     // This is an obsolete field that is no longer used, but it is present in some particularly old POMs
-    @EqualsAndHashCode.Include
-    @ToString.Include
     @Nullable
     String currentVersion;
 
