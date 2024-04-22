@@ -49,7 +49,7 @@ public class MavenDownloadingExceptions extends Exception {
     }
 
     public static MavenDownloadingExceptions append(@Nullable MavenDownloadingExceptions current,
-                                                    MavenDownloadingExceptions exceptions) {
+                                                    @Nullable MavenDownloadingExceptions exceptions) {
         if (current == null) {
             current = new MavenDownloadingExceptions();
         }

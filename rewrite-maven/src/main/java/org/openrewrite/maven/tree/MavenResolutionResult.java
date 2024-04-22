@@ -32,6 +32,7 @@ import java.util.function.Predicate;
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
+@SuppressWarnings("unused")
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -68,6 +69,28 @@ public class MavenResolutionResult implements Marker {
     @With
     @Nullable
     MavenDownloadingExceptions exceptions;
+
+    /**
+     * Retrieve a MavenDownloadingExceptions that occurred during resolution of this MavenResolutionResult or any
+     * of the dependencies resolved within it.
+     *
+     * @return null if no exceptions occurred, or a MavenDownloadingExceptions object containing all exceptions.
+     */
+    @Nullable
+    public MavenDownloadingExceptions getExceptions() {
+        MavenDownloadingExceptions result = exceptions;
+        if (parent != null && parent.getExceptions() != null) {
+            result = MavenDownloadingExceptions.append(result, parent.getExceptions());
+        }
+        for (List<ResolvedDependency> value : dependencies.values()) {
+            for (ResolvedDependency resolvedDependency : value) {
+                if (resolvedDependency.getException() != null) {
+                    result = MavenDownloadingExceptions.append(result, resolvedDependency.getException());
+                }
+            }
+        }
+        return result;
+    }
 
     public List<String> getActiveProfiles() {
         // for backwards compatibility with ASTs that were serialized before activeProfiles was added

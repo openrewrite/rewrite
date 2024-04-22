@@ -138,10 +138,9 @@ public class ResolvedPom {
      * @param ctx        An execution context containing any maven-specific requirements.
      * @param downloader A POM downloader to download dependencies and parents.
      * @return A new instance with dependencies re-resolved or the same instance if no resolved dependencies have changed.
-     * @throws MavenDownloadingException When problems are encountered downloading dependencies or parents.
      */
     @SuppressWarnings("DuplicatedCode")
-    public ResolvedPom resolve(ExecutionContext ctx, MavenPomDownloader downloader) throws MavenDownloadingException {
+    public ResolvedPom resolve(ExecutionContext ctx, MavenPomDownloader downloader) {
         ResolvedPom resolved = ResolvedPom.builder()
                 .requested(requested)
                 .activeProfiles(activeProfiles)
@@ -326,12 +325,12 @@ public class ResolvedPom {
         ExecutionContext ctx;
         MavenPomDownloader downloader;
 
-        public ResolvedPom resolve() throws MavenDownloadingException {
+        public ResolvedPom resolve() {
             resolveParentsRecursively(requested);
             return ResolvedPom.this;
         }
 
-        void resolveParentsRecursively(Pom requested) throws MavenDownloadingException {
+        void resolveParentsRecursively(Pom requested) {
             List<Pom> pomAncestry = new ArrayList<>();
             pomAncestry.add(requested);
 
@@ -360,7 +359,7 @@ public class ResolvedPom {
             resolveParentPluginsRecursively(new ArrayList<>(pomAncestry));
         }
 
-        private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
+        private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) {
             Pom pom = pomAncestry.get(0);
 
             //Resolve properties
@@ -394,7 +393,7 @@ public class ResolvedPom {
             }
         }
 
-        private void resolveParentDependenciesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
+        private void resolveParentDependenciesRecursively(List<Pom> pomAncestry) {
             Pom pom = pomAncestry.get(0);
 
             for (Profile profile : pom.getProfiles()) {
@@ -698,7 +697,7 @@ public class ResolvedPom {
             }
         }
 
-        private void mergeDependencyManagement(List<ManagedDependency> incomingDependencyManagement, Pom pom) throws MavenDownloadingException {
+        private void mergeDependencyManagement(List<ManagedDependency> incomingDependencyManagement, Pom pom) {
             if (!incomingDependencyManagement.isEmpty()) {
                 if (dependencyManagement == null || dependencyManagement.isEmpty()) {
                     dependencyManagement = new ArrayList<>();

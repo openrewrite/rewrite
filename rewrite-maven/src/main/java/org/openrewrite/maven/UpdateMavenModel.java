@@ -128,8 +128,13 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         try {
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
                     resolutionResult.getProjectPoms());
-            return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
-                    (original, ignored) -> updated));
+            MavenDownloadingExceptions exceptions = updated.getExceptions();
+            if(exceptions != null) {
+                return exceptions.warn(document);
+            } else {
+                return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
+                        (original, ignored) -> updated));
+            }
         } catch (MavenDownloadingExceptions e) {
             return e.warn(document);
         }
@@ -152,32 +157,17 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 .orElse(null);
     }
 
-    private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
+    private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) {
         MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
                 getResolutionResult().getActiveProfiles());
-
-        AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
-        try {
             ResolvedPom resolved = resolutionResult.getPom().resolve(ctx, downloader);
             MavenResolutionResult mrr = resolutionResult
                     .withPom(resolved)
                     .withModules(ListUtils.map(resolutionResult.getModules(), module -> {
-                        try {
                             return updateResult(ctx, module, projectPoms);
-                        } catch (MavenDownloadingExceptions e) {
-                            exceptions.set(MavenDownloadingExceptions.append(exceptions.get(), e));
-                            return module;
-                        }
+
                     }))
                     .resolveDependencies(downloader, ctx);
-            if (exceptions.get() != null) {
-                throw exceptions.get();
-            }
             return mrr;
-        } catch (MavenDownloadingExceptions e) {
-            throw MavenDownloadingExceptions.append(exceptions.get(), e);
-        } catch (MavenDownloadingException e) {
-            throw MavenDownloadingExceptions.append(exceptions.get(), e);
-        }
     }
 }

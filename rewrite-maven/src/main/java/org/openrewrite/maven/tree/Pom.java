@@ -92,6 +92,9 @@ public class Pom {
     List<Plugin> plugins = emptyList();
     @Builder.Default
     List<Plugin> pluginManagement = emptyList();
+    @Builder.Default
+    @Nullable
+    MavenDownloadingException exception = null;
 
     public String getGroupId() {
         return gav.getGroupId();

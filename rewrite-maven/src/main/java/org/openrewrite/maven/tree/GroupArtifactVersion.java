@@ -44,6 +44,10 @@ public class GroupArtifactVersion implements Serializable {
         return new GroupArtifact(groupId, artifactId);
     }
 
+    public ResolvedGroupArtifactVersion asResolvedGroupArtifactVersion() {
+        return new ResolvedGroupArtifactVersion(null, groupId, artifactId, version, null);
+    }
+
     public GroupArtifactVersion withGroupArtifact(GroupArtifact ga) {
         if(Objects.equals(ga.getGroupId(), groupId) && Objects.equals(ga.getArtifactId(), artifactId)) {
             return this;

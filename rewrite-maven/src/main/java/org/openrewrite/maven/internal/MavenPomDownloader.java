@@ -464,12 +464,16 @@ public class MavenPomDownloader {
     public Pom download(GroupArtifactVersion gav,
                         @Nullable String relativePath,
                         @Nullable ResolvedPom containingPom,
-                        List<MavenRepository> repositories) throws MavenDownloadingException {
+                        List<MavenRepository> repositories) {
         if (gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
             if (containingPom != null) {
                 ctx.getResolutionListener().downloadError(gav, emptyList(), containingPom.getRequested());
             }
-            throw new MavenDownloadingException("Group id, artifact id, or version are missing.", null, gav);
+            return Pom.builder()
+                    .gav(gav.asResolvedGroupArtifactVersion())
+                    .repositories(repositories)
+                    .exception(new MavenDownloadingException("Group id, artifact id, or version are missing.", null, gav))
+                    .build();
         }
 
         ctx.getResolutionListener().download(gav);
@@ -612,8 +616,12 @@ public class MavenPomDownloader {
         }
         ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
         sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
-        throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
-                .setRepositoryResponses(repositoryResponses);
+        return Pom.builder()
+                .gav(gav.asResolvedGroupArtifactVersion())
+                .repositories(repositories)
+                .exception(new MavenDownloadingException("Unable to download POM.", null, gav)
+                        .setRepositoryResponses(repositoryResponses))
+                .build();
     }
 
     /**
