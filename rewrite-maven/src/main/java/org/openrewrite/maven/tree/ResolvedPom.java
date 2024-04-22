@@ -22,6 +22,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Value;
@@ -43,6 +47,8 @@ import org.openrewrite.maven.tree.ManagedDependency.Imported;
 
 import java.util.*;
 import java.util.function.UnaryOperator;
+
+import org.openrewrite.maven.tree.Plugin.Execution;
 
 import static java.util.Collections.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -607,8 +613,50 @@ public class ResolvedPom {
             return ret;
         }
 
-        private List<Plugin.Execution> mergePluginExecutions(List<Plugin.Execution> executions, List<Plugin.Execution> incomingExecutions) {
-            return executions.isEmpty() ? incomingExecutions : executions; // TODO
+        private List<Plugin.Execution> mergePluginExecutions(final List<Plugin.Execution> executions, final List<Plugin.Execution> incomingExecutions) {
+            if (executions.isEmpty()) {
+                return incomingExecutions;
+            }
+            if (incomingExecutions.isEmpty()) {
+                return executions;
+            }
+            final Map<String, Plugin.Execution> currentExecutionsById = executions
+                    .stream()
+                    .collect(Collectors.toMap(Execution::getId, Function.identity()));
+            final List<Plugin.Execution> mergedExecutions = new ArrayList<>(executions);
+
+            for (final Plugin.Execution incomingExecution : incomingExecutions) {
+                final String executionId = incomingExecution.getId();
+                if (!currentExecutionsById.containsKey(executionId)) {
+                    mergedExecutions.add(incomingExecution);
+                } else {
+                    final Plugin.Execution currentExecution = currentExecutionsById.get(executionId);
+                    // GOALS
+                    final Set<String> mergedGoals = new HashSet<>(currentExecution.getGoals());
+                    mergedGoals.addAll(incomingExecution.getGoals());
+                    // PHASE
+                    String mergedPhase = currentExecution.getPhase();
+                    if (incomingExecution.getPhase() != null &&
+                        !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
+                        mergedPhase = incomingExecution.getPhase();
+                    }
+                    // CONFIGURATION
+                    final JsonNode mergedConfiguration = mergePluginConfigurations(
+                        currentExecution.getConfiguration(),
+                        incomingExecution.getConfiguration());
+                    // EXECUTION
+                    final Plugin.Execution mergedExecution = new Plugin.Execution(
+                            executionId,
+                            new ArrayList<>(mergedGoals),
+                            mergedPhase,
+                            incomingExecution.getInherited(),
+                        mergedConfiguration);
+
+                    mergedExecutions.remove(currentExecution);
+                    mergedExecutions.add(mergedExecution);
+                }
+            }
+            return mergedExecutions;
         }
 
         private Plugin mergePlugins(Plugin plugin, Plugin incoming) {
@@ -825,8 +873,8 @@ public class ResolvedPom {
                     }
 
                     if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
-                        (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
-                        (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
+                            (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
+                            (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
                         throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
                     }
 
@@ -881,7 +929,7 @@ public class ResolvedPom {
                         if (d.getExclusions() != null) {
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
-                                    matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
                                     if (resolved.getEffectiveExclusions().isEmpty()) {
                                         resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                     }
@@ -915,7 +963,7 @@ public class ResolvedPom {
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
         for (ResolvedDependency it : dependencies) {
             if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId()) &&
-                (Objects.equals(classifier, it.getClassifier()))) {
+                    (Objects.equals(classifier, it.getClassifier()))) {
                 return true;
             }
         }
