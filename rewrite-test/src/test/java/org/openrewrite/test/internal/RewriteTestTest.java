@@ -130,4 +130,3 @@ class RecipeWithDescriptionNotEndingWithPeriod extends Recipe {
         return "A fancy description";
     }
 }
-

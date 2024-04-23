@@ -231,4 +231,3 @@ class ChangeNamespaceValueTest implements RewriteTest {
         );
     }
 }
-
