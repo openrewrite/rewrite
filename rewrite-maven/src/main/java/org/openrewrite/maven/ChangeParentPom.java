@@ -36,6 +36,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -190,9 +191,10 @@ public class ChangeParentPom extends Recipe {
                             }
 
                             // Retain managed versions from the old parent that are not managed in the new parent
-                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, null, null);
-                            Pom newParentPom = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, null, resolvedPom.getRepositories());
-                            List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesWithoutExplicitVersions(resolvedPom);
+                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                            ResolvedPom newParent = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, resolvedPom, resolvedPom.getRepositories())
+                                    .resolve(emptyList(), mpd, ctx);
+                            List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, newParent);
                             for (ResolvedManagedDependency dep : dependenciesWithoutExplicitVersions) {
                                 changeParentTagVisitors.add(new AddManagedDependencyVisitor(
                                         dep.getGav().getGroupId(), dep.getGav().getArtifactId(), dep.getGav().getVersion(),
@@ -201,7 +203,7 @@ public class ChangeParentPom extends Recipe {
 
                             // Retain properties from the old parent that are not present in the new parent
                             Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), ctx);
-                            Map<String, String> newParentProps = newParentPom.getProperties();
+                            Map<String, String> newParentProps = newParent.getProperties();
                             for (Map.Entry<String, String> propInUse : propertiesInUse.entrySet()) {
                                 if(!newParentProps.containsKey(propInUse.getKey())) {
                                     changeParentTagVisitors.add(new UnconditionalAddProperty(propInUse.getKey(), propInUse.getValue()));
@@ -230,6 +232,11 @@ public class ChangeParentPom extends Recipe {
                                 doAfterVisit(new RemoveRedundantDependencyVersions(null, null, false, null).getVisitor());
                             }
                         } catch (MavenDownloadingException e) {
+                            for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
+                                MavenRepository repository = repositoryResponse.getKey();
+                                metadataFailures.insertRow(ctx, new MavenMetadataFailures.Row(targetGroupId, targetArtifactId, newVersion,
+                                        repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
+                            }
                             return e.warn(tag);
                         }
                     }
@@ -292,7 +299,9 @@ public class ChangeParentPom extends Recipe {
                             resolvedPom = getResolutionResult().getPom();
                         }
                         String propertyName = m.group(1).trim();
-                        properties.put(m.group(1).trim(), resolvedPom.getProperties().get(propertyName));
+                        if (resolvedPom.getProperties().containsKey(propertyName)) {
+                            properties.put(m.group(1).trim(), resolvedPom.getProperties().get(propertyName));
+                        }
                     }
                 }
                 return t;
@@ -301,17 +310,46 @@ public class ChangeParentPom extends Recipe {
         return properties;
     }
 
-    private static List<ResolvedManagedDependency> getDependenciesWithoutExplicitVersions(ResolvedPom resolvedPom) {
+    private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ResolvedPom newParent) {
+        ResolvedPom resolvedPom = mrr.getPom();
+
+        // Dependencies managed by the current pom's own dependency management are irrelevant to parent upgrade
+        List<ManagedDependency> locallyManaged = mrr.getPom().getRequested().getDependencyManagement();
 
         Set<GroupArtifactVersion> requestedWithoutExplicitVersion = resolvedPom.getRequested().getDependencies().stream()
                 .filter(dep -> dep.getVersion() == null)
+                // Dependencies explicitly managed by the current pom require no changes
+                .filter(dep -> locallyManaged.stream()
+                        .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getGroupId()) && localManagedDep.getArtifactId().equals(dep.getArtifactId())))
                 .map(dep -> new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), null))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        return resolvedPom.getDependencyManagement().stream()
+        if(requestedWithoutExplicitVersion.isEmpty()) {
+            return emptyList();
+        }
+
+        List<ResolvedManagedDependency> depsWithoutExplicitVersion = resolvedPom.getDependencyManagement().stream()
                 .filter(dep -> requestedWithoutExplicitVersion.contains(dep.getGav().withVersion(null)))
+                // Exclude dependencies managed by a bom imported by the current pom
+                .filter(dep -> dep.getBomGav() == null || locallyManaged.stream()
+                        .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getBomGav().getGroupId()) && localManagedDep.getArtifactId().equals(dep.getBomGav().getArtifactId())))
                 .collect(Collectors.toList());
+
+        if(depsWithoutExplicitVersion.isEmpty()) {
+            return emptyList();
+        }
+
+        // Remove from the list any that would still be managed under the new parent
+        Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
+                .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
+                .collect(Collectors.toSet());
+
+        depsWithoutExplicitVersion = depsWithoutExplicitVersion.stream()
+                .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))
+                .collect(Collectors.toList());
+        return depsWithoutExplicitVersion;
     }
+
 
 
     @Value

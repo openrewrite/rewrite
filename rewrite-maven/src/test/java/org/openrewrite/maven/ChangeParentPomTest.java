@@ -1274,4 +1274,195 @@ class ChangeParentPomTest implements RewriteTest {
             """)
         );
     }
+
+    @Test
+    void shouldNotAddToDependencyManagement() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom("org.jenkins-ci.plugins", "org.jenkins-ci.plugins", "plugin", "plugin", "4.81", null, null, null, null)),
+          // language=xml
+          pomXml(
+          """
+            <project>
+                <artifactId>example</artifactId>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                    <groupId>org.jenkins-ci.plugins</groupId>
+                    <artifactId>plugin</artifactId>
+                    <version>4.75</version>
+                    <relativePath/>
+                </parent>
+                <properties>
+                    <jenkins.version>2.387.3</jenkins.version>
+                </properties>
+                <repositories>
+                    <repository>
+                        <id>repo.jenkins-ci.org</id>
+                        <url>https://repo.jenkins-ci.org/public/</url>
+                    </repository>
+                </repositories>
+                <pluginRepositories>
+                    <pluginRepository>
+                        <id>repo.jenkins-ci.org</id>
+                        <url>https://repo.jenkins-ci.org/public/</url>
+                    </pluginRepository>
+                </pluginRepositories>
+                <dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.jenkins.tools.bom</groupId>
+                          <artifactId>bom-2.387.x</artifactId>
+                          <version>2516.v113cb_3d00317</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                      </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.jenkins-ci.plugins</groupId>
+                        <artifactId>junit</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+            """,
+          """
+            <project>
+                <artifactId>example</artifactId>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                    <groupId>org.jenkins-ci.plugins</groupId>
+                    <artifactId>plugin</artifactId>
+                    <version>4.81</version>
+                    <relativePath/>
+                </parent>
+                <properties>
+                    <jenkins.version>2.387.3</jenkins.version>
+                </properties>
+                <repositories>
+                    <repository>
+                        <id>repo.jenkins-ci.org</id>
+                        <url>https://repo.jenkins-ci.org/public/</url>
+                    </repository>
+                </repositories>
+                <pluginRepositories>
+                    <pluginRepository>
+                        <id>repo.jenkins-ci.org</id>
+                        <url>https://repo.jenkins-ci.org/public/</url>
+                    </pluginRepository>
+                </pluginRepositories>
+                <dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.jenkins.tools.bom</groupId>
+                          <artifactId>bom-2.387.x</artifactId>
+                          <version>2516.v113cb_3d00317</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                      </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.jenkins-ci.plugins</groupId>
+                        <artifactId>junit</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+            """
+        ));
+    }
+
+    @Test
+    void doesNotAddMavenDefaultProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
+          pomXml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.17</version>
+                </parent>
+                
+                <properties>
+                  <my-cool-prop>${project.build.directory}</my-cool-prop>
+                </properties>
+              </project>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                </parent>
+                
+                <properties>
+                  <my-cool-prop>${project.build.directory}</my-cool-prop>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotAddGrandparentProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
+          pomXml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.17</version>
+                </parent>
+                
+                <properties>
+                  <my-cool-prop>${junit.version}</my-cool-prop>
+                </properties>
+              </project>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                </parent>
+                
+                <properties>
+                  <my-cool-prop>${junit.version}</my-cool-prop>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
 }

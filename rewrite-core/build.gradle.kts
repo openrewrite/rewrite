@@ -6,6 +6,7 @@ dependencies {
     api("org.openrewrite.tools:jgit:latest.release")
     implementation("org.openrewrite.tools:java-object-diff:latest.release")
     implementation("io.quarkus.gizmo:gizmo:1.0.+")
+    api("com.fasterxml.jackson.core:jackson-core")
     api("com.fasterxml.jackson.core:jackson-databind")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
     api("com.fasterxml.jackson.module:jackson-module-parameter-names")

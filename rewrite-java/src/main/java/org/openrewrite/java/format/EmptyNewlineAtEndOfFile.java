@@ -46,7 +46,7 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-113");
+        return Collections.singleton("RSPEC-S113");
     }
 
     @Override

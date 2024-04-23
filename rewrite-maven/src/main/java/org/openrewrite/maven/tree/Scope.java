@@ -132,4 +132,32 @@ public enum Scope {
             return scope2;
         }
     }
+
+    /**
+     * It is sometimes convenient for recipes that operate on both Gradle and Maven files to translate a Maven scope
+     * into a Gradle dependency configuration with a similar meaning.
+     * Gradle dependency configurations are more varied and have different semantics than Maven scopes, so this should
+     * be used deliberately and in contexts sufficiently general that the differences are not important.
+     */
+    @SuppressWarnings("unused")
+    @Nullable
+    public static String asGradleConfigurationName(@Nullable Scope scope) {
+        if(scope == null) {
+            return null;
+        }
+        switch (scope) {
+            case Compile:
+                return "implementation";
+            case Provided:
+                return "compileOnly";
+            case Runtime:
+                return "runtimeOnly";
+            case Test:
+                return "testImplementation";
+            case System:
+                return "system";
+            default:
+                return null;
+        }
+    }
 }
