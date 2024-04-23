@@ -57,7 +57,7 @@ public class EqualsMethodUsage extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-6519");
+        return Collections.singleton("RSPEC-S6519");
     }
 
     @Override

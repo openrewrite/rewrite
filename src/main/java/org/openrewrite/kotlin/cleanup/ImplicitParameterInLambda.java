@@ -54,7 +54,7 @@ public class ImplicitParameterInLambda extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-6558");
+        return Collections.singleton("RSPEC-S6558");
     }
 
     @Override
