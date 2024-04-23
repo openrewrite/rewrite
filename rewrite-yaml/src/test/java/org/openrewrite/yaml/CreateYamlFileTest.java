@@ -20,10 +20,17 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.remote.RemoteArtifactCache;
+import org.openrewrite.remote.RemoteExecutionContextView;
 import org.openrewrite.test.MockHttpSender;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.net.URI;
+import java.nio.file.Path;
+import java.util.function.Consumer;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -137,6 +144,17 @@ class CreateYamlFileTest implements RewriteTest {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(e -> e.printStackTrace());
         HttpSenderExecutionContextView.view(ctx).setLargeFileHttpSender(new MockHttpSender(() ->
           new ByteArrayInputStream(yamlContent.getBytes())));
+        RemoteExecutionContextView.view(ctx).setArtifactCache(new RemoteArtifactCache() {
+            @Override
+            public @Nullable Path get(URI uri) {
+                return null;
+            }
+
+            @Override
+            public @Nullable Path put(URI uri, InputStream is, Consumer<Throwable> onError) {
+                return null;
+            }
+        });
         rewriteRun(
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
