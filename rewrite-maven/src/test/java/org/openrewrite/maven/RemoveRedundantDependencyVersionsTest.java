@@ -16,6 +16,8 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
@@ -30,7 +32,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveRedundantDependencyVersions(null, null, null, null));
+        spec.recipe(new RemoveRedundantDependencyVersions(null, null, null, null, null));
     }
 
     @Test
@@ -952,7 +954,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void onlyIfVersionsMatchFalse() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
           pomXml(
             """
               <project>
@@ -1016,7 +1018,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void except() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, Collections.singletonList("org.junit.jupiter:junit-jupiter-api"))),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null,
+                  Collections.singletonList("org.junit.jupiter:junit-jupiter-api"))),
           pomXml(
             """
               <project>
@@ -1092,7 +1095,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3268")
     void unmanagedDependencyOnlyIfVersionsMatchFalse() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
           pomXml(
             """
               <project>
@@ -1116,7 +1119,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
     void removeRedundantVersionsFromPluginsManagedByParent() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
           pomXml(
             """
               <project>
@@ -1171,7 +1174,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
     void noChangesIfManagedPluginVersionDoesNotMatch() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, true, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, true, null, null)),
           pomXml(
             """
               <project>
@@ -1203,7 +1206,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void doesNotDowngradeVersion() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
           pomXml(
             """
               <project>
@@ -1236,7 +1239,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void allowUpgradeOfManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
           pomXml(
             """
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1292,7 +1295,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void propertySubstitution() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
           pomXml("""
             <project>
                 <parent>
@@ -1318,6 +1321,85 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                 </build>
             </project>
             """)
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({ "gt,2.5.0", "gte,2.5.0", "any,2.5.0", "eq,2.5.1", "lte,2.5.1", "gte,2.5.1", "any,2.5.1", "lt,2.5.2", "lte,2.5.2", "any,2.5.2" })
+    void onlyIfManagedVersionIs_removals(String comparator, String projectVersion) {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, null, comparator, null)),
+          pomXml(
+            String.format("""
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>2.5.1</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>acme</artifactId>
+                    <version>0.0.1-SNAPSHOT</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-web</artifactId>
+                            <version>%s</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """, projectVersion),
+            """
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>2.5.1</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>acme</artifactId>
+                    <version>0.0.1-SNAPSHOT</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-web</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({ "lt,2.5.0", "lte,2.5.0", "eq,2.5.0", "lt,2.5.1", "gt,2.5.1", "gt,2.5.2", "gte,2.5.2", "eq,2.5.2" })
+    void onlyIfManagedVersionIs_nonremovals(String comparator, String projectVersion) {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, null, comparator, null)),
+          pomXml(
+            String.format("""
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>2.5.1</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>acme</artifactId>
+                    <version>0.0.1-SNAPSHOT</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-web</artifactId>
+                            <version>%s</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """, projectVersion)
+          )
         );
     }
 }
