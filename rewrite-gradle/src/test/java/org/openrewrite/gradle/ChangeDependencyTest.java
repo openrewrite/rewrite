@@ -243,7 +243,7 @@ class ChangeDependencyTest implements RewriteTest {
           )
         );
     }
-    
+
     @Test
     void doNotPinWhenNotVersioned() {
         rewriteRun(
@@ -357,40 +357,41 @@ class ChangeDependencyTest implements RewriteTest {
               """)
         );
     }
+
     @Test
     void handleProvidedCompileConfiguration() {
-       rewriteRun(
-         spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
-         buildGradle(
-           """
-             plugins {
-                 id "war"
-             }
-             
-             repositories {
-                 mavenCentral()
-             }
-             
-             dependencies {
-                 providedCompile "commons-lang:commons-lang:2.6"
-                 implementation group: "commons-lang", name: "commons-lang", version: "2.6"
-             }
-             """,
-           """
-             plugins {
-                 id "war"
-             }
-             
-             repositories {
-                 mavenCentral()
-             }
-             
-             dependencies {
-                 providedCompile "org.apache.commons:commons-lang3:3.11"
-                 implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
-             }
-             """
-         )
-       );
-    }    
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "war"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  providedCompile "commons-lang:commons-lang:2.6"
+                  implementation group: "commons-lang", name: "commons-lang", version: "2.6"
+              }
+              """,
+            """
+              plugins {
+                  id "war"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  providedCompile "org.apache.commons:commons-lang3:3.11"
+                  implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
+              }
+              """
+          )
+        );
+    }
 }
