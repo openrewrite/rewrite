@@ -100,14 +100,11 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
         return new YamlVisitor<ExecutionContext>() {
             @Override
             public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                @Language("yml") String yamlContents = fileContents;
-                if (yamlContents == null && fileContentsUrl != null) {
-                    yamlContents = Checksum.sha256(Remote.builder(
-                            path,
-                            URI.create(fileContentsUrl)
-                    ).build(), ctx).printAll();
-                }
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(documents.getSourcePath())) {
+                    @Language("yml") String yamlContents = fileContents;
+                    if (yamlContents == null && fileContentsUrl != null) {
+                        yamlContents = Remote.builder(path, URI.create(fileContentsUrl)).build().printAll();
+                    }
                     if (StringUtils.isBlank(yamlContents)) {
                         return documents.withDocuments(emptyList());
                     }

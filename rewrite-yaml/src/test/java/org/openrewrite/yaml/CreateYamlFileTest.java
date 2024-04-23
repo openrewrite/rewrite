@@ -159,6 +159,7 @@ class CreateYamlFileTest implements RewriteTest {
 
     @Test
     void shouldUseFileContentsWhenContentsAndContentsUrlNotNull() {
+        @Language("yml")
         String fileContents = """
           # This is a comment
           x:
