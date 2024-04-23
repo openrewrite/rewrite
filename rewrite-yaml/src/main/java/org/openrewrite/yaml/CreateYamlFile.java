@@ -103,7 +103,7 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(documents.getSourcePath())) {
                     @Language("yml") String yamlContents = fileContents;
                     if (yamlContents == null && fileContentsUrl != null) {
-                        yamlContents = Remote.builder(path, URI.create(fileContentsUrl)).build().printAll();
+                        yamlContents = Remote.builder(path, URI.create(fileContentsUrl)).build().printAll(ctx);
                     }
                     if (StringUtils.isBlank(yamlContents)) {
                         return documents.withDocuments(emptyList());
