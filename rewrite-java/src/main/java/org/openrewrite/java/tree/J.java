@@ -4060,7 +4060,7 @@ public interface J extends Tree {
 
         /**
          * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
-         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-1124">JLS</a>.
+         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-S1124">JLS</a>.
          */
         public enum Type {
             Default,
