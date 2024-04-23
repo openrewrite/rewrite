@@ -22,10 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Value;
@@ -44,11 +40,12 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.VersionRequirement;
 import org.openrewrite.maven.tree.ManagedDependency.Defined;
 import org.openrewrite.maven.tree.ManagedDependency.Imported;
+import org.openrewrite.maven.tree.Plugin.Execution;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
-
-import org.openrewrite.maven.tree.Plugin.Execution;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -613,27 +610,31 @@ public class ResolvedPom {
             return ret;
         }
 
-        private List<Plugin.Execution> mergePluginExecutions(final List<Plugin.Execution> executions, final List<Plugin.Execution> incomingExecutions) {
-            if (executions.isEmpty()) {
+        private List<Plugin.Execution> mergePluginExecutions(List<Plugin.Execution> currentExecutions, List<Plugin.Execution> incomingExecutions) {
+            if (currentExecutions.isEmpty()) {
                 return incomingExecutions;
             }
             if (incomingExecutions.isEmpty()) {
-                return executions;
+                return currentExecutions;
             }
-            final Map<String, Plugin.Execution> currentExecutionsById = executions
-                    .stream()
+            Map<String, Plugin.Execution> currentExecutionsById = currentExecutions.stream()
                     .collect(Collectors.toMap(Execution::getId, Function.identity()));
-            final List<Plugin.Execution> mergedExecutions = new ArrayList<>(executions);
+            List<Plugin.Execution> mergedExecutions = new ArrayList<>(currentExecutions);
 
-            for (final Plugin.Execution incomingExecution : incomingExecutions) {
-                final String executionId = incomingExecution.getId();
+            for (Plugin.Execution incomingExecution : incomingExecutions) {
+                String executionId = incomingExecution.getId();
                 if (!currentExecutionsById.containsKey(executionId)) {
                     mergedExecutions.add(incomingExecution);
                 } else {
-                    final Plugin.Execution currentExecution = currentExecutionsById.get(executionId);
+                    Plugin.Execution currentExecution = currentExecutionsById.get(executionId);
                     // GOALS
-                    final Set<String> mergedGoals = new HashSet<>(currentExecution.getGoals());
-                    mergedGoals.addAll(incomingExecution.getGoals());
+                    Set<String> mergedGoals = new HashSet<>();
+                    if (currentExecution.getGoals() != null) {
+                        mergedGoals.addAll(currentExecution.getGoals());
+                    }
+                    if (incomingExecution.getGoals() != null) {
+                        mergedGoals.addAll(incomingExecution.getGoals());
+                    }
                     // PHASE
                     String mergedPhase = currentExecution.getPhase();
                     if (incomingExecution.getPhase() != null &&
@@ -641,16 +642,16 @@ public class ResolvedPom {
                         mergedPhase = incomingExecution.getPhase();
                     }
                     // CONFIGURATION
-                    final JsonNode mergedConfiguration = mergePluginConfigurations(
-                        currentExecution.getConfiguration(),
-                        incomingExecution.getConfiguration());
+                    JsonNode mergedConfiguration = mergePluginConfigurations(
+                            currentExecution.getConfiguration(),
+                            incomingExecution.getConfiguration());
                     // EXECUTION
-                    final Plugin.Execution mergedExecution = new Plugin.Execution(
+                    Plugin.Execution mergedExecution = new Plugin.Execution(
                             executionId,
                             new ArrayList<>(mergedGoals),
                             mergedPhase,
                             incomingExecution.getInherited(),
-                        mergedConfiguration);
+                            mergedConfiguration);
 
                     mergedExecutions.remove(currentExecution);
                     mergedExecutions.add(mergedExecution);
@@ -873,8 +874,8 @@ public class ResolvedPom {
                     }
 
                     if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
-                            (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
-                            (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
+                        (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
+                        (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
                         throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
                     }
 
@@ -929,7 +930,7 @@ public class ResolvedPom {
                         if (d.getExclusions() != null) {
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
-                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                    matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
                                     if (resolved.getEffectiveExclusions().isEmpty()) {
                                         resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                     }
@@ -963,7 +964,7 @@ public class ResolvedPom {
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
         for (ResolvedDependency it : dependencies) {
             if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId()) &&
-                    (Objects.equals(classifier, it.getClassifier()))) {
+                (Objects.equals(classifier, it.getClassifier()))) {
                 return true;
             }
         }
