@@ -30,6 +30,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -142,9 +143,17 @@ class CreateYamlFileTest implements RewriteTest {
             z: y
           """;
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(e -> e.printStackTrace());
-        HttpSenderExecutionContextView.view(ctx).setLargeFileHttpSender(new MockHttpSender(() ->
-          new ByteArrayInputStream(yamlContent.getBytes())));
+        MockHttpSender httpSender = new MockHttpSender(() ->
+          new ByteArrayInputStream(yamlContent.getBytes()));
+        HttpSenderExecutionContextView.view(ctx)
+          .setHttpSender(httpSender)
+          .setLargeFileHttpSender(httpSender);
         RemoteExecutionContextView.view(ctx).setArtifactCache(new RemoteArtifactCache() {
+            @Override
+            public @Nullable Path compute(URI uri, Callable<@Nullable InputStream> artifactStream, Consumer<Throwable> onError) {
+                return null;
+            }
+
             @Override
             public @Nullable Path get(URI uri) {
                 return null;
@@ -156,12 +165,15 @@ class CreateYamlFileTest implements RewriteTest {
             }
         });
         rewriteRun(
-          spec -> spec.recipe(new CreateYamlFile(
-            "test/test.yaml",
-            null,
-            "http://fake.url/test.yaml",
-            true)
-          ),
+          spec -> spec
+            .executionContext(ctx)
+            .recipeExecutionContext(ctx)
+            .recipe(new CreateYamlFile(
+              "test/test.yaml",
+              null,
+              "http://fake.url/test.yaml",
+              true)
+            ),
           yaml(
             null,
             yamlContent,
