@@ -59,7 +59,7 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-1128");
+        return Collections.singleton("RSPEC-S1128");
     }
 
     @Override

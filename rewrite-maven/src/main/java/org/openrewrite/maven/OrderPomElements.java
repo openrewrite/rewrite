@@ -39,7 +39,7 @@ public class OrderPomElements extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-3423");
+        return Collections.singleton("RSPEC-S3423");
     }
 
     @Override
