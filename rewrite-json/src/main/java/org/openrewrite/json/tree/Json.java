@@ -141,6 +141,7 @@ public interface Json extends Tree {
         Markers markers;
 
         @Nullable // for backwards compatibility
+        @Getter
         @With(AccessLevel.PRIVATE)
         String charsetName;
 
