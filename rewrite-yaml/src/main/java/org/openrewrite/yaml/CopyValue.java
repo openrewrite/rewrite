@@ -95,9 +95,9 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
             final JsonPathMatcher oldPathMatcher = new JsonPathMatcher(oldKeyPath);
 
             @Override
-            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
+            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
                 if(acc.snippet == null) {
-                    return super.visitDocuments(documents, executionContext);
+                    return super.visitDocuments(documents, ctx);
                 }
                 return documents;
             }

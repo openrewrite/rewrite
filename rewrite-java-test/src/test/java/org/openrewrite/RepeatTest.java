@@ -43,8 +43,8 @@ public class RepeatTest implements RewriteTest {
 
     static class VerifyCursorWellFormedInRepeat extends JavaVisitor<ExecutionContext> {
         @Override
-        public J preVisit(J tree, ExecutionContext executionContext) {
-            return (J) Repeat.repeatUntilStable(new VerifyCursorWellFormed<>()).visitNonNull(tree, executionContext, getCursor().getParentTreeCursor());
+        public J preVisit(J tree, ExecutionContext ctx) {
+            return (J) Repeat.repeatUntilStable(new VerifyCursorWellFormed<>()).visitNonNull(tree, ctx, getCursor().getParentTreeCursor());
         }
     }
 
@@ -83,8 +83,8 @@ public class RepeatTest implements RewriteTest {
 
     static class VisitorThatFailsToSetCursor extends JavaVisitor<ExecutionContext> {
         @Override
-        public @Nullable J preVisit(J tree, ExecutionContext executionContext) {
-            return (J) Repeat.repeatUntilStable(new JavaVisitor<>()).visitNonNull(tree, executionContext);
+        public @Nullable J preVisit(J tree, ExecutionContext ctx) {
+            return (J) Repeat.repeatUntilStable(new JavaVisitor<>()).visitNonNull(tree, ctx);
         }
     }
 

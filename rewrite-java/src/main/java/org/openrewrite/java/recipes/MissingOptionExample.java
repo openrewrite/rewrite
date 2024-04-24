@@ -40,8 +40,8 @@ public class MissingOptionExample extends Recipe {
         return Preconditions.check(new UsesType<>("org.openrewrite.Option", false),
                 new JavaIsoVisitor<ExecutionContext>() {
                     @Override
-                    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
-                        J.Annotation an = super.visitAnnotation(annotation, executionContext);
+                    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                        J.Annotation an = super.visitAnnotation(annotation, ctx);
                         if (!TypeUtils.isOfClassType(annotation.getType(), "org.openrewrite.Option") || an.getArguments() == null) {
                             return an;
                         }
