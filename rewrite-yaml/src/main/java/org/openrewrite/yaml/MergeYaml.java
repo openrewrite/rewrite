@@ -161,6 +161,9 @@ public class MergeYaml extends Recipe {
                     Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
                             Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visitNonNull(entry.getValue(),
                             ctx, getCursor());
+                    if (value instanceof Yaml.Scalar && value.getPrefix().isEmpty()) {
+                        value = value.withPrefix(" ");
+                    }
                     return entry.withValue(value);
                 }
                 return super.visitMappingEntry(entry, ctx);
