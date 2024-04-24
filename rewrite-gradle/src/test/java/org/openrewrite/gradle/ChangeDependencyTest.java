@@ -359,7 +359,7 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void handleProvidedCompileConfiguration() {
+    void warPluginProvidedConfigurations() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
           buildGradle(
@@ -374,6 +374,7 @@ class ChangeDependencyTest implements RewriteTest {
               
               dependencies {
                   providedCompile "commons-lang:commons-lang:2.6"
+                  providedRuntime "commons-lang:commons-lang:2.6"
                   implementation group: "commons-lang", name: "commons-lang", version: "2.6"
               }
               """,
@@ -388,6 +389,7 @@ class ChangeDependencyTest implements RewriteTest {
               
               dependencies {
                   providedCompile "org.apache.commons:commons-lang3:3.11"
+                  providedRuntime "org.apache.commons:commons-lang3:3.11"
                   implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
               }
               """

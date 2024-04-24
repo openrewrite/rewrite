@@ -52,6 +52,8 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency implementation(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency providedCompile(Object... dependencyNotation)
     Dependency providedCompile(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency providedRuntime(Object... dependencyNotation)
+    Dependency providedRuntime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency runtime(Object... dependencyNotation)
     Dependency runtime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency runtimeOnly(Object... dependencyNotation)
