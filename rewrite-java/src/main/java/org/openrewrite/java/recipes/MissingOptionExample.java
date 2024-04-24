@@ -16,15 +16,18 @@
 package org.openrewrite.java.recipes;
 
 import org.openrewrite.*;
+import org.openrewrite.java.AddOrUpdateAnnotationAttribute;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.SearchResult;
 
 public class MissingOptionExample extends Recipe {
+
+    private static final String ORG_OPENREWRITE_OPTION = "org.openrewrite.Option";
+
     @Override
     public String getDisplayName() {
         return "Find missing `@Option` `example` values";
@@ -37,12 +40,12 @@ public class MissingOptionExample extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesType<>("org.openrewrite.Option", false),
+        return Preconditions.check(new UsesType<>(ORG_OPENREWRITE_OPTION, false),
                 new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                         J.Annotation an = super.visitAnnotation(annotation, ctx);
-                        if (!TypeUtils.isOfClassType(annotation.getType(), "org.openrewrite.Option") || an.getArguments() == null) {
+                        if (!TypeUtils.isOfClassType(annotation.getType(), ORG_OPENREWRITE_OPTION) || an.getArguments() == null) {
                             return an;
                         }
 
@@ -77,7 +80,8 @@ public class MissingOptionExample extends Recipe {
                             }
                         }
 
-                        return SearchResult.found(an, "Missing example value for documentation");
+                        AddOrUpdateAnnotationAttribute addOrUpdateAnnotationAttribute = new AddOrUpdateAnnotationAttribute(ORG_OPENREWRITE_OPTION, "example", "TODO Provide a usage example for the docs", true);
+                        return (J.Annotation) addOrUpdateAnnotationAttribute.getVisitor().visitNonNull(an, ctx, getCursor().getParent());
                     }
                 });
     }
