@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
@@ -139,18 +140,59 @@ class JavaTemplateMatchTest implements RewriteTest {
               class Test {
                   boolean b1 = 1 == 2;
                   boolean b2 = 1 == 3;
-
+              
                   boolean b3 = 2 == 1;
               }
               """,
             """
               import java.util.Objects;
-
+              
               class Test {
                   boolean b1 = Objects.equals(2, 1);
                   boolean b2 = Objects.equals(3, 1);
-
+              
                   boolean b3 = 2 == 1;
+              }
+              """
+          ));
+    }
+
+    @Test
+    void matchNewClassFromThirdPartyLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate template = JavaTemplate.builder("#{any(com.azure.cosmos.CosmosClientBuilder)}.endpoint(\"boo\").userAgentSuffix(\"test\").buildAsyncClient()")
+                .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+                .build();
+              final JavaTemplate replacement = JavaTemplate.builder("\"\"")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  JavaTemplate.Matcher matcher = template.matcher(getCursor());
+                  if(matcher.find()) {
+                      return replacement.apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, executionContext);
+              }
+          }))
+            .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+          ,
+          java(
+            """
+              import com.azure.cosmos.CosmosClientBuilder;
+              import com.azure.cosmos.CosmosAsyncClient;
+              
+              class Test {
+                  Object o = new CosmosClientBuilder().endpoint("boo").userAgentSuffix("test").buildAsyncClient();
+              }
+              """,
+            """
+              import com.azure.cosmos.CosmosClientBuilder;
+              import com.azure.cosmos.CosmosAsyncClient;
+              
+              class Test {
+                  Object o = "";
               }
               """
           ));

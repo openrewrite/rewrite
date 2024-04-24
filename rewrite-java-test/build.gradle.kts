@@ -19,6 +19,7 @@ dependencies {
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
     testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
+    testRuntimeOnly("com.azure:azure-cosmos:4.53.3-hotfix")
     testRuntimeOnly(project(":rewrite-yaml"))
     testImplementation(project(":rewrite-maven"))
 }
