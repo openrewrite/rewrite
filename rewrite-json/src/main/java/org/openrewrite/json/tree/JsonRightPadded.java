@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Data
-public class JsonRightPadded<T> {
+public class JsonRightPadded<T extends Json> {
     @With
     T element;
 
@@ -52,7 +52,7 @@ public class JsonRightPadded<T> {
         return withElement(map.apply(element));
     }
 
-    public static <T> List<T> getElements(List<JsonRightPadded<T>> ls) {
+    public static <T extends Json> List<T> getElements(List<JsonRightPadded<T>> ls) {
         List<T> list = new ArrayList<>();
         for (JsonRightPadded<T> l : ls) {
             T elem = l.getElement();
@@ -92,7 +92,7 @@ public class JsonRightPadded<T> {
         return after;
     }
 
-    public static <T> JsonRightPadded<T> build(T element) {
+    public static <T extends Json> JsonRightPadded<T> build(T element) {
         return new JsonRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
     }
 
