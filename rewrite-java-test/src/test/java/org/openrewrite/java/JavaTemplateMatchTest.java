@@ -162,7 +162,7 @@ class JavaTemplateMatchTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final JavaTemplate template = JavaTemplate.builder("#{any(com.azure.cosmos.CosmosClientBuilder)}.endpoint(\"boo\").userAgentSuffix(\"test\").buildAsyncClient()")
-                .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+                .javaParser(JavaParser.fromJavaVersion().classpath("azure-cosmos"))
                 .build();
               final JavaTemplate replacement = JavaTemplate.builder("\"\"")
                 .build();
