@@ -57,12 +57,16 @@ public interface JavaParser extends Parser {
      */
     String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.java.skipSourceSetTypeGeneration";
 
+    List<Path> runtimeClasspath = new ArrayList<>();
     static List<Path> runtimeClasspath() {
-        return new ClassGraph()
-                .disableNestedJarScanning()
-                .getClasspathURIs().stream()
-                .filter(uri -> "file".equals(uri.getScheme()))
-                .map(Paths::get).collect(toList());
+        if(runtimeClasspath.isEmpty()) {
+            runtimeClasspath.addAll(new ClassGraph()
+                    .disableNestedJarScanning()
+                    .getClasspathURIs().stream()
+                    .filter(uri -> "file".equals(uri.getScheme()))
+                    .map(Paths::get).collect(toList()));
+        }
+        return runtimeClasspath;
     }
 
     /**
