@@ -94,13 +94,13 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     final Boolean addIfMissing;
 
     @Getter
-    @Option(displayName = "Wrapper URI",
-            description = "The URI of the Gradle wrapper distribution. " +
-                          "Lookup of available versions still requires access to https://services.gradle.org " +
-                          "When this is specified the exact literal values supplied for `version` and `distribution` " +
-                          "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively. " +
-                          "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
-            required = false)
+            @Option(example = "TODO Provide a usage example for the docs", displayName = "Wrapper URI",
+                    description = "The URI of the Gradle wrapper distribution. " +
+                            "Lookup of available versions still requires access to https://services.gradle.org " +
+                            "When this is specified the exact literal values supplied for `version` and `distribution` " +
+                            "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively. " +
+                            "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
+                    required = false)
     @Nullable
     final String wrapperUri;
 
@@ -171,7 +171,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             acc.needsWrapperUpdate = true;
                             acc.updatedMarker = buildTool.withVersion(gradleWrapper.getVersion());
                             return true;
-                        } else return compare == 0;
+                        } else {
+                            return compare == 0;
+                        }
                     }
 
                     @Override

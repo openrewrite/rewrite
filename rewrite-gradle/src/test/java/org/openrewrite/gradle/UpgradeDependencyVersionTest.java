@@ -762,18 +762,18 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           ),
           buildGradle(
             """
-                plugins {
-                    id 'java'
-                }
-                
-                repositories {
-                    mavenCentral()
-                }
-                
-                dependencies {
-                    implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
-                    implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
-                }
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
+                  implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
+              }
               """
           )
         );
@@ -792,18 +792,18 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           ),
           buildGradle(
             """
-                plugins {
-                    id 'java'
-                }
-                
-                repositories {
-                    mavenCentral()
-                }
-                
-                dependencies {
-                    implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
-                    implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
-                }
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
+                  implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
+              }
               """
           )
         );

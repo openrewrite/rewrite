@@ -91,7 +91,7 @@ class FindPluginTest implements RewriteTest {
     }
 
     @Test
-    void testMultiModulePrecondition() throws URISyntaxException {
+    void multiModulePrecondition() throws URISyntaxException {
         rewriteRun(
           spec ->  spec.recipeFromYaml("""
             ---

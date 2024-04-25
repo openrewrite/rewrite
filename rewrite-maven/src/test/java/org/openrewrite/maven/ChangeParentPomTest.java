@@ -1000,7 +1000,8 @@ class ChangeParentPomTest implements RewriteTest {
                 "spring-boot-dependencies", "spring-boot-dependencies",
                 "3.2.4",
                 null, null, null, null)),
-              pomXml("""
+              pomXml(
+                    """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>com.mycompany</groupId>
@@ -1054,7 +1055,8 @@ class ChangeParentPomTest implements RewriteTest {
                 "spring-boot-dependencies", "spring-boot-dependencies",
                 "3.2.4",
                 null, null, null, null)),
-              pomXml("""
+              pomXml(
+                    """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>com.mycompany</groupId>
@@ -1234,7 +1236,8 @@ class ChangeParentPomTest implements RewriteTest {
           spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", "org.springframework.boot",
             "spring-boot-starter-parent", "spring-boot-starter-parent",
             "2.3.12.RELEASE", null, null, null, null)),
-          pomXml("""
+          pomXml(
+                """
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
                 <parent>

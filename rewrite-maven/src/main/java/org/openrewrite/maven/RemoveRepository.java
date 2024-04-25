@@ -32,13 +32,13 @@ public class RemoveRepository extends Recipe {
     private static final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/repositories/repository");
     private static final XPathMatcher PLUGIN_REPOS_MATCHER = new XPathMatcher("/project/pluginRepositories/pluginRepository");
 
-    @Option(displayName = "Repository ID",
+    @Option(example = "TODO Provide a usage example for the docs", displayName = "Repository ID",
             description = "A unique repository ID.",
             required = false)
     @Nullable
     String id;
 
-    @Option(displayName = "Repository URL",
+    @Option(example = "TODO Provide a usage example for the docs", displayName = "Repository URL",
             description = "The URL of the repository.")
     String url;
 

@@ -38,7 +38,8 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     void doNothingIfStringLiteralNotFound() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
-          java("""
+          java(
+                """
             package org.openrewrite.java;
                             
             class Test {

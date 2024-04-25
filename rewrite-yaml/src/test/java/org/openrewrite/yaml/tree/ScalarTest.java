@@ -64,7 +64,8 @@ class ScalarTest implements RewriteTest {
     @Test
     void loneScalar() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
             foo # look mom, no mapping
             """, spec -> spec.afterRecipe(documents -> {
                 Yaml.Block maybeScalar = documents.getDocuments().get(0).getBlock();

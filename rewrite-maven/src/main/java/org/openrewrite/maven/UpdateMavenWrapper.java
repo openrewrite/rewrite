@@ -197,7 +197,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             acc.needsWrapperUpdate = true;
                             acc.updatedMarker = buildTool.withVersion(mavenWrapper.getDistributionVersion());
                             return true;
-                        } else return compare == 0;
+                        } else {
+                            return compare == 0;
+                        }
                     }
 
                     @Override
