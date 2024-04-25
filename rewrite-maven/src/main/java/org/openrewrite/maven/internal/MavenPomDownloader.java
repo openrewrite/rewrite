@@ -285,7 +285,7 @@ public class MavenPomDownloader {
                         if (derivedMeta != null) {
                             Counter.builder("rewrite.maven.derived.metadata")
                                     .tag("repositoryUri", repo.getUri())
-                                    .tag("group", gav.getGroupId())
+                                    .tag("group", gav.getGroupId() == null ? "" : gav.getGroupId())
                                     .tag("artifact", gav.getArtifactId())
                                     .register(Metrics.globalRegistry)
                                     .increment();
@@ -464,16 +464,12 @@ public class MavenPomDownloader {
     public Pom download(GroupArtifactVersion gav,
                         @Nullable String relativePath,
                         @Nullable ResolvedPom containingPom,
-                        List<MavenRepository> repositories) {
+                        List<MavenRepository> repositories) throws MavenDownloadingException {
         if (gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
             if (containingPom != null) {
                 ctx.getResolutionListener().downloadError(gav, emptyList(), containingPom.getRequested());
             }
-            return Pom.builder()
-                    .gav(gav.asResolvedGroupArtifactVersion())
-                    .repositories(repositories)
-                    .exception(new MavenDownloadingException("Group id, artifact id, or version are missing.", null, gav))
-                    .build();
+            throw new MavenDownloadingException("Group id, artifact id, or version are missing.", null, gav);
         }
 
         ctx.getResolutionListener().download(gav);
@@ -616,12 +612,8 @@ public class MavenPomDownloader {
         }
         ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
         sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
-        return Pom.builder()
-                .gav(gav.asResolvedGroupArtifactVersion())
-                .repositories(repositories)
-                .exception(new MavenDownloadingException("Unable to download POM.", null, gav)
-                        .setRepositoryResponses(repositoryResponses))
-                .build();
+        throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
+                .setRepositoryResponses(repositoryResponses);
     }
 
     /**

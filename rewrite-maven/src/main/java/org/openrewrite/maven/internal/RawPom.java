@@ -363,7 +363,8 @@ public class RawPom {
                 mapLicenses(getLicenses()),
                 mapProfiles(getProfiles()),
                 mapPlugins((build != null) ? build.getPlugins() : null),
-                mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
+                mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null),
+                null
         );
     }
 

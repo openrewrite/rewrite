@@ -26,4 +26,9 @@ import java.io.Serializable;
 public class GroupArtifact implements Serializable {
     String groupId;
     String artifactId;
+
+    @Override
+    public String toString() {
+        return groupId + ":" + artifactId;
+    }
 }

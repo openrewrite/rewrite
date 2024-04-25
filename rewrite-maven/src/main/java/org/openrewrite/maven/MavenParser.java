@@ -116,15 +116,6 @@ public class MavenParser implements Parser {
                     model = model.resolveDependencies(downloader, ctx);
                 }
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
-            } catch (MavenDownloadingExceptions e) {
-                ParseExceptionResult parseExceptionResult = new ParseExceptionResult(
-                        randomId(),
-                        MavenParser.class.getSimpleName(),
-                        e.getClass().getSimpleName(),
-                        e.warn(docToPom.getKey()).printAll(), // Shows any underlying MavenDownloadingException
-                        null);
-                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(parseExceptionResult)));
-                ctx.getOnError().accept(e);
             } catch (MavenDownloadingException | UncheckedIOException e) {
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e))));
                 ctx.getOnError().accept(e);

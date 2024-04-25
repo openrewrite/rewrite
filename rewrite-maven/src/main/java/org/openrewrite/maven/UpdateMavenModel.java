@@ -125,18 +125,14 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withRepositories(Collections.emptyList());
         }
 
-        try {
-            MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
-                    resolutionResult.getProjectPoms());
-            MavenDownloadingExceptions exceptions = updated.getExceptions();
-            if(exceptions != null) {
-                return exceptions.warn(document);
-            } else {
-                return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
-                        (original, ignored) -> updated));
-            }
-        } catch (MavenDownloadingExceptions e) {
-            return e.warn(document);
+        MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
+                resolutionResult.getProjectPoms());
+        MavenDownloadingExceptions exceptions = updated.getExceptions();
+        if(exceptions != null) {
+            return exceptions.warn(document);
+        } else {
+            return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
+                    (original, ignored) -> updated));
         }
     }
 

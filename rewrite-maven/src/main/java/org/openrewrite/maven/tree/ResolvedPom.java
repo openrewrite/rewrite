@@ -425,7 +425,7 @@ public class ResolvedPom {
             }
         }
 
-        private void resolveParentPluginsRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
+        private void resolveParentPluginsRecursively(List<Pom> pomAncestry) {
             Pom pom = pomAncestry.get(0);
 
             for (Profile profile : pom.getProfiles()) {
@@ -458,7 +458,7 @@ public class ResolvedPom {
 
         }
 
-        private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
+        private Pom resolveParentPom(Pom pom) {
             @SuppressWarnings("DataFlowIssue") GroupArtifactVersion gav = getValues(pom.getParent().getGav());
             if (gav.getVersion() == null) {
                 throw new MavenParsingException("Parent version must always specify a version " + gav);
@@ -466,14 +466,24 @@ public class ResolvedPom {
 
             VersionRequirement newRequirement = VersionRequirement.fromVersion(gav.getVersion(), 0);
             GroupArtifact ga = new GroupArtifact(gav.getGroupId(), gav.getArtifactId());
-            String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
-            if (newRequiredVersion == null) {
-                throw new MavenParsingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement);
-            }
-            gav = gav.withVersion(newRequiredVersion);
+            try {
+                String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
+                if (newRequiredVersion == null) {
+                    return Pom.builder()
+                            .gav(gav.asResolvedGroupArtifactVersion())
+                            .exception(new MavenDownloadingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement, null, gav))
+                            .build();
+                }
+                gav = gav.withVersion(newRequiredVersion);
 
-            return downloader.download(gav,
-                    pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                return downloader.download(gav,
+                        pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+            } catch (MavenDownloadingException e) {
+                return Pom.builder()
+                        .gav(gav.asResolvedGroupArtifactVersion())
+                        .exception(e)
+                        .build();
+            }
         }
 
         private void mergeRequestedDependencies(List<Dependency> incomingRequestedDependencies) {
@@ -704,14 +714,18 @@ public class ResolvedPom {
                 }
                 for (ManagedDependency d : incomingDependencyManagement) {
                     if (d instanceof Imported) {
-                        ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, ResolvedPom.this, repositories)
-                                .resolve(activeProfiles, downloader, initialRepositories, ctx);
-                        MavenExecutionContextView.view(ctx)
-                                .getResolutionListener()
-                                .bomImport(bom.getGav(), pom);
-                        dependencyManagement.addAll(ListUtils.map(bom.getDependencyManagement(), dm -> dm
-                                .withRequestedBom(d)
-                                .withBomGav(bom.getGav())));
+                        try {
+                            ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, ResolvedPom.this, repositories)
+                                    .resolve(activeProfiles, downloader, initialRepositories, ctx);
+                            MavenExecutionContextView.view(ctx)
+                                    .getResolutionListener()
+                                    .bomImport(bom.getGav(), pom);
+                            dependencyManagement.addAll(ListUtils.map(bom.getDependencyManagement(), dm -> dm
+                                    .withRequestedBom(d)
+                                    .withBomGav(bom.getGav())));
+                        } catch (MavenDownloadingException e) {
+                            exception = e;
+                        }
                     } else if (d instanceof Defined) {
                         Defined defined = (Defined) d;
                         MavenExecutionContextView.view(ctx)
@@ -762,7 +776,7 @@ public class ResolvedPom {
                 d = getValues(d, depth);
                 try {
                     if (d.getVersion() == null) {
-                        throw new MavenDownloadingException("No version provided", null, dd.getDependency().getGav());
+                        throw new MavenDownloadingException("No version provided for " + d.getGav().asGroupArtifact(), null, dd.getDependency().getGav());
                     }
 
                     if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()))) {

@@ -191,7 +191,7 @@ public class MavenResolutionResult implements Marker {
 
     private static final Scope[] RESOLVE_SCOPES = new Scope[]{Scope.Compile, Scope.Runtime, Scope.Test, Scope.Provided};
 
-    public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+    public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) {
         Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
         MavenDownloadingExceptions exceptions = null;
 

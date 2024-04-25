@@ -22,6 +22,7 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
@@ -245,10 +246,11 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec -> spec.afterRecipe(after -> {
-                Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
-                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"));
-            })
+            spec -> spec.afterRecipe(after ->
+              assertThat(after.getMarkers().findFirst(MavenResolutionResult.class))
+                .map(MavenResolutionResult::getExceptions)
+                .map(Throwable::getMessage)
+                .contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"))
           )
         );
     }
