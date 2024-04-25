@@ -20,6 +20,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -59,26 +60,30 @@ public class MavenDownloadingExceptions extends Exception {
     }
 
     public Xml.Document warn(Xml.Document document) {
+        MavenResolutionResult mrr = document.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
+        if(mrr == null) {
+            return Markup.warn(document, this);
+        }
+
         Map<GroupArtifact, List<MavenDownloadingException>> byGav = new HashMap<>();
         for (MavenDownloadingException exception : exceptions) {
             byGav.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
                     exception.getRoot().getArtifactId()), ga -> new ArrayList<>()).add(exception);
         }
 
-        return (Xml.Document) new XmlIsoVisitor<Integer>() {
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, Integer integer) {
-                return sourceFile instanceof Xml.Document;
-            }
-
+        return (Xml.Document) new MavenIsoVisitor<Integer>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, Integer integer) {
-                Xml.Tag t = tag;
+                Xml.Tag t = super.visitTag(tag, integer);
+                if(!(DEPENDENCY_MATCHER.matches(getCursor()) || MANAGED_DEPENDENCY_MATCHER.matches(getCursor()) || PARENT_MATCHER.matches(getCursor()))
+                   || !t.getChildValue("groupId").isPresent() || !t.getChildValue("artifactId").isPresent()) {
+                    return t;
+                }
+                String groupId = t.getChildValue("groupId").get();
+                String artifactId = t.getChildValue("artifactId").get();
+                String scope = t.getChildValue("scope").orElse("compile");
                 for (GroupArtifact ga : byGav.keySet()) {
-                    boolean hasException = (DEPENDENCY_MATCHER.matches(getCursor()) || MANAGED_DEPENDENCY_MATCHER.matches(getCursor()) || PARENT_MATCHER.matches(getCursor())) &&
-                                           tag.getChildValue("groupId").map(a -> ga.getGroupId().equals(a)).orElse(false) &&
-                                           tag.getChildValue("artifactId").map(a -> ga.getArtifactId().equals(a)).orElse(false);
-                    if (hasException) {
+                    if (ga.getGroupId().equals(groupId) && ga.getArtifactId().equals(artifactId)) {
                         for (MavenDownloadingException exception : byGav.get(ga)) {
                             t = Markup.warn(t, exception);
                         }

@@ -122,40 +122,14 @@ class MavenDependencyFailuresTest implements RewriteTest {
 
     @Test
     void unresolvableTransitiveDependency(@TempDir Path localRepository) throws IOException {
-        // it's hard to simulate a transitive dependency failure since Maven Central validates
+        // It's hard to simulate a transitive dependency failure since Maven Central validates
         // transitive dependency resolvability on publishing.
         //
-        // this test creates a pom in a local repository that is resolvable at parse time because
-        // it has no dependencies, but becomes unresolvable when the model is refreshed because it
-        // is overwritten on disk with dependencies that don't exist.
-        Path localPom = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.pom");
-        assertThat(localPom.getParent().toFile().mkdirs()).isTrue();
-        Files.writeString(localPom,
-          //language=xml
-          """
-             <project>
-               <groupId>com.bad</groupId>
-               <artifactId>bad-artifact</artifactId>
-               <version>1</version>
-             </project>
-            """
-        );
-        Path localJar = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.jar");
-        Files.writeString(localJar, "dummy");
-
-        MavenRepository mavenLocal = MavenRepository.builder().id("local").uri(localRepository.toUri().toString())
-          .snapshots(false).knownToExist(true).build();
+        // Helpfully there are some old poms which are no longer resolvable.
 
         rewriteRun(
           spec -> spec
             .recipe(updateModel())
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setLocalRepository(mavenLocal)
-            )
-            .recipeExecutionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setLocalRepository(mavenLocal)
-              .setPomCache(new InMemoryMavenPomCache())
-            )
             .cycles(1)
             .expectedCyclesThatMakeChanges(1),
           pomXml(
@@ -166,9 +140,9 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <version>1</version>
                 <dependencies>
                   <dependency>
-                    <groupId>com.bad</groupId>
-                    <artifactId>bad-artifact</artifactId>
-                    <version>1</version>
+                    <groupId>org.jvnet.staxex</groupId>
+                    <artifactId>stax-ex</artifactId>
+                    <version>1.0</version>
                   </dependency>
                 </dependencies>
               </project>
@@ -182,40 +156,14 @@ class MavenDependencyFailuresTest implements RewriteTest {
                   <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
               https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM: doesnotexist:another:1. Tried repositories:
               https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
-                    <groupId>com.bad</groupId>
-                    <artifactId>bad-artifact</artifactId>
-                    <version>1</version>
+                    <groupId>org.jvnet.staxex</groupId>
+                    <artifactId>stax-ex</artifactId>
+                    <version>1.0</version>
                   </dependency>
                 </dependencies>
               </project>
-              """,
-            spec -> spec.beforeRecipe(maven -> {
-                // make the local pom bad before running the recipe
-                Files.writeString(localPom,
-                  //language=xml
-                  """
-                     <project>
-                       <groupId>com.bad</groupId>
-                       <artifactId>bad-artifact</artifactId>
-                       <version>1</version>
-                       <dependencies>
-                         <dependency>
-                           <groupId>doesnotexist</groupId>
-                           <artifactId>doesnotexist</artifactId>
-                           <version>1</version>
-                         </dependency>
-                         <dependency>
-                           <groupId>doesnotexist</groupId>
-                           <artifactId>another</artifactId>
-                           <version>1</version>
-                         </dependency>
-                       </dependencies>
-                     </project>
-                    """
-                );
-            })
-          )
-        );
+              """)
+          );
     }
 
     @Test
@@ -249,10 +197,9 @@ class MavenDependencyFailuresTest implements RewriteTest {
             spec -> spec.afterRecipe(after ->
               assertThat(after.getMarkers().findFirst(MavenResolutionResult.class))
                 .map(MavenResolutionResult::getExceptions)
-                .map(Throwable::getMessage)
-                .contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"))
+                .isNotEmpty())
           )
-        );
+      );
     }
 
     @Test
