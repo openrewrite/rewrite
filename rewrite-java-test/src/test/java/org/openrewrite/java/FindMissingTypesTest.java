@@ -30,6 +30,7 @@ class FindMissingTypesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FindMissingTypes())
+          .parser(JavaParser.fromJavaVersion())
           .typeValidationOptions(TypeValidation.none());
     }
 
@@ -40,7 +41,7 @@ class FindMissingTypesTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-                            
+              
               class ATest {
                   @Test
                   void foo() {}
@@ -48,7 +49,7 @@ class FindMissingTypesTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-
+              
               class ATest {
                   @/*~~(Identifier type is missing or malformed)~~>*/Test
                   void foo() {}
