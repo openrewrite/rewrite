@@ -46,4 +46,3 @@ class CountLinesTest implements RewriteTest {
         );
     }
 }
-

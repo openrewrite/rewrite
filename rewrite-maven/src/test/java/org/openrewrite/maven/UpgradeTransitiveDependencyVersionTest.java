@@ -16,12 +16,13 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
+class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -29,10 +30,12 @@ public class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           "com.fasterxml*", "jackson-core", "2.12.5", null, null, null, null, null, null, null));
     }
 
+    @DocumentExample
     @Test
     void singleProject() {
         rewriteRun(
-          pomXml("""
+          pomXml(
+                """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite</groupId>
@@ -77,7 +80,8 @@ public class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Test
     void leavesDirectDependencyUntouched() {
         rewriteRun(
-          pomXml("""
+          pomXml(
+                """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite</groupId>

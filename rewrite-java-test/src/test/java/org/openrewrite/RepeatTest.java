@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.openrewrite.java.Assertions.java;
 
-public class RepeatTest implements RewriteTest {
+class RepeatTest implements RewriteTest {
 
     /**
      * This visitor verifies that the cursor is well-formed.
