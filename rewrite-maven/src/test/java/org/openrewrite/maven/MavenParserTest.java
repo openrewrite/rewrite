@@ -21,7 +21,6 @@ import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
-import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
@@ -140,7 +139,7 @@ class MavenParserTest implements RewriteTest {
                 """
             )
           )
-        ).withMessage("Could not resolve version for [GroupArtifact(groupId=junit, artifactId=junit)] matching version requirements RangeSet={[88.7,90.9)}");
+        ).withMessage("Could not resolve version for [junit:junit] matching version requirements RangeSet={[88.7,90.9)}");
     }
 
     @Test

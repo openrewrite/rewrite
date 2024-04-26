@@ -16,21 +16,15 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markup;
-import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -121,7 +115,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
     }
 
     @Test
-    void unresolvableTransitiveDependency(@TempDir Path localRepository) throws IOException {
+    void unresolvableTransitiveDependency() {
         // It's hard to simulate a transitive dependency failure since Maven Central validates
         // transitive dependency resolvability on publishing.
         //
@@ -153,9 +147,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM: doesnotexist:another:1. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
+                  <!--~~(activation:activation:1.0 failed. Unable to download POM: activation:activation:1.0. Tried repositories:
+              https://repo.maven.apache.org/maven2: Did not attempt to download because of a previous failure to retrieve from this repository.)~~>--><dependency>
                     <groupId>org.jvnet.staxex</groupId>
                     <artifactId>stax-ex</artifactId>
                     <version>1.0</version>

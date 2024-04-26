@@ -16,20 +16,18 @@
 package org.openrewrite.maven;
 
 import lombok.Getter;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.xml.XmlIsoVisitor;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.openrewrite.maven.MavenVisitor.*;
+import java.util.stream.Collectors;
 
 @Getter
 public class MavenDownloadingExceptions extends Exception {
@@ -52,7 +50,13 @@ public class MavenDownloadingExceptions extends Exception {
     public static MavenDownloadingExceptions append(@Nullable MavenDownloadingExceptions current,
                                                     @Nullable MavenDownloadingExceptions exceptions) {
         if (current == null) {
+            if(exceptions == null) {
+                return new MavenDownloadingExceptions();
+            }
             current = new MavenDownloadingExceptions();
+        }
+        if(exceptions == null) {
+            return current;
         }
         exceptions.getExceptions().forEach(current::addSuppressed);
         current.exceptions.addAll(exceptions.getExceptions());
@@ -81,10 +85,26 @@ public class MavenDownloadingExceptions extends Exception {
                 }
                 String groupId = t.getChildValue("groupId").get();
                 String artifactId = t.getChildValue("artifactId").get();
-                String scope = t.getChildValue("scope").orElse("compile");
+                Scope scope = Scope.fromName(t.getChildValue("scope").orElse("compile"));
+
                 for (GroupArtifact ga : byGav.keySet()) {
-                    if (ga.getGroupId().equals(groupId) && ga.getArtifactId().equals(artifactId)) {
-                        for (MavenDownloadingException exception : byGav.get(ga)) {
+                    if (ga.getGroupId().equals(groupId) && ga.getArtifactId().equals(artifactId)
+                        || mrr.findDependencies(groupId, artifactId, scope)
+                                .stream()
+                                .anyMatch(it -> it.getDependencies().stream()
+                                        .anyMatch(transitive ->
+                                                transitive.getGroupId().equals(ga.getGroupId()) && transitive.getArtifactId().equals(ga.getArtifactId())))) {
+                        // Skip uninteresting exceptions if those are the only exceptions available
+                        List<MavenDownloadingException> withoutRetries = byGav.get(ga).stream()
+                                .filter(it -> !it.getMessage().contains("Did not attempt to download because of a previous failure to retrieve from this repository"))
+                                .collect(Collectors.toList());
+                        List<MavenDownloadingException> exceptionsToAdd;
+                        if(!withoutRetries.isEmpty()) {
+                            exceptionsToAdd = withoutRetries;
+                        } else {
+                            exceptionsToAdd = byGav.get(ga);
+                        }
+                        for (MavenDownloadingException exception : exceptionsToAdd) {
                             t = Markup.warn(t, exception);
                         }
                     }

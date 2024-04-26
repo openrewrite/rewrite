@@ -40,7 +40,6 @@ class AddDependencyTest implements RewriteTest {
           .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core"));
     }
 
-    @SuppressWarnings("UnstableApiUsage")
     @Language("java")
     private final String usingGuavaIntMath = """
           import com.google.common.math.IntMath;
@@ -62,26 +61,26 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <!--~~(Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
-                    https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
-                                <groupId>doesnotexist</groupId>
-                                <artifactId>doesnotexist</artifactId>
-                                <version>1</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
+                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
+                            <groupId>doesnotexist</groupId>
+                            <artifactId>doesnotexist</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -1108,6 +1107,7 @@ class AddDependencyTest implements RewriteTest {
         return addDependency(gav, onlyIfUsing, null, null);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private AddDependency addDependency(String gav, String onlyIfUsing, Boolean acceptTransitive) {
         return addDependency(gav, onlyIfUsing, null, acceptTransitive);
     }
