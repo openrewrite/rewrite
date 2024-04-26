@@ -50,6 +50,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withValue((JsonValue) visit(d.getValue(), p));
+        d = d.withEof(visitSpace(d.getEof(), p));
         return d;
     }
 

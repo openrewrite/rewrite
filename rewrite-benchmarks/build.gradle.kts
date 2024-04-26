@@ -4,10 +4,6 @@ plugins {
     id("me.champeau.gradle.jmh") version "0.5.2"
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
     jmh("com.google.code.findbugs:jsr305:latest.release")
     jmh("org.projectlombok:lombok:latest.release")
