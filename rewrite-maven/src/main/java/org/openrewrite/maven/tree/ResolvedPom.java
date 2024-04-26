@@ -39,9 +39,12 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.VersionRequirement;
 import org.openrewrite.maven.tree.ManagedDependency.Defined;
 import org.openrewrite.maven.tree.ManagedDependency.Imported;
+import org.openrewrite.maven.tree.Plugin.Execution;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -598,8 +601,54 @@ public class ResolvedPom {
             return ret;
         }
 
-        private List<Plugin.Execution> mergePluginExecutions(List<Plugin.Execution> executions, List<Plugin.Execution> incomingExecutions) {
-            return executions.isEmpty() ? incomingExecutions : executions; // TODO
+        private List<Plugin.Execution> mergePluginExecutions(List<Plugin.Execution> currentExecutions, List<Plugin.Execution> incomingExecutions) {
+            if (currentExecutions.isEmpty()) {
+                return incomingExecutions;
+            }
+            if (incomingExecutions.isEmpty()) {
+                return currentExecutions;
+            }
+            Map<String, Plugin.Execution> currentExecutionsById = currentExecutions.stream()
+                    .collect(Collectors.toMap(Execution::getId, Function.identity()));
+            List<Plugin.Execution> mergedExecutions = new ArrayList<>(currentExecutions);
+
+            for (Plugin.Execution incomingExecution : incomingExecutions) {
+                String executionId = incomingExecution.getId();
+                if (!currentExecutionsById.containsKey(executionId)) {
+                    mergedExecutions.add(incomingExecution);
+                } else {
+                    Plugin.Execution currentExecution = currentExecutionsById.get(executionId);
+                    // GOALS
+                    Set<String> mergedGoals = new HashSet<>();
+                    if (currentExecution.getGoals() != null) {
+                        mergedGoals.addAll(currentExecution.getGoals());
+                    }
+                    if (incomingExecution.getGoals() != null) {
+                        mergedGoals.addAll(incomingExecution.getGoals());
+                    }
+                    // PHASE
+                    String mergedPhase = currentExecution.getPhase();
+                    if (incomingExecution.getPhase() != null &&
+                        !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
+                        mergedPhase = incomingExecution.getPhase();
+                    }
+                    // CONFIGURATION
+                    JsonNode mergedConfiguration = mergePluginConfigurations(
+                            currentExecution.getConfiguration(),
+                            incomingExecution.getConfiguration());
+                    // EXECUTION
+                    Plugin.Execution mergedExecution = new Plugin.Execution(
+                            executionId,
+                            new ArrayList<>(mergedGoals),
+                            mergedPhase,
+                            incomingExecution.getInherited(),
+                            mergedConfiguration);
+
+                    mergedExecutions.remove(currentExecution);
+                    mergedExecutions.add(mergedExecution);
+                }
+            }
+            return mergedExecutions;
         }
 
         private Plugin mergePlugins(Plugin plugin, Plugin incoming) {

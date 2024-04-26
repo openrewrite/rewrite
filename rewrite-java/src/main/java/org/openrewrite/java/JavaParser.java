@@ -58,11 +58,7 @@ public interface JavaParser extends Parser {
     String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.java.skipSourceSetTypeGeneration";
 
     static List<Path> runtimeClasspath() {
-        return new ClassGraph()
-                .disableNestedJarScanning()
-                .getClasspathURIs().stream()
-                .filter(uri -> "file".equals(uri.getScheme()))
-                .map(Paths::get).collect(toList());
+        return RuntimeClasspathCache.getRuntimeClasspath();
     }
 
     /**
@@ -450,5 +446,24 @@ public interface JavaParser extends Parser {
                 .orElse(Long.toString(System.nanoTime())) + ".java";
 
         return prefix.resolve(Paths.get(pkg + className));
+    }
+}
+
+class RuntimeClasspathCache {
+    private RuntimeClasspathCache() {
+    }
+
+    @Nullable
+    private static List<Path> runtimeClasspath = null;
+
+    static List<Path> getRuntimeClasspath() {
+        if (runtimeClasspath == null) {
+            runtimeClasspath = new ClassGraph()
+                    .disableNestedJarScanning()
+                    .getClasspathURIs().stream()
+                    .filter(uri -> "file".equals(uri.getScheme()))
+                    .map(Paths::get).collect(toList());
+        }
+        return runtimeClasspath;
     }
 }

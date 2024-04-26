@@ -25,6 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.net.URI;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
@@ -139,7 +140,7 @@ public class DeclarativeRecipe extends Recipe {
                    "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends. ";
         }
 
-        TreeVisitor<?, ExecutionContext> precondition;
+        Supplier<TreeVisitor<?, ExecutionContext>> precondition;
 
         @NonFinal
         transient boolean preconditionApplicable;
@@ -147,14 +148,15 @@ public class DeclarativeRecipe extends Recipe {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
+                TreeVisitor<?, ExecutionContext> p = precondition.get();
                 @Override
                 public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                    return precondition.isAcceptable(sourceFile, ctx);
+                    return p.isAcceptable(sourceFile, ctx);
                 }
 
                 @Override
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    Tree t = precondition.visit(tree, ctx);
+                    Tree t = p.visit(tree, ctx);
                     preconditionApplicable = t != tree;
                     return tree;
                 }
@@ -249,20 +251,16 @@ public class DeclarativeRecipe extends Recipe {
             return recipeList;
         }
 
-        TreeVisitor<?, ExecutionContext> andPreconditions = null;
+        List<Supplier<TreeVisitor<?, ExecutionContext>>> andPreconditions = new ArrayList<>();
         for (Recipe precondition : preconditions) {
             if (isScanningRecipe(precondition)) {
                 throw new IllegalArgumentException(
                         getName() + " declares the ScanningRecipe " + precondition.getName() + " as a precondition." +
                         "ScanningRecipe cannot be used as Preconditions.");
             }
-            if (andPreconditions == null) {
-                andPreconditions = precondition.getVisitor();
-            } else {
-                andPreconditions = Preconditions.and(andPreconditions, precondition.getVisitor());
-            }
+            andPreconditions.add(precondition::getVisitor);
         }
-        PreconditionBellwether bellwether = new PreconditionBellwether(andPreconditions);
+        PreconditionBellwether bellwether = new PreconditionBellwether(Preconditions.and(andPreconditions.toArray(new Supplier[]{})));
         List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
         recipeListWithBellwether.add(bellwether);
         recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, recipeList));
