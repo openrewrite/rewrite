@@ -15,12 +15,12 @@
  */
 package org.openrewrite.quark;
 
-import org.openrewrite.jgit.api.Git;
-import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.jgit.api.Git;
+import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;

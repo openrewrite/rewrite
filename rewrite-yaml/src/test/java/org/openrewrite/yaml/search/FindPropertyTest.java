@@ -59,7 +59,8 @@ class FindPropertyTest implements RewriteTest {
     void relaxedBinding(String propertyKey) {
         rewriteRun(
           spec -> spec.recipe(new FindProperty(propertyKey, true)),
-          yaml("""
+          yaml(
+                """
               acme.my-project.person.first-name: example
               acme.myProject.person.firstName: example
               acme.my_project.person.first_name: example
@@ -78,7 +79,8 @@ class FindPropertyTest implements RewriteTest {
     void exactMatch() {
         rewriteRun(
           spec -> spec.recipe(new FindProperty("acme.my-project.person.first-name", false)),
-          yaml("""
+          yaml(
+                """
               acme.my-project.person.first-name: example
               acme.myProject.person.firstName: example
               acme.my_project.person.first_name: example

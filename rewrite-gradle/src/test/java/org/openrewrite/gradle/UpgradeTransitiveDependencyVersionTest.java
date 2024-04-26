@@ -16,13 +16,14 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
-public class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
+class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -32,6 +33,7 @@ public class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             "com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD"));
     }
 
+    @DocumentExample
     @Test
     void addConstraint() {
         rewriteRun(

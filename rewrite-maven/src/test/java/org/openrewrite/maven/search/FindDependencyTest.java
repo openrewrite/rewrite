@@ -16,11 +16,13 @@
 package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class FindDependencyTest implements RewriteTest {
+    @DocumentExample
     @Test
     void simple() {
         rewriteRun(spec -> spec.recipe(new FindDependency("jakarta.activation", "jakarta.activation-api", null, null)),

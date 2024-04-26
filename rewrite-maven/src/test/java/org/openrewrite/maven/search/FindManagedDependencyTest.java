@@ -16,15 +16,18 @@
 package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class FindManagedDependencyTest implements RewriteTest {
+    @DocumentExample
     @Test
     void simple() {
         rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", null, null)),
-          pomXml("""
+          pomXml(
+                """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -66,7 +69,8 @@ class FindManagedDependencyTest implements RewriteTest {
     @Test
     void version() {
         rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "2.1.2", null)),
-          pomXml("""
+          pomXml(
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
               <modelVersion>4.0.0</modelVersion>
@@ -108,7 +112,8 @@ class FindManagedDependencyTest implements RewriteTest {
     @Test
     void versionRange() {
         rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "^2", null)),
-          pomXml("""
+          pomXml(
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
               <modelVersion>4.0.0</modelVersion>
@@ -151,7 +156,8 @@ class FindManagedDependencyTest implements RewriteTest {
     @Test
     void wrongVersion() {
         rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "1.0.0", null)),
-          pomXml("""
+          pomXml(
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
               <modelVersion>4.0.0</modelVersion>
@@ -176,7 +182,8 @@ class FindManagedDependencyTest implements RewriteTest {
     @Test
     void wrongVersionRange() {
         rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "^1", null)),
-          pomXml("""
+          pomXml(
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
               <modelVersion>4.0.0</modelVersion>
