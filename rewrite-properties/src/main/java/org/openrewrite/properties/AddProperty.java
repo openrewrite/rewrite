@@ -40,7 +40,7 @@ public class AddProperty extends Recipe {
             example = "management.metrics.enable.process.files")
     String property;
 
-    @Option(example = "TODO Provide a usage example for the docs", displayName = "Property value",
+    @Option(example = "newPropValue", displayName = "Property value",
             description = "The value of the new property key.")
     String value;
 

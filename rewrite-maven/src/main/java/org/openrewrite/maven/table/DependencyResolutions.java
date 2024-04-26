@@ -33,7 +33,7 @@ public class DependencyResolutions extends DataTable<DependencyResolutions.Row> 
 
     @Value
     public static class Row {
-        @Option(example = "TODO Provide a usage example for the docs", displayName = "Group",
+        @Option(example = "groupId", displayName = "Group",
                 description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.")
         String groupId;
 

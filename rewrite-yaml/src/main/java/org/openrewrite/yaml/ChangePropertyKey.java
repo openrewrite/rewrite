@@ -63,7 +63,7 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Option(example = "TODO Provide a usage example for the docs", displayName = "Except",
+    @Option(example = "List.of(\"group\")", displayName = "Except",
             description = "If any of these property keys exist as direct children of `oldPropertyKey`, then they will not be moved to `newPropertyKey`.",
             required = false)
     @Nullable
