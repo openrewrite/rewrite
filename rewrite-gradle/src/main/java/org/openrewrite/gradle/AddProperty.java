@@ -39,7 +39,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
             example = "org.gradle.caching")
     String key;
 
-    @Option(example = "TODO Provide a usage example for the docs", displayName = "Property value",
+    @Option(example = "true", displayName = "Property value",
             description = "The value of the property to add.")
     String value;
 
