@@ -928,8 +928,8 @@ class BlankLinesTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4154")
     void eachMethodOnItsOwnLineAnonymousInnerClass() {
-
         rewriteRun(
           blankLines(),
           java(
