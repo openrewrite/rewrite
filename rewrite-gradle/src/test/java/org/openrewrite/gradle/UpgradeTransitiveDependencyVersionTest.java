@@ -69,6 +69,42 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void customConfiguration() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+              }
+              configurations.create("foo")
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  foo 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins {
+                id 'java'
+              }
+              configurations.create("foo")
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      foo('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              
+                  foo 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addConstraintAddsSameArtifactsInSameConfigurationAsSingleConstraint() {
         rewriteRun(
           buildGradle(
