@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
@@ -33,6 +34,7 @@ import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 public class MavenVisitor<P> extends XmlVisitor<P> {
+
     static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
     static final XPathMatcher PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("/project/*/plugins/plugin/dependencies/dependency");
     static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
@@ -41,6 +43,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
     static final XPathMatcher PROFILE_PLUGIN_MATCHER = new XPathMatcher("/project/profiles/*/build/plugins/plugin");
+    static final XPathMatcher PROFILE_MANAGED_PLUGIN_MATCHER = new XPathMatcher("/project/profiles/*/build/pluginManagement/plugins/plugin");
 
     @Nullable
     private transient Xml.Document document;
@@ -197,6 +200,19 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             }
         }
         doAfterVisit(new UpdateMavenModel<>());
+    }
+
+    public boolean isAnyPluginTag(
+        String groupId, String artifactId) {
+        Cursor cursor = getCursor();
+        for (XPathMatcher matcher : Arrays.asList(PLUGIN_MATCHER, MANAGED_PLUGIN_MATCHER,
+            PROFILE_PLUGIN_MATCHER, PROFILE_MANAGED_PLUGIN_MATCHER)) {
+            if (matcher.matches(cursor) && hasPluginGroupId(groupId) && hasPluginArtifactId(
+                artifactId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean isPluginTag() {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import java.util.function.BiFunction;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -58,6 +59,13 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     @Nullable
     String newArtifact;
 
+    @Option(displayName = "Look everywhere",
+            description = "If true, will look for plugin tags everywhere, including pluginManagement in and out of profiles. Default `false`.",
+            example = "my-new-maven-plugin",
+            required = false)
+    @Nullable
+    Boolean lookEverywhere;
+
     @Override
     public String getDisplayName() {
         return "Change Maven plugin group and artifact ID";
@@ -77,10 +85,13 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
         return new MavenVisitor<ExecutionContext>() {
+
+            final BiFunction<String, String, Boolean> isPluginTag = Boolean.TRUE.equals(lookEverywhere) ? this::isPluginTag : this::isAnyPluginTag;
+
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-                if (isPluginTag(oldGroupId, oldArtifactId)) {
+                if (isPluginTag.apply(oldGroupId, oldArtifactId)) {
                     if (newGroupId != null) {
                         t = changeChildTagValue(t, "groupId", newGroupId, ctx);
                     }
