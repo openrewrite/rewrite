@@ -86,7 +86,7 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
 
         return new MavenVisitor<ExecutionContext>() {
 
-            final BiFunction<String, String, Boolean> isPluginTag = Boolean.TRUE.equals(lookEverywhere) ? this::isPluginTag : this::isAnyPluginTag;
+            final BiFunction<String, String, Boolean> isPluginTag = Boolean.TRUE.equals(lookEverywhere) ? this::isAnyPluginTag : this::isPluginTag;
 
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
