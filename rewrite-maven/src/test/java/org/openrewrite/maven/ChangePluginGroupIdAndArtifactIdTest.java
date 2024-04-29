@@ -31,8 +31,7 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
             "io.quarkus",
             "quarkus-bootstrap-maven-plugin",
             null,
-            "quarkus-extension-maven-plugin",
-            false
+            "quarkus-extension-maven-plugin"
           )),
           pomXml(
             """
@@ -108,8 +107,7 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
             "io.quarkus",
             "quarkus-bootstrap-maven-plugin",
             null,
-            "quarkus-extension-maven-plugin",
-            false
+            "quarkus-extension-maven-plugin"
           )),
           pomXml(
             """
@@ -154,8 +152,7 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
             "io.quarkus",
             "quarkus-bootstrap-maven-plugin",
             null,
-            "quarkus-extension-maven-plugin",
-            true
+            "quarkus-extension-maven-plugin"
           )),
           pomXml(
             """
@@ -265,8 +262,7 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
             "io.quarkus",
             "quarkus-bootstrap-maven-plugin",
             null,
-            "quarkus-extension-maven-plugin",
-            true
+            "quarkus-extension-maven-plugin"
           )),
           pomXml(
             """
