@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -29,6 +30,7 @@ class IncrementProjectVersionTest implements RewriteTest {
         spec.recipe(new IncrementProjectVersion("*", "*", IncrementProjectVersion.SemverDigit.MINOR));
     }
 
+    @DocumentExample
     @Test
     void changeProjectVersion() {
         rewriteRun(

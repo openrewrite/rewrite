@@ -112,6 +112,7 @@ class AssertionsTest implements RewriteTest {
             return "Super description.";
         }
 
+        @Override
         public List<Recipe> getRecipeList() {
             return Collections.singletonList(new NonMavenRecipe());
         }

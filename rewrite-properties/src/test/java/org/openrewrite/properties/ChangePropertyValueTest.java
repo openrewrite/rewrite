@@ -165,7 +165,8 @@ class ChangePropertyValueTest implements RewriteTest {
     void partialMatchRegex() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("*", "[replaced:$1]", "\\[replaceme:(.*?)]", true, null)),
-          properties("""
+          properties(
+                """
             multiple=[replaceme:1][replaceme:2]
             multiple-prefixed=test[replaceme:1]test[replaceme:2]
             multiple-suffixed=[replaceme:1]test[replaceme:2]test
@@ -183,7 +184,8 @@ class ChangePropertyValueTest implements RewriteTest {
     void partialMatchNonRegex() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("*", "replaced", "replaceme", null, null)),
-          properties("""
+          properties(
+                """
             multiple=[replaceme:1][replaceme:2]
             multiple-prefixed=test[replaceme:1]test[replaceme:2]
             multiple-suffixed=[replaceme:1]test[replaceme:2]test

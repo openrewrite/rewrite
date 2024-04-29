@@ -29,6 +29,7 @@ import org.openrewrite.json.internal.grammar.JsonPathParser;
 import org.openrewrite.json.internal.grammar.JsonPathParserBaseVisitor;
 import org.openrewrite.json.internal.grammar.JsonPathParserVisitor;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonRightPadded;
 
 import java.util.*;
 import java.util.function.BiPredicate;
@@ -299,12 +300,13 @@ public class JsonPathMatcher {
                     scope = jsonObject.getMembers();
                     return getResultFromList(visitProperty(ctx));
                 } else {
-                    for (Json json : jsonObject.getMembers()) {
+                    String name = ctx.StringLiteral() != null ?
+                            unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                    for (JsonRightPadded<Json> padded : jsonObject.getPadding().getMembers()) {
+                        Json json = padded.getElement();
                         if (json instanceof Json.Member) {
                             Json.Member member = (Json.Member) json;
                             String key = ((Json.Literal) member.getKey()).getValue().toString();
-                            String name = ctx.StringLiteral() != null ?
-                                    unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
                             if (key.equals(name)) {
                                 return member;
                             }

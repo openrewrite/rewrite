@@ -18,8 +18,8 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -191,9 +191,10 @@ public class ChangeParentPom extends Recipe {
                             }
 
                             // Retain managed versions from the old parent that are not managed in the new parent
-                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, null, null);
-                            Pom newParentPom = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, null, resolvedPom.getRepositories());
-                            List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, ctx);
+                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                            ResolvedPom newParent = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, resolvedPom, resolvedPom.getRepositories())
+                                    .resolve(emptyList(), mpd, ctx);
+                            List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, newParent);
                             for (ResolvedManagedDependency dep : dependenciesWithoutExplicitVersions) {
                                 changeParentTagVisitors.add(new AddManagedDependencyVisitor(
                                         dep.getGav().getGroupId(), dep.getGav().getArtifactId(), dep.getGav().getVersion(),
@@ -202,7 +203,7 @@ public class ChangeParentPom extends Recipe {
 
                             // Retain properties from the old parent that are not present in the new parent
                             Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), ctx);
-                            Map<String, String> newParentProps = newParentPom.getProperties();
+                            Map<String, String> newParentProps = newParent.getProperties();
                             for (Map.Entry<String, String> propInUse : propertiesInUse.entrySet()) {
                                 if(!newParentProps.containsKey(propInUse.getKey())) {
                                     changeParentTagVisitors.add(new UnconditionalAddProperty(propInUse.getKey(), propInUse.getValue()));
@@ -231,6 +232,11 @@ public class ChangeParentPom extends Recipe {
                                 doAfterVisit(new RemoveRedundantDependencyVersions(null, null, false, null).getVisitor());
                             }
                         } catch (MavenDownloadingException e) {
+                            for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
+                                MavenRepository repository = repositoryResponse.getKey();
+                                metadataFailures.insertRow(ctx, new MavenMetadataFailures.Row(targetGroupId, targetArtifactId, newVersion,
+                                        repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
+                            }
                             return e.warn(tag);
                         }
                     }
@@ -283,8 +289,8 @@ public class ChangeParentPom extends Recipe {
             @Nullable
             ResolvedPom resolvedPom = null;
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
-                Xml.Tag t = super.visitTag(tag, executionContext);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
                 if(t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
                     String text = ((Xml.CharData) t.getContent().get(0)).getText().trim();
                     Matcher m = PROPERTY_PATTERN.matcher(text);
@@ -293,7 +299,9 @@ public class ChangeParentPom extends Recipe {
                             resolvedPom = getResolutionResult().getPom();
                         }
                         String propertyName = m.group(1).trim();
-                        properties.put(m.group(1).trim(), resolvedPom.getProperties().get(propertyName));
+                        if (resolvedPom.getProperties().containsKey(propertyName)) {
+                            properties.put(m.group(1).trim(), resolvedPom.getProperties().get(propertyName));
+                        }
                     }
                 }
                 return t;
@@ -302,7 +310,7 @@ public class ChangeParentPom extends Recipe {
         return properties;
     }
 
-    private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ExecutionContext ctx) {
+    private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ResolvedPom newParent) {
         ResolvedPom resolvedPom = mrr.getPom();
 
         // Dependencies managed by the current pom's own dependency management are irrelevant to parent upgrade
@@ -332,27 +340,13 @@ public class ChangeParentPom extends Recipe {
         }
 
         // Remove from the list any that would still be managed under the new parent
-        String groupId = newGroupId == null ? oldGroupId : newGroupId;
-        String artifactId = newArtifactId == null ? oldArtifactId : newArtifactId;
-        try {
-            GroupArtifactVersion newParentGav = new GroupArtifactVersion(groupId, artifactId, newVersion);
-            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, null, null);
-            ResolvedPom newParent = mpd.download(newParentGav, null, resolvedPom, resolvedPom.getRepositories())
-                    .resolve(emptyList(), mpd, ctx);
-            Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
-                    .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
-                    .collect(Collectors.toSet());
+        Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
+                .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
+                .collect(Collectors.toSet());
 
-            depsWithoutExplicitVersion = depsWithoutExplicitVersion.stream()
-                    .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))
-                    .collect(Collectors.toList());
-        } catch (MavenDownloadingException e) {
-            for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
-                MavenRepository repository = repositoryResponse.getKey();
-                metadataFailures.insertRow(ctx, new MavenMetadataFailures.Row(groupId, artifactId, newVersion,
-                        repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
-            }
-        }
+        depsWithoutExplicitVersion = depsWithoutExplicitVersion.stream()
+                .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))
+                .collect(Collectors.toList());
         return depsWithoutExplicitVersion;
     }
 

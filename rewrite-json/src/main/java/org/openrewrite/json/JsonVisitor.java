@@ -50,6 +50,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withValue((JsonValue) visit(d.getValue(), p));
+        d = d.withEof(visitSpace(d.getEof(), p));
         return d;
     }
 
@@ -96,7 +97,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
     }
 
     @SuppressWarnings("ConstantConditions")
-    public <T> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, P p) {
+    public <T extends Json> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;

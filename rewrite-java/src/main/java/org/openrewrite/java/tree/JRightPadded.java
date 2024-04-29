@@ -22,9 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 
 /**
  * A Java element that could have trailing space.
@@ -145,8 +143,12 @@ public class JRightPadded<T> {
         }
 
         List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
-        Map<UUID, JRightPadded<J2>> beforeById = before.stream().collect(Collectors
-                .toMap(j -> j.getElement().getId(), Function.identity()));
+        Map<UUID, JRightPadded<J2>> beforeById = new HashMap<>((int) Math.ceil(elements.size() / 0.75));
+        for (JRightPadded<J2> j : before) {
+            if (beforeById.put(j.getElement().getId(), j) != null) {
+                throw new IllegalStateException("Duplicate key");
+            }
+        }
 
         for (J2 t : elements) {
             JRightPadded<J2> found;

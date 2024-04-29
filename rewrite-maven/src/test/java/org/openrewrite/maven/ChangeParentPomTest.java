@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
@@ -1001,7 +1000,8 @@ class ChangeParentPomTest implements RewriteTest {
                 "spring-boot-dependencies", "spring-boot-dependencies",
                 "3.2.4",
                 null, null, null, null)),
-              pomXml("""
+              pomXml(
+                    """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>com.mycompany</groupId>
@@ -1055,7 +1055,8 @@ class ChangeParentPomTest implements RewriteTest {
                 "spring-boot-dependencies", "spring-boot-dependencies",
                 "3.2.4",
                 null, null, null, null)),
-              pomXml("""
+              pomXml(
+                    """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>com.mycompany</groupId>
@@ -1235,7 +1236,8 @@ class ChangeParentPomTest implements RewriteTest {
           spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", "org.springframework.boot",
             "spring-boot-starter-parent", "spring-boot-starter-parent",
             "2.3.12.RELEASE", null, null, null, null)),
-          pomXml("""
+          pomXml(
+                """
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
@@ -1276,7 +1278,6 @@ class ChangeParentPomTest implements RewriteTest {
         );
     }
 
-    @Disabled("Failing in CI but not locally")
     @Test
     void shouldNotAddToDependencyManagement() {
         rewriteRun(
@@ -1372,5 +1373,99 @@ class ChangeParentPomTest implements RewriteTest {
             </project>
             """
         ));
+    }
+
+    @Test
+    void doesNotAddMavenDefaultProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
+          pomXml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.17</version>
+                </parent>
+                
+                <properties>
+                  <my-cool-prop>${project.build.directory}</my-cool-prop>
+                </properties>
+              </project>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                </parent>
+                
+                <properties>
+                  <my-cool-prop>${project.build.directory}</my-cool-prop>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotAddGrandparentProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
+          pomXml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.17</version>
+                </parent>
+                
+                <properties>
+                  <my-cool-prop>${junit.version}</my-cool-prop>
+                </properties>
+              </project>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                </parent>
+                
+                <properties>
+                  <my-cool-prop>${junit.version}</my-cool-prop>
+                </properties>
+              </project>
+              """
+          )
+        );
     }
 }
