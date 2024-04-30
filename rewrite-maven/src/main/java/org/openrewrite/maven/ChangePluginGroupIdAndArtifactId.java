@@ -31,7 +31,6 @@ import java.util.Optional;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangePluginGroupIdAndArtifactId extends Recipe {
-
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
@@ -78,7 +77,6 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
         return new MavenVisitor<ExecutionContext>() {
-
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
@@ -97,13 +95,10 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                 return t;
             }
 
-            private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue,
-                                                ExecutionContext ctx) {
+            private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
                 Optional<Xml.Tag> childTag = tag.getChild(childTagName);
-                if (childTag.isPresent() && !newValue.equals(
-                        childTag.get().getValue().orElse(null))) {
-                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(),
-                            newValue).visitNonNull(tag, ctx);
+                if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
+                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
                 }
                 return tag;
             }
