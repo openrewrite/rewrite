@@ -33,14 +33,13 @@ import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 public class MavenVisitor<P> extends XmlVisitor<P> {
+
     static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
     static final XPathMatcher PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("/project/*/plugins/plugin/dependencies/dependency");
     static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
-    static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("/project/build/pluginManagement/plugins/plugin");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
-    static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
+    static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
-    static final XPathMatcher PROFILE_PLUGIN_MATCHER = new XPathMatcher("/project/profiles/*/build/plugins/plugin");
 
     @Nullable
     private transient Xml.Document document;
@@ -200,8 +199,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isPluginTag() {
-        return isTag("plugin") &&
-               (PLUGIN_MATCHER.matches(getCursor()) || PROFILE_PLUGIN_MATCHER.matches(getCursor()));
+        return isTag("plugin") && PLUGIN_MATCHER.matches(getCursor());
     }
 
     public boolean isPluginTag(String groupId, @Nullable String artifactId) {
@@ -363,11 +361,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     public MavenMetadata downloadMetadata(String groupId, String artifactId, @Nullable ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
         return new MavenPomDownloader(emptyMap(), ctx, getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles())
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getRepositories());
-    }
-
-    @SuppressWarnings("unused")
-    public boolean isManagedPluginTag() {
-        return MANAGED_PLUGIN_MATCHER.matches(getCursor());
     }
 
     /**
