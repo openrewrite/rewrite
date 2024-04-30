@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import java.util.function.BiFunction;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -37,26 +36,26 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Old group ID",
-        description = "The old group ID to replace. The group ID is the first part of a plugin coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
-        example = "org.openrewrite.recipe")
+            description = "The old group ID to replace. The group ID is the first part of a plugin coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
+            example = "org.openrewrite.recipe")
     String oldGroupId;
 
     @Option(displayName = "Old artifact ID",
-        description = "The old artifactId to replace. The artifact ID is the second part of a plugin coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
-        example = "my-deprecated-maven-plugin")
+            description = "The old artifactId to replace. The artifact ID is the second part of a plugin coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
+            example = "my-deprecated-maven-plugin")
     String oldArtifactId;
 
     @Option(displayName = "New group ID",
-        description = "The new group ID to use. Defaults to the existing group ID.",
-        example = "corp.internal.openrewrite.recipe",
-        required = false)
+            description = "The new group ID to use. Defaults to the existing group ID.",
+            example = "corp.internal.openrewrite.recipe",
+            required = false)
     @Nullable
     String newGroupId;
 
     @Option(displayName = "New artifact ID",
-        description = "The new artifact ID to use. Defaults to the existing artifact ID.",
-        example = "my-new-maven-plugin",
-        required = false)
+            description = "The new artifact ID to use. Defaults to the existing artifact ID.",
+            example = "my-new-maven-plugin",
+            required = false)
     @Nullable
     String newArtifact;
 
@@ -99,12 +98,12 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
             }
 
             private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue,
-                ExecutionContext ctx) {
+                                                ExecutionContext ctx) {
                 Optional<Xml.Tag> childTag = tag.getChild(childTagName);
                 if (childTag.isPresent() && !newValue.equals(
-                    childTag.get().getValue().orElse(null))) {
+                        childTag.get().getValue().orElse(null))) {
                     tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(),
-                        newValue).visitNonNull(tag, ctx);
+                            newValue).visitNonNull(tag, ctx);
                 }
                 return tag;
             }
