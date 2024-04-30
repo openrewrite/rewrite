@@ -50,6 +50,13 @@ public class AddSettingsPlugin extends Recipe {
     @Nullable
     String versionPattern;
 
+    @Option(displayName = "Apply plugin",
+            description = "Immediate apply the plugin. Defaults to `true`.",
+            valid = {"true", "false"},
+            required = false)
+    @Nullable
+    Boolean apply;
+
     @Override
     public String getDisplayName() {
         return "Add Gradle settings plugin";
@@ -73,7 +80,7 @@ public class AddSettingsPlugin extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
                 new IsSettingsGradle<>(),
-                new AddPluginVisitor(pluginId, StringUtils.isBlank(version) ? "latest.release" : version, versionPattern)
+                new AddPluginVisitor(pluginId, StringUtils.isBlank(version) ? "latest.release" : version, versionPattern, apply)
         );
     }
 }

@@ -181,7 +181,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                 return cu;
             }
 
-            cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null)
+            cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null, null)
                     .visitNonNull(cu, ctx);
             cu = (G.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
                     .visitNonNull(cu, ctx);
