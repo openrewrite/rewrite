@@ -35,7 +35,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class MavenVisitor<P> extends XmlVisitor<P> {
 
     static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
-    static final XPathMatcher PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("/project/*/plugins/plugin/dependencies/dependency");
+    static final XPathMatcher PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("//plugins/plugin/dependencies/dependency");
     static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
