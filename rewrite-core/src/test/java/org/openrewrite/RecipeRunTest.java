@@ -23,7 +23,8 @@ import org.openrewrite.text.FindAndReplace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RecipeRunTest implements RewriteTest {
+class RecipeRunTest implements RewriteTest {
+    @DocumentExample
     @Test
     void printDatatable() {
         rewriteRun(
@@ -38,7 +39,8 @@ public class RecipeRunTest implements RewriteTest {
                   "The source path of the file before the run.","A recipe may modify the source path. This is the path after the run.","In a hierarchical recipe, the parent of the recipe that made a change. Empty if this is the root of a hierarchy or if the recipe is not hierarchical at all.","The specific recipe that made a change.","An estimated effort that a developer to fix manually instead of using this recipe, in unit of seconds.","The recipe cycle in which the change was made."
                   "file.txt","file.txt","","org.openrewrite.text.FindAndReplace","300","1"
                   """);
-            }), text("""
+            }), text(
+                """
             replace_me
             """, """
             replacement

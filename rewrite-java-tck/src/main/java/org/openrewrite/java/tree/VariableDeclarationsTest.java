@@ -282,4 +282,3 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 }
-

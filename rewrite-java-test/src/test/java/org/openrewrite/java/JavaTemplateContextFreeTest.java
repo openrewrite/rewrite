@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -33,6 +34,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavaTemplateContextFreeTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void replaceMethodBody() {
         rewriteRun(

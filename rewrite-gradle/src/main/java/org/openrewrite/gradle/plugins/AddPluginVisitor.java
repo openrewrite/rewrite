@@ -55,6 +55,9 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     @Nullable
     String versionPattern;
 
+    @Nullable
+    Boolean apply;
+
     private static @Nullable Comment getLicenseHeader(G.CompilationUnit cu) {
         if (!cu.getStatements().isEmpty()) {
             Statement firstStatement = cu.getStatements().get(0);
@@ -136,7 +139,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
             String delimiter = singleQuote.get() < doubleQuote.get() ? "\"" : "'";
             String source = "plugins {\n" +
-                            "    id " + delimiter + pluginId + delimiter + (version != null ? " version " + delimiter + version + delimiter : "") + "\n" +
+                            "    id " + delimiter + pluginId + delimiter + (version != null ? " version " + delimiter + version + delimiter : "") + (version != null && Boolean.FALSE.equals(apply) ? " apply " + apply : "") + "\n" +
                             "}";
             Statement statement = GradleParser.builder().build()
                     .parseInputs(singletonList(Parser.Input.fromString(source)), null, ctx)

@@ -16,19 +16,21 @@
 package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
-public class ChangePluginVersionTest implements RewriteTest {
+class ChangePluginVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi());
     }
 
+    @DocumentExample
     @Test
     void change() {
         rewriteRun(

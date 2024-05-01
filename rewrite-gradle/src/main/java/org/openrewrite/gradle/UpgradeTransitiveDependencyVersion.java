@@ -43,10 +43,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -370,24 +367,30 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            J withConstraint = (J) GradleParser.builder().build().parse(String.format(
-                    "plugin { id 'java' }\n" +
-                    "dependencies { constraints {\n" +
-                    "    %s('%s')%s\n" +
-                    "}}",
-                    config,
+            Optional<G.CompilationUnit> withConstraint = GradleParser.builder().build().parse(String.format(
+                    "plugins {\n" +
+                    "    id 'java'\n" +
+                    "}\n" +
+                    "dependencies {\n" +
+                    "    constraints {\n" +
+                    "        implementation('%s')%s\n" +
+                    "    }\n" +
+                    "}",
                     gav,
-                    because == null ? "" : String.format(" {\n   because '%s'\n}", because)
-            )).findFirst().orElseThrow(() -> new IllegalStateException("Unable to parse constraint"));
+                    because == null ? "" : String.format(" {\n            because '%s'\n        }", because)
+            )).findFirst().map(G.CompilationUnit.class::cast);
 
-            Statement constraint = FindMethods.find(withConstraint, CONSTRAINT_MATCHER, true)
-                    .stream()
-                    .filter(J.MethodInvocation.class::isInstance)
-                    .map(J.MethodInvocation.class::cast)
-                    .filter(m2 -> m2.getSimpleName().equals(config))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Unable to find constraint"))
-                    .withMarkers(Markers.EMPTY);
+            J.MethodInvocation constraint = withConstraint.map(it -> (J.MethodInvocation) it.getStatements().get(1))
+                    .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
+                    .map(dependenciesClosure -> (J.Block)dependenciesClosure.getBody())
+                    .map(dependenciesBody -> (J.Return) dependenciesBody.getStatements().get(0))
+                    .map(returnConstraints -> (J.MethodInvocation) returnConstraints.getExpression())
+                    .map(constraintsInvocation -> (J.Lambda) constraintsInvocation.getArguments().get(0))
+                    .map(constraintsLambda -> (J.Block) constraintsLambda.getBody())
+                    .map(constraintsBlock -> (J.Return) constraintsBlock.getStatements().get(0))
+                    .map(returnConfiguration -> (J.MethodInvocation) returnConfiguration.getExpression())
+                    .map(it -> it.withName(it.getName().withSimpleName(config)))
+                    .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
 
             m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                 if(!(arg instanceof J.Lambda)) {

@@ -32,7 +32,8 @@ class ChangeValueTest implements RewriteTest {
             "$.metadata.name",
             "\"monitoring\""
           )),
-          json("""
+          json(
+                """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -61,7 +62,8 @@ class ChangeValueTest implements RewriteTest {
             "$.subjects.kind",
             "\"Deployment\""
           )),
-          json("""
+          json(
+                """
               {
                 "subjects": [
                   {
