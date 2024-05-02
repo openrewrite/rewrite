@@ -2933,7 +2933,7 @@ public interface J extends Tree {
         }
 
         public InstanceOf withExpression(Expression expression) {
-            return getPadding().withExpr(this.expression.withElement(expression));
+            return getPadding().withExpression(this.expression.withElement(expression));
         }
 
         @With
@@ -2991,10 +2991,20 @@ public interface J extends Tree {
         public static class Padding {
             private final InstanceOf t;
 
+            public JRightPadded<Expression> getExpression() {
+                return t.expression;
+            }
+
+            public InstanceOf withExpression(JRightPadded<Expression> expression) {
+                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+            }
+
+            @Deprecated
             public JRightPadded<Expression> getExpr() {
                 return t.expression;
             }
 
+            @Deprecated
             public InstanceOf withExpr(JRightPadded<Expression> expression) {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
             }

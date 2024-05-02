@@ -676,7 +676,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitInstanceOf(InstanceOf instanceOf, PrintOutputCapture<P> p) {
         beforeSyntax(instanceOf, Space.Location.INSTANCEOF_PREFIX, p);
-        visitRightPadded(instanceOf.getPadding().getExpr(), JRightPadded.Location.INSTANCEOF, "instanceof", p);
+        visitRightPadded(instanceOf.getPadding().getExpression(), JRightPadded.Location.INSTANCEOF, "instanceof", p);
         visit(instanceOf.getClazz(), p);
         visit(instanceOf.getPattern(), p);
         afterSyntax(instanceOf, p);
