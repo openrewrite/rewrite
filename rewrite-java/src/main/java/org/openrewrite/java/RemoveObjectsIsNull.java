@@ -67,7 +67,7 @@ public class RemoveObjectsIsNull extends Recipe {
                 // Replace the method invocation with a simple null check
                 Expression e = m.getArguments().get(0);
                 Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), e);
-                return (Expression) new UnnecessaryParenthesesVisitor().visitNonNull(replaced, ctx, getCursor());
+                return (Expression) new UnnecessaryParenthesesVisitor<>().visitNonNull(replaced, ctx, getCursor());
             }
         });
     }

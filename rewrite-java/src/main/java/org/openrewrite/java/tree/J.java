@@ -3254,7 +3254,7 @@ public interface J extends Tree {
             }
 
             public Parameters withParameters(List<J> parameters) {
-                return getPadding().withParams(JRightPadded.withElements(this.parameters, parameters));
+                return getPadding().withParameters(JRightPadded.withElements(this.parameters, parameters));
             }
 
             @Transient
@@ -3281,10 +3281,20 @@ public interface J extends Tree {
             public static class Padding {
                 private final Parameters t;
 
+                public List<JRightPadded<J>> getParameters() {
+                    return t.parameters;
+                }
+
+                public Parameters withParameters(List<JRightPadded<J>> parameters) {
+                    return t.parameters == parameters ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, parameters);
+                }
+
+                @Deprecated
                 public List<JRightPadded<J>> getParams() {
                     return t.parameters;
                 }
 
+                @Deprecated
                 public Parameters withParams(List<JRightPadded<J>> parameters) {
                     return t.parameters == parameters ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, parameters);
                 }

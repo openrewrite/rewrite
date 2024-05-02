@@ -790,8 +790,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 )
         );
         l = l.withParameters(
-                l.getParameters().getPadding().withParams(
-                        ListUtils.map(l.getParameters().getPadding().getParams(),
+                l.getParameters().getPadding().withParameters(
+                        ListUtils.map(l.getParameters().getPadding().getParameters(),
                                 param -> visitRightPadded(param, JRightPadded.Location.LAMBDA_PARAM, p)
                         )
                 )
