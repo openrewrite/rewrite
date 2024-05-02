@@ -113,14 +113,11 @@ public class JRightPadded<T> {
 
     @Nullable
     public static <T> JRightPadded<T> withElement(@Nullable JRightPadded<T> before, @Nullable T element) {
-        if (before == null) {
-            if (element == null) {
-                return null;
-            }
-            return new JRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
-        }
         if (element == null) {
             return null;
+        }
+        if (before == null) {
+            return new JRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
         }
         return before.withElement(element);
     }
