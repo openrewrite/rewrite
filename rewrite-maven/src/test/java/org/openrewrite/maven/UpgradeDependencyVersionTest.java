@@ -1028,6 +1028,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = { "3.0.12.RELEASE", "=3.0.12.RELEASE" })
+    @Issue("https://github.com/openrewrite/rewrite/issues/4166")
     void upgradeToExactVersion(String version) {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.thymeleaf", "thymeleaf-spring5", version, null,

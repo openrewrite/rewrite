@@ -27,7 +27,7 @@ public class ExactVersion extends LatestRelease {
 
     public ExactVersion(String pattern) {
         super(pattern);
-        if(pattern.startsWith("=")) {
+        if (pattern.startsWith("=")) {
             this.version = pattern.substring(1);
         } else {
             this.version = pattern;
@@ -40,7 +40,7 @@ public class ExactVersion extends LatestRelease {
     }
 
     public static Validated<ExactVersion> build(String pattern) {
-        if(pattern.startsWith("=")) {
+        if (pattern.startsWith("=")) {
             return Validated.valid("exactVersion", new ExactVersion(pattern));
         }
         String versionOnly;
