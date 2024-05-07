@@ -140,9 +140,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             if (!j.getModifiers().isEmpty()) {
                 j = j.withModifiers(withNewline(j.getModifiers()));
             } else {
-                J.ClassDeclaration.Kind kind = j.getAnnotations().getKind();
+                J.ClassDeclaration.Kind kind = j.getPadding().getKind();
                 if (!kind.getPrefix().getWhitespace().contains("\n")) {
-                    j = j.getAnnotations().withKind(kind.withPrefix(
+                    j = j.getPadding().withKind(kind.withPrefix(
                             kind.getPrefix().withWhitespace("\n" + kind.getPrefix().getWhitespace())
                     ));
                 }
