@@ -63,7 +63,7 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
 
         if (!c.getPadding().getKind().getPrefix().isEmpty()) {
             c = concatenatePrefix(c, c.getPadding().getKind().getPrefix());
-            c = c.getAnnotations().withKind(c.getPadding().getKind().withPrefix(Space.EMPTY));
+            c = c.getPadding().withKind(c.getPadding().getKind().withPrefix(Space.EMPTY));
             return c;
         }
 

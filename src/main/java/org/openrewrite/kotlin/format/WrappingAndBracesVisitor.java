@@ -188,7 +188,7 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
             if (!k.getPrefix().getWhitespace().contains("\n")) {
                 k = k.withPrefix(withNewline(k.getPrefix()));
             }
-            c = c.getAnnotations().withKind(k);
+            c = c.getPadding().withKind(k);
         }
 
         if (!c.getLeadingAnnotations().isEmpty()) {
@@ -207,7 +207,7 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
                 Space kindPrefix = kind.getPrefix();
                 if (!kindPrefix.getWhitespace().contains("\n") && kindPrefix.getComments().isEmpty()) {
                     kindPrefix = kindPrefix.withWhitespace("\n" + kindPrefix.getWhitespace());
-                    c = c.getAnnotations().withKind(kind.withPrefix(kindPrefix));
+                    c = c.getPadding().withKind(kind.withPrefix(kindPrefix));
                 }
             }
         }
