@@ -175,7 +175,7 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
         c = c.withLeadingAnnotations(withNewlines(c.getLeadingAnnotations()));
 
-        J.ClassDeclaration.Kind k = c.getAnnotations().getKind();
+        J.ClassDeclaration.Kind k = c.getPadding().getKind();
         List<J.Annotation> leadingAnnotations = k.getAnnotations();
         if (!leadingAnnotations.isEmpty()) {
             leadingAnnotations = ListUtils.map(leadingAnnotations, (index, anno) -> {
@@ -203,7 +203,7 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
             if (hasModifier) {
                 c = c.withModifiers(withNewline(c.getModifiers()));
             } else {
-                J.ClassDeclaration.Kind kind = c.getAnnotations().getKind();
+                J.ClassDeclaration.Kind kind = c.getPadding().getKind();
                 Space kindPrefix = kind.getPrefix();
                 if (!kindPrefix.getWhitespace().contains("\n") && kindPrefix.getComments().isEmpty()) {
                     kindPrefix = kindPrefix.withWhitespace("\n" + kindPrefix.getWhitespace());

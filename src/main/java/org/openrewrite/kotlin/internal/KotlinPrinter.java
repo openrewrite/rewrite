@@ -653,8 +653,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
 
             String kind = getClassKind(classDecl);
-            visit(classDecl.getAnnotations().getKind().getAnnotations(), p);
-            visitSpace(classDecl.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
+            visit(classDecl.getPadding().getKind().getAnnotations(), p);
+            visitSpace(classDecl.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
 
             KObject KObject = classDecl.getMarkers().findFirst(KObject.class).orElse(null);
             if (KObject != null) {
