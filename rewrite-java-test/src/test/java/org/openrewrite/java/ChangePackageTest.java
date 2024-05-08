@@ -1582,16 +1582,16 @@ class ChangePackageTest implements RewriteTest {
             """
               @org.openrewrite.MyAnnotation(myEnum = org.openrewrite.MyEnum.BAR)
               package com.acme;
-               """,
+              """,
             """
               @org.openrewrite.test.MyAnnotation(myEnum = org.openrewrite.test.MyEnum.BAR)
               package com.acme;
-               """,
+              """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.MyAnnotation")).isEmpty();
                 assertThat(cu.findType("org.openrewrite.test.MyAnnotation")).isNotEmpty();
-                assertThat(cu.findType("org.openrewrite.MyEnum.BAR")).isEmpty();
-                assertThat(cu.findType("org.openrewrite.test.MyEnum.BAR")).isNotEmpty();
+                assertThat(cu.findType("org.openrewrite.MyEnum")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty();
             })
           )
         );
