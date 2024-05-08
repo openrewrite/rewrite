@@ -232,11 +232,7 @@ public class ChangeParentPom extends Recipe {
                                 doAfterVisit(new RemoveRedundantDependencyVersions(null, null, false, null).getVisitor());
                             }
                         } catch (MavenDownloadingException e) {
-                            for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
-                                MavenRepository repository = repositoryResponse.getKey();
-                                metadataFailures.insertRow(ctx, new MavenMetadataFailures.Row(targetGroupId, targetArtifactId, newVersion,
-                                        repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
-                            }
+                            metadataFailures.insertRow(ctx, e);
                             return e.warn(tag);
                         }
                     }

@@ -268,6 +268,33 @@ public class MethodMatcher {
         return matchesParameterTypes(parameterTypes);
     }
 
+    public boolean matches(J.MethodDeclaration method, J.NewClass enclosing) {
+        if (enclosing.getType() == null) {
+            return false;
+        }
+
+        // aspectJUtils does not support matching classes separated by packages.
+        // [^.]* is the product of a fully wild card match for a method. `* foo()`
+        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern()))
+                                    || TypeUtils.isAssignableTo(targetType, enclosing.getType());
+        if (!matchesTargetType) {
+            return false;
+        }
+
+        if (method.getMethodType() != null && !matchesMethodName(method.getMethodType().getName())) {
+            return false;
+        }
+
+        List<JavaType> parameterTypes =
+                method
+                        .getParameters()
+                        .stream()
+                        .map(MethodMatcher::variableDeclarationsType)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+        return matchesParameterTypes(parameterTypes);
+    }
+
     @Nullable
     private static JavaType variableDeclarationsType(Statement v) {
         if (v instanceof J.VariableDeclarations) {

@@ -94,6 +94,38 @@ class ChangeMethodNameTest implements RewriteTest {
     }
 
     @Test
+    void changeMethodNameForOverriddenMethodAnonymousClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", true, null)),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              package com.abc;
+              class A {
+                   public void test() {
+                       new B() {
+                           @Override
+                           public void singleArg(String s) {}
+                       };
+                   }
+              }
+              """,
+            """
+              package com.abc;
+              class A {
+                   public void test() {
+                       new B() {
+                           @Override
+                           public void bar(String s) {}
+                       };
+                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @SuppressWarnings("MethodMayBeStatic")
     void changeMethodNameForOverriddenMethodMatchOverridesFalse() {

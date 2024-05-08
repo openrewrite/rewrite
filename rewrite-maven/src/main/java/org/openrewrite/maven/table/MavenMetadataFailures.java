@@ -23,7 +23,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.maven.tree.MavenRepository;
 
 import java.util.Map;
 
@@ -54,19 +53,35 @@ public class MavenMetadataFailures extends DataTable<MavenMetadataFailures.Row> 
         try {
             return download.download();
         } catch (MavenDownloadingException e) {
+            insertRow(ctx, e);
             GroupArtifactVersion failedOn = e.getFailedOn();
-            for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
+            for (Map.Entry<String, String> repositoryResponse : e.getRepositoryUriToResponse().entrySet()) {
                 insertRow(ctx, new Row(
                         failedOn.getGroupId(),
                         failedOn.getArtifactId(),
                         failedOn.getVersion(),
-                        repositoryResponse.getKey().getUri(),
-                        repositoryResponse.getKey().getSnapshots(),
-                        repositoryResponse.getKey().getReleases(),
+                        repositoryResponse.getKey(),
+                        null,
+                        null,
                         repositoryResponse.getValue()
                 ));
             }
             throw e;
+        }
+    }
+
+    public void insertRow(ExecutionContext ctx, MavenDownloadingException e) {
+        GroupArtifactVersion failedOn = e.getFailedOn();
+        for (Map.Entry<String, String> repositoryResponse : e.getRepositoryUriToResponse().entrySet()) {
+            insertRow(ctx, new Row(
+                    failedOn.getGroupId(),
+                    failedOn.getArtifactId(),
+                    failedOn.getVersion(),
+                    repositoryResponse.getKey(),
+                    null,
+                    null,
+                    repositoryResponse.getValue()
+            ));
         }
     }
 }

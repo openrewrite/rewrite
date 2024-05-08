@@ -241,7 +241,7 @@ public class MavenPomDownloader {
 
         MavenMetadata mavenMetadata = null;
         Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
-        Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
+        Map<String, String> repositoryUriToResponses = new LinkedHashMap<>();
         List<String> attemptedUris = new ArrayList<>(normalizedRepos.size());
         for (MavenRepository repo : normalizedRepos) {
             ctx.getResolutionListener().repository(repo, containingPom);
@@ -272,13 +272,13 @@ public class MavenPomDownloader {
                         result = Optional.of(MavenMetadata.parse(responseBody));
                     }
                 } catch (HttpSenderResponseException e) {
-                    repositoryResponses.put(repo, e.getMessage());
+                    repositoryUriToResponses.put(repo.getUri(), e.getMessage());
                     if (e.isClientSideException()) {
                         //If we have a 400-404, cache an empty result.
                         cacheEmptyResult = true;
                     }
                 } catch (IOException e) {
-                    repositoryResponses.put(repo, e.getMessage());
+                    repositoryUriToResponses.put(repo.getUri(), e.getMessage());
                 }
 
                 if (result == null) {
@@ -295,7 +295,7 @@ public class MavenPomDownloader {
                             result = Optional.of(derivedMeta);
                         }
                     } catch (HttpSenderResponseException | MavenDownloadingException | IOException e) {
-                        repositoryResponses.put(repo, e.getMessage());
+                        repositoryUriToResponses.put(repo.getUri(), e.getMessage());
                     }
                 }
                 if (result == null && cacheEmptyResult) {
@@ -304,7 +304,7 @@ public class MavenPomDownloader {
                     mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, null);
                 }
             } else if (!result.isPresent()) {
-                repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
+                repositoryUriToResponses.put(repo.getUri(), "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
 
             // Merge metadata from repository and cache metadata result.
@@ -322,7 +322,7 @@ public class MavenPomDownloader {
             sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
             ctx.getResolutionListener().downloadError(gav, attemptedUris, null);
             throw new MavenDownloadingException("Unable to download metadata.", null, gav)
-                    .setRepositoryResponses(repositoryResponses);
+                    .setRepositoryUriToResponse(repositoryUriToResponses);
         }
 
         sample.stop(timer.tags("outcome", "success").register(Metrics.globalRegistry));
@@ -516,7 +516,7 @@ public class MavenPomDownloader {
         Timer.Sample sample = Timer.start();
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "pom");
 
-        Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
+        Map<String, String> repositoryUriToResponses = new LinkedHashMap<>();
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         GroupArtifactVersion originalGav = gav;
         gav = handleSnapshotTimestampVersion(gav);
@@ -577,7 +577,7 @@ public class MavenPomDownloader {
                         }
                     } catch (IOException e) {
                         // unable to read the pom from a file-based repository.
-                        repositoryResponses.put(repo, e.getMessage());
+                        repositoryUriToResponses.put(repo.getUri(), e.getMessage());
                     }
                 } else {
                     try {
@@ -597,26 +597,26 @@ public class MavenPomDownloader {
                         sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
                         return pom;
                     } catch (HttpSenderResponseException e) {
-                        repositoryResponses.put(repo, e.getMessage());
+                        repositoryUriToResponses.put(repo.getUri(), e.getMessage());
                         if (e.isClientSideException()) {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
                         }
                     } catch (IOException e) {
-                        repositoryResponses.put(repo, e.getMessage());
+                        repositoryUriToResponses.put(repo.getUri(), e.getMessage());
                     }
                 }
             } else if (result.isPresent()) {
                 sample.stop(timer.tags("outcome", "cached").register(Metrics.globalRegistry));
                 return result.get();
             } else {
-                repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
+                repositoryUriToResponses.put(repo.getUri(), "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
         }
         ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
         sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
         throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
-                .setRepositoryResponses(repositoryResponses);
+                .setRepositoryUriToResponse(repositoryUriToResponses);
     }
 
     /**

@@ -38,5 +38,11 @@ class SemverTest {
           .isInstanceOf(CaretRange.class);
         assertThat(Semver.validate("[1.5,2)", null).getValue())
           .isInstanceOf(SetRange.class);
+        assertThat(Semver.validate("1.5.1", null).getValue())
+          .isInstanceOf(ExactVersion.class);
+        assertThat(Semver.validate("=1.5.1", null).getValue())
+          .isInstanceOf(ExactVersion.class);
+        assertThat(Semver.validate("=1.5-1", null).getValue())
+          .isInstanceOf(ExactVersion.class);
     }
 }

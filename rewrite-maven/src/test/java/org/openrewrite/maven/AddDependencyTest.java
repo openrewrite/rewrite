@@ -913,6 +913,77 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void preferRootPom() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>project1</module>
+                        <module>project2</module>
+                    </modules>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>project1</module>
+                        <module>project2</module>
+                    </modules>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project1",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project1</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+                """)
+          ),
+          mavenProject("project2",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project2</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void rawVisitorDoesNotDuplicate() {
         rewriteRun(
           spec -> spec.recipe(
@@ -968,82 +1039,82 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>org.springframework.samples</groupId>
-                      <artifactId>spring-petclinic</artifactId>
-                      <version>2.7.3</version>
-                    
-                      <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>3.0.5</version>
-                      </parent>
-                      <name>petclinic</name>
-                    
-                      <properties>
-                        <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
-                    
-                        <java.version>17</java.version>
-                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-                        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-                    
-                        <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
-                        <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
-                    
-                        <jacoco.version>0.8.8</jacoco.version>
-                    
-                      </properties>
-                    
-                      <dependencies>
-                        <dependency>
-                          <groupId>org.springframework.boot</groupId>
-                          <artifactId>spring-boot-starter-data-jpa</artifactId>
-                        </dependency>
-                      </dependencies>
-                    
-                    </project>
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.springframework.samples</groupId>
+                  <artifactId>spring-petclinic</artifactId>
+                  <version>2.7.3</version>
+                
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.0.5</version>
+                  </parent>
+                  <name>petclinic</name>
+                
+                  <properties>
+                    <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
+                
+                    <java.version>17</java.version>
+                    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+                
+                    <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
+                    <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
+                
+                    <jacoco.version>0.8.8</jacoco.version>
+                
+                  </properties>
+                
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-data-jpa</artifactId>
+                    </dependency>
+                  </dependencies>
+                
+                </project>
                 """,
               """
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>org.springframework.samples</groupId>
-                      <artifactId>spring-petclinic</artifactId>
-                      <version>2.7.3</version>
-                    
-                      <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>3.0.5</version>
-                      </parent>
-                      <name>petclinic</name>
-                    
-                      <properties>
-                        <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
-                    
-                        <java.version>17</java.version>
-                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-                        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-                    
-                        <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
-                        <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
-                    
-                        <jacoco.version>0.8.8</jacoco.version>
-                    
-                      </properties>
-                    
-                      <dependencies>
-                        <dependency>
-                          <groupId>jakarta.xml.bind</groupId>
-                          <artifactId>jakarta.xml.bind-api</artifactId>
-                        </dependency>
-                        <dependency>
-                          <groupId>org.springframework.boot</groupId>
-                          <artifactId>spring-boot-starter-data-jpa</artifactId>
-                        </dependency>
-                      </dependencies>
-                    
-                    </project>
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.springframework.samples</groupId>
+                  <artifactId>spring-petclinic</artifactId>
+                  <version>2.7.3</version>
+                
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.0.5</version>
+                  </parent>
+                  <name>petclinic</name>
+                
+                  <properties>
+                    <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
+                
+                    <java.version>17</java.version>
+                    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+                
+                    <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
+                    <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
+                
+                    <jacoco.version>0.8.8</jacoco.version>
+                
+                  </properties>
+                
+                  <dependencies>
+                    <dependency>
+                      <groupId>jakarta.xml.bind</groupId>
+                      <artifactId>jakarta.xml.bind-api</artifactId>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-data-jpa</artifactId>
+                    </dependency>
+                  </dependencies>
+                
+                </project>
                 """
             )
           )
@@ -1105,7 +1176,11 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    private AddDependency addDependency(String gav, String onlyIfUsing) {
+    private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
+        return addDependency(gav, null, null, null);
+    }
+
+    private AddDependency addDependency(String gav, @Nullable String onlyIfUsing) {
         return addDependency(gav, onlyIfUsing, null, null);
     }
 
@@ -1114,11 +1189,11 @@ class AddDependencyTest implements RewriteTest {
         return addDependency(gav, onlyIfUsing, null, acceptTransitive);
     }
 
-    private AddDependency addDependency(String gav, String onlyIfUsing, @Nullable String scope) {
+    private AddDependency addDependency(String gav, @Nullable String onlyIfUsing, @Nullable String scope) {
         return addDependency(gav, onlyIfUsing, scope, null);
     }
 
-    private AddDependency addDependency(String gav, String onlyIfUsing, @Nullable String scope, @Nullable Boolean acceptTransitive) {
+    private AddDependency addDependency(String gav, @Nullable String onlyIfUsing, @Nullable String scope, @Nullable Boolean acceptTransitive) {
         String[] gavParts = gav.split(":");
         return new AddDependency(gavParts[0], gavParts[1], gavParts[2], null, scope, true, onlyIfUsing, null, null,
           false, null, acceptTransitive);

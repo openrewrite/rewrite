@@ -542,7 +542,8 @@ public class ImportLayoutStyle implements JavaStyle {
 
         private void setJVMClassNames() {
             for (JavaType.FullyQualified fqn : classpath) {
-                if ("java.lang".equals(fqn.getPackageName())) {
+                // first check `getFullyQualifiedName()` to avoid unnecessary allocations
+                if (fqn.getFullyQualifiedName().startsWith("java.lang.") && "java.lang".equals(fqn.getPackageName())) {
                     jvmClasspathNames.add(fqn.getClassName());
                 }
             }
@@ -554,7 +555,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
             for (JRightPadded<J.Import> anImport : originalImports) {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
-                nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>())
+                nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>(3))
                                 .add(anImport.getElement().getPackageName());
             }
 
@@ -562,24 +563,18 @@ public class ImportLayoutStyle implements JavaStyle {
                 String packageName = classGraphFqn.getPackageName();
                 if (checkPackageForClasses.contains(packageName)) {
                     String className = classGraphFqn.getClassName();
-                    Set<String> packages = nameToPackages.getOrDefault(className, new HashSet<>());
-                    packages.add(packageName);
-                    nameToPackages.put(className, packages);
+                    nameToPackages.computeIfAbsent(className, p -> new HashSet<>(3)).add(packageName);
                 } else if (checkPackageForClasses.contains(classGraphFqn.getFullyQualifiedName())) {
                     packageName = classGraphFqn.getFullyQualifiedName();
                     for (JavaType.Variable member : classGraphFqn.getMembers()) {
-                        if (member.getFlags().contains(Flag.Static)) {
-                            Set<String> packages = nameToPackages.getOrDefault(member.getName(), new HashSet<>());
-                            packages.add(packageName);
-                            nameToPackages.put(member.getName(), packages);
+                        if (member.hasFlags(Flag.Static)) {
+                            nameToPackages.computeIfAbsent(member.getName(), p -> new HashSet<>(3)).add(packageName);
                         }
                     }
 
                     for (JavaType.Method method : classGraphFqn.getMethods()) {
-                        if (method.getFlags().contains(Flag.Static)) {
-                            Set<String> packages = nameToPackages.getOrDefault(method.getName(), new HashSet<>());
-                            packages.add(packageName);
-                            nameToPackages.put(method.getName(), packages);
+                        if (method.hasFlags(Flag.Static)) {
+                            nameToPackages.computeIfAbsent(method.getName(), p -> new HashSet<>(3)).add(packageName);
                         }
                     }
                 }

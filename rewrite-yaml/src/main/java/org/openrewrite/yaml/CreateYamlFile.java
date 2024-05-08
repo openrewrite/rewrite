@@ -21,8 +21,10 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.remote.Remote;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -48,6 +50,13 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
             required = false)
     @Nullable
     String fileContents;
+
+    @Option(displayName = "File contents URL",
+            description = "URL to file containing text content for the file. Use either `fileContents` or `fileContentsUrl` option.",
+            example = "http://foo.bar/baz.yaml",
+            required = false)
+    @Nullable
+    String fileContentsUrl;
 
     @Option(displayName = "Overwrite existing file",
             description = "If there is an existing file, should it be overwritten.",
@@ -92,14 +101,18 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
             @Override
             public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(documents.getSourcePath())) {
-                    if (StringUtils.isBlank(fileContents)) {
+                    @Language("yml") String yamlContents = fileContents;
+                    if (yamlContents == null && fileContentsUrl != null) {
+                        yamlContents = Remote.builder(path, URI.create(fileContentsUrl)).build().printAll(ctx);
+                    }
+                    if (StringUtils.isBlank(yamlContents)) {
                         return documents.withDocuments(emptyList());
                     }
-                    if (documents.printAll().equals(fileContents)) {
+                    if (documents.printAll().equals(yamlContents)) {
                         return documents;
                     }
                     Optional<SourceFile> sourceFiles = YamlParser.builder().build()
-                            .parse(fileContents)
+                            .parse(yamlContents)
                             .findFirst();
                     if (sourceFiles.isPresent()) {
                         SourceFile sourceFile = sourceFiles.get();

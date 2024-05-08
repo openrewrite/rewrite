@@ -48,7 +48,7 @@ public class MavenDownloadingException extends Exception {
      * or a reason why the downloaded artifact was invalid from a given repository.
      */
     @NonFinal
-    private Map<MavenRepository, String> repositoryResponses = Collections.emptyMap();
+    private Map<String, String> repositoryUriToResponse = Collections.emptyMap();
 
     public MavenDownloadingException setRoot(GroupArtifactVersion root) {
         this.root = root;
@@ -60,13 +60,13 @@ public class MavenDownloadingException extends Exception {
     }
 
     /**
-     * @param repositoryResponses The HTTP response codes of the repositories that were tried, as an
+     * @param repositoryUriToResponse The HTTP response codes of the repositories that were tried, as an
      *                            instance of {@link Map} that iterates the responses in the order in
      *                            which the repositories were tried.
      * @return This exception instance.
      */
-    public MavenDownloadingException setRepositoryResponses(Map<MavenRepository, String> repositoryResponses) {
-        this.repositoryResponses = repositoryResponses;
+    public MavenDownloadingException setRepositoryUriToResponse(Map<String, String> repositoryUriToResponse) {
+        this.repositoryUriToResponse = repositoryUriToResponse;
         return this;
     }
 
@@ -83,10 +83,10 @@ public class MavenDownloadingException extends Exception {
         }
         message += super.getMessage();
 
-        if (!repositoryResponses.isEmpty()) {
+        if (!repositoryUriToResponse.isEmpty()) {
             StringJoiner repos = new StringJoiner("\n");
-            for (Map.Entry<MavenRepository, String> repoResponse : repositoryResponses.entrySet()) {
-                repos.add(repoResponse.getKey().getUri() + ": " + repoResponse.getValue());
+            for (Map.Entry<String, String> repoResponse : repositoryUriToResponse.entrySet()) {
+                repos.add(repoResponse.getKey() + ": " + repoResponse.getValue());
             }
             return message + " Tried repositories:\n" + repos;
         }

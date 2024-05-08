@@ -81,6 +81,21 @@ public class XmlParser implements Parser {
                p.endsWith(".tld") ||
                p.endsWith(".xjb") ||
                p.endsWith(".jsp") ||
+               // Datastage file formats that are all xml under the hood
+               p.endsWith(".det") ||
+               p.endsWith(".pjb") ||
+               p.endsWith(".qjb") ||
+               p.endsWith(".sjb") ||
+               p.endsWith(".prt") ||
+               p.endsWith(".srt") ||
+               p.endsWith(".psc") ||
+               p.endsWith(".ssc") ||
+               p.endsWith(".tbd") ||
+               p.endsWith(".tfm") ||
+               p.endsWith(".dqs") ||
+               p.endsWith(".stp") ||
+               p.endsWith(".dcn") ||
+               p.endsWith(".pst") ||
                p.endsWith(".csproj");
     }
 
