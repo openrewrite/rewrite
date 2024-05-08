@@ -25,13 +25,14 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -163,6 +164,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public static class Scanned {
         boolean usingType;
         Map<JavaProject, String> scopeByProject = new HashMap<>();
+        Set<ResolvedGroupArtifactVersion> pomsDefinedInCurrentRepository = new HashSet<>();
     }
 
     @Override
@@ -188,6 +190,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                                 )
                         );
                     }
+                } else if(tree instanceof Xml.Document) {
+                    Xml.Document doc = (Xml.Document) tree;
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
+                    if(mrr == null) {
+                        return sourceFile;
+                    }
+                    acc.pomsDefinedInCurrentRepository.add(mrr.getPom().getGav());
                 }
                 return sourceFile;
             }
@@ -227,6 +236,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return maven;
                         }
                     }
+                }
+
+                if(onlyIfUsing == null && getResolutionResult().getParent() != null && acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav())) {
+                    return maven;
                 }
 
                 return new AddDependencyVisitor(

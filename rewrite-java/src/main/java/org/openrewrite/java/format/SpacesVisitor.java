@@ -842,8 +842,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         if (!(l.getParameters().getParameters().isEmpty() || l.getParameters().getParameters().iterator().next() instanceof J.Empty)) {
             int parametersSize = l.getParameters().getParameters().size();
             l = l.withParameters(
-                    l.getParameters().getPadding().withParams(
-                            ListUtils.map(l.getParameters().getPadding().getParams(),
+                    l.getParameters().getPadding().withParameters(
+                            ListUtils.map(l.getParameters().getPadding().getParameters(),
                                     (index, elemContainer) -> {
                                         if (index != 0) {
                                             elemContainer = elemContainer.withElement(

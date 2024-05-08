@@ -38,7 +38,7 @@ public class GStringCurlyBraces extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new GroovyVisitor<ExecutionContext>() {
             @Override
-            public J visitGStringValue(G.GString.Value value, ExecutionContext executionContext) {
+            public J visitGStringValue(G.GString.Value value, ExecutionContext ctx) {
                 return value.withEnclosedInBraces(true);
             }
         };

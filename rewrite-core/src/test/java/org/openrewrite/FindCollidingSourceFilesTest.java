@@ -28,6 +28,7 @@ class FindCollidingSourceFilesTest implements RewriteTest {
         spec.recipe(new FindCollidingSourceFiles());
     }
 
+    @DocumentExample
     @Test
     void findsCollision() {
         rewriteRun(

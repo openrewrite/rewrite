@@ -98,8 +98,8 @@ public class UpdateJavaCompatibility extends Recipe {
             final MethodMatcher javaVersionToVersionMatcher = new MethodMatcher("org.gradle.api.JavaVersion toVersion(..)");
 
             @Override
-            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
-                G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, executionContext);
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
                 if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
                     c = addCompatibilityTypeToSourceFile(c, "source");
                 }

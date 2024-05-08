@@ -1,5 +1,6 @@
 plugins {
     id("org.openrewrite.build.java-base")
+    id("org.openrewrite.build.recipe-repositories")
     id("me.champeau.gradle.jmh") version "0.5.2"
 }
 

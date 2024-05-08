@@ -76,6 +76,7 @@ public class MavenPomDownloader {
 
     @Nullable
     private MavenSettings mavenSettings;
+    private Collection<MavenRepositoryMirror> mirrors;
 
     @Nullable
     private List<String> activeProfiles;
@@ -97,6 +98,7 @@ public class MavenPomDownloader {
                               @Nullable List<String> activeProfiles) {
         this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
         this.mavenSettings = mavenSettings;
+        this.mirrors = this.ctx.getMirrors(mavenSettings);
         this.activeProfiles = activeProfiles;
     }
 
@@ -137,6 +139,7 @@ public class MavenPomDownloader {
         this.mavenCache = this.ctx.getPomCache();
         this.addCentralRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
         this.addLocalRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
+        this.mirrors = this.ctx.getMirrors(this.ctx.getSettings());
     }
 
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
@@ -861,7 +864,7 @@ public class MavenPomDownloader {
     }
 
     private MavenRepository applyMirrors(MavenRepository repository) {
-        return MavenRepositoryMirror.apply(ctx.getMirrors(mavenSettings), repository);
+        return MavenRepositoryMirror.apply(mirrors, repository);
     }
 
     @Getter

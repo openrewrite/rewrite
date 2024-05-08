@@ -15,14 +15,14 @@
  */
 package org.openrewrite.internal;
 
+import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.diff.DiffEntry;
 import org.openrewrite.jgit.diff.DiffFormatter;
 import org.openrewrite.jgit.diff.RawTextComparator;
 import org.openrewrite.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.openrewrite.jgit.internal.storage.dfs.InMemoryRepository;
 import org.openrewrite.jgit.lib.*;
-import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

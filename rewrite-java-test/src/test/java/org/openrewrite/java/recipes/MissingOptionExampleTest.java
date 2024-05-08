@@ -40,11 +40,11 @@ class MissingOptionExampleTest implements RewriteTest {
             """
               import org.openrewrite.Option;
               import org.openrewrite.Recipe;
-
+              
               class SomeRecipe extends Recipe {
                   @Option(displayName = "Test", description = "Test")
                   private String test;
-                            
+              
                   @Override
                   public String getDisplayName() {
                       return "Find missing `@Option` `example` values";
@@ -60,9 +60,9 @@ class MissingOptionExampleTest implements RewriteTest {
               import org.openrewrite.Recipe;
 
               class SomeRecipe extends Recipe {
-                  /*~~(Missing example value for documentation)~~>*/@Option(displayName = "Test", description = "Test")
+                  @Option(example = "TODO Provide a usage example for the docs", displayName = "Test", description = "Test")
                   private String test;
-                            
+              
                   @Override
                   public String getDisplayName() {
                       return "Find missing `@Option` `example` values";
@@ -84,11 +84,11 @@ class MissingOptionExampleTest implements RewriteTest {
             """
               import org.openrewrite.Option;
               import org.openrewrite.Recipe;
-
+              
               class SomeRecipe extends Recipe {
                   @Option(displayName = "Test", description = "Test", example = "true")
                   private boolean test = true;
-                            
+              
                   @Override
                   public String getDisplayName() {
                       return "Find missing `@Option` `example` values";
@@ -118,11 +118,11 @@ class MissingOptionExampleTest implements RewriteTest {
             """
               import org.openrewrite.Option;
               import org.openrewrite.Recipe;
-
+              
               class SomeRecipe extends Recipe {
                   @Option(displayName = "Test", description = "Test")
                   private %s test;
-                            
+              
                   @Override
                   public String getDisplayName() {
                       return "Find missing `@Option` `example` values";
@@ -144,11 +144,11 @@ class MissingOptionExampleTest implements RewriteTest {
             """
               import org.openrewrite.Option;
               import org.openrewrite.Recipe;
-
+              
               class SomeRecipe extends Recipe {
                   @Option(displayName = "Test", description = "Test", valid = {"foo", "bar"})
                   private String test;
-                            
+              
                   @Override
                   public String getDisplayName() {
                       return "Find missing `@Option` `example` values";

@@ -104,6 +104,7 @@ class JavaVisitorTest implements RewriteTest {
                     if ("myMethod".equals(md.getSimpleName())) {
                         //noinspection ConstantConditions
                         return (J.MethodDeclaration) new JavaIsoVisitor<ExecutionContext>() {
+                            @Override
                             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                                 doAfterVisit(afterVisitor);
                                 return super.visitMethodDeclaration(method, p);
@@ -114,7 +115,8 @@ class JavaVisitorTest implements RewriteTest {
                 }
             })
           ),
-          java("""
+          java(
+                """
            class A {
              public void method1() {
              }

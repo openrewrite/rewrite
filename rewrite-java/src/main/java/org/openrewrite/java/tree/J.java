@@ -2933,7 +2933,7 @@ public interface J extends Tree {
         }
 
         public InstanceOf withExpression(Expression expression) {
-            return getPadding().withExpr(this.expression.withElement(expression));
+            return getPadding().withExpression(this.expression.withElement(expression));
         }
 
         @With
@@ -2991,10 +2991,20 @@ public interface J extends Tree {
         public static class Padding {
             private final InstanceOf t;
 
+            public JRightPadded<Expression> getExpression() {
+                return t.expression;
+            }
+
+            public InstanceOf withExpression(JRightPadded<Expression> expression) {
+                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+            }
+
+            @Deprecated
             public JRightPadded<Expression> getExpr() {
                 return t.expression;
             }
 
+            @Deprecated
             public InstanceOf withExpr(JRightPadded<Expression> expression) {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
             }
@@ -3244,7 +3254,7 @@ public interface J extends Tree {
             }
 
             public Parameters withParameters(List<J> parameters) {
-                return getPadding().withParams(JRightPadded.withElements(this.parameters, parameters));
+                return getPadding().withParameters(JRightPadded.withElements(this.parameters, parameters));
             }
 
             @Transient
@@ -3271,10 +3281,20 @@ public interface J extends Tree {
             public static class Padding {
                 private final Parameters t;
 
+                public List<JRightPadded<J>> getParameters() {
+                    return t.parameters;
+                }
+
+                public Parameters withParameters(List<JRightPadded<J>> parameters) {
+                    return t.parameters == parameters ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, parameters);
+                }
+
+                @Deprecated
                 public List<JRightPadded<J>> getParams() {
                     return t.parameters;
                 }
 
+                @Deprecated
                 public Parameters withParams(List<JRightPadded<J>> parameters) {
                     return t.parameters == parameters ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, parameters);
                 }

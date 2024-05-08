@@ -1296,7 +1296,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     void propertySubstitution() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
-          pomXml("""
+          pomXml(
+            """
             <project>
                 <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -1320,7 +1321,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </plugins>
                 </build>
             </project>
-            """)
+            """
+          )
         );
     }
 

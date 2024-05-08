@@ -148,12 +148,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             GradleProject gradleProject;
 
             @Override
-            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
                 gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
                 if (gradleProject == null) {
                     return cu;
                 }
-                return super.visitCompilationUnit(cu, executionContext);
+                return super.visitCompilationUnit(cu, ctx);
             }
 
             @Override
@@ -284,11 +284,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         final DependencyVersionState acc;
         final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
         @Override
-        public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
+        public Properties visitFile(Properties.File file, ExecutionContext ctx) {
             if(!file.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME)) {
                 return file;
             }
-            return super.visitFile(file, executionContext);
+            return super.visitFile(file, ctx);
         }
 
         @Override

@@ -95,6 +95,7 @@ public class Assertions {
     }
 
     private static final Parser.Builder javaParser = JavaParser.fromJavaVersion()
+            .classpath(JavaParser.runtimeClasspath())
             .logCompilationWarningsAndErrors(true);
 
     public static SourceSpecs java(@Language("java") @Nullable String before, Consumer<SourceSpec<J.CompilationUnit>> spec) {
