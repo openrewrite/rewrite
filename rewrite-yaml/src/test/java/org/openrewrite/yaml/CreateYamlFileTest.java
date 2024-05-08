@@ -27,10 +27,13 @@ import org.openrewrite.test.MockHttpSender;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.Callable;
+import java.nio.file.StandardCopyOption;
 import java.util.function.Consumer;
 
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -150,18 +153,19 @@ class CreateYamlFileTest implements RewriteTest {
           .setLargeFileHttpSender(httpSender);
         RemoteExecutionContextView.view(ctx).setArtifactCache(new RemoteArtifactCache() {
             @Override
-            public @Nullable Path compute(URI uri, Callable<@Nullable InputStream> artifactStream, Consumer<Throwable> onError) {
-                return null;
-            }
-
-            @Override
             public @Nullable Path get(URI uri) {
                 return null;
             }
 
             @Override
             public @Nullable Path put(URI uri, InputStream is, Consumer<Throwable> onError) {
-                return null;
+                try {
+                    var file = File.createTempFile("rewrite", "yaml");
+                    Files.copy(is, file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    return file.toPath();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
         });
         rewriteRun(
