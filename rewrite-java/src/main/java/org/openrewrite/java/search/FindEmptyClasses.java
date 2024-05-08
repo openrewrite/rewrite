@@ -41,7 +41,7 @@ public class FindEmptyClasses extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-2094");
+        return Collections.singleton("RSPEC-S2094");
     }
 
     @Override

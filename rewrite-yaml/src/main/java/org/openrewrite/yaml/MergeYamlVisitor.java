@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static java.util.Objects.requireNonNull;
-
 @AllArgsConstructor
 @RequiredArgsConstructor
 public class MergeYamlVisitor<P> extends YamlVisitor<P> {
@@ -62,10 +60,12 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     public Yaml visitSequence(Yaml.Sequence existingSeq, P p) {
         if (scope.isScope(existingSeq)) {
             if (incoming instanceof Yaml.Mapping) {
+                // Distribute the incoming mapping to each entry in the sequence
                 return existingSeq.withEntries(ListUtils.map(existingSeq.getEntries(), (i, existingSeqEntry) -> {
-                    Yaml.Block b = (Yaml.Block) new MergeYamlVisitor<>(existingSeqEntry.getBlock(),
-                            incoming, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat).visit(existingSeqEntry.getBlock(), p, getCursor());
-                    return existingSeqEntry.withBlock(requireNonNull(b));
+                    Yaml.Block b = (Yaml.Block) new MergeYamlVisitor<>(existingSeqEntry.getBlock(), incoming,
+                            acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
+                            .visitNonNull(existingSeqEntry.getBlock(), p, new Cursor(getCursor(), existingSeqEntry));
+                    return existingSeqEntry.withBlock(b);
                 }));
             } else if (incoming instanceof Yaml.Sequence) {
                 return mergeSequence(existingSeq, (Yaml.Sequence) incoming, p, getCursor());
@@ -127,7 +127,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     private Yaml.Sequence mergeSequence(Yaml.Sequence s1, Yaml.Sequence s2, P p, Cursor cursor) {
-
         if (acceptTheirs) {
             return s1;
         }
@@ -135,7 +134,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         boolean isSequenceOfScalars = s2.getEntries().stream().allMatch(entry -> entry.getBlock() instanceof Yaml.Scalar);
 
         if (isSequenceOfScalars) {
-
             List<Yaml.Sequence.Entry> incomingEntries = new ArrayList<>(s2.getEntries());
 
             nextEntry:
@@ -154,7 +152,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             return s1.withEntries(ListUtils.concatAll(s1.getEntries(),
                     ListUtils.map(incomingEntries, incomingEntry -> autoFormat(incomingEntry, p, cursor))));
         } else {
-
             if (objectIdentifyingProperty == null) {
                 // No identifier set to match entries on, so cannot continue
                 return s1;

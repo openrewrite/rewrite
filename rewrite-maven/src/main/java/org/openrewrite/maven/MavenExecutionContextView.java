@@ -40,6 +40,8 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_MIRRORS = "org.openrewrite.maven.mirrors";
     private static final String MAVEN_CREDENTIALS = "org.openrewrite.maven.auth";
     private static final String MAVEN_LOCAL_REPOSITORY = "org.openrewrite.maven.localRepo";
+    private static final String MAVEN_ADD_LOCAL_REPOSITORY = "org.openrewrite.maven.useLocalRepo";
+    private static final String MAVEN_ADD_CENTRAL_REPOSITORY = "org.openrewrite.maven.useCentralRepo";
     private static final String MAVEN_REPOSITORIES = "org.openrewrite.maven.repos";
     private static final String MAVEN_PINNED_SNAPSHOT_VERSIONS = "org.openrewrite.maven.pinnedSnapshotVersions";
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
@@ -142,6 +144,26 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_LOCAL_REPOSITORY, MAVEN_LOCAL_DEFAULT);
     }
 
+    public MavenExecutionContextView setAddLocalRepository(boolean useLocalRepository) {
+        putMessage(MAVEN_ADD_LOCAL_REPOSITORY, useLocalRepository);
+        return this;
+    }
+
+    @Nullable
+    public Boolean getAddLocalRepository() {
+        return getMessage(MAVEN_ADD_LOCAL_REPOSITORY, null);
+    }
+
+    public MavenExecutionContextView setAddCentralRepository(boolean useCentralRepository) {
+        putMessage(MAVEN_ADD_CENTRAL_REPOSITORY, useCentralRepository);
+        return this;
+    }
+
+    @Nullable
+    public Boolean getAddCentralRepository() {
+        return getMessage(MAVEN_ADD_CENTRAL_REPOSITORY);
+    }
+
     public MavenExecutionContextView setRepositories(List<MavenRepository> repositories) {
         putMessage(MAVEN_REPOSITORIES, repositories);
         return this;
@@ -212,7 +234,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     private static List<String> mapActiveProfiles(MavenSettings settings, String... activeProfiles) {
-        if(settings.getActiveProfiles() == null) {
+        if (settings.getActiveProfiles() == null) {
             return Arrays.asList(activeProfiles);
         }
         return Stream.concat(

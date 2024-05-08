@@ -204,7 +204,7 @@ public class DependencyInsight extends Recipe {
         private boolean hasMarker = false;
 
         public Tree attachMarkers(Tree before, ExecutionContext ctx) {
-            J after = super.visitNonNull(before, ctx);
+            Tree after = super.visitNonNull(before, ctx);
             if (!hasMarker) {
                 if (after == before) {
                     attachToDependencyClosure = true;

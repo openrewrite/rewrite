@@ -142,7 +142,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
         return "Add a managed Maven dependency to a `pom.xml` file.";
     }
 
-    static class Scanned {
+    public static class Scanned {
         boolean usingType;
         List<SourceFile> rootPoms = new ArrayList<>();
     }
@@ -164,7 +164,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                         acc.rootPoms.add(document);
                     }
                 });
-                if(acc.usingType) {
+                if (acc.usingType) {
                     return SearchResult.found(document);
                 }
 
@@ -201,6 +201,9 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                 if (!Boolean.TRUE.equals(addToRootPom) || acc.rootPoms.contains(document)) {
                     ResolvedPom pom = getResolutionResult().getPom();
                     String convertedVersion = pom.getValue(version);
+                    if (convertedVersion == null) {
+                        return maven;
+                    }
                     Validated<VersionComparator> versionValidation = Semver.validate(convertedVersion, versionPattern);
                     if (versionValidation.isValid()) {
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());

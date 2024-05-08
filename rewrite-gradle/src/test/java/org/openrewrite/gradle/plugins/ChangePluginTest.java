@@ -126,4 +126,17 @@ class ChangePluginTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dontChangeExisting() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'io.moderne.rewrite' version '1.0.34'
+              }
+              """
+          )
+        );
+    }
 }

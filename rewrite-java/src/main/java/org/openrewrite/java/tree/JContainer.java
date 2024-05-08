@@ -154,14 +154,11 @@ public class JContainer<T> {
 
     @Nullable
     public static <J2 extends J> JContainer<J2> withElementsNullable(@Nullable JContainer<J2> before, @Nullable List<J2> elements) {
-        if (before == null) {
-            if (elements == null || elements.isEmpty()) {
-                return null;
-            }
-            return JContainer.build(Space.EMPTY, JRightPadded.withElements(emptyList(), elements), Markers.EMPTY);
-        }
         if (elements == null || elements.isEmpty()) {
             return null;
+        }
+        if (before == null) {
+            return JContainer.build(Space.EMPTY, JRightPadded.withElements(emptyList(), elements), Markers.EMPTY);
         }
         return before.getPadding().withElements(JRightPadded.withElements(before.elements, elements));
     }

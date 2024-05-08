@@ -16,11 +16,13 @@
 package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
 class RemoveEmptyXmlTagsTest implements RewriteTest {
+    @DocumentExample
     @Test
     void removeEmptyPluginRepositories() {
         rewriteRun(

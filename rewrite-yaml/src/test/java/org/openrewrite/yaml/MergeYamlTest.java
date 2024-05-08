@@ -167,7 +167,7 @@ class MergeYamlTest implements RewriteTest {
               widget:
                 list:
                   - item 1
-                """,
+              """,
             """
               widget:
                 list:
@@ -908,6 +908,81 @@ class MergeYamlTest implements RewriteTest {
               """,
             """
               name: sam
+              """
+          )
+        );
+    }
+
+    @Test
+    void addNewEntryToSequence() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups",
+              // language=yaml
+              """
+                - name: newName
+                  jobs:
+                    - newJob
+                """,
+              false, "name")),
+          yaml(
+            """
+              groups:
+                - name: analysis
+                  jobs:
+                    - analysis
+                - name: update
+                  jobs:
+                    - update
+              """,
+            """
+              groups:
+                - name: analysis
+                  jobs:
+                    - analysis
+                - name: update
+                  jobs:
+                    - update
+                - name: newName
+                  jobs:
+                    - newJob
+              """)
+        );
+    }
+
+    @Test
+    // Mimics `org.openrewrite.java.micronaut.UpdateSecurityYamlIfNeeded`
+    void mergeEmptyStructureFollowedByCopyValue() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new MergeYaml(
+              "$.spec",
+              //language=yaml
+              """
+                empty:
+                  initially:
+                """,
+              false,
+              null
+            ),
+            new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
+            .expectedCyclesThatMakeChanges(2),
+          yaml(
+            """
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                level1:
+                  level2: true
+              """,
+            """
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                level1:
+                  level2: true
+                empty:
+                  initially: true
               """
           )
         );

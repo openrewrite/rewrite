@@ -19,6 +19,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -28,6 +29,7 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.*;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Collections.singletonList;
@@ -43,7 +45,11 @@ public class DependencyVersionSelector {
     @Nullable
     MavenMetadataFailures metadataFailures;
 
+    @Nullable
     GradleProject gradleProject;
+
+    @Nullable
+    GradleSettings gradleSettings;
 
     /**
      * Used to select a version for a new dependency that has no prior version.
@@ -110,7 +116,7 @@ public class DependencyVersionSelector {
      */
     @Nullable
     public String select(GroupArtifactVersion gav,
-                         String configuration,
+                         @Nullable String configuration,
                          @Nullable String version,
                          @Nullable String versionPattern,
                          ExecutionContext ctx) throws MavenDownloadingException {
@@ -137,13 +143,14 @@ public class DependencyVersionSelector {
     }
 
     private Optional<String> findNewerVersion(GroupArtifactVersion gav,
-                                              String configuration,
+                                              @Nullable String configuration,
                                               VersionComparator versionComparator,
                                               ExecutionContext ctx) throws MavenDownloadingException {
         try {
-            List<MavenRepository> repos = "classpath".equals(configuration) ?
-                    gradleProject.getMavenPluginRepositories() :
-                    gradleProject.getMavenRepositories();
+            if(gav.getGroupId() == null) {
+                return Optional.empty();
+            }
+            List<MavenRepository> repos = determineRepos(configuration);
             MavenMetadata mavenMetadata = metadataFailures == null ?
                     downloadMetadata(gav.getGroupId(), gav.getArtifactId(), repos, ctx) :
                     metadataFailures.insertRows(ctx, () -> downloadMetadata(gav.getGroupId(), gav.getArtifactId(),
@@ -159,5 +166,15 @@ public class DependencyVersionSelector {
     private MavenMetadata downloadMetadata(String groupId, String artifactId, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
         return new MavenPomDownloader(ctx).downloadMetadata(
                 new GroupArtifact(groupId, artifactId), null, repositories);
+    }
+
+    private List<MavenRepository> determineRepos(@Nullable String configuration) {
+        if (gradleSettings != null) {
+            return gradleSettings.getPluginRepositories();
+        }
+        Objects.requireNonNull(gradleProject);
+        return "classpath".equals(configuration) ?
+                gradleProject.getMavenPluginRepositories() :
+                gradleProject.getMavenRepositories();
     }
 }

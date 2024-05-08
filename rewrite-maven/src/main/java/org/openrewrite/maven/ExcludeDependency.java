@@ -18,10 +18,12 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
@@ -106,23 +108,29 @@ public class ExcludeDependency extends Recipe {
                         if (individualExclusions.stream().noneMatch(exclusion ->
                                 groupId.equals(exclusion.getChildValue("groupId").orElse(null)) &&
                                 artifactId.equals(exclusion.getChildValue("artifactId").orElse(null)))) {
-                            doAfterVisit(new AddToTagVisitor<>(exclusions, Xml.Tag.build("" +
-                                                                                         "<exclusion>\n" +
-                                                                                         "<groupId>" + groupId + "</groupId>\n" +
-                                                                                         "<artifactId>" + artifactId + "</artifactId>\n" +
-                                                                                         "</exclusion>")));
+                            Xml.Tag newExclusions = (Xml.Tag) new AddToTagVisitor<>(exclusions,
+                                    Xml.Tag.build("" +
+                                                  "<exclusion>\n" +
+                                                  "<groupId>" + groupId + "</groupId>\n" +
+                                                  "<artifactId>" + artifactId + "</artifactId>\n" +
+                                                  "</exclusion>"))
+                                    .visitNonNull(exclusions, ctx, getCursor());
+                            tag = tag.withContent(ListUtils.map((List<Content>) tag.getContent(), t -> t == exclusions ? newExclusions : t));
                         }
                     } else {
-                        doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("" +
-                                                                              "<exclusions>\n" +
-                                                                              "<exclusion>\n" +
-                                                                              "<groupId>" + groupId + "</groupId>\n" +
-                                                                              "<artifactId>" + artifactId + "</artifactId>\n" +
-                                                                              "</exclusion>\n" +
-                                                                              "</exclusions>")));
+                        tag = (Xml.Tag) new AddToTagVisitor<>(tag,
+                                Xml.Tag.build("" +
+                                              "<exclusions>\n" +
+                                              "<exclusion>\n" +
+                                              "<groupId>" + groupId + "</groupId>\n" +
+                                              "<artifactId>" + artifactId + "</artifactId>\n" +
+                                              "</exclusion>\n" +
+                                              "</exclusions>"))
+                                .visitNonNull(tag, ctx, getCursor().getParentOrThrow());
                     }
                     maybeUpdateModel();
                 }
+                return tag;
             }
 
             return super.visitTag(tag, ctx);

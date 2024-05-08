@@ -18,6 +18,10 @@ package org.openrewrite;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.Arrays;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
 public class Preconditions {
 
     public static TreeVisitor<?, ExecutionContext> check(Recipe check, TreeVisitor<?, ExecutionContext> v) {
@@ -132,6 +136,16 @@ public class Preconditions {
                     }
                 }
                 return t2;
+            }
+        };
+    }
+    @SafeVarargs
+    public static Supplier<TreeVisitor<?, ExecutionContext>> and(Supplier<TreeVisitor<?, ExecutionContext>>... svs) {
+        return new Supplier<TreeVisitor<?, ExecutionContext>>() {
+            @Override
+            public TreeVisitor<?, ExecutionContext> get() {
+                TreeVisitor<?, ExecutionContext>[] visitors =  Arrays.stream(svs).map(Supplier::get).collect(Collectors.toList()).toArray(new TreeVisitor[]{});
+                return and(visitors);
             }
         };
     }

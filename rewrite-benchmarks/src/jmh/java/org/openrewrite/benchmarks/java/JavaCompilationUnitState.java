@@ -71,7 +71,7 @@ public class JavaCompilationUnitState {
 
         sourceFiles = JavaParser.fromJavaVersion()
                 .classpath("jsr305", "classgraph", "jackson-annotations", "micrometer-core", "slf4j-api",
-                        "org.eclipse.jgit")
+                        "org.openrewrite.jgit")
 //                .logCompilationWarningsAndErrors(true)
                 .build()
                 .parse(inputs, null, new InMemoryExecutionContext(Throwable::printStackTrace))

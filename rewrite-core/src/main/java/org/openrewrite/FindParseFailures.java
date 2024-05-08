@@ -41,7 +41,7 @@ public class FindParseFailures extends Recipe {
     @Nullable
     String parserType;
 
-    @Option(displayName = "Stack trace",
+    @Option(example = "RuntimeException", displayName = "Stack trace",
             description = "Only mark stack traces with a message containing this text.",
             required = false)
     @Nullable

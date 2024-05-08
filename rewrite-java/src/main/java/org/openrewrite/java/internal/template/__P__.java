@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@NonNullApi
-package org.openrewrite.xml.marker;
+package org.openrewrite.java.internal.template;
 
-import org.openrewrite.internal.lang.NonNullApi;
+public class __P__ {
+    public static native <T> T p();
+
+    public static native <T> T[] arrp();
+
+    public static native boolean booleanp();
+
+    public static native byte bytep();
+
+    public static native char charp();
+
+    public static native double doublep();
+
+    public static native int intp();
+
+    public static native long longp();
+
+    public static native short shortp();
+
+    public static native float floatp();
+}

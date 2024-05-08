@@ -20,9 +20,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyGroupIdTest implements RewriteTest {
 
@@ -66,7 +69,8 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void findDependency(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupId(group, artifact, "org.dewrite", null)),
+          spec -> spec.recipe(new ChangeDependencyGroupId(group, artifact, "org.dewrite", null))
+            .beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
@@ -95,7 +99,13 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
                   api 'org.dewrite:rewrite-core:latest.release'
                   api "org.dewrite:rewrite-core:latest.release"
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(cu.getMarkers().findFirst(GradleProject.class))
+                .map(gp -> gp.getConfiguration("api"))
+                .map(conf -> conf.findRequestedDependency("org.dewrite", "rewrite-core"))
+                .as("Requested dependency model should have been updated to have groupId org.dewrite")
+                .isPresent())
           )
         );
     }

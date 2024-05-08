@@ -79,7 +79,9 @@ public class XmlParser implements Parser {
                p.endsWith(".xsl") ||
                p.endsWith(".xslt") ||
                p.endsWith(".tld") ||
-               p.endsWith(".xjb");
+               p.endsWith(".xjb") ||
+               p.endsWith(".jsp") ||
+               p.endsWith(".csproj");
     }
 
     @Override

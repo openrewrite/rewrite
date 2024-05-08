@@ -98,7 +98,7 @@ public class TypeMatcher {
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
         return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
-               this.targetTypePattern != null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+               this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {

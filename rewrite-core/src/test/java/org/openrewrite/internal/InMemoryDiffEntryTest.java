@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import org.eclipse.jgit.lib.FileMode;
+import org.openrewrite.jgit.lib.FileMode;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 

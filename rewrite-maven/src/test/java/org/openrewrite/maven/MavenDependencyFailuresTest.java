@@ -83,7 +83,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
     void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
+            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build())))
             .recipeExecutionContext(new InMemoryExecutionContext())
@@ -178,8 +178,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <dependencies>
-                  <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM. Tried repositories:
+                  <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
+              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM: doesnotexist:another:1. Tried repositories:
               https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
                     <groupId>com.bad</groupId>
                     <artifactId>bad-artifact</artifactId>
@@ -247,7 +247,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(after -> {
                 Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
-                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM. Tried repositories"));
+                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"));
             })
           )
         );

@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class EnvironmentTest implements RewriteTest {
@@ -98,6 +99,41 @@ class EnvironmentTest implements RewriteTest {
           .getChangeset()
           .getAllResults();
         assertThat(changes).hasSize(1);
+    }
+
+    @Test
+    void activeRecipeNotFoundSuggestions() {
+        var env = Environment.builder()
+          .load(
+            new YamlResourceLoader(
+              //language=yml
+              new ByteArrayInputStream(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.ChangeTextToHello
+                  displayName: Change text to hello
+                  recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello
+                  ---
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.ChangeTextToHelloWorld
+                  displayName: Change text to hello world
+                  recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello
+                  """.getBytes()
+              ),
+              URI.create("rewrite.yml"),
+              new Properties()
+            )
+          )
+          .build();
+
+        assertThatExceptionOfType(RecipeException.class)
+          .isThrownBy(() -> env.activateRecipes("foo.ChangeTextToHelloWorld"))
+          .withMessageContaining("foo.ChangeTextToHelloWorld")
+          .withMessageContaining("test.ChangeTextToHelloWorld");
     }
 
     @Test

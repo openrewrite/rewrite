@@ -40,9 +40,12 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.VersionRequirement;
 import org.openrewrite.maven.tree.ManagedDependency.Defined;
 import org.openrewrite.maven.tree.ManagedDependency.Imported;
+import org.openrewrite.maven.tree.Plugin.Execution;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -154,6 +157,7 @@ public class ResolvedPom {
      * @return A new instance with dependencies re-resolved or the same instance if no resolved dependencies have changed.
      * @throws MavenDownloadingException When problems are encountered downloading dependencies or parents.
      */
+    @SuppressWarnings("DuplicatedCode")
     public ResolvedPom resolve(ExecutionContext ctx, MavenPomDownloader downloader) throws MavenDownloadingException {
         ResolvedPom resolved = new ResolvedPom(
                 requested,
@@ -168,13 +172,13 @@ public class ResolvedPom {
         ).resolver(ctx, downloader).resolve();
 
         for (Map.Entry<String, String> property : resolved.getProperties().entrySet()) {
-            if (property.getValue() != null && !property.getValue().equals(properties.get(property.getKey()))) {
+            if (properties == null || (property.getValue() != null && !property.getValue().equals(properties.get(property.getKey())))) {
                 return resolved;
             }
         }
 
         List<Dependency> resolvedRequestedDependencies = resolved.getRequestedDependencies();
-        if (requestedDependencies.size() != resolvedRequestedDependencies.size()) {
+        if (requestedDependencies == null || requestedDependencies.size() != resolvedRequestedDependencies.size()) {
             return resolved;
         }
         for (int i = 0; i < resolvedRequestedDependencies.size(); i++) {
@@ -184,7 +188,7 @@ public class ResolvedPom {
         }
 
         List<ResolvedManagedDependency> resolvedDependencyManagement = resolved.getDependencyManagement();
-        if (dependencyManagement.size() != resolvedDependencyManagement.size()) {
+        if (dependencyManagement == null || dependencyManagement.size() != resolvedDependencyManagement.size()) {
             return resolved;
         }
         for (int i = 0; i < resolvedDependencyManagement.size(); i++) {
@@ -195,7 +199,7 @@ public class ResolvedPom {
         }
 
         List<MavenRepository> resolvedRepositories = resolved.getRepositories();
-        if (repositories.size() != resolvedRepositories.size()) {
+        if (repositories == null || repositories.size() != resolvedRepositories.size()) {
             return resolved;
         }
         for (int i = 0; i < resolvedRepositories.size(); i++) {
@@ -205,7 +209,7 @@ public class ResolvedPom {
         }
 
         List<Plugin> resolvedPlugins = resolved.getPlugins();
-        if (plugins.size() != resolvedPlugins.size()) {
+        if (plugins == null || plugins.size() != resolvedPlugins.size()) {
             return resolved;
         }
         for (int i = 0; i < resolvedPlugins.size(); i++) {
@@ -215,7 +219,7 @@ public class ResolvedPom {
         }
 
         List<Plugin> resolvedPluginManagement = resolved.getPluginManagement();
-        if (pluginManagement.size() != resolvedPluginManagement.size()) {
+        if (pluginManagement == null || pluginManagement.size() != resolvedPluginManagement.size()) {
             return resolved;
         }
         for (int i = 0; i < resolvedPluginManagement.size(); i++) {
@@ -247,6 +251,7 @@ public class ResolvedPom {
         return requested.getVersion();
     }
 
+    @SuppressWarnings("unused")
     @Nullable
     public String getDatedSnapshotVersion() {
         return requested.getDatedSnapshotVersion();
@@ -297,7 +302,7 @@ public class ResolvedPom {
     }
 
     @Nullable
-    public String getManagedVersion(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
+    public String getManagedVersion(@Nullable String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
         for (ResolvedManagedDependency dm : dependencyManagement) {
             if (dm.matches(groupId, artifactId, type, classifier)) {
                 return getValue(dm.getVersion());
@@ -605,8 +610,54 @@ public class ResolvedPom {
             return ret;
         }
 
-        private List<Plugin.Execution> mergePluginExecutions(List<Plugin.Execution> executions, List<Plugin.Execution> incomingExecutions) {
-            return executions.isEmpty() ? incomingExecutions : executions; // TODO
+        private List<Plugin.Execution> mergePluginExecutions(List<Plugin.Execution> currentExecutions, List<Plugin.Execution> incomingExecutions) {
+            if (currentExecutions.isEmpty()) {
+                return incomingExecutions;
+            }
+            if (incomingExecutions.isEmpty()) {
+                return currentExecutions;
+            }
+            Map<String, Plugin.Execution> currentExecutionsById = currentExecutions.stream()
+                    .collect(Collectors.toMap(Execution::getId, Function.identity()));
+            List<Plugin.Execution> mergedExecutions = new ArrayList<>(currentExecutions);
+
+            for (Plugin.Execution incomingExecution : incomingExecutions) {
+                String executionId = incomingExecution.getId();
+                if (!currentExecutionsById.containsKey(executionId)) {
+                    mergedExecutions.add(incomingExecution);
+                } else {
+                    Plugin.Execution currentExecution = currentExecutionsById.get(executionId);
+                    // GOALS
+                    Set<String> mergedGoals = new HashSet<>();
+                    if (currentExecution.getGoals() != null) {
+                        mergedGoals.addAll(currentExecution.getGoals());
+                    }
+                    if (incomingExecution.getGoals() != null) {
+                        mergedGoals.addAll(incomingExecution.getGoals());
+                    }
+                    // PHASE
+                    String mergedPhase = currentExecution.getPhase();
+                    if (incomingExecution.getPhase() != null &&
+                        !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
+                        mergedPhase = incomingExecution.getPhase();
+                    }
+                    // CONFIGURATION
+                    JsonNode mergedConfiguration = mergePluginConfigurations(
+                            currentExecution.getConfiguration(),
+                            incomingExecution.getConfiguration());
+                    // EXECUTION
+                    Plugin.Execution mergedExecution = new Plugin.Execution(
+                            executionId,
+                            new ArrayList<>(mergedGoals),
+                            mergedPhase,
+                            incomingExecution.getInherited(),
+                            mergedConfiguration);
+
+                    mergedExecutions.remove(currentExecution);
+                    mergedExecutions.add(mergedExecution);
+                }
+            }
+            return mergedExecutions;
         }
 
         private Plugin mergePlugins(Plugin plugin, Plugin incoming) {
