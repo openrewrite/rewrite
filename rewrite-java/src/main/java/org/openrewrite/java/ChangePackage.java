@@ -150,6 +150,8 @@ public class ChangePackage extends Recipe {
             String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_FROM_KEY, original);
 
+            pkg = pkg.withAnnotations(ListUtils.map(pkg.getAnnotations(), a -> visitAndCast(a, ctx)));
+
             if (original.equals(oldPackageName)) {
                 getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_TO_KEY, newPackageName);
 
@@ -169,7 +171,7 @@ public class ChangePackage extends Recipe {
                         .apply(getCursor(), pkg.getCoordinates().replace());
             }
             //noinspection ConstantConditions
-            return super.visitPackage(pkg, ctx);
+            return pkg;
         }
 
         @Override
