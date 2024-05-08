@@ -174,7 +174,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
                             lastEnd = lastEnd + mappingStartEvent.getAnchor().length() + fmt.length() + 1;
                             fmt = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
-                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
+                            int dashPrefixIndex = commentAwareIndexOf('-', fmt, FindIndexStrategy.FIRST);
                             if (dashPrefixIndex > -1) {
                                 fmt = fmt.substring(0, dashPrefixIndex);
                             }
@@ -182,9 +182,9 @@ public class YamlParser implements org.openrewrite.Parser {
 
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
                         String startBracePrefix = null;
-                        int openingBraceIndex = commentAwareIndexOf('{', fullPrefix);
+                        int openingBraceIndex = commentAwareIndexOf('{', fullPrefix, FindIndexStrategy.FIRST);
                         if (openingBraceIndex != -1) {
-                            int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
+                            int startIndex = commentAwareIndexOf(':', fullPrefix, FindIndexStrategy.FIRST) + 1;
                             startBracePrefix = fullPrefix.substring(startIndex, openingBraceIndex);
                             lastEnd = event.getEndMark().getIndex();
                         }
@@ -261,7 +261,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             // and its trailing comma.
                             SequenceBuilder sequenceBuilder = (SequenceBuilder) builder;
                             String betweenEvents = reader.readStringFromBuffer(event.getEndMark().getIndex(), parser.peekEvent().getStartMark().getIndex() - 1);
-                            int commaIndex = commentAwareIndexOf(',', betweenEvents);
+                            int commaIndex = commentAwareIndexOf(',', betweenEvents, FindIndexStrategy.FIRST);
                             String commaPrefix = null;
                             if (commaIndex != -1) {
                                 commaPrefix = betweenEvents.substring(0, commaIndex);
@@ -287,7 +287,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             Yaml.Sequence seq = (Yaml.Sequence) mappingOrSequence;
                             if (seq.getOpeningBracketPrefix() != null) {
                                 String s = reader.readStringFromBuffer(lastEnd, event.getStartMark().getIndex());
-                                int closingBracketIndex = commentAwareIndexOf(']', s);
+                                int closingBracketIndex = commentAwareIndexOf(']', s, FindIndexStrategy.FIRST);
                                 lastEnd = lastEnd + closingBracketIndex + 1;
                                 mappingOrSequence = seq.withClosingBracketPrefix(s.substring(0, closingBracketIndex));
                             }
@@ -296,7 +296,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             Yaml.Mapping map = (Yaml.Mapping) mappingOrSequence;
                             if (map.getOpeningBracePrefix() != null) {
                                 String s = reader.readStringFromBuffer(lastEnd, event.getStartMark().getIndex());
-                                int closingBraceIndex = commentAwareIndexOf('}', s);
+                                int closingBraceIndex = commentAwareIndexOf('}', s, FindIndexStrategy.FIRST);
                                 lastEnd = lastEnd + closingBraceIndex + 1;
                                 mappingOrSequence = map.withClosingBracePrefix(s.substring(0, closingBraceIndex));
                             }
@@ -321,7 +321,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
                             lastEnd = lastEnd + sse.getAnchor().length() + fmt.length() + 1;
                             fmt = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
-                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
+                            int dashPrefixIndex = commentAwareIndexOf('-', fmt, FindIndexStrategy.FIRST);
                             if (dashPrefixIndex > -1) {
                                 fmt = fmt.substring(0, dashPrefixIndex);
                             }
@@ -329,9 +329,9 @@ public class YamlParser implements org.openrewrite.Parser {
 
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
                         String startBracketPrefix = null;
-                        int openingBracketIndex = commentAwareIndexOf('[', fullPrefix);
+                        int openingBracketIndex = commentAwareIndexOf('[', fullPrefix, FindIndexStrategy.FIRST);
                         if (openingBracketIndex != -1) {
-                            int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
+                            int startIndex = commentAwareIndexOf(':', fullPrefix, FindIndexStrategy.FIRST) + 1;
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
                             lastEnd = event.getEndMark().getIndex();
                         }
@@ -389,7 +389,7 @@ public class YamlParser implements org.openrewrite.Parser {
             postFix.append(c);
         }
 
-        int prefixStart = commentAwareIndexOf(':', eventPrefix);
+        int prefixStart = commentAwareIndexOf(':', eventPrefix, FindIndexStrategy.FIRST);
         String prefix = "";
         if (!isForScalar) {
             prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
@@ -398,10 +398,12 @@ public class YamlParser implements org.openrewrite.Parser {
     }
 
     /**
-     * Return the index of the target character if it appears in a non-comment portion of the String, or -1 if it does not appear.
+     * Return the first or last index of the target character that appears in a non-comment portion of the String,
+     * or -1 if it does not appear.
      */
-    private static int commentAwareIndexOf(char target, String s) {
+    private static int commentAwareIndexOf(char target, String s, FindIndexStrategy strategy) {
         boolean inComment = false;
+        int lastFoundIndex = -1;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (inComment) {
@@ -410,13 +412,21 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             } else {
                 if (c == target) {
-                    return i;
+                    lastFoundIndex = i;
+                    if (strategy == FindIndexStrategy.FIRST) {
+                        break;
+                    }
                 } else if (c == '#') {
                     inComment = true;
                 }
             }
         }
-        return -1;
+        return lastFoundIndex;
+    }
+
+    private enum FindIndexStrategy {
+        FIRST,
+        LAST
     }
 
     @Override
@@ -464,7 +474,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 key = (Yaml.Alias) block;
             } else {
                 String keySuffix = block.getPrefix();
-                block = block.withPrefix(keySuffix.substring(commentAwareIndexOf(':', keySuffix) + 1));
+                block = block.withPrefix(keySuffix.substring(commentAwareIndexOf(':', keySuffix, FindIndexStrategy.FIRST) + 1));
 
                 // Begin moving whitespace from the key to the entry that contains the key
                 String originalKeyPrefix = key.getPrefix();
@@ -474,11 +484,11 @@ public class YamlParser implements org.openrewrite.Parser {
                 // Similarly if the prefix includes a ':', it will be owned by the mapping that contains this mapping
                 // So this entry's prefix begins after any such delimiter
                 int entryPrefixStartIndex = Math.max(
-                        commentAwareIndexOf('-', originalKeyPrefix),
-                        commentAwareIndexOf(':', originalKeyPrefix)) + 1;
+                        commentAwareIndexOf('-', originalKeyPrefix, FindIndexStrategy.FIRST),
+                        commentAwareIndexOf(':', originalKeyPrefix, FindIndexStrategy.FIRST)) + 1;
                 String entryPrefix = originalKeyPrefix.substring(entryPrefixStartIndex);
                 String beforeMappingValueIndicator = keySuffix.substring(0,
-                        Math.max(commentAwareIndexOf(':', keySuffix), 0));
+                        Math.max(commentAwareIndexOf(':', keySuffix, FindIndexStrategy.FIRST), 0));
                 entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, Markers.EMPTY, key, beforeMappingValueIndicator, block));
                 key = null;
             }
@@ -513,7 +523,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
         public void push(Yaml.Block block, @Nullable String commaPrefix) {
             String rawPrefix = block.getPrefix();
-            int dashIndex = commentAwareIndexOf('-', rawPrefix);
+            int dashIndex = commentAwareIndexOf('-', rawPrefix, FindIndexStrategy.LAST);
             String entryPrefix;
             String blockPrefix;
             boolean hasDash = dashIndex != -1;
