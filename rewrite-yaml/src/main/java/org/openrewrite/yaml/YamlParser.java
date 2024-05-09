@@ -416,10 +416,10 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             } else {
                 if (c == target) {
-                    lastFoundIndex = i;
                     if (strategy == FindIndexStrategy.FIRST) {
-                        break;
+                        return i;
                     }
+                    lastFoundIndex = i;
                 } else if (c == '#') {
                     inComment = true;
                 }
