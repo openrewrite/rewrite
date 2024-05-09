@@ -1546,4 +1546,54 @@ class ChangePackageTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void packageInfoAnnotation() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite;
+                          
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+                          
+              @Target(ElementType.PACKAGE)
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface MyAnnotation {
+                  MyEnum myEnum() default MyEnum.FOO;
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package org.openrewrite;
+                          
+              public enum MyEnum {
+                  FOO,
+                  BAR
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              @org.openrewrite.MyAnnotation(myEnum = org.openrewrite.MyEnum.BAR)
+              package com.acme;
+              """,
+            """
+              @org.openrewrite.test.MyAnnotation(myEnum = org.openrewrite.test.MyEnum.BAR)
+              package com.acme;
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.MyAnnotation")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.MyAnnotation")).isNotEmpty();
+                assertThat(cu.findType("org.openrewrite.MyEnum")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty();
+            })
+          )
+        );
+    }
 }

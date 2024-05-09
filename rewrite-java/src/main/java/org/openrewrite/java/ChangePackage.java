@@ -146,9 +146,11 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+        public J visitPackage(J.Package pkg, ExecutionContext ctx) {
             String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_FROM_KEY, original);
+
+            pkg = pkg.withAnnotations(ListUtils.map(pkg.getAnnotations(), a -> visitAndCast(a, ctx)));
 
             if (original.equals(oldPackageName)) {
                 getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_TO_KEY, newPackageName);
