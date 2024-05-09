@@ -241,10 +241,14 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         G.CompilationUnit g = (G.CompilationUnit) s;
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                    classifier, extension, metadataFailures).visitNonNull(g, ctx);
+                                    classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(g, ctx);
                         }
 
                         return g;
+                    }
+
+                    private boolean isTopLevel(Cursor cursor) {
+                        return cursor.getParent().firstEnclosing(J.MethodInvocation.class) == null;
                     }
                 })
         );
