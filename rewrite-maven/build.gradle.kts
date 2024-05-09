@@ -70,7 +70,7 @@ tasks.withType<Javadoc> {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/VersionRangeParser**", "**/AddDependency**", "**/MavenResolutionResult.java")
+    exclude("**/VersionRangeParser**", "**/AddDependency**")
 }
 
 configure<LicenseExtension> {
