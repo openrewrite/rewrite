@@ -129,7 +129,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 switch (event.getEventId()) {
                     case DocumentEnd: {
                         assert document != null;
-                        if(blockStack.size() == 1 && blockStack.peek() instanceof ScalarBuilder) {
+                        if (blockStack.size() == 1 && blockStack.peek() instanceof ScalarBuilder) {
                             // The yaml document consists of a single scalar value not in a mapping or sequence
                             ScalarBuilder builder = (ScalarBuilder) blockStack.pop();
                             lastEnd = builder.getLastEnd();
@@ -270,7 +270,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             sequenceBuilder.push(finalScalar, commaPrefix);
 
                         } else if (builder == null) {
-                            if(!"".equals(finalScalar.getValue())) {
+                            if (!"".equals(finalScalar.getValue())) {
                                 // If the "scalar" is just a comment, allow it to accrue to the Document.End rather than create a phantom scalar
                                 blockStack.push(new ScalarBuilder(finalScalar, event.getEndMark().getIndex()));
                             }
@@ -397,11 +397,17 @@ public class YamlParser implements org.openrewrite.Parser {
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
     }
 
-    /**
-     * Return the index of the target character if it appears in a non-comment portion of the String, or -1 if it does not appear.
-     */
     private static int commentAwareIndexOf(char target, String s) {
+        return commentAwareIndexOf(target, s, FindIndexStrategy.FIRST);
+    }
+
+    /**
+     * Return the first or last index of the target character that appears in a non-comment portion of the String,
+     * or -1 if it does not appear.
+     */
+    private static int commentAwareIndexOf(char target, String s, FindIndexStrategy strategy) {
         boolean inComment = false;
+        int lastFoundIndex = -1;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (inComment) {
@@ -410,13 +416,21 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             } else {
                 if (c == target) {
-                    return i;
+                    if (strategy == FindIndexStrategy.FIRST) {
+                        return i;
+                    }
+                    lastFoundIndex = i;
                 } else if (c == '#') {
                     inComment = true;
                 }
             }
         }
-        return -1;
+        return lastFoundIndex;
+    }
+
+    private enum FindIndexStrategy {
+        FIRST,
+        LAST
     }
 
     @Override
@@ -513,7 +527,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
         public void push(Yaml.Block block, @Nullable String commaPrefix) {
             String rawPrefix = block.getPrefix();
-            int dashIndex = commentAwareIndexOf('-', rawPrefix);
+            int dashIndex = commentAwareIndexOf('-', rawPrefix, FindIndexStrategy.LAST);
             String entryPrefix;
             String blockPrefix;
             boolean hasDash = dashIndex != -1;
@@ -537,6 +551,7 @@ public class YamlParser implements org.openrewrite.Parser {
     private static class ScalarBuilder implements BlockBuilder {
         Yaml.Scalar scalar;
         int lastEnd;
+
         @Override
         public void push(Yaml.Block block) {
             throw new IllegalStateException("Unable to push on top of a scalar.");

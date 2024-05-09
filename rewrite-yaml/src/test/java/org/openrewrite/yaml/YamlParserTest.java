@@ -65,6 +65,25 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4176")
+    void listOfLists() {
+        rewriteRun(
+          yaml(
+            """
+              root:
+                  listOfLists:
+                    - - a
+                      - b
+                    - - c
+                      - d
+                      - - e
+                        - f
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     @ParameterizedTest
     @ValueSource(strings = {
