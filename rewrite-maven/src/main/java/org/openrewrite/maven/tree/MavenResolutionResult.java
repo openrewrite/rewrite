@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.ExecutionContext;
@@ -32,7 +33,7 @@ import java.util.function.Predicate;
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor = @__(@JsonCreator))
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
 public class MavenResolutionResult implements Marker {
@@ -64,6 +65,25 @@ public class MavenResolutionResult implements Marker {
 
     @With
     List<String> activeProfiles;
+
+    @With
+    @Nullable
+    MavenDownloadingExceptions exceptions;
+
+    // Temporary for binary compatibility from before the exceptions field was added
+    public MavenResolutionResult(
+            UUID id, @Nullable Integer managedReference, ResolvedPom pom, List<MavenResolutionResult> modules,
+            @Nullable MavenResolutionResult parent, Map<Scope, List<ResolvedDependency>> dependencies,
+            @Nullable MavenSettings mavenSettings, List<String> activeProfiles) {
+        this.id = id;
+        this.managedReference = managedReference;
+        this.pom = pom;
+        this.modules = modules;
+        this.parent = parent;
+        this.dependencies = dependencies;
+        this.mavenSettings = mavenSettings;
+        this.activeProfiles = activeProfiles;
+    }
 
     public List<String> getActiveProfiles() {
         // for backwards compatibility with ASTs that were serialized before activeProfiles was added
