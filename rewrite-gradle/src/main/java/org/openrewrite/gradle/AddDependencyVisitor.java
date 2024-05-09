@@ -41,6 +41,7 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.tree.ParseError;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -75,6 +76,9 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
     @Nullable
     private String resolvedVersion;
+
+    @Nullable
+    private final Predicate<Cursor> insertPredicate;
 
     @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
@@ -217,6 +221,10 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (!DEPENDENCIES_DSL_MATCHER.matches(m)) {
+                return m;
+            }
+
+            if (!insertPredicate.test(getCursor())) {
                 return m;
             }
 
