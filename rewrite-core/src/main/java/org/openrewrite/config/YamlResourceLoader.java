@@ -278,28 +278,42 @@ public class YamlResourceLoader implements ResourceLoader {
             }
         } else if (recipeData instanceof Map) {
             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) recipeData).entrySet().iterator().next();
+            String recipeName = nameAndConfig.getKey();
+            Object recipeArgs = nameAndConfig.getValue();
             try {
-                if (nameAndConfig.getValue() instanceof Map) {
+                if (recipeArgs instanceof Map) {
                     try {
-                        addRecipe.accept(instantiateRecipe(nameAndConfig.getKey(),
-                                (Map<String, Object>) nameAndConfig.getValue()));
+                        addRecipe.accept(instantiateRecipe(recipeName, (Map<String, Object>) recipeArgs));
                     } catch (IllegalArgumentException e) {
                         if (e.getCause() instanceof InvalidTypeIdException) {
-                            addValidation.accept(Validated.invalid(nameAndConfig.getKey(),
-                                    nameAndConfig.getValue(), "Recipe class " +
-                                                              nameAndConfig.getKey() + " cannot be found"));
+                            addValidation.accept(
+                                    Validated.invalid(
+                                            recipeName,
+                                            recipeArgs,
+                                            "Recipe class " + recipeName + " cannot be found"));
                         } else {
-                            addValidation.accept(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
-                                    "Unable to load Recipe: " + e));
+                            addValidation.accept(
+                                    Validated.invalid(
+                                            recipeName,
+                                            recipeArgs,
+                                            "Unable to load Recipe: " + e));
                         }
+                    } catch (NoClassDefFoundError e) {
+                        addValidation.accept(
+                                Validated.invalid(
+                                        recipeName,
+                                        recipeArgs,
+                                        "Recipe class " + nameAndConfig.getKey() + " cannot be found"));
                     }
                 } else {
-                    addValidation.accept(Validated.invalid(nameAndConfig.getKey(),
-                            nameAndConfig.getValue(),
-                            "Declarative recipeList entries are expected to be strings or mappings"));
+                    addValidation.accept(
+                            Validated.invalid(
+                                recipeName,
+                                recipeArgs,
+                                "Declarative recipeList entries are expected to be strings or mappings"));
                 }
             } catch (Exception e) {
-                addValidation.accept(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
+                addValidation.accept(Validated.invalid(recipeName, recipeArgs,
                         "Unexpected declarative recipe parsing exception " +
                         e.getClass().getName()));
             }
