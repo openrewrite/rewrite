@@ -491,7 +491,6 @@ public class ChangeType extends Recipe {
         private final JavaType.Class originalType;
         private final JavaType.Class targetType;
         private final MethodMatcher originalConstructor;
-        private boolean updatePath;
 
         private ChangeClassDefinition(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
@@ -509,8 +508,8 @@ public class ChangeType extends Recipe {
                 String newFqn = fqnToPath(targetType.getFullyQualifiedName());
 
                 Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
-                updatePath = updatePath(cu, oldPath, newPath.toString());
-                if (updatePath) {
+                if (updatePath(cu, oldPath, newPath.toString())) {
+                    getCursor().putMessage("UPDATE_PATH", true);
                     cu = cu.withSourcePath(newPath);
                 }
                 return super.visit(cu, ctx);
@@ -533,17 +532,20 @@ public class ChangeType extends Recipe {
 
         @Override
         public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
-            String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
-            if (updatePath && original.equals(originalType.getPackageName())) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
-                if (fq != null) {
-                    if (fq.getPackageName().isEmpty()) {
-                        getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
-                        //noinspection DataFlowIssue
-                        return null;
-                    } else {
-                        String newPkg = targetType.getPackageName();
-                        return JavaTemplate.builder(newPkg).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
+            Boolean updatePath = getCursor().pollNearestMessage("UPDATE_PATH");
+            if (updatePath != null && updatePath) {
+                String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+                if (original.equals(originalType.getPackageName())) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
+                    if (fq != null) {
+                        if (fq.getPackageName().isEmpty()) {
+                            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
+                            //noinspection DataFlowIssue
+                            return null;
+                        } else {
+                            String newPkg = targetType.getPackageName();
+                            return JavaTemplate.builder(newPkg).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
+                        }
                     }
                 }
             }
