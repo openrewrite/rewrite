@@ -1802,4 +1802,34 @@ class ChangeTypeTest implements RewriteTest {
         );
 
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4182")
+    @Test
+    void doesNotModifyPackageOfSibling() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.openrewrite.Test", "org.openrewrite.subpackage.Test", false)),
+          java(
+            """
+              package org.openrewrite;
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.subpackage;
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package org.openrewrite;
+              public class Sibling {
+                  public Test test() {
+                      return new Test();
+                  }
+              }
+              """
+          )
+        );
+    }
 }
