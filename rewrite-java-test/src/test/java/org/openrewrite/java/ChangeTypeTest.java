@@ -1823,7 +1823,9 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
+              import org.openrewrite.Test;
+              
               public class Sibling {
                   public Test test() {
                       return new Test();
@@ -1832,9 +1834,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               import org.openrewrite.subpackage.Test;
-
+              
               public class Sibling {
                   public Test test() {
                       return new Test();

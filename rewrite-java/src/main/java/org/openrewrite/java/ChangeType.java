@@ -491,6 +491,7 @@ public class ChangeType extends Recipe {
         private final JavaType.Class originalType;
         private final JavaType.Class targetType;
         private final MethodMatcher originalConstructor;
+        private boolean updatePath;
 
         private ChangeClassDefinition(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
@@ -508,7 +509,8 @@ public class ChangeType extends Recipe {
                 String newFqn = fqnToPath(targetType.getFullyQualifiedName());
 
                 Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
-                if (updatePath(cu, oldPath, newPath.toString())) {
+                updatePath = updatePath(cu, oldPath, newPath.toString());
+                if (updatePath) {
                     cu = cu.withSourcePath(newPath);
                 }
                 return super.visit(cu, ctx);
@@ -532,7 +534,7 @@ public class ChangeType extends Recipe {
         @Override
         public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
             String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
-            if (original.equals(originalType.getPackageName())) {
+            if (updatePath && original.equals(originalType.getPackageName())) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
                 if (fq != null) {
                     if (fq.getPackageName().isEmpty()) {
