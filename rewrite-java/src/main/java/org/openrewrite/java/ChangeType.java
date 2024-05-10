@@ -509,7 +509,7 @@ public class ChangeType extends Recipe {
 
                 Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
                 if (updatePath(cu, oldPath, newPath.toString())) {
-                    getCursor().putMessage("UPDATE_PATH", true);
+                    getCursor().putMessage("UPDATE_PACKAGE", true);
                     cu = cu.withSourcePath(newPath);
                 }
                 return super.visit(cu, ctx);
@@ -532,8 +532,8 @@ public class ChangeType extends Recipe {
 
         @Override
         public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
-            Boolean updatePath = getCursor().pollNearestMessage("UPDATE_PATH");
-            if (updatePath != null && updatePath) {
+            Boolean updatePackage = getCursor().pollNearestMessage("UPDATE_PACKAGE");
+            if (updatePackage != null && updatePackage) {
                 String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
                 if (original.equals(originalType.getPackageName())) {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
