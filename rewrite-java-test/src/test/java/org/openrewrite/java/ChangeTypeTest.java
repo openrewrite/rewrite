@@ -1823,6 +1823,18 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
+
+              public class Sibling {
+                  public Test test() {
+                      return new Test();
+                  }
+              }
+              """,
+            """
+              package org.openrewrite;
+
+              import org.openrewrite.subpackage.Test;
+
               public class Sibling {
                   public Test test() {
                       return new Test();
