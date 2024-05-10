@@ -224,7 +224,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 return m;
             }
 
-            if (!insertPredicate.test(getCursor())) {
+            if (insertPredicate != null && !insertPredicate.test(getCursor())) {
                 return m;
             }
 
