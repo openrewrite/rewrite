@@ -502,6 +502,15 @@ public class ChangeType extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
+                for (J.ClassDeclaration declaration : cu.getClasses()) {
+                    // Check the class name instead of source path, as it might differ
+                    String fqn = declaration.getType().getFullyQualifiedName();
+                    if (fqn.equals(originalType.getFullyQualifiedName())) {
+                        getCursor().putMessage("UPDATE_PACKAGE", true);
+                        break;
+                    }
+                }
+
                 String oldPath = cu.getSourcePath().toString().replace('\\', '/');
                 // The old FQN must exist in the path.
                 String oldFqn = fqnToPath(originalType.getFullyQualifiedName());
@@ -509,7 +518,6 @@ public class ChangeType extends Recipe {
 
                 Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
                 if (updatePath(cu, oldPath, newPath.toString())) {
-                    getCursor().putMessage("UPDATE_PACKAGE", true);
                     cu = cu.withSourcePath(newPath);
                 }
                 return super.visit(cu, ctx);
