@@ -67,18 +67,38 @@ class YamlParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4176")
-    void listOfLists() {
+    void listsAndListsOfLists() {
         rewriteRun(
           yaml(
             """
               root:
-                  listOfLists:
-                    - - a
-                      - b
-                    - - c
-                      - d
-                      - - e
-                        - f
+                normalListOfScalars:
+                - a
+                -  b
+                normalListOfScalarsWithIndentation:
+                  -  a
+                  - b
+                normalListOfMappings:
+                  - a: b
+                    c:  d
+                  - e:  f
+                normalListOfSquareBracketLists:
+                  -   [ mno, pqr]
+                  -  [stu , vwx]
+                squareList: [x, y, z]
+                listOfListsOfScalars:
+                - - a
+                  -  b
+                listOfListsOfScalarsWithIndentation:
+                  - - a
+                    -  b
+                listOfListsOfMappings:
+                  - - a:  b
+                      c: d
+                    - e:  f
+                listOfListsOfSquareBracketLists:
+                  - - [mno, pqr ]
+                    -  [stu , vwx]
               """
           )
         );
