@@ -400,6 +400,7 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4189")
     void renamePackageNullRecursiveImportedCheckStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
@@ -457,6 +458,7 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4189")
     void renamePackageImportedCheckStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
@@ -514,6 +516,7 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4189")
     void renamePackageRecursiveImportedStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
