@@ -252,7 +252,7 @@ public class YamlResourceLoader implements ResourceLoader {
     }
 
     @SuppressWarnings("unchecked")
-    private void loadRecipe(@Language("markdown") String name,
+    void loadRecipe(@Language("markdown") String name,
                             int i,
                             Object recipeData,
                             Consumer<String> addLazyLoadRecipe,
@@ -261,17 +261,16 @@ public class YamlResourceLoader implements ResourceLoader {
         if (recipeData instanceof String) {
             String recipeName = (String) recipeData;
             try {
-
                 // first try an explicitly-declared zero-arg constructor
                 addRecipe.accept((Recipe) Class.forName(recipeName, true,
                                 classLoader == null ? this.getClass().getClassLoader() : classLoader)
                         .getDeclaredConstructor()
                         .newInstance());
-            } catch (ReflectiveOperationException reflectiveOperationException) {
+            } catch (ReflectiveOperationException | NoClassDefFoundError e) {
                 try {
                     // then try jackson
                     addRecipe.accept(instantiateRecipe(recipeName, new HashMap<>()));
-                } catch (IllegalArgumentException illegalArgumentException) {
+                } catch (IllegalArgumentException | NoClassDefFoundError ee) {
                     // else, it's probably declarative
                     addLazyLoadRecipe.accept(recipeName);
                 }

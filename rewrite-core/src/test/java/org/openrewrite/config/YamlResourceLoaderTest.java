@@ -15,24 +15,30 @@
  */
 package org.openrewrite.config;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Contributor;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.Maintainer;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class YamlResourceLoaderTest implements RewriteTest {
+
+    @BeforeAll
+    static void beforeAll() {
+        try {
+            // Instantiate once to throw a ExceptionInInitializerError and subsequent
+            // instantiations will throw a NoClassDefFoundError.
+            new RecipeWithBadStaticInitializer();
+        } catch (ExceptionInInitializerError ignored) {
+        }
+    }
 
     @Test
     void dataTables() {
@@ -311,5 +317,60 @@ class YamlResourceLoaderTest implements RewriteTest {
           ),
           text("Hello", "Hello World!")
         );
+    }
+
+    @Test
+    void loadRecipeWithRecipeDataStringThatThrowsNoClassDefFoundError() {
+        final List<String> lazyLoadRecipes = new ArrayList<>();
+        YamlResourceLoader resourceLoader = createYamlResourceLoader();
+
+        resourceLoader.loadRecipe(
+          "org.company.CustomRecipe",
+          0,
+          RecipeWithBadStaticInitializer.class.getName(),
+          recipe -> lazyLoadRecipes.add(recipe),
+          recipe -> {},
+          validated -> {});
+
+        assertEquals(1, lazyLoadRecipes.size());
+        assertEquals(RecipeWithBadStaticInitializer.class.getName(), lazyLoadRecipes.get(0));
+    }
+
+    @Test
+    void loadRecipeWithRecipeDataMapThatThrowsNoClassDefFoundError() {
+        final List<Validated<Object>> invalidRecipes = new ArrayList<>();
+        YamlResourceLoader resourceLoader = createYamlResourceLoader();
+
+        resourceLoader.loadRecipe(
+            "org.company.CustomRecipe",
+            0,
+            Map.of(RecipeWithBadStaticInitializer.class.getName(), Map.of()),
+            recipe -> {},
+            recipe -> {},
+            validated -> invalidRecipes.add(validated));
+
+        assertEquals(1, invalidRecipes.size());
+    }
+
+    private YamlResourceLoader createYamlResourceLoader() {
+        return new YamlResourceLoader(
+                new ByteArrayInputStream("type: specs.openrewrite.org/v1beta/recipe" .getBytes()),
+                URI.create("rewrite.yml"),
+                new Properties());
+    }
+
+    private static class RecipeWithBadStaticInitializer extends Recipe {
+        // Explicitly fail static initialization
+        static int val = 1/0;
+
+        @Override
+        public String getDisplayName() {
+            return "";
+        }
+
+        @Override
+        public String getDescription() {
+            return "";
+        }
     }
 }
