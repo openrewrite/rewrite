@@ -21,7 +21,7 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingFailure;
 
 import java.io.Serializable;
 import java.util.*;
@@ -71,7 +71,7 @@ public class ResolvedDependency implements Serializable {
     List<GroupArtifact> effectiveExclusions;
 
     @Nullable
-    MavenDownloadingException exception;
+    MavenDownloadingFailure failure;
 
     public List<GroupArtifact> getEffectiveExclusions() {
         return effectiveExclusions == null ? emptyList() : effectiveExclusions;

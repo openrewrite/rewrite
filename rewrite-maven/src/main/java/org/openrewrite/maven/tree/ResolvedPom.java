@@ -32,6 +32,7 @@ import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
+import org.openrewrite.maven.MavenDownloadingFailure;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
@@ -99,7 +100,7 @@ public class ResolvedPom {
 
     @NonFinal
     @Nullable
-    MavenDownloadingException exception;
+    MavenDownloadingFailure failure;
 
     /**
      * Deduplicate dependencies and dependency management dependencies
@@ -773,7 +774,7 @@ public class ResolvedPom {
                                     .withRequestedBom(d)
                                     .withBomGav(bom.getGav())));
                         } catch (MavenDownloadingException e) {
-                            exception = e;
+                            failure = e.asFailure();
                         }
                     } else if (d instanceof Defined) {
                         Defined defined = (Defined) d;
@@ -889,7 +890,7 @@ public class ResolvedPom {
                                 .requested(dPom)
                                 .activeProfiles(activeProfiles)
                                 .properties(properties)
-                                .exception(e)
+                                .failure(e.asFailure())
                                 .build();
                     }
 
@@ -911,7 +912,7 @@ public class ResolvedPom {
                             Boolean.valueOf(resolvedPom.getValue(dd.getDependency().getOptional())),
                             depth,
                             emptyList(),
-                            resolvedPom.getException());
+                            resolvedPom.getFailure());
 
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()

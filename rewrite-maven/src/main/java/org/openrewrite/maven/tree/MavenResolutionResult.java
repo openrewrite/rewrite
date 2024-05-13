@@ -20,9 +20,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenDownloadingExceptions;
-import org.openrewrite.maven.MavenSettings;
+import org.openrewrite.maven.*;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
@@ -68,7 +66,7 @@ public class MavenResolutionResult implements Marker {
 
     @With
     @Nullable
-    MavenDownloadingExceptions exceptions;
+    MavenDownloadingFailures failures;
 
     /**
      * Retrieve a MavenDownloadingExceptions that occurred during resolution of this MavenResolutionResult or any
@@ -77,15 +75,15 @@ public class MavenResolutionResult implements Marker {
      * @return null if no exceptions occurred, or a MavenDownloadingExceptions object containing all exceptions.
      */
     @Nullable
-    public MavenDownloadingExceptions getExceptions() {
-        MavenDownloadingExceptions result = exceptions;
+    public MavenDownloadingFailures getExceptions() {
+        MavenDownloadingFailures result = failures;
         if (parent != null && parent.getExceptions() != null) {
-            result = MavenDownloadingExceptions.append(result, parent.getExceptions());
+            result = MavenDownloadingFailures.append(result, parent.getExceptions());
         }
         for (List<ResolvedDependency> value : dependencies.values()) {
             for (ResolvedDependency resolvedDependency : value) {
-                if (resolvedDependency.getException() != null) {
-                    result = MavenDownloadingExceptions.append(result, resolvedDependency.getException());
+                if (resolvedDependency.getFailure() != null) {
+                    result = MavenDownloadingExceptions.append(result, resolvedDependency.getFailure());
                 }
             }
         }

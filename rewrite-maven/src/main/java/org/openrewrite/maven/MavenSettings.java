@@ -104,7 +104,7 @@ public class MavenSettings {
     @Nullable
     public static MavenSettings readMavenSettingsFromDisk(ExecutionContext ctx) {
         final Optional<MavenSettings> userSettings = Optional.of(userSettingsPath())
-                .filter(MavenSettings::exists)
+                .filter(Files::exists)
                 .map(path -> parse(path, ctx));
         final MavenSettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
         return userSettings.map(mavenSettings -> mavenSettings.merge(installSettings))
@@ -124,20 +124,12 @@ public class MavenSettings {
         for (String envVariable : Arrays.asList("MVN_HOME", "M2_HOME", "MAVEN_HOME")) {
             for (String s : Optional.ofNullable(System.getenv(envVariable)).map(Arrays::asList).orElse(emptyList())) {
                 Path resolve = Paths.get(s).resolve("conf/settings.xml");
-                if (exists(resolve)) {
+                if (Files.exists(resolve)) {
                     return Optional.of(resolve);
                 }
             }
         }
         return Optional.empty();
-    }
-
-    private static boolean exists(Path path) {
-        try {
-            return path.toFile().exists();
-        } catch (SecurityException e) {
-            return false;
-        }
     }
 
     public MavenSettings merge(@Nullable MavenSettings installSettings) {

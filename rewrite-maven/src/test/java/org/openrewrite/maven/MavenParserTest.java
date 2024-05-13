@@ -2967,7 +2967,7 @@ class MavenParserTest implements RewriteTest {
                 .map(mrr -> mrr.findDependencies("activation", "activation", null))
                 .as("activation:activation:1.0 is a dependency of org.jvnet.staxex:stax-ex:1.0")
                 .isNotEmpty()
-                .map(it -> it.get(0).getException())
+                .map(it -> it.get(0).getFailure())
                 .as("activation:activation:1.0 is not published to maven central so there must have been an exception resolving it")
                 .containsInstanceOf(MavenDownloadingException.class)
             )

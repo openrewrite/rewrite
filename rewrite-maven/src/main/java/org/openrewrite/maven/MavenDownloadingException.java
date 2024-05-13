@@ -21,7 +21,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.MavenRepository;
 
 import java.util.Collections;
 import java.util.Map;
@@ -91,6 +90,10 @@ public class MavenDownloadingException extends Exception {
             return message + " Tried repositories:\n" + repos;
         }
         return message;
+    }
+
+    public MavenDownloadingFailure asFailure() {
+        return new MavenDownloadingFailure(root, failedOn, repositoryUriToResponse, getStackTrace());
     }
 
     public <T extends Tree> T warn(T t) {
