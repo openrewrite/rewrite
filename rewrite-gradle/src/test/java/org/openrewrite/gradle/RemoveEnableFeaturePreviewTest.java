@@ -22,6 +22,13 @@ import org.openrewrite.test.RewriteTest;
 public class RemoveEnableFeaturePreviewTest implements RewriteTest {
 
     @Test
+    void testFail() {
+        org.junit.jupiter.api.Assertions.assertTrue(false,
+          "Tested this recipe manually by publishing to maven local and used it in a local project, "
+            + "doesn't seem to be working, so failing the build for now so it won't get merged yet");
+    }
+
+    @Test
     void testRemoveEnableFeaturePreviewMethodRecipe_singleQuotes() {
         //language=gradle
         rewriteRun(
