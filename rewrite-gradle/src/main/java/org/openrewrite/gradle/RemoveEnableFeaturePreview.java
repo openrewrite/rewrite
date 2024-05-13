@@ -10,15 +10,15 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.J.Literal;
 import org.openrewrite.java.tree.J.MethodInvocation;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveEnableFeaturePreview extends Recipe {
-
-  private static final String ENABLE_FEATURE_PREVIEW_METHOD_NAME = "enableFeaturePreview";
 
   @Option(displayName = "The feature preview name",
       description = "The name of the feature preview to remove.",
@@ -48,15 +48,15 @@ public class RemoveEnableFeaturePreview extends Recipe {
     @Override
     public MethodInvocation visitMethodInvocation(MethodInvocation method,
         @NotNull ExecutionContext executionContext) {
-      if (ENABLE_FEATURE_PREVIEW_METHOD_NAME.equals(method.getSimpleName())) {
+      final MethodMatcher methodMatcher =
+          new MethodMatcher("org.gradle.api.initialization.Settings enableFeaturePreview(String)");
+
+      if (methodMatcher.matches(method)) {
         List<Expression> arguments = method.getArguments();
         for (Expression argument : arguments) {
           if (argument instanceof J.Literal) {
-            String candidatePreviewFeatureName = ((J.Literal) argument).getValue().toString();
-            // Remove leading and trailing single or double quotes.
-            candidatePreviewFeatureName = candidatePreviewFeatureName.substring(0,
-                candidatePreviewFeatureName.length());
-            if (candidatePreviewFeatureName.equals(previewFeatureName)) {
+            String candidatePreviewFeatureName = (String) ((Literal) argument).getValue();
+            if (previewFeatureName.equals(candidatePreviewFeatureName)) {
               return null;
             }
           }

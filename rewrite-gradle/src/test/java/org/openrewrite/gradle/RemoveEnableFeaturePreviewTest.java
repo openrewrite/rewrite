@@ -95,7 +95,7 @@ public class RemoveEnableFeaturePreviewTest implements RewriteTest {
     }
 
     @Test
-    void testRemoveEnableFeaturePreviewMethodRecipe_noChangeNullArgument() {
+    void testRemoveEnableFeaturePreviewMethodRecipe_noChangeNoArgument() {
         //language=gradle
         rewriteRun(
           spec -> spec.recipe(new RemoveEnableFeaturePreview("ONE_LOCKFILE_PER_PROJECT")),
@@ -108,6 +108,30 @@ public class RemoveEnableFeaturePreviewTest implements RewriteTest {
                 }
                 
                 enableFeaturePreview()
+                              
+                rootProject.name = 'merge-service'
+                              
+                include 'service'
+              """,
+            spec -> spec.path(Paths.get("settings.gradle"))
+          )
+        );
+    }
+
+    @Test
+    void testRemoveEnableFeaturePreviewMethodRecipe_noChangeNullArgument() {
+        //language=gradle
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEnableFeaturePreview("ONE_LOCKFILE_PER_PROJECT")),
+          Assertions.settingsGradle(
+            """
+                pluginManagement {
+                    repositories {
+                        gradlePluginPortal()
+                    }
+                }
+                
+                enableFeaturePreview(null)
                               
                 rootProject.name = 'merge-service'
                               
