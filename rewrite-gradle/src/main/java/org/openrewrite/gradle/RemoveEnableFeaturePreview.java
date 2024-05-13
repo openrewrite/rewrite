@@ -33,7 +33,7 @@ public class RemoveEnableFeaturePreview extends Recipe {
 
   @Override
   public @NotNull String getDescription() {
-    return "Remove a Gradle enableFeaturePreview method from settings.gradle / settings.gradle.kts.";
+    return "Remove an enabled Gradle preview feature from `settings.gradle`.";
   }
 
   @Override
