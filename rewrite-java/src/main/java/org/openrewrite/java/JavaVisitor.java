@@ -457,14 +457,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
         c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> visitAndCast(m, p)));
         //Kind can have annotations associated with it, need to visit those.
-        c = c.getAnnotations().withKind(
-                classDecl.getAnnotations().getKind().withAnnotations(
-                        ListUtils.map(classDecl.getAnnotations().getKind().getAnnotations(), a -> visitAndCast(a, p))
+        c = c.getPadding().withKind(
+                classDecl.getPadding().getKind().withAnnotations(
+                        ListUtils.map(classDecl.getPadding().getKind().getAnnotations(), a -> visitAndCast(a, p))
                 )
         );
-        c = c.getAnnotations().withKind(
-                c.getAnnotations().getKind().withPrefix(
-                        visitSpace(c.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p)
+        c = c.getPadding().withKind(
+                c.getPadding().getKind().withPrefix(
+                        visitSpace(c.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p)
                 )
         );
         c = c.withName(visitAndCast(c.getName(), p));
@@ -1404,16 +1404,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
 
         setCursor(getCursor().getParent());
-        if (t == null) {
-            // If nothing changed leave AST node the same
-            if (left.getElement() == null && before == left.getBefore()) {
-                return left;
-            }
-            //noinspection ConstantConditions
-            return null;
+        // If nothing changed leave AST node the same
+        if (left.getElement() == t && before == left.getBefore()) {
+            return left;
         }
 
-        return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
+        //noinspection ConstantConditions
+        return t == null ? null : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
     public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
