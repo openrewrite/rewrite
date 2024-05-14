@@ -127,7 +127,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
 
         MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
                 resolutionResult.getProjectPoms());
-        MavenDownloadingExceptions exceptions = updated.getExceptions();
+        MavenDownloadingFailures exceptions = updated.getExceptions();
         if(exceptions != null) {
             return exceptions.warn(document);
         } else {

@@ -64,6 +64,10 @@ public interface Markup extends Marker {
         return markup(t, new Markup.Warn(randomId(), throwable));
     }
 
+    static <T extends Tree> T warn(T t, String message, String detail) {
+        return markup(t, new Markup.Warn(randomId(), message, detail));
+    }
+
     static <T extends Tree> T info(T t, String message) {
         return info(t, message, null);
     }

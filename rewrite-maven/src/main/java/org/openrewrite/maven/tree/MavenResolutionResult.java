@@ -83,7 +83,7 @@ public class MavenResolutionResult implements Marker {
         for (List<ResolvedDependency> value : dependencies.values()) {
             for (ResolvedDependency resolvedDependency : value) {
                 if (resolvedDependency.getFailure() != null) {
-                    result = MavenDownloadingExceptions.append(result, resolvedDependency.getFailure());
+                    result = MavenDownloadingFailures.append(result, resolvedDependency.getFailure());
                 }
             }
         }
@@ -191,7 +191,7 @@ public class MavenResolutionResult implements Marker {
 
     public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) {
         Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
-        MavenDownloadingExceptions exceptions = null;
+        MavenDownloadingFailures failures = null;
 
         Map<GroupArtifact, Set<GroupArtifactVersion>> exceptionsInLowerScopes = new HashMap<>();
         for (Scope scope : RESOLVE_SCOPES) {
@@ -201,14 +201,14 @@ public class MavenResolutionResult implements Marker {
                 for (MavenDownloadingException exception : e.getExceptions()) {
                     if (exceptionsInLowerScopes.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
                             exception.getRoot().getArtifactId()), ga -> new HashSet<>()).add(exception.getFailedOn())) {
-                        exceptions = MavenDownloadingExceptions.append(exceptions, exception);
+                        failures = MavenDownloadingFailures.append(failures, exception.asFailure());
                     }
                 }
             }
         }
         MavenResolutionResult result = withDependencies(dependencies);
-        if (exceptions != null) {
-            result = result.withExceptions(exceptions);
+        if (failures != null) {
+            result = result.withFailures(failures);
         }
         return result;
     }
