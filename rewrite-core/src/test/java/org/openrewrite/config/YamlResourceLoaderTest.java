@@ -324,32 +324,24 @@ class YamlResourceLoaderTest implements RewriteTest {
 
     @Test
     void loadRecipeWithRecipeDataStringThatThrowsNoClassDefFoundError() {
-        final List<String> lazyLoadRecipes = new ArrayList<>();
-        YamlResourceLoader resourceLoader = createYamlResourceLoader();
-
-        resourceLoader.loadRecipe(
-          "org.company.CustomRecipe",
-          0,
-          RecipeWithBadStaticInitializer.class.getName(),
-          recipe -> lazyLoadRecipes.add(recipe),
-          recipe -> {
-          },
-          validated -> {
-          });
-
-        assertEquals(1, lazyLoadRecipes.size());
-        assertEquals(RecipeWithBadStaticInitializer.class.getName(), lazyLoadRecipes.get(0));
+        assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(
+          RecipeWithBadStaticInitializer.class.getName());
     }
 
     @Test
     void loadRecipeWithRecipeDataMapThatThrowsNoClassDefFoundError() {
+        assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(
+          Map.of(RecipeWithBadStaticInitializer.class.getName(), Map.of()));
+    }
+
+    private void assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(Object recipeData) {
         final List<Validated<Object>> invalidRecipes = new ArrayList<>();
         YamlResourceLoader resourceLoader = createYamlResourceLoader();
 
         resourceLoader.loadRecipe(
           "org.company.CustomRecipe",
           0,
-          Map.of(RecipeWithBadStaticInitializer.class.getName(), Map.of()),
+          recipeData,
           recipe -> {
           },
           recipe -> {
@@ -361,7 +353,7 @@ class YamlResourceLoaderTest implements RewriteTest {
 
     private YamlResourceLoader createYamlResourceLoader() {
         return new YamlResourceLoader(
-          new ByteArrayInputStream("type: specs.openrewrite.org/v1beta/recipe" .getBytes()),
+          new ByteArrayInputStream("type: specs.openrewrite.org/v1beta/recipe".getBytes()),
           URI.create("rewrite.yml"),
           new Properties());
     }
