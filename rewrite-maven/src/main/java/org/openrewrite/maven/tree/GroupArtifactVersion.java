@@ -45,7 +45,7 @@ public class GroupArtifactVersion implements Serializable {
     }
 
     public ResolvedGroupArtifactVersion asResolvedGroupArtifactVersion() {
-        return new ResolvedGroupArtifactVersion(null, groupId, artifactId, version, null);
+        return new ResolvedGroupArtifactVersion(null, groupId, artifactId, (version == null ? "UNRESOLVABLE" : version), null);
     }
 
     public GroupArtifactVersion withGroupArtifact(GroupArtifact ga) {

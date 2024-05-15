@@ -31,7 +31,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.MavenDownloadingFailure;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
@@ -475,7 +474,10 @@ public class ResolvedPom {
                 if (newRequiredVersion == null) {
                     return Pom.builder()
                             .gav(gav.asResolvedGroupArtifactVersion())
-                            .exception(new MavenDownloadingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement, null, gav))
+                            .failure(MavenDownloadingFailure.builder()
+                                    .message("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement)
+                                    .failedOn(gav)
+                                    .build())
                             .build();
                 }
                 gav = gav.withVersion(newRequiredVersion);
@@ -485,7 +487,7 @@ public class ResolvedPom {
             } catch (MavenDownloadingException e) {
                 return Pom.builder()
                         .gav(gav.asResolvedGroupArtifactVersion())
-                        .exception(e)
+                        .failure(MavenDownloadingFailure.fromException(e))
                         .build();
             }
         }
@@ -797,12 +799,12 @@ public class ResolvedPom {
         }
     }
 
-    public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+    public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) {
         return resolveDependencies(scope, new HashMap<>(), downloader, ctx);
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
-                                                        MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+                                                        MavenPomDownloader downloader, ExecutionContext ctx) {
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
         List<DependencyAndDependent> dependenciesAtDepth = new ArrayList<>();
@@ -814,7 +816,6 @@ public class ResolvedPom {
             }
         }
 
-        MavenDownloadingExceptions exceptions = null;
         int depth = 0;
         while (!dependenciesAtDepth.isEmpty()) {
             List<DependencyAndDependent> dependenciesAtNextDepth = new ArrayList<>();
@@ -824,33 +825,70 @@ public class ResolvedPom {
                 Dependency d = dd.getDefinedIn().getValues(dd.getDependency(), depth);
                 //The dependency may be modified by the current pom's managed dependencies
                 d = getValues(d, depth);
-                try {
-                    if (d.getVersion() == null) {
-                        throw new MavenDownloadingException("No version provided for " + d.getGav().asGroupArtifact(), null, dd.getDependency().getGav());
-                    }
+                if (d.getVersion() == null) {
+                    dependencies.add(ResolvedDependency.builder()
+                            .gav(d.getGav().asResolvedGroupArtifactVersion())
+                            .classifier(d.getClassifier())
+                            .depth(depth)
+                            .failure(MavenDownloadingFailure.builder()
+                                    .message("No version provided for " + d.getGav().asGroupArtifact())
+                                    .failedOn(d.getGav())
+                                    .build())
+                            .build());
+                    continue;
+                }
 
-                    if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()))) {
-                        continue;
-                    }
+                if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()))) {
+                    continue;
+                }
 
-                    GroupArtifact ga = new GroupArtifact(d.getGroupId(), d.getArtifactId());
-                    VersionRequirement existingRequirement = requirements.get(ga);
-                    if (existingRequirement == null) {
-                        VersionRequirement newRequirement = VersionRequirement.fromVersion(d.getVersion(), depth);
-                        requirements.put(ga, newRequirement);
+                GroupArtifact ga = new GroupArtifact(d.getGroupId(), d.getArtifactId());
+                VersionRequirement existingRequirement = requirements.get(ga);
+                if (existingRequirement == null) {
+                    VersionRequirement newRequirement = VersionRequirement.fromVersion(d.getVersion(), depth);
+                    requirements.put(ga, newRequirement);
+                    try {
                         String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
                         if (newRequiredVersion == null) {
-                            throw new MavenParsingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement);
+                            dependencies.add(ResolvedDependency.builder()
+                                    .gav(d.getGav().asResolvedGroupArtifactVersion())
+                                    .classifier(d.getClassifier())
+                                    .depth(depth)
+                                    .failure((MavenDownloadingFailure.builder()
+                                            .message("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement)
+                                            .failedOn(d.getGav())
+                                            .build()))
+                                    .build());
+                            continue;
                         }
                         d = d.withGav(d.getGav().withVersion(newRequiredVersion));
-                    } else {
-                        VersionRequirement newRequirement = existingRequirement.addRequirement(d.getVersion());
-                        requirements.put(ga, newRequirement);
+                    } catch (MavenDownloadingException e) {
+                        dependencies.add(ResolvedDependency.builder()
+                                .gav(d.getGav().asResolvedGroupArtifactVersion())
+                                .classifier(d.getClassifier())
+                                .depth(depth)
+                                .failure(e.asFailure())
+                                .build());
+                        continue;
 
+                    }
+                } else {
+                    VersionRequirement newRequirement = existingRequirement.addRequirement(d.getVersion());
+                    requirements.put(ga, newRequirement);
+                    try {
                         String existingRequiredVersion = existingRequirement.resolve(ga, downloader, getRepositories());
                         String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
                         if (newRequiredVersion == null) {
-                            throw new MavenParsingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement);
+                            dependencies.add(ResolvedDependency.builder()
+                                    .gav(d.getGav().asResolvedGroupArtifactVersion())
+                                    .classifier(d.getClassifier())
+                                    .depth(depth)
+                                    .failure((MavenDownloadingFailure.builder()
+                                            .message("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement)
+                                            .failedOn(d.getGav())
+                                            .build()))
+                                    .build());
+                            continue;
                         }
                         d = d.withGav(d.getGav().withVersion(newRequiredVersion));
 
@@ -867,110 +905,122 @@ public class ResolvedPom {
                             // so just skip and continue on
                             continue;
                         }
-                    }
-
-                    if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
-                        (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
-                        (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
-                        throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
-                    }
-
-                    MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
-                    ResolvedPom resolvedPom;
-                    Pom dPom;
-                    try {
-                        dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories());
-                        resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
-                    } catch  (MavenDownloadingException e) {
-                        ResolvedGroupArtifactVersion gav = new ResolvedGroupArtifactVersion(null, d.getGroupId(), d.getArtifactId(), d.getVersion(), null);
-                        dPom = Pom.builder()
-                                .gav(gav)
-                                .build();
-                        resolvedPom = ResolvedPom.builder()
-                                .requested(dPom)
-                                .activeProfiles(activeProfiles)
-                                .properties(properties)
+                    } catch (MavenDownloadingException e) {
+                        dependencies.add(ResolvedDependency.builder()
+                                .gav(d.getGav().asResolvedGroupArtifactVersion())
+                                .classifier(d.getClassifier())
+                                .depth(depth)
                                 .failure(e.asFailure())
-                                .build();
-                    }
-
-                    if (resolvedPom == null) {
-                        resolvedPom = ResolvedPom.builder()
-                                .requested(dPom)
-                                .activeProfiles(getActiveProfiles())
-                                .initialRepositories(initialRepositories)
-                                .build();
-                        resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
-                        cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
-                    }
-
-                    ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
-                            resolvedPom.getGav(), dd.getDependency(), emptyList(),
-                            resolvedPom.getRequested().getLicenses(),
-                            resolvedPom.getValue(dd.getDependency().getType()),
-                            resolvedPom.getValue(dd.getDependency().getClassifier()),
-                            Boolean.valueOf(resolvedPom.getValue(dd.getDependency().getOptional())),
-                            depth,
-                            emptyList(),
-                            resolvedPom.getFailure());
-
-                    MavenExecutionContextView.view(ctx)
-                            .getResolutionListener()
-                            .dependency(scope, resolved, dd.getDefinedIn());
-
-                    // build link between the including dependency and this one
-                    ResolvedDependency includedBy = dd.getDependent();
-                    if (includedBy != null) {
-                        if (includedBy.getDependencies().isEmpty()) {
-                            includedBy.unsafeSetDependencies(new ArrayList<>());
-                        }
-                        includedBy.getDependencies().add(resolved);
-                    }
-
-                    if (dd.getScope().transitiveOf(scope) == scope) {
-                        dependencies.add(resolved);
-                    } else {
+                                .build());
                         continue;
                     }
+                }
 
-                    nextDependency:
-                    for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
-                        if (d2.getGroupId() == null) {
-                            d2 = d2.withGav(d2.getGav().withGroupId(resolvedPom.getGroupId()));
-                        }
-                        String optional = resolvedPom.getValue(d2.getOptional());
-                        if (optional != null && Boolean.parseBoolean(optional.trim())) {
-                            continue;
-                        }
-                        if (d.getExclusions() != null) {
-                            for (GroupArtifact exclusion : d.getExclusions()) {
-                                if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
-                                    matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
-                                    if (resolved.getEffectiveExclusions().isEmpty()) {
-                                        resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
-                                    }
-                                    resolved.getEffectiveExclusions().add(exclusion);
-                                    continue nextDependency;
+                if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
+                    (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
+                    (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
+                    dependencies.add(ResolvedDependency.builder()
+                            .gav(d.getGav().asResolvedGroupArtifactVersion())
+                            .optional(Boolean.parseBoolean(d.getOptional()))
+                            .depth(depth)
+                            .classifier(d.getClassifier())
+                            .failure(MavenDownloadingFailure.builder()
+                                    .message("Could not resolve property")
+                                    .failedOn(d.getGav())
+                                    .build())
+                            .build());
+                    continue;
+                }
+
+                MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
+                ResolvedPom resolvedPom;
+                Pom dPom;
+                try {
+                    dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories());
+                    resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
+                } catch (MavenDownloadingException e) {
+                    ResolvedGroupArtifactVersion gav = new ResolvedGroupArtifactVersion(null, d.getGroupId(), d.getArtifactId(), d.getVersion(), null);
+                    dPom = Pom.builder()
+                            .gav(gav)
+                            .build();
+                    resolvedPom = ResolvedPom.builder()
+                            .requested(dPom)
+                            .activeProfiles(activeProfiles)
+                            .properties(properties)
+                            .failure(e.asFailure())
+                            .build();
+                }
+
+                if (resolvedPom == null) {
+                    resolvedPom = ResolvedPom.builder()
+                            .requested(dPom)
+                            .activeProfiles(getActiveProfiles())
+                            .initialRepositories(initialRepositories)
+                            .build();
+                    resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
+                    cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
+                }
+
+                ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
+                        resolvedPom.getGav(), dd.getDependency(), emptyList(),
+                        resolvedPom.getRequested().getLicenses(),
+                        resolvedPom.getValue(dd.getDependency().getType()),
+                        resolvedPom.getValue(dd.getDependency().getClassifier()),
+                        Boolean.valueOf(resolvedPom.getValue(dd.getDependency().getOptional())),
+                        depth,
+                        emptyList(),
+                        resolvedPom.getFailure());
+
+                MavenExecutionContextView.view(ctx)
+                        .getResolutionListener()
+                        .dependency(scope, resolved, dd.getDefinedIn());
+
+                // build link between the including dependency and this one
+                ResolvedDependency includedBy = dd.getDependent();
+                if (includedBy != null) {
+                    if (includedBy.getDependencies().isEmpty()) {
+                        includedBy.unsafeSetDependencies(new ArrayList<>());
+                    }
+                    includedBy.getDependencies().add(resolved);
+                }
+
+                if (dd.getScope().transitiveOf(scope) == scope) {
+                    dependencies.add(resolved);
+                } else {
+                    continue;
+                }
+
+                nextDependency:
+                for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
+                    if (d2.getGroupId() == null) {
+                        d2 = d2.withGav(d2.getGav().withGroupId(resolvedPom.getGroupId()));
+                    }
+                    String optional = resolvedPom.getValue(d2.getOptional());
+                    if (optional != null && Boolean.parseBoolean(optional.trim())) {
+                        continue;
+                    }
+                    if (d.getExclusions() != null) {
+                        for (GroupArtifact exclusion : d.getExclusions()) {
+                            if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
+                                matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                if (resolved.getEffectiveExclusions().isEmpty()) {
+                                    resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                 }
+                                resolved.getEffectiveExclusions().add(exclusion);
+                                continue nextDependency;
                             }
                         }
-
-                        Scope d2Scope = getDependencyScope(d2, resolvedPom);
-                        if (d2Scope.isInClasspathOf(dd.getScope())) {
-                            dependenciesAtNextDepth.add(new DependencyAndDependent(d2, d2Scope, resolved, dd.getRootDependent(), resolvedPom));
-                        }
                     }
-                } catch (MavenDownloadingException e) {
-                    exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(dd.getRootDependent().getGav()));
+
+                    Scope d2Scope = getDependencyScope(d2, resolvedPom);
+                    if (d2Scope.isInClasspathOf(dd.getScope())) {
+                        dependenciesAtNextDepth.add(new DependencyAndDependent(d2, d2Scope, resolved, dd.getRootDependent(), resolvedPom));
+                    }
                 }
             }
 
             dependenciesAtDepth = dependenciesAtNextDepth;
             depth++;
-        }
-
-        if (exceptions != null) {
-            throw exceptions;
         }
 
         return dependencies;

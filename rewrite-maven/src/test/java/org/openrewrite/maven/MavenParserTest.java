@@ -117,7 +117,6 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     void invalidRange() {
-        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() ->
           rewriteRun(
             // Counter to what Maven does most of the time, the last range "wins" when the same dependency
             // is defined twice with a range.
@@ -136,10 +135,20 @@ class MavenParserTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </project>
-                """
+                """,
+              spec -> spec.afterRecipe(doc -> {
+                  assertThat(doc.getMarkers().findFirst(MavenResolutionResult.class))
+                    .isPresent()
+                    .get()
+                    .extracting(MavenResolutionResult::getAllFailures)
+                    .extracting(MavenDownloadingFailures::getFailures)
+                    .matches(failures -> failures.stream()
+                      .anyMatch(failure -> failure.getMessage()
+                        .equals("Could not resolve version for [junit:junit] matching version requirements RangeSet={[88.7,90.9)}")));
+              })
             )
-          )
-        ).withMessage("Could not resolve version for [junit:junit] matching version requirements RangeSet={[88.7,90.9)}");
+          );
+        //.withMessage("Could not resolve version for [junit:junit] matching version requirements RangeSet={[88.7,90.9)}");
     }
 
     @Test
@@ -2969,7 +2978,7 @@ class MavenParserTest implements RewriteTest {
                 .isNotEmpty()
                 .map(it -> it.get(0).getFailure())
                 .as("activation:activation:1.0 is not published to maven central so there must have been an exception resolving it")
-                .containsInstanceOf(MavenDownloadingException.class)
+                .containsInstanceOf(MavenDownloadingFailure.class)
             )
           )
         );

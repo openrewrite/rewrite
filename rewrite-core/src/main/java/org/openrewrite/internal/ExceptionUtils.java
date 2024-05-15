@@ -32,12 +32,14 @@ public class ExceptionUtils {
         StringJoiner sanitized = new StringJoiner("\n");
         Throwable cause = t instanceof RecipeRunException ? t.getCause() : t;
         sanitized.add(cause.getClass().getName() + ": " + cause.getLocalizedMessage());
+        sanitized.add(sanitizeStackTrace(cause.getStackTrace()));
+        return sanitized.toString();
+    }
 
+    public static String sanitizeStackTrace(StackTraceElement[] stackTraceElements) {
+        StringJoiner sanitized = new StringJoiner("\n");
         int i = 0;
-        for (StackTraceElement stackTraceElement : cause.getStackTrace()) {
-            if (stackTraceElement.getClassName().equals(until.getName())) {
-                break;
-            }
+        for (StackTraceElement stackTraceElement : stackTraceElements) {
             if (i++ >= 16) {
                 sanitized.add("  ...");
                 break;

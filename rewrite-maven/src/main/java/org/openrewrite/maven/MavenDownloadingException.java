@@ -49,7 +49,7 @@ public class MavenDownloadingException extends Exception {
     @NonFinal
     private Map<String, String> repositoryUriToResponse = Collections.emptyMap();
 
-    public MavenDownloadingException setRoot(GroupArtifactVersion root) {
+    public MavenDownloadingException setRoot(@Nullable GroupArtifactVersion root) {
         this.root = root;
         return this;
     }
@@ -93,7 +93,7 @@ public class MavenDownloadingException extends Exception {
     }
 
     public MavenDownloadingFailure asFailure() {
-        return new MavenDownloadingFailure(root, failedOn, repositoryUriToResponse, getStackTrace());
+        return new MavenDownloadingFailure(getMessage(), root, failedOn, repositoryUriToResponse, getStackTrace());
     }
 
     public <T extends Tree> T warn(T t) {

@@ -2,6 +2,7 @@ package org.openrewrite.maven;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
@@ -45,15 +46,18 @@ public class MavenDownloadingFailures {
     }
 
     public Xml.Document warn(Xml.Document document) {
+        if(failures.isEmpty()) {
+            return document;
+        }
         MavenResolutionResult mrr = document.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
         if(mrr == null) {
-            return Markup.warn(document, this);
+            return Markup.warn(document, "No maven resolution result is available", "");
         }
 
         Map<GroupArtifact, List<MavenDownloadingFailure>> byGav = new HashMap<>();
-        for (MavenDownloadingFailure exception : failures) {
-            byGav.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
-                    exception.getRoot().getArtifactId()), ga -> new ArrayList<>()).add(exception);
+        for (MavenDownloadingFailure failure : failures) {
+            byGav.computeIfAbsent(new GroupArtifact(failure.getFailedOn().getGroupId(),
+                    failure.getFailedOn().getArtifactId()), ga -> new ArrayList<>()).add(failure);
         }
 
         return (Xml.Document) new MavenIsoVisitor<Integer>() {
@@ -79,14 +83,14 @@ public class MavenDownloadingFailures {
                         List<MavenDownloadingFailure> withoutRetries = byGav.get(ga).stream()
                                 .filter(it -> !it.getMessage().contains("Did not attempt to download because of a previous failure to retrieve from this repository"))
                                 .collect(Collectors.toList());
-                        List<MavenDownloadingException> exceptionsToAdd;
+                        List<MavenDownloadingFailure> exceptionsToAdd;
                         if(!withoutRetries.isEmpty()) {
                             exceptionsToAdd = withoutRetries;
                         } else {
                             exceptionsToAdd = byGav.get(ga);
                         }
-                        for (MavenDownloadingException exception : exceptionsToAdd) {
-                            t = Markup.warn(t, exception);
+                        for (MavenDownloadingFailure failure : exceptionsToAdd) {
+                            t = Markup.warn(t, failure.getMessage(), ExceptionUtils.sanitizeStackTrace(failure.getStackTrace()));
                         }
                     }
                 }

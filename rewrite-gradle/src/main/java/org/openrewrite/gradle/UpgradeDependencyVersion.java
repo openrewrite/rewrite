@@ -37,7 +37,6 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
@@ -656,7 +655,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             if (anyChanged) {
                 gp = gp.withNameToConfiguration(newNameToConfiguration);
             }
-        } catch (MavenDownloadingException | MavenDownloadingExceptions e) {
+        } catch (MavenDownloadingException e) {
             return gp;
         }
         return gp;

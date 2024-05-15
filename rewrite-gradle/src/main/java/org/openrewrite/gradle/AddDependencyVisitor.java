@@ -34,7 +34,6 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
@@ -206,7 +205,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
             }
             gp = gp.withNameToConfiguration(newNameToConfiguration);
-        } catch (MavenDownloadingException | MavenDownloadingExceptions | IllegalArgumentException e) {
+        } catch (MavenDownloadingException | IllegalArgumentException e) {
             return Markup.warn(buildScript, e);
         }
         return buildScript.withMarkers(buildScript.getMarkers().setByType(gp));

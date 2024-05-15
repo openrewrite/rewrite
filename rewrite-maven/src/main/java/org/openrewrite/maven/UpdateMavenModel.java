@@ -24,7 +24,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
@@ -127,7 +126,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
 
         MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
                 resolutionResult.getProjectPoms());
-        MavenDownloadingFailures exceptions = updated.getExceptions();
+        MavenDownloadingFailures exceptions = updated.getAllFailures();
         if(exceptions != null) {
             return exceptions.warn(document);
         } else {

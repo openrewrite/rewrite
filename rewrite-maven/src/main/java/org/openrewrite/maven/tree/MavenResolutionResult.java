@@ -64,10 +64,6 @@ public class MavenResolutionResult implements Marker {
     @With
     List<String> activeProfiles;
 
-    @With
-    @Nullable
-    MavenDownloadingFailures failures;
-
     /**
      * Retrieve a MavenDownloadingExceptions that occurred during resolution of this MavenResolutionResult or any
      * of the dependencies resolved within it.
@@ -75,11 +71,11 @@ public class MavenResolutionResult implements Marker {
      * @return null if no exceptions occurred, or a MavenDownloadingExceptions object containing all exceptions.
      */
     @Nullable
-    public MavenDownloadingFailures getExceptions() {
-        MavenDownloadingFailures result = failures;
-        if (parent != null && parent.getExceptions() != null) {
-            result = MavenDownloadingFailures.append(result, parent.getExceptions());
-        }
+    public MavenDownloadingFailures getAllFailures() {
+        MavenDownloadingFailures result = new MavenDownloadingFailures(Collections.emptyList());
+//        if (parent != null && parent.getFailures() != null) {
+//            result = MavenDownloadingFailures.append(result, parent.getFailures());
+//        }
         for (List<ResolvedDependency> value : dependencies.values()) {
             for (ResolvedDependency resolvedDependency : value) {
                 if (resolvedDependency.getFailure() != null) {
@@ -191,26 +187,11 @@ public class MavenResolutionResult implements Marker {
 
     public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) {
         Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
-        MavenDownloadingFailures failures = null;
-
         Map<GroupArtifact, Set<GroupArtifactVersion>> exceptionsInLowerScopes = new HashMap<>();
         for (Scope scope : RESOLVE_SCOPES) {
-            try {
-                dependencies.put(scope, pom.resolveDependencies(scope, downloader, ctx));
-            } catch (MavenDownloadingExceptions e) {
-                for (MavenDownloadingException exception : e.getExceptions()) {
-                    if (exceptionsInLowerScopes.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
-                            exception.getRoot().getArtifactId()), ga -> new HashSet<>()).add(exception.getFailedOn())) {
-                        failures = MavenDownloadingFailures.append(failures, exception.asFailure());
-                    }
-                }
-            }
+            dependencies.put(scope, pom.resolveDependencies(scope, downloader, ctx));
         }
-        MavenResolutionResult result = withDependencies(dependencies);
-        if (failures != null) {
-            result = result.withFailures(failures);
-        }
-        return result;
+        return withDependencies(dependencies);
     }
 
     public Map<Path, Pom> getProjectPoms() {

@@ -22,6 +22,7 @@ import lombok.With;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingFailure;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
@@ -94,7 +95,7 @@ public class Pom {
     List<Plugin> pluginManagement = emptyList();
     @Builder.Default
     @Nullable
-    MavenDownloadingException exception = null;
+    MavenDownloadingFailure failure = null;
 
     public String getGroupId() {
         return gav.getGroupId();

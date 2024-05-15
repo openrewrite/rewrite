@@ -189,7 +189,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(after ->
               assertThat(after.getMarkers().findFirst(MavenResolutionResult.class))
-                .map(MavenResolutionResult::getExceptions)
+                .map(MavenResolutionResult::getAllFailures)
                 .isNotEmpty())
           )
       );
