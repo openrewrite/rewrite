@@ -72,18 +72,18 @@ public class MavenResolutionResult implements Marker {
      */
     @Nullable
     public MavenDownloadingFailures getAllFailures() {
-        MavenDownloadingFailures result = new MavenDownloadingFailures(Collections.emptyList());
-//        if (parent != null && parent.getFailures() != null) {
-//            result = MavenDownloadingFailures.append(result, parent.getFailures());
-//        }
+        List<MavenDownloadingFailure> failures = new ArrayList<>();
         for (List<ResolvedDependency> value : dependencies.values()) {
             for (ResolvedDependency resolvedDependency : value) {
                 if (resolvedDependency.getFailure() != null) {
-                    result = MavenDownloadingFailures.append(result, resolvedDependency.getFailure());
+                    failures.add(resolvedDependency.getFailure());
                 }
             }
         }
-        return result;
+        if(failures.isEmpty()) {
+            return null;
+        }
+        return new MavenDownloadingFailures(failures);
     }
 
     public List<String> getActiveProfiles() {
