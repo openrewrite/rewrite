@@ -15,16 +15,14 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
@@ -49,6 +47,7 @@ import java.util.stream.Collectors;
 import static java.util.Collections.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
+@AllArgsConstructor(onConstructor = @__(@JsonCreator))
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @Getter
 @Builder
@@ -100,6 +99,22 @@ public class ResolvedPom {
     @NonFinal
     @Nullable
     MavenDownloadingFailure failure;
+
+    public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
+        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList());
+    }
+
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement) {
+        this.requested = requested;
+        this.activeProfiles = activeProfiles;
+        this.properties = properties;
+        this.dependencyManagement = dependencyManagement;
+        this.initialRepositories = initialRepositories;
+        this.repositories = repositories;
+        this.requestedDependencies = requestedDependencies;
+        this.plugins = plugins;
+        this.pluginManagement = pluginManagement;
+    }
 
     /**
      * Deduplicate dependencies and dependency management dependencies
