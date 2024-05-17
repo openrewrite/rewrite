@@ -25,7 +25,6 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.groovy.GroovyIsoVisitor;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.Literal;
@@ -61,22 +60,26 @@ public class RemoveEnableFeaturePreview extends Recipe {
   public class RemoveEnableFeaturePreviewVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
     @Override
-    public MethodInvocation visitMethodInvocation(MethodInvocation method,
-        @NotNull ExecutionContext executionContext) {
-      final MethodMatcher methodMatcher =
-          new MethodMatcher("org.gradle.api.initialization.Settings enableFeaturePreview(String)");
+    public MethodInvocation visitMethodInvocation(
+        MethodInvocation method, @NotNull ExecutionContext executionContext) {
 
-      if (methodMatcher.matches(method)) {
-        List<Expression> arguments = method.getArguments();
-        for (Expression argument : arguments) {
-          if (argument instanceof J.Literal) {
-            String candidatePreviewFeatureName = (String) ((Literal) argument).getValue();
-            if (previewFeatureName.equals(candidatePreviewFeatureName)) {
-              return null;
-            }
-          }
+      if (!"enableFeaturePreview".equals(method.getSimpleName())) {
+        return method;
+      }
+
+      List<Expression> arguments = method.getArguments();
+      if (arguments == null || arguments.size() != 1) {
+        return method;
+      }
+
+      Expression argument = arguments.get(0);
+      if (argument instanceof J.Literal) {
+        String candidatePreviewFeatureName = (String) ((Literal) argument).getValue();
+        if (previewFeatureName.equals(candidatePreviewFeatureName)) {
+          return null;
         }
       }
+
       return method;
     }
   }
