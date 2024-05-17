@@ -120,29 +120,18 @@ public class ImportLayoutStyle implements JavaStyle {
             return singletonList(paddedToAdd);
         }
 
+        // Do not add the import if it is already present.
+        String qualifiedName = paddedToAdd.getElement().getQualid().toString();
+        if (originalImports.stream().anyMatch(i -> qualifiedName.equals(i.getElement().getQualid().toString()))) {
+            return originalImports;
+        }
+
         // don't star fold just yet, because we are only going to star fold adjacent imports along with
         // the import to add at most. we don't even want to star fold other non-adjacent imports in the same
         // block that should be star folded according to the layout style (minimally invasive change).
         List<JRightPadded<J.Import>> ideallyOrdered =
                 new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layout, packagesToFold)
                         .orderImports(ListUtils.concat(originalImports, paddedToAdd), new HashSet<>());
-
-        if (ideallyOrdered.size() == originalImports.size()) {
-            Set<String> originalPaths = new HashSet<>();
-            for (JRightPadded<J.Import> originalImport : originalImports) {
-                originalPaths.add(originalImport.getElement().getTypeName());
-            }
-            int sharedImports = 0;
-            for (JRightPadded<J.Import> importJRightPadded : ideallyOrdered) {
-                if (originalPaths.contains(importJRightPadded.getElement().getTypeName())) {
-                    sharedImports++;
-                }
-            }
-            if (sharedImports == originalImports.size()) {
-                // must be a duplicate of an existing import
-                return originalImports;
-            }
-        }
 
         JRightPadded<J.Import> before = null;
         JRightPadded<J.Import> after = null;
