@@ -121,9 +121,9 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         // Do not add the import if it is already present.
-        String qualifiedName = paddedToAdd.getElement().getQualid().toString();
+        JavaType addedType = paddedToAdd.getElement().getQualid().getType();
         for (JRightPadded<J.Import> originalImport : originalImports) {
-            if (qualifiedName.equals(originalImport.getElement().getQualid().toString())) {
+            if (TypeUtils.isOfType(addedType, originalImport.getElement().getQualid().getType())) {
                 return originalImports;
             }
         }
