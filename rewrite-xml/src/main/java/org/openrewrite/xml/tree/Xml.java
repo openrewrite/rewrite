@@ -301,6 +301,12 @@ public interface Xml extends Tree {
         }
 
         public Tag withName(String name) {
+            if(!name.equals(name.trim())) {
+                throw new IllegalArgumentException("Tag name must not contain leading or trailing whitespace");
+            }
+            if(this.name.equals(name)) {
+                return this;
+            }
             return new Tag(id, prefixUnsafe, markers, name, attributes, content,
                     closing == null ? null : closing.withName(name),
                     beforeTagDelimiterPrefix);

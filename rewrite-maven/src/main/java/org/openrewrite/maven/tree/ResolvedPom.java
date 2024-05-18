@@ -22,10 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
@@ -58,10 +55,9 @@ public class ResolvedPom {
     public static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
-    private static final ResolvedPom SUPER_POM = new ResolvedPom(
-            new Pom(null, null, null, null, null, null, emptyMap(), emptyList(), emptyList(), singletonList(MavenRepository.MAVEN_CENTRAL), emptyList(), emptyList(), null, null),
-            emptyList()
-    );
+    private static final ResolvedPom SUPER_POM = ResolvedPom.builder()
+            .repositories(singletonList(MavenRepository.MAVEN_CENTRAL))
+            .build();
 
     @With
     Pom requested;
@@ -159,6 +155,11 @@ public class ResolvedPom {
      */
     @SuppressWarnings("DuplicatedCode")
     public ResolvedPom resolve(ExecutionContext ctx, MavenPomDownloader downloader) throws MavenDownloadingException {
+        // If this resolved pom represents an obsolete pom format, refuse to resolve in same as Maven itself would
+        if(requested.getObsoletePomVersion() != null) {
+            return this;
+        }
+
         ResolvedPom resolved = new ResolvedPom(
                 requested,
                 activeProfiles,
