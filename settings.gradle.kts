@@ -105,10 +105,5 @@ develocity {
         }
 
         uploadInBackground = !isCiServer
-        publishing {
-            onlyIf {
-                authenticated
-            }
-        }
     }
 }
