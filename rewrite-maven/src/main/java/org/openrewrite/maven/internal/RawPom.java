@@ -49,6 +49,7 @@ import static java.util.Collections.emptyMap;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
 @XmlRootElement(name = "project")
+@SuppressWarnings("unused")
 public class RawPom {
 
     // Obsolete field supplanted by the "modelVersion" field in modern poms
@@ -384,28 +385,6 @@ public class RawPom {
                     .pluginManagement(mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null));
         }
         return builder.build();
-//        return new Pom(
-//                inputPath,
-//                repo,
-//                parent,
-//                new ResolvedGroupArtifactVersion(
-//                        repo == null ? null : repo.getUri(),
-//                        Objects.requireNonNull(getGroupId()),
-//                        artifactId,
-//                        Objects.requireNonNull(getVersion()),
-//                        null),
-//                name,
-//                null,
-//                getPackaging(),
-//                getProperties() == null ? emptyMap() : getProperties(),
-//                mapDependencyManagement(getDependencyManagement()),
-//                mapRequestedDependencies(getDependencies()),
-//                mapRepositories(getRepositories()),
-//                mapLicenses(getLicenses()),
-//                mapProfiles(getProfiles()),
-//                mapPlugins((build != null) ? build.getPlugins() : null),
-//                mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
-//        );
     }
 
     private List<org.openrewrite.maven.tree.License> mapLicenses(@Nullable Licenses rawLicenses) {
