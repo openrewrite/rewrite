@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.config.DeclarativeNamedStyles;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
@@ -89,7 +90,8 @@ class ImportLayoutStyleTest {
     }
 
     @Test
-    void testAddImport() {
+    @Issue("https://github.com/openrewrite/rewrite/issues/4196")
+    void addImportInPresenceOfDuplicateOtherImport() {
         ImportLayoutStyle style = new ImportLayoutStyle(
                 Integer.MAX_VALUE, Integer.MAX_VALUE, Collections.emptyList(), Collections.emptyList());
         JRightPadded<J.Import> import1 = new JRightPadded<>(

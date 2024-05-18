@@ -122,8 +122,10 @@ public class ImportLayoutStyle implements JavaStyle {
 
         // Do not add the import if it is already present.
         String qualifiedName = paddedToAdd.getElement().getQualid().toString();
-        if (originalImports.stream().anyMatch(i -> qualifiedName.equals(i.getElement().getQualid().toString()))) {
-            return originalImports;
+        for (JRightPadded<J.Import> originalImport : originalImports) {
+            if (qualifiedName.equals(originalImport.getElement().getQualid().toString())) {
+                return originalImports;
+            }
         }
 
         // don't star fold just yet, because we are only going to star fold adjacent imports along with
