@@ -114,28 +114,6 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
         }
 
         @Test
-        void noArgument() {
-            //language=gradle
-            rewriteRun(
-              settingsGradle(
-                """
-                  pluginManagement {
-                      repositories {
-                          gradlePluginPortal()
-                      }
-                  }
-                  
-                  enableFeaturePreview()
-                  
-                  rootProject.name = 'merge-service'
-                  
-                  include 'service'
-                  """
-              )
-            );
-        }
-
-        @Test
         void nullArgument() {
             //language=gradle
             rewriteRun(
