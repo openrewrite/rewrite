@@ -20,9 +20,17 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.config.DeclarativeNamedStyles;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.marker.Markers;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -79,5 +87,42 @@ class ImportLayoutStyleTest {
         );
 
         mapper.readValue(mapper.writeValueAsBytes(style), DeclarativeNamedStyles.class);
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4196")
+    void addImportInPresenceOfDuplicateOtherImport() {
+        ImportLayoutStyle style = new ImportLayoutStyle(
+                Integer.MAX_VALUE, Integer.MAX_VALUE, Collections.emptyList(), Collections.emptyList());
+        JRightPadded<J.Import> import1 = new JRightPadded<>(
+                new J.Import(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+                        TypeTree.build("pkg.Clazz.MEMBER_1").withPrefix(Space.SINGLE_SPACE),
+                        null),
+                Space.EMPTY,
+                Markers.EMPTY);
+        JRightPadded<J.Import> import2 = new JRightPadded<>(
+                new J.Import(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+                        TypeTree.build("pkg.Clazz.MEMBER_1").withPrefix(Space.SINGLE_SPACE),
+                        null),
+                Space.EMPTY,
+                Markers.EMPTY);
+        J.Import importToAdd = new J.Import(
+                randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+                TypeTree.build("pkg.Clazz.MEMBER_2").withPrefix(Space.SINGLE_SPACE),
+            null);
+        assertThat(style.addImport(List.of(import1, import2), importToAdd, null, Collections.emptyList()))
+                .containsExactlyInAnyOrder(
+                        import1, import1, new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));
     }
 }

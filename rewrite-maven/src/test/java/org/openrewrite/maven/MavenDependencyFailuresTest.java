@@ -22,6 +22,8 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
@@ -120,7 +122,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
     }
 
     @Test
-    void unresolvableTransitiveDependency(@TempDir Path localRepository) throws IOException {
+    void unresolvableTransitiveDependencyDueToInvalidPom(@TempDir Path localRepository) throws IOException {
         // it's hard to simulate a transitive dependency failure since Maven Central validates
         // transitive dependency resolvability on publishing.
         //
@@ -278,6 +280,63 @@ class MavenDependencyFailuresTest implements RewriteTest {
               </project>
               """
           )
+        );
+    }
+
+    @Test
+    void oldPomVersionNoDependencyResolution() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <pomVersion>3</pomVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!-- Dependency resolution is not attempted since this pom has a "pomVersion" field -->
+                  <dependency>
+                    <groupId>org.whatever</groupId>
+                    <artifactId>doesnotexist</artifactId>
+                    <version>8.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """)
+        );
+    }
+
+    @Test
+    void unresolvableTransitiveDependencyDueToInvalidPom() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <!-- staxex has a pom with an obsolete format, its dependencies should NOT be resolved -->
+                    <groupId>org.jvnet.staxex</groupId>
+                    <artifactId>stax-ex</artifactId>
+                    <version>1.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pom ->
+              {
+                  assertThat(pom.getMarkers().findFirst(MavenResolutionResult.class))
+                    .isPresent()
+                    .get()
+                    .extracting(mrr -> mrr.getDependencies().get(Scope.Compile))
+                    .matches(deps -> deps.size() == 1)
+                    .extracting(deps -> deps.get(0))
+                    .matches(dep -> dep.getGroupId().equals("org.jvnet.staxex") &&
+                      dep.getArtifactId().equals("stax-ex") &&
+                      dep.getVersion().equals("1.0"));
+              }))
         );
     }
 
