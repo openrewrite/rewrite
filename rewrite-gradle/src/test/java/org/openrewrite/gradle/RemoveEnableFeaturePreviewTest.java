@@ -15,25 +15,32 @@
  */
 package org.openrewrite.gradle;
 
-import java.nio.file.Paths;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-public class RemoveEnableFeaturePreviewTest implements RewriteTest {
+import static org.openrewrite.gradle.Assertions.settingsGradle;
+
+class RemoveEnableFeaturePreviewTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new RemoveEnableFeaturePreview("ONE_LOCKFILE_PER_PROJECT"));
+    }
 
     @Test
-    void testRemoveEnableFeaturePreviewMethodRecipe_singleQuotes() {
+    void singleQuotes() {
         //language=gradle
         rewriteRun(
-          spec -> spec.recipe(new RemoveEnableFeaturePreview("ONE_LOCKFILE_PER_PROJECT")),
-          Assertions.settingsGradle(
+          settingsGradle(
             """
                 pluginManagement {
                     repositories {
                         gradlePluginPortal()
                     }
                 }
-                              
+              
                 rootProject.name = 'merge-service'
                 enableFeaturePreview('ONE_LOCKFILE_PER_PROJECT')
               """,
@@ -43,118 +50,111 @@ public class RemoveEnableFeaturePreviewTest implements RewriteTest {
                         gradlePluginPortal()
                     }
                 }
-                              
+              
                 rootProject.name = 'merge-service'
-              """,
-            spec -> spec.path(Paths.get("settings.gradle"))
+              """
           )
         );
     }
 
     @Test
-    void testRemoveEnableFeaturePreviewMethodRecipe_doubleQuotes() {
+    void doubleQuotes() {
         //language=gradle
         rewriteRun(
-          spec -> spec.recipe(new RemoveEnableFeaturePreview("ONE_LOCKFILE_PER_PROJECT")),
-          Assertions.settingsGradle(
+          settingsGradle(
             """
-                pluginManagement {
-                    repositories {
-                        gradlePluginPortal()
-                    }
-                }
-                              
-                rootProject.name = 'merge-service'
-                enableFeaturePreview("ONE_LOCKFILE_PER_PROJECT")
-                              
-                include 'service'
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              
+              rootProject.name = 'merge-service'
+              enableFeaturePreview("ONE_LOCKFILE_PER_PROJECT")
+              
+              include 'service'
               """,
             """
-                pluginManagement {
-                    repositories {
-                        gradlePluginPortal()
-                    }
-                }
-                              
-                rootProject.name = 'merge-service'
-                              
-                include 'service'
-              """,
-            spec -> spec.path(Paths.get("settings.gradle"))
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              
+              rootProject.name = 'merge-service'
+              
+              include 'service'
+              """
           )
         );
     }
 
-    @Test
-    void testRemoveEnableFeaturePreviewMethodRecipe_noChange() {
-        //language=gradle
-        rewriteRun(
-          spec -> spec.recipe(new RemoveEnableFeaturePreview("ONE_LOCKFILE_PER_PROJECT")),
-          Assertions.settingsGradle(
-            """
-                pluginManagement {
-                    repositories {
-                        gradlePluginPortal()
-                    }
-                }
-                
-                enableFeaturePreview("DIFFERENT_FEATURE")
-                              
-                rootProject.name = 'merge-service'
-                              
-                include 'service'
-              """,
-            spec -> spec.path(Paths.get("settings.gradle"))
-          )
-        );
-    }
+    @Nested
+    class NoChange {
+        @Test
+        void differentFeature() {
+            //language=gradle
+            rewriteRun(
+              settingsGradle(
+                """
+                  pluginManagement {
+                      repositories {
+                          gradlePluginPortal()
+                      }
+                  }
+                  
+                  enableFeaturePreview("DIFFERENT_FEATURE")
+                  
+                  rootProject.name = 'merge-service'
+                  
+                  include 'service'
+                  """
+              )
+            );
+        }
 
-    @Test
-    void testRemoveEnableFeaturePreviewMethodRecipe_noChangeNoArgument() {
-        //language=gradle
-        rewriteRun(
-          spec -> spec.recipe(new RemoveEnableFeaturePreview("ONE_LOCKFILE_PER_PROJECT")),
-          Assertions.settingsGradle(
-            """
-                pluginManagement {
-                    repositories {
-                        gradlePluginPortal()
-                    }
-                }
-                
-                enableFeaturePreview()
-                              
-                rootProject.name = 'merge-service'
-                              
-                include 'service'
-              """,
-            spec -> spec.path(Paths.get("settings.gradle"))
-          )
-        );
-    }
+        @Test
+        void noArgument() {
+            //language=gradle
+            rewriteRun(
+              settingsGradle(
+                """
+                  pluginManagement {
+                      repositories {
+                          gradlePluginPortal()
+                      }
+                  }
+                  
+                  enableFeaturePreview()
+                  
+                  rootProject.name = 'merge-service'
+                  
+                  include 'service'
+                  """
+              )
+            );
+        }
 
-    @Test
-    void testRemoveEnableFeaturePreviewMethodRecipe_noChangeNullArgument() {
-        //language=gradle
-        rewriteRun(
-          spec -> spec.recipe(new RemoveEnableFeaturePreview("ONE_LOCKFILE_PER_PROJECT")),
-          Assertions.settingsGradle(
-            """
-                pluginManagement {
-                    repositories {
-                        gradlePluginPortal()
-                    }
-                }
-                
-                enableFeaturePreview(null)
-                              
-                rootProject.name = 'merge-service'
-                              
-                include 'service'
-              """,
-            spec -> spec.path(Paths.get("settings.gradle"))
-          )
-        );
+        @Test
+        void nullArgument() {
+            //language=gradle
+            rewriteRun(
+              settingsGradle(
+                """
+                  pluginManagement {
+                      repositories {
+                          gradlePluginPortal()
+                      }
+                  }
+                  
+                  enableFeaturePreview(null)
+                  
+                  rootProject.name = 'merge-service'
+                  
+                  include 'service'
+                  """
+              )
+            );
+        }
     }
-
 }

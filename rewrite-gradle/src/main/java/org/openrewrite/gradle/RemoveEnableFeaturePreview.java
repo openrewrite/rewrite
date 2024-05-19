@@ -15,73 +15,43 @@
  */
 package org.openrewrite.gradle;
 
-import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jetbrains.annotations.NotNull;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyIsoVisitor;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.J.Literal;
-import org.openrewrite.java.tree.J.MethodInvocation;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveEnableFeaturePreview extends Recipe {
 
-  @Option(displayName = "The feature preview name",
-      description = "The name of the feature preview to remove.",
-      example = "ONE_LOCKFILE_PER_PROJECT"
-  )
-  public String previewFeatureName;
-
-  @Override
-  public @NotNull String getDisplayName() {
-    return "Remove an enabled Gradle preview feature";
-  }
-
-  @Override
-  public @NotNull String getDescription() {
-    return "Remove an enabled Gradle preview feature from `settings.gradle`.";
-  }
-
-  @Override
-  public TreeVisitor<?, ExecutionContext> getVisitor() {
-    return Preconditions.check(
-        new IsSettingsGradle<>(),
-        new RemoveEnableFeaturePreviewVisitor());
-  }
-
-  public class RemoveEnableFeaturePreviewVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    @Option(displayName = "The feature preview name",
+            description = "The name of the feature preview to remove.",
+            example = "ONE_LOCKFILE_PER_PROJECT")
+    String previewFeatureName;
 
     @Override
-    public MethodInvocation visitMethodInvocation(
-        MethodInvocation method, @NotNull ExecutionContext executionContext) {
-
-      if (!"enableFeaturePreview".equals(method.getSimpleName())) {
-        return method;
-      }
-
-      List<Expression> arguments = method.getArguments();
-      if (arguments == null || arguments.size() != 1) {
-        return method;
-      }
-
-      Expression argument = arguments.get(0);
-      if (argument instanceof J.Literal) {
-        String candidatePreviewFeatureName = (String) ((Literal) argument).getValue();
-        if (previewFeatureName.equals(candidatePreviewFeatureName)) {
-          return null;
-        }
-      }
-
-      return method;
+    public String getDisplayName() {
+        return "Remove an enabled Gradle preview feature";
     }
-  }
 
+    @Override
+    public String getDescription() {
+        return "Remove an enabled Gradle preview feature from `settings.gradle`.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new IsSettingsGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                if ("enableFeaturePreview".equals(method.getSimpleName()) &&
+                    method.getArguments().size() == 1 &&
+                    J.Literal.isLiteralValue(method.getArguments().get(0), previewFeatureName)) {
+                    return null;
+                }
+                return method;
+            }
+        });
+    }
 }
