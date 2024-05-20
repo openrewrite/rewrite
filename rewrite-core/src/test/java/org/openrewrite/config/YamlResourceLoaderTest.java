@@ -15,24 +15,30 @@
  */
 package org.openrewrite.config;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Contributor;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.Maintainer;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class YamlResourceLoaderTest implements RewriteTest {
+
+    @BeforeAll
+    static void beforeAll() {
+        try {
+            // Instantiate once to throw a ExceptionInInitializerError and subsequent
+            // instantiations will throw a NoClassDefFoundError.
+            new RecipeWithBadStaticInitializer();
+        } catch (ExceptionInInitializerError ignored) {
+        }
+    }
 
     @Test
     void dataTables() {
@@ -171,7 +177,10 @@ class YamlResourceLoaderTest implements RewriteTest {
         Collection<Recipe> recipes = env.listRecipes();
         assertThat(recipes).hasSize(1);
         Recipe recipe = recipes.iterator().next();
-        Optional<Contributor> maybeJon = recipe.getContributors().stream().filter(c -> c.getName().equals("Jonathan Schneider")).findFirst();
+        Optional<Contributor> maybeJon = recipe.getContributors()
+          .stream()
+          .filter(c -> c.getName().equals("Jonathan Schneider"))
+          .findFirst();
         assertThat(maybeJon).isPresent();
     }
 
@@ -234,15 +243,15 @@ class YamlResourceLoaderTest implements RewriteTest {
             assertThat(r.getExamples()).first().satisfies(e -> {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a text file");
                 assertThat(e.getSources()).hasSize(2);
-                assertThat(e.getSources()).first().satisfies( s -> {
-                    assertThat(s.getBefore()).isEqualTo("World");
-                    assertThat(s.getAfter()).isEqualTo("Hello!");
-                    assertThat(s.getPath()).isEqualTo("1.txt");
-                    assertThat(s.getLanguage()).isEqualTo("text");
+                assertThat(e.getSources()).first().satisfies(s -> {
+                      assertThat(s.getBefore()).isEqualTo("World");
+                      assertThat(s.getAfter()).isEqualTo("Hello!");
+                      assertThat(s.getPath()).isEqualTo("1.txt");
+                      assertThat(s.getLanguage()).isEqualTo("text");
                   }
                 );
 
-                assertThat(e.getSources().get(1)).satisfies( s -> {
+                assertThat(e.getSources().get(1)).satisfies(s -> {
                       assertThat(s.getBefore()).isEqualTo("World 2");
                       assertThat(s.getAfter()).isEqualTo("Hello 2!");
                       assertThat(s.getPath()).isEqualTo("2.txt");
@@ -258,7 +267,7 @@ class YamlResourceLoaderTest implements RewriteTest {
                 assertThat(e.getParameters().get(1)).isEqualTo("1");
 
                 assertThat(e.getSources()).hasSize(1);
-                assertThat(e.getSources()).first().satisfies( s -> {
+                assertThat(e.getSources()).first().satisfies(s -> {
                     //language=java
                     assertThat(s.getBefore()).isEqualTo("""
                       public class A {
@@ -311,5 +320,56 @@ class YamlResourceLoaderTest implements RewriteTest {
           ),
           text("Hello", "Hello World!")
         );
+    }
+
+    @Test
+    void loadRecipeWithRecipeDataStringThatThrowsNoClassDefFoundError() {
+        assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(
+          RecipeWithBadStaticInitializer.class.getName());
+    }
+
+    @Test
+    void loadRecipeWithRecipeDataMapThatThrowsNoClassDefFoundError() {
+        assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(
+          Map.of(RecipeWithBadStaticInitializer.class.getName(), Map.of()));
+    }
+
+    private void assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(Object recipeData) {
+        final List<Validated<Object>> invalidRecipes = new ArrayList<>();
+        YamlResourceLoader resourceLoader = createYamlResourceLoader();
+
+        resourceLoader.loadRecipe(
+          "org.company.CustomRecipe",
+          0,
+          recipeData,
+          recipe -> {
+          },
+          recipe -> {
+          },
+          validated -> invalidRecipes.add(validated));
+
+        assertEquals(1, invalidRecipes.size());
+    }
+
+    private YamlResourceLoader createYamlResourceLoader() {
+        return new YamlResourceLoader(
+          new ByteArrayInputStream("type: specs.openrewrite.org/v1beta/recipe".getBytes()),
+          URI.create("rewrite.yml"),
+          new Properties());
+    }
+
+    private static class RecipeWithBadStaticInitializer extends Recipe {
+        // Explicitly fail static initialization
+        static int val = 1 / 0;
+
+        @Override
+        public String getDisplayName() {
+            return "";
+        }
+
+        @Override
+        public String getDescription() {
+            return "";
+        }
     }
 }
