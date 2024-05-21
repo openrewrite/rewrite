@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
@@ -58,7 +59,18 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                           "Default `true`.",
             required = false)
     @Nullable
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
     Boolean onlyIfVersionsMatch;
+
+    @Option(displayName = "Only if managed version is ...",
+            description = "Only remove the explicit version if the managed version has the specified comparative relationship to the explicit version. " +
+                    "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
+                    "Default `eq`.",
+            valid = { "any", "eq", "lt", "lte", "gt", "gte" },
+            required = false)
+    @Nullable
+    Comparator onlyIfManagedVersionIs;
 
     @Option(displayName = "Except",
             description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe."
@@ -67,6 +79,39 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             required = false)
     @Nullable
     List<String> except;
+
+    @Deprecated
+    public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
+            @Nullable Boolean onlyIfVersionsMatch, @Nullable List<String> except) {
+        this(groupPattern, artifactPattern, onlyIfVersionsMatch, null, except);
+    }
+
+    public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
+            @Nullable Comparator onlyIfManagedVersionIs, @Nullable List<String> except) {
+        this(groupPattern, artifactPattern, null, onlyIfManagedVersionIs, except);
+    }
+
+    @JsonCreator
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
+            @Nullable Boolean onlyIfVersionsMatch, @Nullable Comparator onlyIfManagedVersionIs,
+            @Nullable List<String> except) {
+        this.groupPattern = groupPattern;
+        this.artifactPattern = artifactPattern;
+        this.onlyIfVersionsMatch = onlyIfVersionsMatch;
+        this.onlyIfManagedVersionIs = onlyIfManagedVersionIs;
+        this.except = except;
+    }
+
+    public enum Comparator {
+        ANY,
+        EQ,
+        LT,
+        LTE,
+        GT,
+        GTE
+    }
 
     @Override
     public String getDisplayName() {
@@ -95,18 +140,32 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         }));
             }
         }
+        if (onlyIfVersionsMatch != null && onlyIfManagedVersionIs != null) {
+            validated = validated.and(Validated.invalid("onlyIfVersionsMatch", onlyIfVersionsMatch, "is deprecated in favor of onlyIfManagedVersionIs, and they cannot be used together"));
+        }
         return validated;
+    }
+
+    private Comparator determineComparator() {
+        if (onlyIfVersionsMatch != null) {
+            return onlyIfVersionsMatch ? Comparator.EQ : Comparator.GTE;
+        }
+        if (onlyIfManagedVersionIs != null) {
+            return onlyIfManagedVersionIs;
+        }
+        return Comparator.EQ;
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        Comparator comparator = determineComparator();
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Document d = super.visitDocument(document, ctx);
                 if (d != document) {
                     d = (Xml.Document) new RemoveEmptyDependencyTags().visitNonNull(d, ctx);
-                    if (onlyIfVersionsMatch == null || !onlyIfVersionsMatch) {
+                    if (!comparator.equals(Comparator.EQ)) {
                         maybeUpdateModel();
                     }
                 }
@@ -189,10 +248,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     if (versionAccordingToParent == null) {
                         return false;
                     }
-                    if (isExactMatchRequired()) {
-                        return Objects.equals(versionAccordingToParent, d.getRequested().getVersion());
-                    }
-                    return isManagedNewerThanRequested(versionAccordingToParent, d.getRequested().getVersion());
+                    return matchesComparator(versionAccordingToParent, d.getRequested().getVersion());
                 } catch (Exception e) {
                     return false;
                 }
@@ -204,10 +260,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 }
                 String managedVersion = getResolutionResult().getPom().getManagedVersion(d.getGroupId(),
                         d.getArtifactId(), d.getRequested().getType(), d.getRequested().getClassifier());
-                if (isExactMatchRequired()) {
-                    return Objects.equals(managedVersion, d.getRequested().getVersion());
-                }
-                return isManagedNewerThanRequested(managedVersion, d.getRequested().getVersion());
+                return matchesComparator(managedVersion, d.getRequested().getVersion());
             }
 
             private boolean matchesVersion(Plugin p) {
@@ -215,19 +268,25 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     return false;
                 }
                 String managedVersion = getManagedPluginVersion(getResolutionResult().getPom(), p.getGroupId(), p.getArtifactId());
-                if (isExactMatchRequired()) {
-                    return Objects.equals(managedVersion, p.getVersion());
+                return matchesComparator(managedVersion, p.getVersion());
+            }
+
+            private boolean matchesComparator(@Nullable String managedVersion, String requestedVersion) {
+                if (managedVersion == null) {
+                    return false;
                 }
-                return isManagedNewerThanRequested(managedVersion, p.getVersion());
-            }
-
-            private boolean isManagedNewerThanRequested(@Nullable String managedVersion, String requestedVersion) {
-                return managedVersion != null && new LatestIntegration(null)
-                                                         .compare(null, managedVersion, requestedVersion) >= 0;
-            }
-
-            private boolean isExactMatchRequired() {
-                return onlyIfVersionsMatch == null || onlyIfVersionsMatch;
+                if (comparator.equals(Comparator.ANY)) {
+                    return true;
+                }
+                int comparison = new LatestIntegration(null)
+                        .compare(null, managedVersion, requestedVersion);
+                if (comparison < 0) {
+                    return comparator.equals(Comparator.LT) || comparator.equals(Comparator.LTE);
+                } else if (comparison > 0) {
+                    return comparator.equals(Comparator.GT) || comparator.equals(Comparator.GTE);
+                } else {
+                    return comparator.equals(Comparator.EQ) || comparator.equals(Comparator.LTE) || comparator.equals(Comparator.GTE);
+                }
             }
 
             private boolean isNotExcepted(ResolvedDependency d) {
