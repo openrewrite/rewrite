@@ -64,12 +64,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     Boolean onlyIfVersionsMatch;
 
     @Option(displayName = "Only if managed version is ...",
-            description = "Only remove the explicit version if it has the specified comparative relationship with the managed version." +
+            description = "Only remove the explicit version if the managed version has the specified comparative relationship to the explicit version. " +
+                    "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
                     "Default `eq`.",
-            valid = { Comparator.ANY, Comparator.EQ, Comparator.LT, Comparator.LTE, Comparator.GT, Comparator.GTE},
+            valid = { "any", "eq", "lt", "lte", "gt", "gte" },
             required = false)
     @Nullable
-    String onlyIfManagedVersionIs;
+    Comparator onlyIfManagedVersionIs;
 
     @Option(displayName = "Except",
             description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe."
@@ -85,9 +86,16 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         this(groupPattern, artifactPattern, onlyIfVersionsMatch, null, except);
     }
 
-    @JsonCreator
     public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
-            @Nullable Boolean onlyIfVersionsMatch, @Nullable String onlyIfManagedVersionIs,
+            @Nullable Comparator onlyIfManagedVersionIs, @Nullable List<String> except) {
+        this(groupPattern, artifactPattern, null, onlyIfManagedVersionIs, except);
+    }
+
+    @JsonCreator
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
+            @Nullable Boolean onlyIfVersionsMatch, @Nullable Comparator onlyIfManagedVersionIs,
             @Nullable List<String> except) {
         this.groupPattern = groupPattern;
         this.artifactPattern = artifactPattern;
@@ -96,29 +104,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         this.except = except;
     }
 
-    // pseudo enum to avoid (de)serialization concerns
-    public static class Comparator {
-        public static final String ANY = "any";
-        public static final String EQ = "eq";
-        public static final String LT = "lt";
-        public static final String LTE = "lte";
-        public static final String GT = "gt";
-        public static final String GTE = "gte";
-
-        public static boolean validate(String comparator) {
-            switch (comparator.toLowerCase()) {
-                case ANY:
-                case EQ:
-                case LT:
-                case LTE:
-                case GT:
-                case GTE:
-                    return true;
-                default:
-                    return false;
-
-            }
-        }
+    public enum Comparator {
+        ANY,
+        EQ,
+        LT,
+        LTE,
+        GT,
+        GTE
     }
 
     @Override
@@ -148,28 +140,25 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         }));
             }
         }
-        if (onlyIfManagedVersionIs != null) {
-            validated = validated.and(Validated.test("onlyIfManagedVersionIs", "is not a valid comparator", onlyIfManagedVersionIs, Comparator::validate));
-        }
         if (onlyIfVersionsMatch != null && onlyIfManagedVersionIs != null) {
             validated = validated.and(Validated.invalid("onlyIfVersionsMatch", onlyIfVersionsMatch, "is deprecated in favor of onlyIfManagedVersionIs, and they cannot be used together"));
         }
         return validated;
     }
 
-    private String determineComparator() {
+    private Comparator determineComparator() {
         if (onlyIfVersionsMatch != null) {
             return onlyIfVersionsMatch ? Comparator.EQ : Comparator.GTE;
         }
         if (onlyIfManagedVersionIs != null) {
-            return onlyIfManagedVersionIs.toLowerCase();
+            return onlyIfManagedVersionIs;
         }
         return Comparator.EQ;
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        String comparator = determineComparator();
+        Comparator comparator = determineComparator();
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {

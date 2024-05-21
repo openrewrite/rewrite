@@ -1018,7 +1018,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void except() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null,
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE,
                   Collections.singletonList("org.junit.jupiter:junit-jupiter-api"))),
           pomXml(
             """
@@ -1093,9 +1093,9 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3268")
-    void unmanagedDependencyOnlyIfVersionsMatchFalse() {
+    void unmanagedDependencyAnyMatch() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.ANY, null)),
           pomXml(
             """
               <project>
@@ -1119,7 +1119,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
     void removeRedundantVersionsFromPluginsManagedByParent() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
           pomXml(
             """
               <project>
@@ -1174,7 +1174,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
     void noChangesIfManagedPluginVersionDoesNotMatch() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, true, null, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.EQ, null)),
           pomXml(
             """
               <project>
@@ -1206,7 +1206,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void doesNotDowngradeVersion() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
           pomXml(
             """
               <project>
@@ -1239,7 +1239,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void allowUpgradeOfManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
           pomXml(
             """
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1295,7 +1295,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void propertySubstitution() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
           pomXml(
             """
             <project>
@@ -1327,10 +1327,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource({ "gt,2.5.0", "gte,2.5.0", "any,2.5.0", "eq,2.5.1", "lte,2.5.1", "gte,2.5.1", "any,2.5.1", "lt,2.5.2", "lte,2.5.2", "any,2.5.2" })
+    @CsvSource({ "GT,2.5.0", "GTE,2.5.0", "ANY,2.5.0", "EQ,2.5.1", "LTE,2.5.1", "GTE,2.5.1", "ANY,2.5.1", "LT,2.5.2", "LTE,2.5.2", "ANY,2.5.2" })
     void onlyIfManagedVersionIs_removals(String comparator, String projectVersion) {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, null, comparator, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
           pomXml(
             String.format("""
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -1376,10 +1376,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource({ "lt,2.5.0", "lte,2.5.0", "eq,2.5.0", "lt,2.5.1", "gt,2.5.1", "gt,2.5.2", "gte,2.5.2", "eq,2.5.2" })
+    @CsvSource({ "LT,2.5.0", "LTE,2.5.0", "EQ,2.5.0", "LT,2.5.1", "GT,2.5.1", "GT,2.5.2", "GTE,2.5.2", "EQ,2.5.2" })
     void onlyIfManagedVersionIs_nonremovals(String comparator, String projectVersion) {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, null, comparator, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
           pomXml(
             String.format("""
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
