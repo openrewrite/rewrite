@@ -305,7 +305,7 @@ class YamlResourceLoaderTest implements RewriteTest {
                     content: " World!"
                     preamble: "preamble"
                     appendNewline : false
-                    existingFileStrategy: "Continue"
+                    existingFileStrategy: "cOnTiNuE"
               """,
             "org.openrewrite.gradle.testCaseInsensitiveEnumInYaml"
           ),
