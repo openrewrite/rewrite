@@ -19,7 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.marker.JavaVersion;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -28,29 +28,26 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class HasJavaVersion extends Recipe {
+public class HasBuildToolVersion extends Recipe {
 
-    @Option(displayName = "Java version",
+    @Option(displayName = "Build tool type",
+            description = "The build tool to search for.",
+            example = "Maven")
+    BuildTool.Type type;
+
+    @Option(displayName = "Build tool version",
             description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "17.X")
+            example = "3.6.0-9999")
     String version;
-
-    @Option(displayName = "Version check against target compatibility",
-            description = "The source and target compatibility versions can be different. This option allows you to " +
-                          "check against the target compatibility version instead of the source compatibility version.",
-            example = "17.X",
-            required = false)
-    @Nullable
-    Boolean checkTargetCompatibility;
 
     @Override
     public String getDisplayName() {
-        return "Find files compiled at a specific Java version";
+        return "Find files with a particular build tool version";
     }
 
     @Override
     public String getDescription() {
-        return "Finds Java source files matching a particular language level. " +
+        return "Finds Java source files built with a particular build tool. " +
                "This is useful especially as a precondition for other recipes.";
     }
 
@@ -71,11 +68,9 @@ public class HasJavaVersion extends Recipe {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree != null) {
-                    return tree.getMarkers().findFirst(JavaVersion.class)
-                            .filter(version -> versionComparator.isValid(null, Integer.toString(
-                                    Boolean.TRUE.equals(checkTargetCompatibility) ?
-                                            version.getMajorReleaseVersion() :
-                                            version.getMajorVersion())))
+                    return tree.getMarkers().findFirst(BuildTool.class)
+                            .filter(buildTool -> buildTool.getType() == type)
+                            .filter(buildTool -> versionComparator.isValid(null, buildTool.getVersion()))
                             .map(version -> SearchResult.found(tree))
                             .orElse(tree);
                 }
