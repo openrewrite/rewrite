@@ -118,6 +118,10 @@ public class DeleteProperty extends Recipe {
         public Yaml visitSequence(Yaml.Sequence sequence, P p) {
             sequence = (Yaml.Sequence) super.visitSequence(sequence, p);
             List<Yaml.Sequence.Entry> entries = sequence.getEntries();
+            if (entries.isEmpty()) {
+                return sequence;
+            }
+
             entries = ListUtils.map(entries, entry -> ToBeRemoved.hasMarker(entry) ? null : entry);
             return entries.isEmpty() ? ToBeRemoved.withMarker(sequence) : sequence.withEntries(entries);
         }
