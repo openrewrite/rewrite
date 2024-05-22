@@ -30,26 +30,29 @@ class HasBuildToolVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new HasBuildToolVersion(BuildTool.Type.Maven, "3.6.0-9999"));
+        spec.recipe(new HasBuildToolVersion(BuildTool.Type.Maven, "3.6.0-3.8.0"));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
       "3.6.0",
       "3.6.1",
-      "3.8.0",
-      "4.0.0"
+      "3.8.0"
     })
     @DocumentExample
-    void detectMavenVersion(String version) {
+    void detectMavenVersionWithinRange(String version) {
         rewriteRun(
           java("class A {}", "/*~~>*/class A {}",
             spec -> spec.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, version)))
         );
     }
 
-    @Test
-    void doNotDetectOlderVersion() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "3.5.4",
+      "3.8.1",
+      "4.0.0"
+    })    void doNotDetectVersionsOutsideRange() {
         rewriteRun(
           java("class A {}",
             spec -> spec.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.5.4")))
