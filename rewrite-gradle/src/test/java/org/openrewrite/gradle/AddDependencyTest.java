@@ -1261,6 +1261,57 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4094")
+    void doNotAddToIncorrectBlocks() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", null)),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java'
+                    id 'io.spring.dependency-management' version '1.1.5'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencyManagement {
+                    dependencies {
+                        dependency "org.openrewrite:rewrite-core:8.0.0"
+                    }
+                }
+                """,
+              """
+                plugins {
+                    id 'java'
+                    id 'io.spring.dependency-management' version '1.1.5'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencyManagement {
+                    dependencies {
+                        dependency "org.openrewrite:rewrite-core:8.0.0"
+                    }
+                }
+                
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(String gav, String onlyIfUsing) {
         return addDependency(gav, onlyIfUsing, null);
     }

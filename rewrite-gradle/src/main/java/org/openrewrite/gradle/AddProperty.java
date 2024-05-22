@@ -45,7 +45,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
 
     @Option(displayName = "Overwrite if exists",
             description = "If a property with the same key exists, overwrite.",
-            example = "Enable the Gradle build cache")
+            example = "true")
     @Nullable
     Boolean overwrite;
 

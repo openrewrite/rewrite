@@ -204,7 +204,7 @@ public class MavenSettings {
             if (key.startsWith("env.")) {
                 return System.getenv().get(key.substring(4));
             }
-            return null;
+            return System.getenv().get(key);
         };
 
         public MavenSettings interpolate(MavenSettings mavenSettings) {

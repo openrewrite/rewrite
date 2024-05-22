@@ -502,6 +502,15 @@ public class ChangeType extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
+                for (J.ClassDeclaration declaration : cu.getClasses()) {
+                    // Check the class name instead of source path, as it might differ
+                    String fqn = declaration.getType().getFullyQualifiedName();
+                    if (fqn.equals(originalType.getFullyQualifiedName())) {
+                        getCursor().putMessage("UPDATE_PACKAGE", true);
+                        break;
+                    }
+                }
+
                 String oldPath = cu.getSourcePath().toString().replace('\\', '/');
                 // The old FQN must exist in the path.
                 String oldFqn = fqnToPath(originalType.getFullyQualifiedName());
@@ -531,17 +540,20 @@ public class ChangeType extends Recipe {
 
         @Override
         public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
-            String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
-            if (original.equals(originalType.getPackageName())) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
-                if (fq != null) {
-                    if (fq.getPackageName().isEmpty()) {
-                        getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
-                        //noinspection DataFlowIssue
-                        return null;
-                    } else {
-                        String newPkg = targetType.getPackageName();
-                        return JavaTemplate.builder(newPkg).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
+            Boolean updatePackage = getCursor().pollNearestMessage("UPDATE_PACKAGE");
+            if (updatePackage != null && updatePackage) {
+                String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+                if (original.equals(originalType.getPackageName())) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
+                    if (fq != null) {
+                        if (fq.getPackageName().isEmpty()) {
+                            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
+                            //noinspection DataFlowIssue
+                            return null;
+                        } else {
+                            String newPkg = targetType.getPackageName();
+                            return JavaTemplate.builder(newPkg).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
+                        }
                     }
                 }
             }
