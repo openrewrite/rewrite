@@ -3357,6 +3357,11 @@ public interface J extends Tree {
             }
             return false;
         }
+
+        @Override
+        public String toString() {
+            return String.valueOf(value);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

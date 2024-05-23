@@ -323,7 +323,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             if(!CONSTRAINTS_MATCHER.matches(m)) {
                 return m;
             }
-            String ga = gav.getGroupId() + ":" + gav.getArtifactId() + ":";
+            String ga = gav.getGroupId() + ":" + gav.getArtifactId();
             AtomicReference<String> existingConstraintVersion = new AtomicReference<>();
             J.MethodInvocation existingConstraint = FindMethods.find(m, CONSTRAINT_MATCHER, true).stream()
                     .filter(J.MethodInvocation.class::isInstance)
@@ -421,31 +421,57 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if(existingConstraint.isScope(m)) {
-                AtomicBoolean updated = new AtomicBoolean(false);
+                AtomicBoolean updatedBecause = new AtomicBoolean(false);
                 m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                     if(arg instanceof J.Literal) {
+                        String valueSource = ((J.Literal) arg).getValueSource();
                         char quote;
-                        if(((J.Literal) arg).getValueSource() == null) {
+                        if(valueSource == null) {
                             quote = '\'';
                         } else {
-                            quote = ((J.Literal) arg).getValueSource().charAt(0);
+                            quote = valueSource.charAt(0);
                         }
                         return ((J.Literal) arg).withValue(gav.toString())
                                 .withValueSource(quote + gav.toString() + quote);
+                    } else if (arg instanceof J.Lambda) {
+                        arg = (Expression) new RemoveVersionVisitor().visitNonNull(arg, ctx);
                     }
                     if(because != null) {
                         Expression arg2 = (Expression) new UpdateBecauseTextVisitor(because)
                                 .visitNonNull(arg, ctx, getCursor());
                         if(arg2 != arg) {
-                            updated.set(true);
+                            updatedBecause.set(true);
                         }
                         return arg2;
                     }
                     return arg;
                 }));
-                if(because != null && !updated.get()) {
+                if(because != null && !updatedBecause.get()) {
                     m = (J.MethodInvocation) new CreateBecauseVisitor(because).visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
                 }
+            }
+            return m;
+        }
+    }
+
+    private static class RemoveVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
+
+        @Override
+        public J.Return visitReturn(J.Return _return, ExecutionContext executionContext) {
+            J.Return r = super.visitReturn(_return, executionContext);
+            if(r.getExpression() == null) {
+                //noinspection DataFlowIssue
+                return null;
+            }
+            return r;
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+            if("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
+                //noinspection DataFlowIssue
+                return null;
             }
             return m;
         }
