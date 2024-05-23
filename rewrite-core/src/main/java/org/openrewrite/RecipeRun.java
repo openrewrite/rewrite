@@ -111,8 +111,7 @@ public class RecipeRun {
                 try {
                     Field field = row.getClass().getDeclaredField(fieldName);
                     field.setAccessible(true);
-                    //Assume every column value is printable with toString
-                    rowValues.add(formatForCsv(field.get(row).toString()));
+                    rowValues.add(formatForCsv(field.get(row)));
                 } catch (NoSuchFieldException | IllegalAccessException e) {
                     ctx.getOnError().accept(e);
                 }
@@ -121,9 +120,10 @@ public class RecipeRun {
         }
     }
 
-    private static String formatForCsv(@Nullable String data) {
+    private static String formatForCsv(@Nullable Object data) {
         if (data != null) {
-            return String.format("\"%s\"", data.replace("\"", "\"\""));
+            // Assume every column value is printable with toString
+            return String.format("\"%s\"", data.toString().replace("\"", "\"\""));
         } else {
             return "\"\"";
         }
