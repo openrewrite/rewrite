@@ -384,12 +384,8 @@ public class YamlParser implements org.openrewrite.Parser {
     If the dashes of the sequence do not have an indentation, the end mark will point to the character AFTER the dash.
     */
     private boolean shouldUseYamlParserBugWorkaround(SequenceStartEvent event) {
-        int index = event.getStartMark().getIndex();
-        if (index > event.getStartMark().getBuffer().length - 1) {
-            return false;
-        }
-        int startChar = event.getStartMark().getBuffer()[index];
-        int endChar = event.getEndMark().getBuffer()[event.getEndMark().getIndex()];
+        int startChar = event.getStartMark().getBuffer()[event.getStartMark().getPointer()];
+        int endChar = event.getEndMark().getBuffer()[event.getEndMark().getPointer()];
         return startChar == '-' && endChar != '-';
     }
 
