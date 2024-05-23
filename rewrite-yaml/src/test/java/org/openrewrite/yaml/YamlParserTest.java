@@ -168,4 +168,52 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void troublesomeYaml() {
+        rewriteRun(
+          yaml(
+            """
+              configDefinitions:
+                appConfig:
+                  description: "App config for consumer."
+                  resolutionPaths:
+                    - default: "/envProfile"
+                  properties:
+                    container:
+                      description: "Container to use to the cosmos client."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      defaultValue: "UUIDItem"
+                      rules:
+                        possibleValues: []
+                    database:
+                      description: "Database to connect and use."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      defaultValue: "ForkliftPocDB"
+                      rules:
+                        possibleValues: []
+                appConfig2:
+                  description: "App config for consumer."
+                  resolutionPaths:
+                    - default: "/envProfile"
+                  properties:
+                    container:
+                      description: "Container to use to the cosmos client."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      defaultValue: "CosmosSDKTest"
+                      rules:
+                        possibleValues: []
+                    database:
+                      description: "Database to connect and use."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      rules:
+                        possibleValues: []
+              """
+          )
+        );
+    }
 }
