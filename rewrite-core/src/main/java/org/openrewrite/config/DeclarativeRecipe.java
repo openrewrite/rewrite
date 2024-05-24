@@ -370,7 +370,6 @@ public class DeclarativeRecipe extends Recipe {
                 contributors.add(new Contributor(contributorEntry.getKey().getName(), contributorEntry.getKey().getEmail(), contributorEntry.getValue()));
             }
             contributors.sort(Comparator.comparing(Contributor::getLineCount).reversed());
-
         }
         return contributors;
     }
