@@ -30,6 +30,7 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -48,7 +49,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>> {
+public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVersion.Accumulator> {
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
@@ -125,35 +126,81 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
     }
 
     @Override
-    public Set<GroupArtifact> getInitialValue(ExecutionContext ctx) {
-        return new HashSet<>();
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        return new Accumulator();
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Set<GroupArtifact> projectArtifacts) {
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator accumulator) {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 ResolvedPom pom = getResolutionResult().getPom();
-                projectArtifacts.add(new GroupArtifact(pom.getGroupId(), pom.getArtifactId()));
-                return document;
+                accumulator.projectArtifacts.add(new GroupArtifact(pom.getGroupId(), pom.getArtifactId()));
+                return super.visitDocument(document, ctx);
+            }
+
+            @Override
+            public Xml.Tag visitTag(final Xml.Tag tag, final ExecutionContext executionContext) {
+                ResolvedDependency d = findDependency(tag);
+                if (d != null && d.getRepository() != null) {
+                    // if the resolved dependency exists AND it does not represent an artifact that was parsed
+                    // as a source file, attempt to find a new version.
+                    try {
+                        String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), executionContext);
+                        if (newerVersion != null) {
+                            Optional<Xml.Tag> version = tag.getChild("version");
+                            if (version.isPresent()) {
+                                String requestedVersion = d.getRequested().getVersion();
+                                if (requestedVersion != null && requestedVersion.startsWith("${") && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
+                                    String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
+                                    if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
+                                        getPomDeclaringProperty(getResolutionResult(), propertyName)
+                                                .ifPresent(pom -> accumulator.pomProperties.add(
+                                                        new PomProperty(requireNonNull(pom.getSourcePath()), propertyName)));
+                                    }
+                                }
+                            }
+                        }
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(tag);
+                    }
+                }
+                return super.visitTag(tag, executionContext);
+            }
+
+            @Nullable
+            private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) throws MavenDownloadingException {
+                return UpgradeDependencyVersion.this.findNewerVersion(version, ctx, () -> downloadMetadata(groupId, artifactId, ctx));
             }
         };
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Set<GroupArtifact> projectArtifacts) {
-        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
-        assert versionComparator != null;
-
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator accumulator) {
         return new MavenIsoVisitor<ExecutionContext>() {
             private final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
+
+            @Override
+            public Xml.Document visitDocument(final Xml.Document document, final ExecutionContext executionContext) {
+                return super.visitDocument(document, executionContext);
+            }
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 try {
-                    if (isDependencyTag(groupId, artifactId)) {
+                    if (isPropertyTag()) {
+                        accumulator.pomProperties.stream()
+                                .filter(pomProperty -> pomProperty.pomFilePath.equals(getResolutionResult().getPom().getRequested().getSourcePath()))
+                                .map(PomProperty::getProperty)
+                                .filter(propertyName -> propertyName.equals(tag.getName())
+                                        && !tag.getValue().map(newVersion::equals).orElse(false))
+                                .forEach(propertyName -> {
+                                    doAfterVisit(new ChangeTagValueVisitor<>(tag, newVersion));
+                                    maybeUpdateModel();
+                                });
+                    } else if (isDependencyTag(groupId, artifactId)) {
                         t = upgradeDependency(ctx, t);
                     } else if (isManagedDependencyTag(groupId, artifactId)) {
                         if (isManagedDependencyImportTag(groupId, artifactId)) {
@@ -221,7 +268,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                         if (version.isPresent()) {
                             String requestedVersion = d.getRequested().getVersion();
                             if (requestedVersion != null && requestedVersion.startsWith("${") && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
-                                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false).getVisitor());
+                                String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
+                                if (getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
+                                    doAfterVisit(new ChangePropertyValue(propertyName, newerVersion, overrideManagedVersion, false).getVisitor());
+                                }
                             } else {
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(version.get(), newerVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                             }
@@ -258,7 +308,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                     String artifactId = managedDependency.getArtifactId();
                     String version = managedDependency.getVersion();
                     if (version != null &&
-                        !projectArtifacts.contains(new GroupArtifact(groupId, artifactId)) &&
+                        !accumulator.projectArtifacts.contains(new GroupArtifact(groupId, artifactId)) &&
                         matchesGlob(groupId, UpgradeDependencyVersion.this.groupId) &&
                         matchesGlob(artifactId, UpgradeDependencyVersion.this.artifactId)) {
                         return upgradeVersion(ctx, t, managedDependency.getRequested().getVersion(), groupId, artifactId, version);
@@ -268,7 +318,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                         if (dm.getBomGav() != null) {
                             String group = getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()));
                             String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
-                            if (!projectArtifacts.contains(new GroupArtifact(group, artifactId))) {
+                            if (!accumulator.projectArtifacts.contains(new GroupArtifact(group, artifactId))) {
                                 ResolvedGroupArtifactVersion bom = dm.getBomGav();
                                 if (Objects.equals(group, bom.getGroupId()) &&
                                     Objects.equals(artifactId, bom.getArtifactId())) {
@@ -329,33 +379,64 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
 
             @Nullable
             private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) throws MavenDownloadingException {
-                String finalVersion = !Semver.isVersion(version) ? "0.0.0" : version;
-
-                // in the case of "latest.patch", a new version can only be derived if the
-                // current version is a semantic version
-                if (versionComparator instanceof LatestPatch && !versionComparator.isValid(finalVersion, finalVersion)) {
-                    return null;
-                }
-
-                try {
-                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    List<String> versions = new ArrayList<>();
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(finalVersion, v)) {
-                            versions.add(v);
-                        }
-                    }
-                    // handle upgrades from non semver versions like "org.springframework.cloud:spring-cloud-dependencies:Camden.SR5"
-                    if (!Semver.isVersion(finalVersion) && !versions.isEmpty()) {
-                        versions.sort(versionComparator);
-                        return versions.get(versions.size() - 1);
-                    }
-                    return versionComparator.upgrade(finalVersion, versions).orElse(null);
-                } catch (IllegalStateException e) {
-                    // this can happen when we encounter exotic versions
-                    return null;
-                }
+                return UpgradeDependencyVersion.this.findNewerVersion(version, ctx, () -> downloadMetadata(groupId, artifactId, ctx));
             }
         };
+    }
+
+    @Nullable
+    private String findNewerVersion(String version, ExecutionContext ctx, MavenMetadataFailures.MavenMetadataDownloader download) throws MavenDownloadingException {
+        VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
+
+        String finalVersion = !Semver.isVersion(version) ? "0.0.0" : version;
+
+        // in the case of "latest.patch", a new version can only be derived if the
+        // current version is a semantic version
+        if (versionComparator instanceof LatestPatch && !versionComparator.isValid(finalVersion, finalVersion)) {
+            return null;
+        }
+
+        try {
+            MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, download);
+            List<String> versions = new ArrayList<>();
+            for (String v : mavenMetadata.getVersioning().getVersions()) {
+                if (versionComparator.isValid(finalVersion, v)) {
+                    versions.add(v);
+                }
+            }
+            // handle upgrades from non semver versions like "org.springframework.cloud:spring-cloud-dependencies:Camden.SR5"
+            if (!Semver.isVersion(finalVersion) && !versions.isEmpty()) {
+                versions.sort(versionComparator);
+                return versions.get(versions.size() - 1);
+            }
+            return versionComparator.upgrade(finalVersion, versions).orElse(null);
+        } catch (IllegalStateException e) {
+            // this can happen when we encounter exotic versions
+            return null;
+        }
+    }
+
+    private static Optional<Pom> getPomDeclaringProperty(
+            @Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName) {
+        if (currentMavenResolutionResult == null) {
+            return Optional.empty();
+        }
+        Pom pom = currentMavenResolutionResult.getPom().getRequested();
+        if (pom.getProperties().containsKey(propertyName)) {
+            return Optional.of(pom);
+        }
+        return getPomDeclaringProperty(currentMavenResolutionResult.getParent(), propertyName);
+    }
+
+    @Value
+    public static class Accumulator {
+        Set<GroupArtifact> projectArtifacts = new HashSet<>();
+        Set<PomProperty> pomProperties = new HashSet<>();
+    }
+
+    @Value
+    public static class PomProperty {
+        Path pomFilePath;
+        String property;
     }
 }
