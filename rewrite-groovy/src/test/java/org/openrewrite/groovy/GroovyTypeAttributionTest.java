@@ -18,6 +18,7 @@ package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
@@ -81,7 +82,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
     @Test
     void closureImplicitParameterAttributed() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
               public <T> T register(String name, Class<T> type, Closure<T> configurationAction) {
                   return null
               }
@@ -106,7 +108,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
     @Test
     void closureImplicitParameterAttributedZeroArgMethod() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
               public <T> T register(String name, Class<T> type, Closure<T> configurationAction) {
                   return null
               }
@@ -131,7 +134,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
     @Test
     void closureNamedParameterAttributed() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
               public <T> T register(String name, Class<T> type, Closure<T> configurationAction) {
                   return null
               }
@@ -154,7 +158,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
     @Test
     void closureWithDelegate() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
               public String register(@DelegatesTo(String) Closure stringAction) {
                   return null
               }
@@ -179,7 +184,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
     @Test
     void infersDelegateViaSimilarGradleApi() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
               package org.gradle.api
               
               interface Action<T> {
@@ -208,13 +214,15 @@ class GroovyTypeAttributionTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void typeFromClasspathResources() {
         rewriteRun(
           spec -> spec.recipe(new FindTypes("org.junit.jupiter.api.Test", null))
             .parser(GroovyParser.builder()
                 .classpathFromResource(new InMemoryExecutionContext(), "junit-jupiter-api-5.+")),
-          groovy("""
+          groovy(
+                """
             import org.junit.jupiter.api.Test
             class A {
                 Test t

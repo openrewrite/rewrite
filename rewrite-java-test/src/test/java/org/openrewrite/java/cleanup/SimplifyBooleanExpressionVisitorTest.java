@@ -43,8 +43,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
               public class A {
                   boolean a;
                   {
-                      if(true == a) {
-                      }
+                      if (true == a) {}
+                      if (a == true) {}
                   }
               }
               """,
@@ -52,8 +52,40 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
               public class A {
                   boolean a;
                   {
-                      if(a) {
-                      }
+                      if (a) {}
+                      if (a) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void simplifyEqualsLiteralFalseIf() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean a;
+                  boolean b;
+                  {
+                      if (false == a) {}
+                      if (a == false) {}
+                      if ((a && b) == false) {}
+                      if (false == (a && b)) {}
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean a;
+                  boolean b;
+                  {
+                      if (!a) {}
+                      if (!a) {}
+                      if (!(a && b)) {}
+                      if (!(a && b)) {}
                   }
               }
               """
@@ -76,7 +108,9 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       boolean f = (e == true) || e;
                       boolean g = f && false;
                       boolean h = g;
-                      boolean i = (a != false);
+                      boolean i = a == false;
+                      boolean j = a != false;
+                      boolean k = a != true;
                   }
               }
               """,
@@ -91,7 +125,9 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       boolean f = e;
                       boolean g = false;
                       boolean h = g;
-                      boolean i = a;
+                      boolean i = !a;
+                      boolean j = a;
+                      boolean k = !a;
                   }
               }
               """
@@ -382,6 +418,14 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       boolean i=a!=true;
                   }
               }
+              """,
+            """
+              public class A {
+                  {
+                      boolean a=true;
+                      boolean i=!a;
+                  }
+              }
               """
           )
         );
@@ -406,6 +450,46 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       if (false) {
                           System.out.println("");
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void negatedTernary() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m1(boolean a) {
+                      return !(a ? true : false);
+                  }
+                  boolean m2(boolean a) {
+                      return !(!a ? true : false);
+                  }
+                  boolean m3(boolean a) {
+                      return !a ? true : false;
+                  }
+                  boolean m4(boolean a) {
+                      return a ? true : false;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m1(boolean a) {
+                      return a ? false : true;
+                  }
+                  boolean m2(boolean a) {
+                      return a ? true : false;
+                  }
+                  boolean m3(boolean a) {
+                      return a ? false : true;
+                  }
+                  boolean m4(boolean a) {
+                      return a ? true : false;
                   }
               }
               """

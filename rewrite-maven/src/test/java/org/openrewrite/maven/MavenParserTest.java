@@ -70,6 +70,30 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    void skipDependencyResolution() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().skipDependencyResolution(true)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>foo</groupId>
+                    <artifactId>bar</artifactId>
+                    <version>42</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2603")
     void repositoryWithPropertyPlaceholder() {
         rewriteRun(
@@ -883,7 +907,6 @@ class MavenParserTest implements RewriteTest {
             });
 
             mockRepo.start();
-
             var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
                 throw new RuntimeException(t);
             }));
@@ -941,6 +964,7 @@ class MavenParserTest implements RewriteTest {
               .hasSize(1)
               .matches(deps -> deps.get(0).getGroupId().equals("com.foo") &&
                                deps.get(0).getArtifactId().equals("bar"));
+            mockRepo.shutdown();
         }
     }
 

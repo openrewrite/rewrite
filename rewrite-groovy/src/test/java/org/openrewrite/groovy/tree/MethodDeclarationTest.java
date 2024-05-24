@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -148,6 +149,32 @@ class MethodDeclarationTest implements RewriteTest {
                     return super.visitArrayType(arrayType, o);
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3559")
+    void escapedMethodNameTest() {
+        rewriteRun(
+          groovy(
+            """
+              def 'default'() {}
+              'default'()
+              """
+          )
+        );
+    }
+
+    @Test
+    void escapedMethodNameWithSpacesTest() {
+        rewriteRun(
+          groovy(
+            """
+              def 'some test scenario description'() {}
+              'some test scenario description'()
+              """
           )
         );
     }

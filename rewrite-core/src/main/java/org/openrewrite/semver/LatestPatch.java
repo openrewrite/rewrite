@@ -48,7 +48,7 @@ public class LatestPatch implements VersionComparator {
 
         //noinspection ConstantConditions
         return TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern)
-                .<VersionComparator>getValue()
+                .getValue()
                 .compare(currentVersion, v1, v2);
     }
 

@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,59 +29,68 @@ class QualifyThisVisitorTest implements RewriteTest {
         spec.recipe(toRecipe(QualifyThisVisitor::new));
     }
 
+    @DocumentExample
     @Test
     void qualifyThis() {
         rewriteRun(
-                java("""
-                        public class Foo {
-                            private String str = "str";
-                            public String getStr() {
-                                return this.str;
-                            }
-                        }
-                        """, """
-                        public class Foo {
-                            private String str = "str";
-                            public String getStr() {
-                                return Foo.this.str;
-                            }
-                        }
-                        """)
+          java(
+            """
+              public class Foo {
+                  private String str = "str";
+                  public String getStr() {
+                      return this.str;
+                  }
+              }
+              """,
+            """
+              public class Foo {
+                  private String str = "str";
+                  public String getStr() {
+                      return Foo.this.str;
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void alreadyQualifiedNoop() {
         rewriteRun(
-                java("""
-                        public class Foo {
-                            private String str = "str";
-                            public String getStr() {
-                                return Foo.this.str;
-                            }
-                        }
-                        """)
+          java(
+            """
+              public class Foo {
+                  private String str = "str";
+                  public String getStr() {
+                      return Foo.this.str;
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void qualifyThisMethodInvocation() {
         rewriteRun(
-                java("""
-                        public class Foo {
-                            private String str = "str";
-                            public int getLength() {
-                                return this.str.length();
-                            }
-                        }
-                        """, """
-                        public class Foo {
-                            private String str = "str";
-                            public int getLength() {
-                                return Foo.this.str.length();
-                            }
-                        }
-                        """)
+          java(
+            """
+              public class Foo {
+                  private String str = "str";
+                  public int getLength() {
+                      return this.str.length();
+                  }
+              }
+              """,
+            """
+              public class Foo {
+                  private String str = "str";
+                  public int getLength() {
+                      return Foo.this.str.length();
+                  }
+              }
+              """
+          )
         );
     }
 }

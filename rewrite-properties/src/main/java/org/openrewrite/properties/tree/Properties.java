@@ -28,8 +28,6 @@ import org.openrewrite.properties.internal.PropertiesPrinter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -70,6 +68,7 @@ public interface Properties extends Tree {
         @With
         Path sourcePath;
 
+        @With
         List<Content> content;
         @With
         String eof;
@@ -98,28 +97,6 @@ public interface Properties extends Tree {
         @Override
         public SourceFile withCharset(Charset charset) {
             return withCharsetName(charset.name());
-        }
-
-        public List<Content> getContent() {
-            return Collections.unmodifiableList(content);
-        }
-
-        public File withContent(List<Content> content) {
-            int size = content.size();
-            if (size == this.content.size()) {
-                boolean allIdentical = true;
-                for (int i = 0; i < size; i++) {
-                    if (content.get(i) != this.content.get(i)) {
-                        allIdentical = false;
-                        break;
-                    }
-                }
-                if (allIdentical) {
-                    return this;
-                }
-            }
-
-            return new File(id, prefix, markers, sourcePath, new ArrayList<>(content), eof, charsetName, charsetBomMarked, fileAttributes, checksum);
         }
 
         @Override

@@ -33,25 +33,25 @@ import java.util.Objects;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddRepository extends Recipe {
     private static final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/repositories");
 
-    @Option(displayName = "Repository ID",
+    @Option(example = "repo-id", displayName = "Repository ID",
             description = "A unique name to describe the repository.")
     String id;
 
-    @Option(displayName = "Repository URL",
+    @Option(example = "http://myrepo.maven.com/repo", displayName = "Repository URL",
             description = "The URL of the repository.")
     String url;
 
-    @Option(required = false,
+    @Option(example = "My Great Repo Name", required = false,
             displayName = "Repository name",
             description = "A display name for the repository.")
     @Nullable
     String repoName;
 
-    @Option(required = false,
+    @Option(example = "default", required = false,
             displayName = "Repository layout",
             description = "The Maven layout of the repository.")
     @Nullable
@@ -63,13 +63,13 @@ public class AddRepository extends Recipe {
     @Nullable
     Boolean snapshotsEnabled;
 
-    @Option(required = false,
+    @Option(example = "warn", required = false,
             displayName = "Snapshots checksum policy",
             description = "Governs whether snapshots require checksums.")
     @Nullable
     String snapshotsChecksumPolicy;
 
-    @Option(required = false,
+    @Option(example = "always", required = false,
             displayName = "Snapshots update policy",
             description = "The policy governing snapshot updating interval.")
     @Nullable
@@ -81,13 +81,13 @@ public class AddRepository extends Recipe {
     @Nullable
     Boolean releasesEnabled;
 
-    @Option(required = false,
+    @Option(example = "fail", required = false,
             displayName = "Releases checksum policy",
             description = "Governs whether releases require checksums.")
     @Nullable
     String releasesChecksumPolicy;
 
-    @Option(required = false,
+    @Option(example = "never", required = false,
             displayName = "Releases update policy",
             description = "The policy governing release updating interval.")
     @Nullable

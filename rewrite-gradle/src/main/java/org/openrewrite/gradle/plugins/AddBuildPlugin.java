@@ -18,17 +18,12 @@ package org.openrewrite.gradle.plugins;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.groovy.GroovyIsoVisitor;
-import org.openrewrite.groovy.tree.G;
+import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
 
-import java.util.Optional;
-
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddBuildPlugin extends Recipe {
     @Option(displayName = "Plugin id",
             description = "The plugin id to apply.",
@@ -53,6 +48,13 @@ public class AddBuildPlugin extends Recipe {
     @Nullable
     String versionPattern;
 
+    @Option(displayName = "Apply plugin",
+            description = "Immediate apply the plugin. Defaults to `true`.",
+            valid = {"true", "false"},
+            required = false)
+    @Nullable
+    Boolean apply;
+
     @Override
     public String getDisplayName() {
         return "Add Gradle plugin";
@@ -75,18 +77,8 @@ public class AddBuildPlugin extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
-                new IsBuildGradle<>(),
-                new GroovyIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                        Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
-                        if (!maybeGradleProject.isPresent()) {
-                            return cu;
-                        }
-
-                        GradleProject gradleProject = maybeGradleProject.get();
-                        return (G.CompilationUnit) new AddPluginVisitor(pluginId, version, versionPattern, gradleProject.getMavenPluginRepositories()).visitNonNull(cu, ctx);
-                    }
-                });
+                new FindGradleProject(FindGradleProject.SearchCriteria.Marker),
+                new AddPluginVisitor(pluginId, version, versionPattern, apply)
+        );
     }
 }

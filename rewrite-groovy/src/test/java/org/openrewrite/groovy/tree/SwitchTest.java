@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GrUnnecessarySemicolon", "GroovyVariableNotAssigned"})
+@SuppressWarnings({"GrUnnecessarySemicolon", "GroovyVariableNotAssigned", "GroovyFallthrough"})
 class SwitchTest implements RewriteTest {
 
     @Test
@@ -46,7 +46,7 @@ class SwitchTest implements RewriteTest {
             """
               int n;
               switch(n) {
-                 case 0: break;
+                 case 0: break ;
               }
               """
           )
@@ -59,7 +59,7 @@ class SwitchTest implements RewriteTest {
           groovy(
             """
               switch(0) {
-                  default: System.out.println("default!");
+                  default: System.out.println("default!") ;
               }
               """,
             spec -> spec.afterRecipe(cu -> {

@@ -17,7 +17,10 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -29,7 +32,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
-import static org.openrewrite.Repeat.repeatUntilStable;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
@@ -40,7 +42,7 @@ import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
  * drop below the configured values.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveUnusedImports extends Recipe {
 
     @Override
@@ -57,7 +59,7 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-1128");
+        return Collections.singleton("RSPEC-S1128");
     }
 
     @Override
@@ -67,7 +69,7 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new NoMissingTypes(), repeatUntilStable(new RemoveUnusedImportsVisitor()));
+        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsVisitor());
     }
 
     private static class RemoveUnusedImportsVisitor extends JavaIsoVisitor<ExecutionContext> {

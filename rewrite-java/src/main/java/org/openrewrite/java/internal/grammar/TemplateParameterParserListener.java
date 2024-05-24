@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,15 +53,35 @@ public interface TemplateParameterParserListener extends ParseTreeListener {
 	 */
 	void exitPatternType(TemplateParameterParser.PatternTypeContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link TemplateParameterParser#matcherParameter}.
+	 * Enter a parse tree produced by {@link TemplateParameterParser#type}.
 	 * @param ctx the parse tree
 	 */
-	void enterMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx);
+	void enterType(TemplateParameterParser.TypeContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link TemplateParameterParser#matcherParameter}.
+	 * Exit a parse tree produced by {@link TemplateParameterParser#type}.
 	 * @param ctx the parse tree
 	 */
-	void exitMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx);
+	void exitType(TemplateParameterParser.TypeContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#typeParameter}.
+	 * @param ctx the parse tree
+	 */
+	void enterTypeParameter(TemplateParameterParser.TypeParameterContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#typeParameter}.
+	 * @param ctx the parse tree
+	 */
+	void exitTypeParameter(TemplateParameterParser.TypeParameterContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#variance}.
+	 * @param ctx the parse tree
+	 */
+	void enterVariance(TemplateParameterParser.VarianceContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#variance}.
+	 * @param ctx the parse tree
+	 */
+	void exitVariance(TemplateParameterParser.VarianceContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link TemplateParameterParser#parameterName}.
 	 * @param ctx the parse tree
@@ -72,6 +92,16 @@ public interface TemplateParameterParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitParameterName(TemplateParameterParser.ParameterNameContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#typeName}.
+	 * @param ctx the parse tree
+	 */
+	void enterTypeName(TemplateParameterParser.TypeNameContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#typeName}.
+	 * @param ctx the parse tree
+	 */
+	void exitTypeName(TemplateParameterParser.TypeNameContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link TemplateParameterParser#matcherName}.
 	 * @param ctx the parse tree

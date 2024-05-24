@@ -18,6 +18,10 @@ package org.openrewrite;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.Arrays;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
 public class Preconditions {
 
     public static TreeVisitor<?, ExecutionContext> check(Recipe check, TreeVisitor<?, ExecutionContext> v) {
@@ -80,6 +84,11 @@ public class Preconditions {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : null;
+                // calling `isAcceptable()` in case `v` overrides `visit(Tree, P)`
+                if (sourceFile != null && !v.isAcceptable(sourceFile, ctx)) {
+                    return SearchResult.found(tree);
+                }
                 Tree t2 = v.visit(tree, ctx);
                 return tree == t2 && tree != null ?
                         SearchResult.found(tree) :
@@ -93,7 +102,12 @@ public class Preconditions {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : null;
                 for (TreeVisitor<?, ExecutionContext> v : vs) {
+                    // calling `isAcceptable()` in case `v` overrides `visit(Tree, P)`
+                    if (sourceFile != null && !v.isAcceptable(sourceFile, ctx)) {
+                        continue;
+                    }
                     Tree t2 = v.visit(tree, ctx);
                     if (tree != t2) {
                         return t2;
@@ -109,14 +123,29 @@ public class Preconditions {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : null;
                 Tree t2 = tree;
                 for (TreeVisitor<?, ExecutionContext> v : vs) {
+                    // calling `isAcceptable()` in case `v` overrides `visit(Tree, P)`
+                    if (sourceFile != null && !v.isAcceptable(sourceFile, ctx)) {
+                        continue;
+                    }
                     t2 = v.visit(tree, ctx);
                     if (tree == t2) {
                         return tree;
                     }
                 }
                 return t2;
+            }
+        };
+    }
+    @SafeVarargs
+    public static Supplier<TreeVisitor<?, ExecutionContext>> and(Supplier<TreeVisitor<?, ExecutionContext>>... svs) {
+        return new Supplier<TreeVisitor<?, ExecutionContext>>() {
+            @Override
+            public TreeVisitor<?, ExecutionContext> get() {
+                TreeVisitor<?, ExecutionContext>[] visitors =  Arrays.stream(svs).map(Supplier::get).collect(Collectors.toList()).toArray(new TreeVisitor[]{});
+                return and(visitors);
             }
         };
     }

@@ -34,6 +34,7 @@ import static java.util.Collections.emptyList;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public class Space {
     public static final Space EMPTY = new Space("", emptyList());
+    public static final Space SINGLE_SPACE = new Space(" ", emptyList());
 
     private final List<Comment> comments;
 
@@ -138,33 +139,48 @@ public class Space {
     }
 
     public static Space format(String formatting) {
+        return format(formatting, 0, formatting.length());
+    }
+
+    public static Space format(String formatting, int beginIndex, int toIndex) {
+        if (beginIndex == toIndex) {
+            return Space.EMPTY;
+        } else if (toIndex == beginIndex + 1 && ' ' == formatting.charAt(beginIndex)) {
+            return Space.SINGLE_SPACE;
+        } else {
+            rangeCheck(formatting.length(), beginIndex, toIndex);
+        }
+
         StringBuilder prefix = new StringBuilder();
         StringBuilder comment = new StringBuilder();
-        List<Comment> comments = new ArrayList<>();
+        List<Comment> comments = new ArrayList<>(1);
 
         boolean inSingleLineComment = false;
         boolean inMultiLineComment = false;
 
         char last = 0;
 
-        char[] charArray = formatting.toCharArray();
-        for (char c : charArray) {
+        for (int i = beginIndex; i < toIndex; i++) {
+            char c = formatting.charAt(i);
             switch (c) {
                 case '/':
                     if (inSingleLineComment) {
                         comment.append(c);
                     } else if (last == '/' && !inMultiLineComment) {
                         inSingleLineComment = true;
-                        comment = new StringBuilder();
+                        comment.setLength(0);
+                        prefix.setLength(prefix.length() - 1);
                     } else if (last == '*' && inMultiLineComment && comment.length() > 0) {
                         inMultiLineComment = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
-                        comments.add(new Comment(true, comment.toString(), prefix.toString(), Markers.EMPTY));
-                        prefix = new StringBuilder();
-                        comment = new StringBuilder();
+                        comments.add(new Comment(true, comment.toString(), prefix.substring(0, prefix.length() - 1), Markers.EMPTY));
+                        prefix.setLength(0);
+                        comment.setLength(0);
                         continue;
-                    } else {
+                    } else if (inMultiLineComment) {
                         comment.append(c);
+                    } else {
+                        prefix.append(c);
                     }
                     break;
                 case '\r':
@@ -172,8 +188,8 @@ public class Space {
                     if (inSingleLineComment) {
                         inSingleLineComment = false;
                         comments.add(new Comment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
-                        prefix = new StringBuilder();
-                        comment = new StringBuilder();
+                        prefix.setLength(0);
+                        comment.setLength(0);
                         prefix.append(c);
                     } else if (!inMultiLineComment) {
                         prefix.append(c);
@@ -186,7 +202,7 @@ public class Space {
                         comment.append(c);
                     } else if (last == '/' && !inMultiLineComment) {
                         inMultiLineComment = true;
-                        comment = new StringBuilder();
+                        comment.setLength(0);
                     } else {
                         comment.append(c);
                     }
@@ -199,6 +215,11 @@ public class Space {
                     }
             }
             last = c;
+        }
+        // If a file ends with a single-line comment there may be no terminating newline
+        if (comment.length() > 0) {
+            comments.add(new Comment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
+            prefix.setLength(0);
         }
 
         // Shift the whitespace on each comment forward to be a suffix of the comment before it, and the
@@ -215,6 +236,19 @@ public class Space {
         }
 
         return build(whitespace, comments);
+    }
+
+    static void rangeCheck(int arrayLength, int fromIndex, int toIndex) {
+        if (fromIndex > toIndex) {
+            throw new IllegalArgumentException(
+                    "fromIndex(" + fromIndex + ") > toIndex(" + toIndex + ")");
+        }
+        if (fromIndex < 0) {
+            throw new StringIndexOutOfBoundsException(fromIndex);
+        }
+        if (toIndex > arrayLength) {
+            throw new StringIndexOutOfBoundsException(toIndex);
+        }
     }
 
     public static <H extends Json> List<H> formatFirstPrefix(List<H> trees, Space prefix) {

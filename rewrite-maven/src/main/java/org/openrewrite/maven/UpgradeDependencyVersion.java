@@ -47,7 +47,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
  * <li>The default behavior for managed dependencies is to leave them unaltered unless the "overrideManagedVersion" is set to true.</li>
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>> {
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -174,7 +174,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
 
                 if (t != tag && PROJECT_MATCHER.matches(getCursor())) {
                     maybeUpdateModel();
-                    doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, true, null).getVisitor());
+                    doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, null, null, null).getVisitor());
                 }
 
                 return t;
@@ -189,10 +189,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
                                 retainVersions();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions).getVisitor());
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null,
+                                        retainVersions).getVisitor());
                                 doAfterVisit(upgradeManagedDependency);
                                 maybeUpdateModel();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null).getVisitor());
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null, null).getVisitor());
                             }
                         }
                     } catch (MavenDownloadingException e) {

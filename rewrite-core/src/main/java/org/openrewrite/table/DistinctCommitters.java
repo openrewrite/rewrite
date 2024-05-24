@@ -16,6 +16,7 @@
 package org.openrewrite.table;
 
 import lombok.Value;
+import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
 
@@ -31,9 +32,17 @@ public class DistinctCommitters extends DataTable<DistinctCommitters.Row> {
 
     @Value
     public static class Row {
+        @Column(displayName = "Name",
+                description = "The name of the committer.")
         String name;
+        @Column(displayName = "Email",
+                description = "The email of the committer.")
         String email;
+        @Column(displayName = "Last commit",
+                description = "The date of this committer's last commit.")
         LocalDate lastCommit;
+        @Column(displayName = "Number of commits",
+                description = "The number of commits made by this committer.")
         int commits;
     }
 }

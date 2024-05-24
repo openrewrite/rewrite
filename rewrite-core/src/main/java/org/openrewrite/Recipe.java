@@ -31,8 +31,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.net.URI;
@@ -60,8 +58,6 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescrip
 public abstract class Recipe implements Cloneable {
     public static final String PANIC = "__AHHH_PANIC!!!__";
 
-    private static final Logger logger = LoggerFactory.getLogger(Recipe.class);
-
     @SuppressWarnings("unused")
     @JsonProperty("@c")
     public String getJacksonPolymorphicTypeTag() {
@@ -87,6 +83,14 @@ public abstract class Recipe implements Cloneable {
         public String getDescription() {
             return "Default no-op test, does nothing.";
         }
+    }
+
+    /**
+     * @return The maximum number of cycles this recipe is allowed to make changes in a recipe run.
+     */
+    @Incubating(since = "8.0.0")
+    public int maxCycles() {
+        return Integer.MAX_VALUE;
     }
 
     /**
@@ -325,7 +329,15 @@ public abstract class Recipe implements Cloneable {
     }
 
     public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx) {
-        return new RecipeScheduler().scheduleRun(this, before, ctx);
+        return run(before, ctx, 3);
+    }
+
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles) {
+        return run(before, ctx, maxCycles, 1);
+    }
+
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles, int minCycles) {
+        return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
     @SuppressWarnings("unused")
@@ -353,7 +365,7 @@ public abstract class Recipe implements Cloneable {
             try {
                 validated = validated.and(Validated.required(clazz.getSimpleName() + '.' + field.getName(), field.get(this)));
             } catch (IllegalAccessException e) {
-                logger.warn("Unable to validate the field [{}] on the class [{}]", field.getName(), clazz.getName());
+                validated = Validated.invalid(field.getName(), null, "Unable to access " + clazz.getName() + "." + field.getName(), e);
             }
         }
         for (Recipe recipe : getRecipeList()) {
@@ -380,8 +392,12 @@ public abstract class Recipe implements Cloneable {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         Recipe recipe = (Recipe) o;
         return getName().equals(recipe.getName());
     }

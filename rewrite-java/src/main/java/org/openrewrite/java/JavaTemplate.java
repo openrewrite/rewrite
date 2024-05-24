@@ -15,11 +15,13 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
 import lombok.Value;
 import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
@@ -27,27 +29,59 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.template.SourceTemplate;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
 @SuppressWarnings("unused")
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
+
+    @Nullable
+    private static Path TEMPLATE_CLASSPATH_DIR;
+
+    protected static Path getTemplateClasspathDir() {
+        if (TEMPLATE_CLASSPATH_DIR == null) {
+            try {
+                TEMPLATE_CLASSPATH_DIR = Files.createTempDirectory("java-template");
+                Path templateDir = Files.createDirectories(TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal/template"));
+                try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__M__.class")) {
+                    assert in != null;
+                    Files.copy(in, templateDir.resolve("__M__.class"));
+                }
+                try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__P__.class")) {
+                    assert in != null;
+                    Files.copy(in, templateDir.resolve("__P__.class"));
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return TEMPLATE_CLASSPATH_DIR;
+    }
+
+    @Getter
     private final String code;
-    private final int parameterCount;
+
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> javaParser, String code, Set<String> imports,
+    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, Set<String> imports,
                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
-        this.code = code;
-        this.onAfterVariableSubstitution = onAfterVariableSubstitution;
-        this.parameterCount = StringUtils.countOccurrences(code, "#{");
-        this.templateParser = new JavaTemplateParser(contextSensitive, javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
+        this(code, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports));
     }
 
-    public String getCode() {
-        return code;
+    private static JavaParser.Builder<?,?> augmentClasspath(JavaParser.Builder<?,?> parserBuilder) {
+        return parserBuilder.addClasspathEntry(getTemplateClasspathDir());
+    }
+
+    protected JavaTemplate(String code, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {
+        this.code = code;
+        this.onAfterVariableSubstitution = onAfterVariableSubstitution;
+        this.templateParser = templateParser;
     }
 
     @Override
@@ -57,7 +91,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             throw new IllegalArgumentException("`scope` must point to a J instance.");
         }
 
-        Substitutions substitutions = new Substitutions(code, parameters);
+        Substitutions substitutions = substitutions(parameters);
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
@@ -65,6 +99,10 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
                 .getMixin()
                 .visit(scope.getValue(), 0, scope.getParentOrThrow());
+    }
+
+    protected Substitutions substitutions(Object[] parameters) {
+        return new Substitutions(code, parameters);
     }
 
     @Incubating(since = "8.0.0")
@@ -120,14 +158,14 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         private boolean contextSensitive;
 
-        private JavaParser.Builder<?, ?> javaParser = JavaParser.fromJavaVersion();
+        private JavaParser.Builder<?, ?> parser = org.openrewrite.java.JavaParser.fromJavaVersion();
 
         private Consumer<String> onAfterVariableSubstitution = s -> {
         };
         private Consumer<String> onBeforeParseTemplate = s -> {
         };
 
-        Builder(String code) {
+        protected Builder(String code) {
             this.code = code.trim();
         }
 
@@ -176,8 +214,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
         }
 
-        public Builder javaParser(JavaParser.Builder<?, ?> javaParser) {
-            this.javaParser = javaParser;
+        public Builder javaParser(JavaParser.Builder<?, ?> parser) {
+            this.parser = parser;
             return this;
         }
 
@@ -192,7 +230,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(contextSensitive, javaParser, code, imports,
+            return new JavaTemplate(contextSensitive, parser.clone(), code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }

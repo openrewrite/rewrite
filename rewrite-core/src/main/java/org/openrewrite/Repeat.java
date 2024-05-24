@@ -39,15 +39,44 @@ public class Repeat {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if(tree instanceof SourceFile && !v.isAcceptable((SourceFile)tree, ctx)) {
+                if (tree instanceof SourceFile && !v.isAcceptable((SourceFile) tree, ctx)) {
+                    return tree;
+                }
+
+                if (tree != null && !(tree instanceof SourceFile) && getCursor().isRoot()) {
+                    throw new IllegalArgumentException(
+                            String.format(
+                                    "Repeat visitor called on a non-source file tree without a cursor pointing to the root of the tree. " +
+                                    "Passed tree type: `%s`. " +
+                                    "This is likely a bug in the calling code. Use a `visit` method that accepts a cursor instead.",
+                                    tree.getClass().getName()
+                            ));
+                }
+
+                Tree previous = tree;
+                Tree current = null;
+                for (int i = 0; i < maxCycles; i++) {
+                    current = v.visit(previous, ctx);
+                    if (current == previous) {
+                        break;
+                    }
+                    previous = current;
+                }
+
+                return current;
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
+                if (tree instanceof SourceFile && !v.isAcceptable((SourceFile) tree, ctx)) {
                     return tree;
                 }
 
                 Tree previous = tree;
                 Tree current = null;
-                for(int i = 0; i < maxCycles; i++) {
-                    current = v.visit(previous, ctx);
-                    if(current == previous) {
+                for (int i = 0; i < maxCycles; i++) {
+                    current = v.visit(previous, ctx, parent);
+                    if (current == previous) {
                         break;
                     }
                     previous = current;

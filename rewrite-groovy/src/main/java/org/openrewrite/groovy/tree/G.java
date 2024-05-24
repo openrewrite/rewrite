@@ -21,8 +21,12 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
+import org.openrewrite.groovy.service.GroovyAutoFormatService;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -134,6 +138,27 @@ public interface G extends J {
 
         public G.CompilationUnit withPackageDeclaration(Package packageDeclaration) {
             return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            String serviceName = service.getName();
+            try {
+                Class<S> serviceClass;
+                if (GroovyAutoFormatService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (AutoFormatService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovyAutoFormatService.class.getName());
+                } else if (WhitespaceValidationService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovyWhitespaceValidationService.class.getName());
+                } else {
+                    return JavaSourceFile.super.service(service);
+                }
+                return (T) serviceClass.getConstructor().newInstance();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
 
         List<JRightPadded<Statement>> statements;
@@ -260,7 +285,19 @@ public interface G extends J {
                         .map(i -> (JRightPadded<Statement>) (Object) i)
                         .collect(Collectors.toList()));
 
-                return t.getPadding().getClasses() == classes ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                List<JRightPadded<ClassDeclaration>> originalClasses = t.getPadding().getClasses();
+                if (originalClasses.size() != classes.size()) {
+                    return new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                } else {
+                    boolean hasChanges = false;
+                    for (int i = 0; i < originalClasses.size(); i++) {
+                        if (originalClasses.get(i) != classes.get(i)) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                    return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                }
             }
 
             @Transient
@@ -283,7 +320,19 @@ public interface G extends J {
                         .map(i -> (JRightPadded<Statement>) (Object) i)
                         .collect(Collectors.toList()));
 
-                return t.getPadding().getImports() == imports ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
+                if (originalImports.size() != imports.size()) {
+                    return new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                } else {
+                    boolean hasChanges = false;
+                    for (int i = 0; i < originalImports.size(); i++) {
+                        if (originalImports.get(i) != imports.get(i)) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                    return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                }
             }
 
             public List<JRightPadded<Statement>> getStatements() {
@@ -309,14 +358,13 @@ public interface G extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
+    @Getter
     final class ExpressionStatement implements G, Expression, Statement {
 
         @With
-        @Getter
         UUID id;
 
         @With
-        @Getter
         Expression expression;
 
         // For backwards compatibility with older ASTs before there was an id field
@@ -364,6 +412,13 @@ public interface G extends J {
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
+            if(expression instanceof J.MethodInvocation) {
+                if (!(type instanceof JavaType.Method)) {
+                    return (T) this;
+                }
+                JavaType.Method m = (JavaType.Method) type;
+                return (T) withExpression(((J.MethodInvocation) expression).withMethodType(m));
+            }
             return (T) withExpression(expression.withType(type));
         }
 
@@ -402,6 +457,7 @@ public interface G extends J {
             return key.getElement();
         }
 
+        @SuppressWarnings("unused")
         public MapEntry withKey(@Nullable Expression key) {
             return getPadding().withKey(JRightPadded.withElement(this.key, key));
         }
@@ -484,6 +540,7 @@ public interface G extends J {
             return elements.getElements();
         }
 
+        @SuppressWarnings("unused")
         public MapLiteral withElements(List<G.MapEntry> elements) {
             return getPadding().withElements(JContainer.withElements(this.elements, elements));
         }
@@ -558,10 +615,12 @@ public interface G extends J {
 
         JContainer<Expression> elements;
 
+        @SuppressWarnings("unused")
         public List<Expression> getElements() {
             return elements.getElements();
         }
 
+        @SuppressWarnings("unused")
         public ListLiteral withElements(List<Expression> elements) {
             return getPadding().withElements(JContainer.withElements(this.elements, elements));
         }
@@ -699,6 +758,7 @@ public interface G extends J {
             return operator.getElement();
         }
 
+        @SuppressWarnings("unused")
         public G.Binary withOperator(G.Binary.Type operator) {
             return getPadding().withOperator(this.operator.withElement(operator));
         }
@@ -790,6 +850,7 @@ public interface G extends J {
             return inclusive.getElement();
         }
 
+        @SuppressWarnings("unused")
         public Range withInclusive(boolean inclusive) {
             return getPadding().withInclusive(this.inclusive.withElement(inclusive));
         }
@@ -802,8 +863,25 @@ public interface G extends J {
             return from.getType();
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public Range withType(@Nullable JavaType type) {
+            boolean fromIsMethod = from instanceof J.MethodInvocation;
+            boolean toIsMethod = to instanceof J.MethodInvocation;
+            if (fromIsMethod || toIsMethod) {
+                if (!(type instanceof JavaType.Method)) {
+                    return this;
+                }
+                JavaType.Method m = (JavaType.Method) type;
+                Range r = this;
+                if (fromIsMethod) {
+                    r = r.withFrom(((J.MethodInvocation) r.getFrom()).withMethodType(m));
+                }
+                if (toIsMethod) {
+                    r = r.withTo(((J.MethodInvocation) r.getTo()).withMethodType(m));
+                }
+                return r;
+            }
             return withFrom(from.withType(type)).withTo(to.withType(type));
         }
 

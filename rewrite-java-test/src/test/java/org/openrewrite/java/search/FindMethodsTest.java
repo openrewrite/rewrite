@@ -246,4 +246,32 @@ class FindMethodsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findAnnotationMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("Example description(..)", false)),
+          java(
+            """
+              public @interface Example {
+                  String name() default "";
+              
+                  String description() default "";
+              }
+              """
+          ),
+          java(
+            """
+              @Example(description = "test")
+              public class A {
+              }
+              """,
+            """
+              @Example(/*~~>*/description = "test")
+              public class A {
+              }
+              """
+          )
+        );
+    }
 }

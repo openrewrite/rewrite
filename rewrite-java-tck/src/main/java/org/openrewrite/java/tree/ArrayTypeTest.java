@@ -15,9 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -41,10 +43,10 @@ class ArrayTypeTest implements RewriteTest {
     @ValueSource(strings = {
       "String [] [ ] s;",
       """
-      String [] [ ] method() {
-          return null;
-      }
-      """
+        String [] [ ] method() {
+            return null;
+        }
+        """
     })
     void arrayType(String input) {
         rewriteRun(
@@ -76,6 +78,7 @@ class ArrayTypeTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void javaTypesFromJsonCreatorConstructor() {
         rewriteRun(
@@ -160,5 +163,34 @@ class ArrayTypeTest implements RewriteTest {
           null
         );
         assertThat(migratedArrayType.toString()).isEqualTo("String");
+    }
+
+    @Disabled("Fails print idempotency test")
+    @Test
+    void annotatedVarargsParameter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void m1(String @Deprecated... s) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled("Fails print idempotency test")
+    @Test
+    @SuppressWarnings("CStyleArrayDeclaration")
+    void annotatedCStyleArrayParameter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void m2(String  s @Deprecated[]) {}
+              }
+              """
+          )
+        );
     }
 }

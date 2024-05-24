@@ -29,10 +29,8 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.openrewrite.Repeat.repeatUntilStable;
-
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Override
     public String getDisplayName() {
@@ -70,7 +68,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesType<>(annotationType, false), repeatUntilStable(new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext ctx) {
                 if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
@@ -156,7 +154,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 return a;
             }
-        }));
+        });
     }
 
     @Nullable

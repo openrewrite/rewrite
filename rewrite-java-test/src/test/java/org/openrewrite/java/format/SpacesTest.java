@@ -4836,4 +4836,25 @@ class SpacesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void spaceBetweenAnnotations() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+              class A {
+                  void m(@Deprecated@SuppressWarnings("ALL") int a) {
+                  }
+              }
+              """,
+            """
+              class A {
+                  void m(@Deprecated @SuppressWarnings("ALL") int a) {
+                  }
+              }
+              """
+          )
+        );
+    }
 }

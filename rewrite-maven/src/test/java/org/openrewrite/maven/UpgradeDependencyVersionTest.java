@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -1025,10 +1026,12 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void upgradeToExactVersion() {
+    @ParameterizedTest
+    @ValueSource(strings = { "3.0.12.RELEASE", "=3.0.12.RELEASE" })
+    @Issue("https://github.com/openrewrite/rewrite/issues/4166")
+    void upgradeToExactVersion(String version) {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.thymeleaf", "thymeleaf-spring5", "3.0.12.RELEASE", null,
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.thymeleaf", "thymeleaf-spring5", version, null,
             null, null)),
           pomXml(
             """

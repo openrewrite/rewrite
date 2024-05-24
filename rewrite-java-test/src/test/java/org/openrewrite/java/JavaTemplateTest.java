@@ -16,14 +16,16 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.Repeat.repeatUntilStable;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -41,7 +43,6 @@ class JavaTemplateTest implements RewriteTest {
                       ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
                       return JavaTemplate.builder("value = 0")
                         .contextSensitive()
-                        .doBeforeParseTemplate(System.out::println)
                         .build()
                         .apply(getCursor(), assignment.getCoordinates().replace());
                   }
@@ -462,7 +463,7 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void templatingWhileLoopCondition() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> repeatUntilStable(new JavaVisitor<>() {
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext p) {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
@@ -475,7 +476,7 @@ class JavaTemplateTest implements RewriteTest {
                   }
                   return binary;
               }
-          }))),
+          })),
           java(
             """
               import java.util.List;
@@ -558,7 +559,7 @@ class JavaTemplateTest implements RewriteTest {
                       unary.getExpression()
                     );
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {
@@ -591,7 +592,7 @@ class JavaTemplateTest implements RewriteTest {
                     .build()
                     .apply(getCursor(), memberRef.getCoordinates().replace());
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           java(
             """
               import java.util.ArrayList;
@@ -636,7 +637,7 @@ class JavaTemplateTest implements RewriteTest {
                       return fa;
                   }
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          }).withMaxCycles(1)),
           java(
             """
               import java.io.File;

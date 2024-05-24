@@ -20,12 +20,14 @@ import lombok.experimental.FieldDefaults;
 import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
+import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -86,6 +88,7 @@ public interface Xml extends Tree {
         @With
         Path sourcePath;
 
+        @Getter
         @With
         String prefixUnsafe;
 
@@ -101,6 +104,7 @@ public interface Xml extends Tree {
         @With
         Markers markers;
 
+        @Getter
         @Nullable // for backwards compatibility
         @With(AccessLevel.PRIVATE)
         String charsetName;
@@ -156,6 +160,15 @@ public interface Xml extends Tree {
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new XmlPrinter<>();
         }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            if (WhitespaceValidationService.class.getName().equals(service.getName())) {
+                return (T) new XmlWhitespaceValidationService();
+            }
+            return SourceFile.super.service(service);
+        }
     }
 
     @Value
@@ -181,6 +194,8 @@ public interface Xml extends Tree {
         XmlDecl xmlDecl;
 
         List<Misc> misc;
+
+        List<JspDirective> jspDirectives;
 
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
@@ -286,6 +301,12 @@ public interface Xml extends Tree {
         }
 
         public Tag withName(String name) {
+            if(!name.equals(name.trim())) {
+                throw new IllegalArgumentException("Tag name must not contain leading or trailing whitespace");
+            }
+            if(this.name.equals(name)) {
+                return this;
+            }
             return new Tag(id, prefixUnsafe, markers, name, attributes, content,
                     closing == null ? null : closing.withName(name),
                     beforeTagDelimiterPrefix);
@@ -466,6 +487,11 @@ public interface Xml extends Tree {
             String beforeTagDelimiterPrefix;
 
             @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitTagClosing(this, p);
+            }
+
+            @Override
             public String toString() {
                 return "</" + name + ">";
             }
@@ -523,6 +549,11 @@ public interface Xml extends Tree {
             Markers markers;
             Quote quote;
             String value;
+
+            @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitAttributeValue(this, p);
+            }
         }
 
         public String getKeyAsString() {
@@ -627,8 +658,10 @@ public interface Xml extends Tree {
 
         Markers markers;
         Ident name;
+
         @Nullable
         Ident externalId;
+
         List<Ident> internalSubset;
 
         @Nullable
@@ -658,6 +691,12 @@ public interface Xml extends Tree {
 
             Markers markers;
             List<Element> elements;
+
+            @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitDocTypeDeclExternalSubsets(this, p);
+            }
+
         }
 
         @Override
@@ -725,6 +764,58 @@ public interface Xml extends Tree {
         @Override
         public String toString() {
             return "Ident{" + name + "}";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    class JspDirective implements Xml, Content {
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @With
+        String prefixUnsafe;
+
+        public JspDirective withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
+
+        @With
+        Markers markers;
+
+        @With
+        String beforeTypePrefix;
+
+        String type;
+
+        public JspDirective withType(String type) {
+            return new JspDirective(id, prefixUnsafe, markers, beforeTypePrefix, type, attributes,
+                    beforeDirectiveEndPrefix);
+        }
+
+        @With
+        List<Attribute> attributes;
+
+        /**
+         * Space before '%&gt;'
+         */
+        @With
+        String beforeDirectiveEndPrefix;
+
+        @Override
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+            return v.visitJspDirective(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "<%@ " + type + attributes.stream().map(a -> " " + a.getKey().getName() + "=\"" + a.getValueAsString() + "\"")
+                    .collect(Collectors.joining("")) + "%>";
         }
     }
 }

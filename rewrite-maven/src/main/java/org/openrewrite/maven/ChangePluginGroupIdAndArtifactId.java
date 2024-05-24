@@ -29,7 +29,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePluginGroupIdAndArtifactId extends Recipe {
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);

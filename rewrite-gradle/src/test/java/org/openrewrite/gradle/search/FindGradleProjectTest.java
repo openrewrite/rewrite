@@ -23,7 +23,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -60,7 +60,6 @@ class FindGradleProjectTest implements RewriteTest {
     void isGradleKotlinProject() {
         rewriteRun(
           text(
-            //language=kotlin
             """
               plugins {
                   id("java")

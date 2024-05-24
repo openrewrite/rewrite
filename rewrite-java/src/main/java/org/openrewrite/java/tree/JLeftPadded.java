@@ -91,14 +91,11 @@ public class JLeftPadded<T> {
 
     @Nullable
     public static <T> JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T element) {
-        if (before == null) {
-            if (element == null) {
-                return null;
-            }
-            return new JLeftPadded<>(Space.EMPTY, element, Markers.EMPTY);
-        }
         if (element == null) {
             return null;
+        }
+        if (before == null) {
+            return new JLeftPadded<>(Space.EMPTY, element, Markers.EMPTY);
         }
         return before.withElement(element);
     }

@@ -23,9 +23,9 @@ import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
-import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -51,11 +51,12 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
-        return new AdHocRecipe(null, null, visitor, null);
+        return new AdHocRecipe(null, null, null, visitor, null, null);
     }
 
     static AdHocRecipe toRecipe() {
-        return new AdHocRecipe(null, null, TreeVisitor::noop, null);
+        return new AdHocRecipe(null, null, null,
+                TreeVisitor::noop, null, null);
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {
@@ -188,6 +189,24 @@ public interface RewriteTest extends SourceSpecs {
             testClassSpec.getRecipePrinter().printTree(recipe);
         }
 
+        int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();
+
+        // There may not be any tests that have "after" assertions, but that change file attributes or file names.
+        // If so, the test can declare an expected set of cycles that make changes.
+        int expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
+                (testClassSpec.expectedCyclesThatMakeChanges == null ? 0 : testClassSpec.expectedCyclesThatMakeChanges) :
+                testMethodSpec.expectedCyclesThatMakeChanges;
+
+        // If there are any tests that have assertions (an "after"), then set the expected cycles.
+        for (SourceSpec<?> s : sourceSpecs) {
+            if (s.after != null) {
+                expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
+                        testClassSpec.getExpectedCyclesThatMakeChanges(cycles) :
+                        testMethodSpec.getExpectedCyclesThatMakeChanges(cycles);
+                break;
+            }
+        }
+
         ExecutionContext ctx;
         if (testMethodSpec.getExecutionContext() != null) {
             ctx = testMethodSpec.getExecutionContext();
@@ -285,7 +304,8 @@ public interface RewriteTest extends SourceSpecs {
                 // Validate before source
                 nextSpec.validateSource.accept(sourceFile, TypeValidation.before(testMethodSpec, testClassSpec));
 
-                // Validate that printing a parsed AST yields the same source text
+                // Validate that printing the LST yields the same source text
+                // Validate that the LST whitespace do not contain any non-whitespace characters
                 int j = 0;
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
@@ -298,6 +318,16 @@ public interface RewriteTest extends SourceSpecs {
                                 "parser implementation itself. Please open an issue to report this, providing a sample of the " +
                                 "code that generated this error for"
                         );
+                        try {
+                            WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
+                            SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
+                            if(whitespaceValidated != null && whitespaceValidated != sourceFile) {
+                                fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
+                                     "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                            }
+                        } catch (UnsupportedOperationException e) {
+                            // Language/parser does not provide whitespace validation and that's OK for now
+                        }
                     }
                 }
 
@@ -339,12 +369,15 @@ public interface RewriteTest extends SourceSpecs {
         } else if (testClassSpec.getSourceSet() != null) {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
         } else {
-            lss = new InMemoryLargeSourceSet(runnableSourceFiles);
+            lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
         }
 
         RecipeRun recipeRun = recipe.run(
                 lss,
-                recipeCtx);
+                recipeCtx,
+                cycles,
+                expectedCyclesThatMakeChanges + 1
+        );
 
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
@@ -567,48 +600,6 @@ public interface RewriteTest extends SourceSpecs {
                     .collect(Collectors.joining("\n"));
             fail("The recipe added a source file that was not expected. All source file paths, before and after recipe run:\n" + paths);
         }
-
-        boolean shouldValidateOutputStability;
-        if(testMethodSpec.getRecipeOutputStabilityValidation() == null) {
-            shouldValidateOutputStability = testClassSpec.getRecipeOutputStabilityValidation() == null || testClassSpec.getRecipeOutputStabilityValidation();
-        } else {
-            shouldValidateOutputStability = testMethodSpec.getRecipeOutputStabilityValidation();
-        }
-        if(shouldValidateOutputStability) {
-            List<SourceFile> afterSources = recipeRun.getChangeset().getAllResults().stream()
-                    .map(Result::getAfter)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-            if(!afterSources.isEmpty()) {
-                new InMemoryLargeSourceSet(afterSources);
-                RecipeRun secondRun = recipe.run(new InMemoryLargeSourceSet(afterSources), recipeCtx);
-                List<Result> unstableResults = secondRun.getChangeset().getAllResults().stream()
-                        .filter(it -> it.getBefore() != null && it.getAfter() != null && !it.getBefore().printAll().equals(it.getAfter().printAll()))
-                        .collect(Collectors.toList());
-                if (!unstableResults.isEmpty()) {
-                    String unstableMessage = unstableResults.stream()
-                            .map(unstable -> {
-                                assert unstable.getBefore() != null;
-                                assert unstable.getAfter() != null;
-                                return
-                                        "\n------------------------------------------------------------------------\n" +
-                                        unstable.getBefore().getSourcePath() + " after first recipe application" +
-                                        "\n------------------------------------------------------------------------\n" +
-                                        unstable.getBefore().printAll() +
-                                        "\n------------------------------------------------------------------------\n" +
-                                        unstable.getAfter().getSourcePath() + " after second recipe application" +
-                                        "\n------------------------------------------------------------------------\n" +
-                                        unstable.getAfter().printAll();
-                            })
-                            .collect(Collectors.joining("\n"));
-                    fail("Running the recipe on its expected output resulted in additional changes.\n" +
-                         "For correctness and performance recipes are expected to be stable, making all of their changes in a single application.\n" +
-                         "This error is typically resolved by adding defensive guards against unnecessary changes.\n" +
-                         "You can opt out of this validation by setting recipeOutputStabilityValidation(false).\n" +
-                         "The recipe produced unstable results for these sources: \n" + unstableMessage);
-                }
-            }
-        }
     }
 
     static void assertContentEquals(SourceFile sourceFile, String expected, String actual, String errorMessagePrefix) {
@@ -665,8 +656,14 @@ public interface RewriteTest extends SourceSpecs {
             }
         } else {
             assertThat(recipe.getDisplayName()).as("%s display name should not end with a period.", recipe.getName()).doesNotEndWith(".");
-            assertThat(recipe.getDescription()).as("%s description should not be null or empty", recipe.getName()).isNotEmpty();
-            assertThat(recipe.getDescription()).as("%s description should end with a period.", recipe.getName()).endsWith(".");
+            String description = recipe.getDescription();
+            assertThat(description).as("%s description should not be null or empty", recipe.getName()).isNotEmpty();
+            if (description.endsWith(")")) {
+                String lastLine = description.substring(description.lastIndexOf('\n') + 1).trim();
+                assertThat(lastLine).as("%s description not ending with a period should be because the description ends with a markdown list of pure links", recipe.getName()).startsWith("- [");
+            } else {
+                assertThat(description).as("%s description should end with a period.", recipe.getName()).endsWith(".");
+            }
         }
     }
 

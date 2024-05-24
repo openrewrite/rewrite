@@ -39,7 +39,7 @@ import java.util.Optional;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveDependency extends Recipe {
 
     @Option(displayName = "Group",
@@ -102,7 +102,7 @@ public class RemoveDependency extends Recipe {
                         }
                         return requested;
                     }));
-                    newGdc = newGdc.withResolved(ListUtils.map(newGdc.getResolved(), resolved -> {
+                    newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), resolved -> {
                         if (dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                             return null;
                         }
@@ -113,7 +113,8 @@ public class RemoveDependency extends Recipe {
                 }
 
                 if (!anyChanged) {
-                    return cu;
+                    // instance was changed, but no marker update is needed
+                    return g;
                 }
 
                 return g.withMarkers(g.getMarkers().setByType(gp.withNameToConfiguration(nameToConfiguration)));

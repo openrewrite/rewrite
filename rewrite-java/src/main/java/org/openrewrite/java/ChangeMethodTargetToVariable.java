@@ -33,7 +33,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeMethodTargetToVariable extends Recipe {
 
     /**

@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Result;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor
 public class GenerateModel {
@@ -57,6 +59,8 @@ public class GenerateModel {
                         null,
                         ctx
                 )
+                .map(J.CompilationUnit.class::cast)
+                .toList()
                 .get(0)
                 .getClasses()
                 .get(0)
@@ -81,28 +85,26 @@ public class GenerateModel {
                 Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/tree/TomlRightPadded.java")
         );
 
-        results.addAll(new WriteModel(modelClasses).run(List.of(jp().parse(
-                ListUtils.concat(TomlTreePath, deps), null, ctx).get(0)), ctx).getResults());
-        results.addAll(new WriteVisitorMethods(modelClasses).run(jp().parse(
-                List.of(
-                        Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/TomlVisitor.java"),
-                        Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/TomlIsoVisitor.java")
-                ),
-                null,
-                ctx
-        ), ctx).getResults());
-        results.addAll(new WritePrinter(modelClasses).run(jp().parse(
-                List.of(
-                        Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/internal/TomlPrinter.java")
-                ),
-                null,
-                ctx
-        ), ctx).getResults());
+        results.addAll(new WriteModel(modelClasses)
+                .run(new InMemoryLargeSourceSet(jp().parse(
+                                ListUtils.concat(TomlTreePath, deps), null, ctx)
+                        .collect(toList())), ctx).getChangeset().getAllResults());
+        results.addAll(new WriteVisitorMethods(modelClasses)
+                .run(new InMemoryLargeSourceSet(jp().parse(List.of(
+                                Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/TomlVisitor.java"),
+                                Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/TomlIsoVisitor.java")
+                        ), null, ctx)
+                        .collect(toList())), ctx).getChangeset().getAllResults());
+        results.addAll(new WritePrinter(modelClasses)
+                .run(new InMemoryLargeSourceSet(jp().parse(List.of(
+                                Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/internal/TomlPrinter.java")), null, ctx)
+                        .collect(toList())), ctx).getChangeset().getAllResults());
 
         writeResults(results);
 
         // TODO Unable to add accessors in the first phase due to some bug in JavaTemplate.
-        writeResults(new WritePaddingAccessors().run(jp().parse(List.of(TomlTreePath), null, ctx), ctx).getResults());
+        writeResults(new WritePaddingAccessors()
+                .run(new InMemoryLargeSourceSet(jp().parse(List.of(TomlTreePath), null, ctx).collect(toList())), ctx).getChangeset().getAllResults());
     }
 
     private void writeResults(List<Result> results) {

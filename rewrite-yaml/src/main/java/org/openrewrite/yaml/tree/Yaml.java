@@ -180,6 +180,11 @@ public interface Yaml extends Tree {
             boolean explicit;
 
             @Override
+            public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+                return v.visitDocumentEnd(this, p);
+            }
+
+            @Override
             public End copyPaste() {
                 return new End(randomId(), prefix, Markers.EMPTY, explicit);
             }

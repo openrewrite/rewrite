@@ -12,17 +12,29 @@ typedPattern
     ;
 
 patternType
-    : matcherName LPAREN ((matcherParameter COMMA)* matcherParameter)? RPAREN
+    : matcherName LPAREN (type)? RPAREN
     ;
 
-matcherParameter
-    :   FullyQualifiedName
-    |   Identifier
-    |   Number
+type
+    : typeName (LBRACK (typeParameter COMMA)* typeParameter RBRACK)?
+    ;
+
+typeParameter
+    : variance? type
+    | WILDCARD
+    ;
+
+variance
+    : WILDCARD Variance
     ;
 
 parameterName
     : Identifier
+    ;
+
+typeName
+    : FullyQualifiedName
+    | Identifier
     ;
 
 matcherName

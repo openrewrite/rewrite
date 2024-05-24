@@ -249,6 +249,30 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void isAssignableToWildcard() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  java.util.List<?> l = new java.util.ArrayList<String>();
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                    JavaType type = variable.getVariableType().getType();
+                    JavaType exprType = variable.getInitializer().getType();
+                    assertThat(type).isInstanceOf(JavaType.Parameterized.class);
+                    assertThat(exprType).isInstanceOf(JavaType.Parameterized.class);
+                    assertThat(TypeUtils.isAssignableTo(type, exprType)).isTrue();
+                    return super.visitVariable(variable, o);
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1857")
     @Test
     void isParameterizedTypeWithShallowClassesOfType() {

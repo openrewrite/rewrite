@@ -36,7 +36,7 @@ import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class DeleteProperty extends Recipe {
     @Option(displayName = "Property key",
             description = "The key to be deleted.",
@@ -118,6 +118,10 @@ public class DeleteProperty extends Recipe {
         public Yaml visitSequence(Yaml.Sequence sequence, P p) {
             sequence = (Yaml.Sequence) super.visitSequence(sequence, p);
             List<Yaml.Sequence.Entry> entries = sequence.getEntries();
+            if (entries.isEmpty()) {
+                return sequence;
+            }
+
             entries = ListUtils.map(entries, entry -> ToBeRemoved.hasMarker(entry) ? null : entry);
             return entries.isEmpty() ? ToBeRemoved.withMarker(sequence) : sequence.withEntries(entries);
         }

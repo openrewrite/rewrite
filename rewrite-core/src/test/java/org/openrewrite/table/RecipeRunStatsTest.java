@@ -27,7 +27,7 @@ import org.openrewrite.text.PlainTextVisitor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RecipeRunStatsTest implements RewriteTest {
+class RecipeRunStatsTest implements RewriteTest {
 
     @AllArgsConstructor
     static class RecipeWithApplicabilityTest extends Recipe {
@@ -77,10 +77,14 @@ public class RecipeRunStatsTest implements RewriteTest {
                 .hasSize(1);
               RecipeRunStats.Row row = rows.get(0);
               assertThat(row.getRecipe()).endsWith("RecipeWithApplicabilityTest");
+              assertThat(row.getSourceFiles())
+                .as("Test framework will invoke the recipe once when it is expected to make a change, " +
+                    "then once again when it is expected to make no change")
+                .isEqualTo(2);
               assertThat(row.getEditMax()).isGreaterThan(0);
               assertThat(row.getEditTotalTime())
                 .as("Cumulative time should be greater than any single visit time")
-                .isGreaterThanOrEqualTo(row.getEditMax());
+                .isGreaterThan(row.getEditMax());
           }),
           text("samuel", "sam")
         );

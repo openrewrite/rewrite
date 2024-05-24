@@ -22,6 +22,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.JavaParser;
@@ -52,7 +53,7 @@ public class JavaTemplateParser {
     @Language("java")
     private static final String SUBSTITUTED_ANNOTATION = "@java.lang.annotation.Documented public @interface SubAnnotation { int value(); }";
 
-    private final JavaParser.Builder<?, ?> parser;
+    private final Parser.Builder parser;
     private final Consumer<String> onAfterVariableSubstitution;
     private final Consumer<String> onBeforeParseTemplate;
     private final Set<String> imports;
@@ -60,15 +61,27 @@ public class JavaTemplateParser {
     private final BlockStatementTemplateGenerator statementTemplateGenerator;
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
-    public JavaTemplateParser(boolean contextSensitive, JavaParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
+    public JavaTemplateParser(boolean contextSensitive, Parser.Builder parser, Consumer<String> onAfterVariableSubstitution,
                               Consumer<String> onBeforeParseTemplate, Set<String> imports) {
+        this(
+                parser,
+                onAfterVariableSubstitution,
+                onBeforeParseTemplate,
+                imports,
+                contextSensitive,
+                new BlockStatementTemplateGenerator(imports, contextSensitive),
+                new AnnotationTemplateGenerator(imports)
+        );
+    }
+
+    protected JavaTemplateParser(Parser.Builder parser, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean contextSensitive, BlockStatementTemplateGenerator statementTemplateGenerator, AnnotationTemplateGenerator annotationTemplateGenerator) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.onBeforeParseTemplate = onBeforeParseTemplate;
         this.imports = imports;
         this.contextSensitive = contextSensitive;
-        this.statementTemplateGenerator = new BlockStatementTemplateGenerator(imports, contextSensitive);
-        this.annotationTemplateGenerator = new AnnotationTemplateGenerator(imports);
+        this.statementTemplateGenerator = statementTemplateGenerator;
+        this.annotationTemplateGenerator = annotationTemplateGenerator;
     }
 
     public List<Statement> parseParameters(Cursor cursor, String template) {
@@ -241,7 +254,7 @@ public class JavaTemplateParser {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-        JavaParser jp = parser.clone().build();
+        Parser jp = parser.build();
         return (stub.contains("@SubAnnotation") ?
                 jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION) :
                 jp.reset().parse(ctx, stub))

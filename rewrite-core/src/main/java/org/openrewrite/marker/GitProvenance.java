@@ -18,13 +18,13 @@ package org.openrewrite.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.lib.*;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
-import org.eclipse.jgit.treewalk.WorkingTreeOptions;
+import org.openrewrite.jgit.api.Git;
+import org.openrewrite.jgit.api.errors.GitAPIException;
+import org.openrewrite.jgit.lib.*;
+import org.openrewrite.jgit.revwalk.RevCommit;
+import org.openrewrite.jgit.transport.RemoteConfig;
+import org.openrewrite.jgit.transport.URIish;
+import org.openrewrite.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.ci.BuildEnvironment;
@@ -38,7 +38,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.time.ZonedDateTime;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -88,10 +87,12 @@ public class GitProvenance implements Marker {
             baseUrl = baseUrl.substring(4);
         }
         String remainder = origin.substring(origin.indexOf(baseUrl) + baseUrl.length());
+        if (remainder.startsWith(":")) {
+            remainder = remainder.substring(1);
+        }
         if (remainder.startsWith("/")) {
             remainder = remainder.substring(1);
         }
-
         return remainder.substring(0, remainder.lastIndexOf('/'));
     }
 
@@ -321,8 +322,12 @@ public class GitProvenance implements Marker {
     private static List<Committer> getCommitters(Repository repository) {
         try (Git git = Git.open(repository.getDirectory())) {
             ObjectId head = repository.readOrigHead();
-            if(head == null) {
-                return emptyList();
+            if (head == null) {
+                Ref headRef = repository.getRefDatabase().findRef("HEAD");
+                if (headRef == null || headRef.getObjectId() == null) {
+                    return emptyList();
+                }
+                head = headRef.getObjectId();
             }
 
             Map<String, Committer> committers = new TreeMap<>();
@@ -330,8 +335,7 @@ public class GitProvenance implements Marker {
                 PersonIdent who = commit.getAuthorIdent();
                 Committer committer = committers.computeIfAbsent(who.getEmailAddress(),
                         email -> new Committer(who.getName(), email, new TreeMap<>()));
-                committer.getCommitsByDay().compute(ZonedDateTime
-                                .ofInstant(who.getWhen().toInstant(), who.getTimeZone().toZoneId())
+                committer.getCommitsByDay().compute(who.getWhen().toInstant().atZone(who.getTimeZone().toZoneId())
                                 .toLocalDate(),
                         (day, count) -> count == null ? 1 : count + 1);
             }
