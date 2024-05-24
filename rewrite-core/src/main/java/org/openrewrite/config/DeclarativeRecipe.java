@@ -149,6 +149,7 @@ public class DeclarativeRecipe extends Recipe {
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
                 TreeVisitor<?, ExecutionContext> p = precondition.get();
+
                 @Override
                 public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                     return p.isAcceptable(sourceFile, ctx);
@@ -355,7 +356,7 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     @Override
-    public List<Contributor> getContributors() {
+    public synchronized List<Contributor> getContributors() {
         if (contributors == null) {
             Map<NameEmail, Integer> contributorToLineCount = new HashMap<>();
             contributors = new ArrayList<>();
@@ -369,6 +370,7 @@ public class DeclarativeRecipe extends Recipe {
                 contributors.add(new Contributor(contributorEntry.getKey().getName(), contributorEntry.getKey().getEmail(), contributorEntry.getValue()));
             }
             contributors.sort(Comparator.comparing(Contributor::getLineCount).reversed());
+
         }
         return contributors;
     }
