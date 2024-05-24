@@ -133,6 +133,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator accumulator) {
         return new MavenIsoVisitor<ExecutionContext>() {
+            private final VersionComparator versionComparator =
+                    requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
+
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 ResolvedPom pom = getResolutionResult().getPom();
@@ -170,8 +173,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             @Nullable
-            private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) throws MavenDownloadingException {
-                return UpgradeDependencyVersion.this.findNewerVersion(version, ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+            private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx)
+                    throws MavenDownloadingException {
+                return UpgradeDependencyVersion.this.findNewerVersion(
+                        version, ctx, () -> downloadMetadata(groupId, artifactId, ctx), versionComparator);
             }
         };
     }
@@ -180,6 +185,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator accumulator) {
         return new MavenIsoVisitor<ExecutionContext>() {
             private final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
+            private final VersionComparator versionComparator =
+                    requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
             @Override
             public Xml.Document visitDocument(final Xml.Document document, final ExecutionContext executionContext) {
@@ -378,16 +385,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             @Nullable
-            private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) throws MavenDownloadingException {
-                return UpgradeDependencyVersion.this.findNewerVersion(version, ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+            private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx)
+                    throws MavenDownloadingException {
+                return UpgradeDependencyVersion.this.findNewerVersion(
+                        version, ctx, () -> downloadMetadata(groupId, artifactId, ctx), versionComparator);
             }
         };
     }
 
     @Nullable
-    private String findNewerVersion(String version, ExecutionContext ctx, MavenMetadataFailures.MavenMetadataDownloader download) throws MavenDownloadingException {
-        VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
-
+    private String findNewerVersion(
+            String version, ExecutionContext ctx, MavenMetadataFailures.MavenMetadataDownloader download,
+            VersionComparator versionComparator) throws MavenDownloadingException {
         String finalVersion = !Semver.isVersion(version) ? "0.0.0" : version;
 
         // in the case of "latest.patch", a new version can only be derived if the
