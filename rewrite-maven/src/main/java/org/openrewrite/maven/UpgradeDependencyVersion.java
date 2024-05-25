@@ -189,11 +189,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
             @Override
-            public Xml.Document visitDocument(final Xml.Document document, final ExecutionContext executionContext) {
-                return super.visitDocument(document, executionContext);
-            }
-
-            @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 try {
