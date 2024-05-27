@@ -193,15 +193,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 Xml.Tag t = super.visitTag(tag, ctx);
                 try {
                     if (isPropertyTag()) {
-                        accumulator.pomProperties.stream()
-                                .filter(pomProperty -> pomProperty.pomFilePath.equals(getResolutionResult().getPom().getRequested().getSourcePath()))
-                                .map(PomProperty::getProperty)
-                                .filter(propertyName -> propertyName.equals(tag.getName())
-                                        && !tag.getValue().map(newVersion::equals).orElse(false))
-                                .forEach(propertyName -> {
+                        if (!tag.getValue().map(newVersion::equals).orElse(false)) {
+                            Path pomSourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
+                            for (PomProperty pomProperty : accumulator.pomProperties) {
+                                if (pomProperty.pomFilePath.equals(pomSourcePath)
+                                        && pomProperty.property.equals(tag.getName())) {
                                     doAfterVisit(new ChangeTagValueVisitor<>(tag, newVersion));
                                     maybeUpdateModel();
-                                });
+                                }
+                            }
+                        }
                     } else if (isDependencyTag(groupId, artifactId)) {
                         t = upgradeDependency(ctx, t);
                     } else if (isManagedDependencyTag(groupId, artifactId)) {
