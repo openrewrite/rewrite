@@ -352,6 +352,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            if("constraints".equals(method.getSimpleName())) {
+                // don't mess with anything inside a constraints block, leave that to UpgradeTransitiveDependency version recipe
+                return method;
+            }
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
             if (DEPENDENCY_DSL_MATCHER.matches(m)) {
                 List<Expression> depArgs = m.getArguments();
