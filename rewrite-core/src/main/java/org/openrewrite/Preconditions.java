@@ -18,9 +18,7 @@ package org.openrewrite;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.Arrays;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 public class Preconditions {
 
@@ -28,34 +26,11 @@ public class Preconditions {
         if (check instanceof ScanningRecipe) {
             throw new IllegalArgumentException("ScanningRecipe is not supported as a check");
         }
-        return check(check.getVisitor(), v);
+        return new RecipeCheck(check, v);
     }
 
     public static TreeVisitor<?, ExecutionContext> check(TreeVisitor<?, ExecutionContext> check, TreeVisitor<?, ExecutionContext> v) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return check.isAcceptable(sourceFile, ctx) && v.isAcceptable(sourceFile, ctx);
-            }
-
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                // if tree isn't an instanceof SourceFile, then a precondition visitor may
-                // not be able to do its work because it may assume we are starting from the root level
-                return !(tree instanceof SourceFile) || check.visit(tree, ctx) != tree ?
-                        v.visit(tree, ctx) :
-                        tree;
-            }
-
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
-                // if tree isn't an instanceof SourceFile, then a precondition visitor may
-                // not be able to do its work because it may assume we are starting from the root level
-                return !(tree instanceof SourceFile) || check.visit(tree, ctx, parent) != tree ?
-                        v.visit(tree, ctx, parent) :
-                        tree;
-            }
-        };
+        return new Check(check, v);
     }
 
     public static TreeVisitor<?, ExecutionContext> check(boolean check, TreeVisitor<?, ExecutionContext> v) {
@@ -139,14 +114,63 @@ public class Preconditions {
             }
         };
     }
+
     @SafeVarargs
     public static Supplier<TreeVisitor<?, ExecutionContext>> and(Supplier<TreeVisitor<?, ExecutionContext>>... svs) {
-        return new Supplier<TreeVisitor<?, ExecutionContext>>() {
-            @Override
-            public TreeVisitor<?, ExecutionContext> get() {
-                TreeVisitor<?, ExecutionContext>[] visitors =  Arrays.stream(svs).map(Supplier::get).collect(Collectors.toList()).toArray(new TreeVisitor[]{});
-                return and(visitors);
+        return () -> {
+            //noinspection unchecked
+            TreeVisitor<?, ExecutionContext>[] visitors = new TreeVisitor[svs.length];
+            for (int i = 0; i < svs.length; i++) {
+                Supplier<TreeVisitor<?, ExecutionContext>> sv = svs[i];
+                visitors[i] = sv.get();
             }
+            return and(visitors);
         };
+    }
+
+    public static class RecipeCheck extends Check {
+        private final Recipe check;
+
+        public RecipeCheck(Recipe check, TreeVisitor<?, ExecutionContext> v) {
+            super(check.getVisitor(), v);
+            this.check = check;
+        }
+
+        public Recipe getCheck() {
+            return check;
+        }
+    }
+
+    public static class Check extends TreeVisitor<Tree, ExecutionContext> {
+        private final TreeVisitor<?, ExecutionContext> check;
+        private final TreeVisitor<?, ExecutionContext> v;
+
+        public Check(TreeVisitor<?, ExecutionContext> check, TreeVisitor<?, ExecutionContext> v) {
+            this.check = check;
+            this.v = v;
+        }
+
+        @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            return check.isAcceptable(sourceFile, ctx) && v.isAcceptable(sourceFile, ctx);
+        }
+
+        @Override
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            // if tree isn't an instanceof SourceFile, then a precondition visitor may
+            // not be able to do its work because it may assume we are starting from the root level
+            return !(tree instanceof SourceFile) || check.visit(tree, ctx) != tree ?
+                    v.visit(tree, ctx) :
+                    tree;
+        }
+
+        @Override
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
+            // if tree isn't an instanceof SourceFile, then a precondition visitor may
+            // not be able to do its work because it may assume we are starting from the root level
+            return !(tree instanceof SourceFile) || check.visit(tree, ctx, parent) != tree ?
+                    v.visit(tree, ctx, parent) :
+                    tree;
+        }
     }
 }
