@@ -139,7 +139,37 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new DependencyVersionState();
     }
 
-    private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
+    private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(groovy.lang.Closure)");
+    private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
+
+    private static boolean isLikelyDependencyConfiguration(Cursor cursor) {
+        if (!(cursor.getValue() instanceof J.MethodInvocation)) {
+            return false;
+        }
+        J.MethodInvocation m = cursor.getValue();
+        if (DEPENDENCY_CONFIGURATION_MATCHER.matches(m)) {
+            return true;
+        }
+        // If it's a configuration created by a plugin, we may not be able to type-attribute it
+        // In the absence of type-attribution use its presence within a dependencies block to approximate
+        if (m.getType() != null) {
+            return false;
+        }
+        while (cursor != null) {
+            if (cursor.getValue() instanceof J.MethodInvocation) {
+                m = cursor.getValue();
+                String methodName = m.getSimpleName();
+                if ("constraints".equals(methodName)) {
+                    return false;
+                }
+                if (DEPENDENCY_DSL_MATCHER.matches(m)) {
+                    return true;
+                }
+            }
+            cursor = cursor.getParent();
+        }
+        return false;
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
@@ -159,7 +189,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (DEPENDENCY_DSL_MATCHER.matches(m)) {
+                if (isLikelyDependencyConfiguration(getCursor())) {
                     if (m.getArguments().get(0) instanceof G.MapEntry) {
                         String groupId = null;
                         String artifactId = null;
@@ -283,9 +313,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private class UpdateProperties extends PropertiesVisitor<ExecutionContext> {
         final DependencyVersionState acc;
         final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+
         @Override
         public Properties visitFile(Properties.File file, ExecutionContext ctx) {
-            if(!file.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME)) {
+            if (!file.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME)) {
                 return file;
             }
             return super.visitFile(file, ctx);
@@ -323,7 +354,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
             gradleProject = cu.getMarkers().findFirst(GradleProject.class)
                     .orElse(null);
-            if(gradleProject == null) {
+            if (gradleProject == null) {
                 return cu;
             }
             return super.visitCompilationUnit(cu, ctx);
@@ -352,12 +383,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            if("constraints".equals(method.getSimpleName())) {
+            if ("constraints".equals(method.getSimpleName())) {
                 // don't mess with anything inside a constraints block, leave that to UpgradeTransitiveDependency version recipe
                 return method;
             }
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-            if (DEPENDENCY_DSL_MATCHER.matches(m)) {
+            if (isLikelyDependencyConfiguration(getCursor())) {
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m, ctx);
