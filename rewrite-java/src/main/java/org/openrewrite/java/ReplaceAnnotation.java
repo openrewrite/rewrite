@@ -17,32 +17,28 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
-import org.openrewrite.java.search.UsesType;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ReplaceAnnotation extends Recipe {
-    @Option(displayName = "Annotation pattern to replace",
-            description = "An annotation pattern, expressed as a method pattern to replace.",
+
+    @Option(displayName = "Annotation to replace",
+            description = "An annotation matcher, expressed as a method pattern to replace.",
             example = "@org.jetbrains.annotations.NotNull(\"Test\")")
     String annotationPatternToReplace;
+
     @Option(displayName = "Annotation template to insert",
             description = "An annotation template to add instead of original one, will be parsed with `JavaTemplate`.",
-            example = "@NonNull")
+            example = "@org.jetbrains.annotations.NotNull(\"Null not permitted\")")
     String annotationTemplateToInsert;
-    @Option(displayName = "Type of inserted Annotation",
-            description = "The fully qualified class name of the annotation to insert.",
-            example = "lombok.NonNull")
-    String annotationFQN;
-    @Option(displayName = "Templates Artifact id",
-            description = "The Maven artifactId to load the inserted annotations type from, defaults to JDK internals.",
-            example = "lombok",
-            required = false)
-    String artifactId;
 
     @Override
     public String getDisplayName() {
@@ -57,14 +53,9 @@ public class ReplaceAnnotation extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesType<>(annotationFQN, false),
-                new ReplaceAnnotationVisitor(
-                        new AnnotationMatcher(annotationPatternToReplace),
-                        JavaTemplate.builder(annotationTemplateToInsert)
-                                .imports(annotationFQN)
-                                .javaParser(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true)
-                                        .classpath(artifactId))
-                                .build()));
+        return new ReplaceAnnotationVisitor(
+                new AnnotationMatcher(annotationPatternToReplace),
+                JavaTemplate.builder(annotationTemplateToInsert).javaParser(JavaParser.fromJavaVersion()).build());
     }
 
     public static class ReplaceAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -78,19 +69,24 @@ public class ReplaceAnnotation extends Recipe {
         }
 
         @Override
-        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-            annotation = super.visitAnnotation(annotation, ctx);
+        public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext ctx) {
+            J.Annotation maybeReplacingAnnotation = super.visitAnnotation(a, ctx);
 
-            boolean replaceAnnotation = matcher.matches(annotation);
-            if (replaceAnnotation) {
-                JavaType replacedAnnotationType = annotation.getType();
-                annotation = replacement.apply(getCursor(), annotation.getCoordinates().replace());
-                JavaType insertedAnnotationType = annotation.getType();
-                maybeRemoveImport(TypeUtils.asFullyQualified(replacedAnnotationType));
-                maybeAddImport(TypeUtils.asFullyQualified(insertedAnnotationType).getFullyQualifiedName(), false);
+            boolean keepAnnotation = !matcher.matches(maybeReplacingAnnotation);
+            if (keepAnnotation) {
+                return maybeReplacingAnnotation;
             }
 
-            return annotation;
+
+            JavaType.FullyQualified replacedAnnotationType = TypeUtils.asFullyQualified(maybeReplacingAnnotation.getType());
+            maybeRemoveImport(replacedAnnotationType);
+
+            JavaCoordinates replaceCoordinate = maybeReplacingAnnotation.getCoordinates().replace();
+            J.Annotation replacement = this.replacement.apply(getCursor(), replaceCoordinate);
+
+            doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(replacement));
+
+            return replacement;
         }
     }
 }
