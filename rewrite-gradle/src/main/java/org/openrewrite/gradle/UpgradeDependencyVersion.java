@@ -141,6 +141,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
 
+    private boolean isGradleDependency(Cursor cursor) {
+        MethodInvocation firstEnclosingMethodInvocation =
+                cursor.getParent().firstEnclosing(MethodInvocation.class);
+        return cursor != null &&
+                cursor.getParent() != null &&
+                firstEnclosingMethodInvocation != null &&
+                firstEnclosingMethodInvocation.getSimpleName().equals("dependencies");
+    }
+    
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
 
@@ -159,7 +168,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (DEPENDENCY_DSL_MATCHER.matches(m)) {
+                if (isGradleDependency(getCursor())) {
                     if (m.getArguments().get(0) instanceof G.MapEntry) {
                         String groupId = null;
                         String artifactId = null;
@@ -357,7 +366,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return method;
             }
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-            if (DEPENDENCY_DSL_MATCHER.matches(m)) {
+            if (isGradleDependency(getCursor())) {
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m, ctx);
