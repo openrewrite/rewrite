@@ -74,6 +74,14 @@ public class Pom {
 
     ResolvedGroupArtifactVersion gav;
 
+    /**
+     * Old Maven Poms had a "pomVersion" field which was replaced by "modelVersion" in newer versions of Maven.
+     * When Maven encounters a pom with this field, it refuses to resolve its dependencies.
+     * We keep track of this field so that we can match Maven's behavior.
+     */
+    @Nullable
+    String obsoletePomVersion;
+
     @Nullable
     String name;
 

@@ -303,7 +303,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
-                  
+              
                   constraints {
                   }
               }
@@ -336,7 +336,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
               dependencies {
                   earlib 'org.openrewrite:rewrite-java:7.0.0'
-                  
+              
                   constraints {
                   }
               }
@@ -360,6 +360,45 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void removeOtherVersionConstraint() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core') {
+                          because 'security'
+                          version {
+                              strictly('2.12.0')
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addConstraintToNonTransitiveExtendingTransitiveConfiguration() {
         rewriteRun(
           buildGradle(
@@ -369,7 +408,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               configurations.earlib.extendsFrom configurations.deploy
               dependencies {
                   deploy 'org.openrewrite:rewrite-java:7.0.0'
-                  
+              
                   constraints {
                   }
               }
@@ -400,7 +439,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               repositories { mavenCentral() }
               dependencies {
                   deploy 'org.openrewrite:rewrite-java:7.0.0'
-                  
+              
                   constraints {
                   }
               }

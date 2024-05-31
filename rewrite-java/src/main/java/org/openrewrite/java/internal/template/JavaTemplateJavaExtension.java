@@ -146,7 +146,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     c = c.withTypeParameters(ListUtils.map(c.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
                                 }
                                 c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> m.withAnnotations(emptyList())));
-                                c = c.getAnnotations().withKind(c.getAnnotations().getKind().withAnnotations(emptyList()));
+                                c = c.getPadding().withKind(c.getPadding().getKind().withAnnotations(emptyList()));
                             } else {
                                 for (J.Annotation a : gen) {
                                     c = c.withLeadingAnnotations(ListUtils.insertInOrder(c.getLeadingAnnotations(), a,

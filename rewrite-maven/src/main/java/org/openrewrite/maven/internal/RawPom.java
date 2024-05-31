@@ -23,6 +23,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.*;
@@ -48,7 +49,13 @@ import static java.util.Collections.emptyMap;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
 @XmlRootElement(name = "project")
+@SuppressWarnings("unused")
 public class RawPom {
+
+    // Obsolete field supplanted by the "modelVersion" field in modern poms
+    @Nullable
+    String pomVersion;
+
     @Nullable
     Parent parent;
 
@@ -65,6 +72,10 @@ public class RawPom {
     @ToString.Include
     @Nullable
     String version;
+
+    // Obsolete field supplanted by the "version" field in modern poms
+    @Nullable
+    String currentVersion;
 
     @EqualsAndHashCode.Include
     @ToString.Include
@@ -330,35 +341,50 @@ public class RawPom {
 
     @Nullable
     public String getVersion() {
-        return version == null && parent != null ? parent.getVersion() : version;
+        if(version == null) {
+            if(currentVersion == null) {
+                if(parent == null) {
+                    return null;
+                } else {
+                    return parent.getVersion();
+                }
+            } else {
+                return currentVersion;
+            }
+        }
+        return version;
     }
+
 
     public Pom toPom(@Nullable Path inputPath, @Nullable MavenRepository repo) {
         org.openrewrite.maven.tree.Parent parent = getParent() == null ? null : new org.openrewrite.maven.tree.Parent(new GroupArtifactVersion(
                 getParent().getGroupId(), getParent().getArtifactId(),
                 getParent().getVersion()), getParent().getRelativePath());
 
-        return new Pom(
-                inputPath,
-                repo,
-                parent,
-                new ResolvedGroupArtifactVersion(
+        Pom.PomBuilder builder = Pom.builder()
+                .sourcePath(inputPath)
+                .repository(repo)
+                .parent(parent)
+                .gav(new ResolvedGroupArtifactVersion(
                         repo == null ? null : repo.getUri(),
                         Objects.requireNonNull(getGroupId()),
                         artifactId,
                         Objects.requireNonNull(getVersion()),
-                        null),
-                name,
-                getPackaging(),
-                getProperties() == null ? emptyMap() : getProperties(),
-                mapDependencyManagement(getDependencyManagement()),
-                mapRequestedDependencies(getDependencies()),
-                mapRepositories(getRepositories()),
-                mapLicenses(getLicenses()),
-                mapProfiles(getProfiles()),
-                mapPlugins((build != null) ? build.getPlugins() : null),
-                mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
-        );
+                        null))
+                .name(name)
+                .obsoletePomVersion(pomVersion)
+                .packaging(packaging)
+                .properties(getProperties() == null ? emptyMap() : getProperties())
+                .licenses(mapLicenses(getLicenses()))
+                .profiles(mapProfiles(getProfiles()));
+        if(StringUtils.isBlank(pomVersion)) {
+            builder.dependencies(mapRequestedDependencies(getDependencies()))
+                    .dependencyManagement(mapDependencyManagement(getDependencyManagement()))
+                    .repositories(mapRepositories(getRepositories()))
+                    .plugins(mapPlugins((build != null) ? build.getPlugins() : null))
+                    .pluginManagement(mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null));
+        }
+        return builder.build();
     }
 
     private List<org.openrewrite.maven.tree.License> mapLicenses(@Nullable Licenses rawLicenses) {

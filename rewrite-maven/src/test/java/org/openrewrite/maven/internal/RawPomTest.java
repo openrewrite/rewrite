@@ -171,18 +171,18 @@ class RawPomTest {
         String pomString = """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+          
                   <parent>
                       <groupId>org.springframework.boot</groupId>
                       <artifactId>spring-boot-starter-parent</artifactId>
                       <version>2.4.0</version>
                   </parent>
-              
+          
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <packaging>jar</packaging>
-                  
+          
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -194,7 +194,7 @@ class RawPomTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
-                  
+          
                   <dependencies>
                     <dependency>
                       <groupId>org.junit.jupiter</groupId>
@@ -209,7 +209,7 @@ class RawPomTest {
                       </exclusions>
                     </dependency>
                   </dependencies>
-
+          
                   <build>
                       <plugins>
                           <plugin>
@@ -382,7 +382,7 @@ class RawPomTest {
                                   </plugins>
                               </pluginManagement>
                           </build>
-
+          
                       </profile>
                   </profiles>
               </project>

@@ -358,14 +358,13 @@ public interface G extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
+    @Getter
     final class ExpressionStatement implements G, Expression, Statement {
 
         @With
-        @Getter
         UUID id;
 
         @With
-        @Getter
         Expression expression;
 
         // For backwards compatibility with older ASTs before there was an id field
@@ -413,6 +412,13 @@ public interface G extends J {
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
+            if(expression instanceof J.MethodInvocation) {
+                if (!(type instanceof JavaType.Method)) {
+                    return (T) this;
+                }
+                JavaType.Method m = (JavaType.Method) type;
+                return (T) withExpression(((J.MethodInvocation) expression).withMethodType(m));
+            }
             return (T) withExpression(expression.withType(type));
         }
 
@@ -451,6 +457,7 @@ public interface G extends J {
             return key.getElement();
         }
 
+        @SuppressWarnings("unused")
         public MapEntry withKey(@Nullable Expression key) {
             return getPadding().withKey(JRightPadded.withElement(this.key, key));
         }
@@ -533,6 +540,7 @@ public interface G extends J {
             return elements.getElements();
         }
 
+        @SuppressWarnings("unused")
         public MapLiteral withElements(List<G.MapEntry> elements) {
             return getPadding().withElements(JContainer.withElements(this.elements, elements));
         }
@@ -607,10 +615,12 @@ public interface G extends J {
 
         JContainer<Expression> elements;
 
+        @SuppressWarnings("unused")
         public List<Expression> getElements() {
             return elements.getElements();
         }
 
+        @SuppressWarnings("unused")
         public ListLiteral withElements(List<Expression> elements) {
             return getPadding().withElements(JContainer.withElements(this.elements, elements));
         }
@@ -748,6 +758,7 @@ public interface G extends J {
             return operator.getElement();
         }
 
+        @SuppressWarnings("unused")
         public G.Binary withOperator(G.Binary.Type operator) {
             return getPadding().withOperator(this.operator.withElement(operator));
         }
@@ -839,6 +850,7 @@ public interface G extends J {
             return inclusive.getElement();
         }
 
+        @SuppressWarnings("unused")
         public Range withInclusive(boolean inclusive) {
             return getPadding().withInclusive(this.inclusive.withElement(inclusive));
         }
@@ -851,8 +863,25 @@ public interface G extends J {
             return from.getType();
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public Range withType(@Nullable JavaType type) {
+            boolean fromIsMethod = from instanceof J.MethodInvocation;
+            boolean toIsMethod = to instanceof J.MethodInvocation;
+            if (fromIsMethod || toIsMethod) {
+                if (!(type instanceof JavaType.Method)) {
+                    return this;
+                }
+                JavaType.Method m = (JavaType.Method) type;
+                Range r = this;
+                if (fromIsMethod) {
+                    r = r.withFrom(((J.MethodInvocation) r.getFrom()).withMethodType(m));
+                }
+                if (toIsMethod) {
+                    r = r.withTo(((J.MethodInvocation) r.getTo()).withMethodType(m));
+                }
+                return r;
+            }
             return withFrom(from.withType(type)).withTo(to.withType(type));
         }
 

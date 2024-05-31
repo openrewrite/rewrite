@@ -333,7 +333,10 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (openingBracketIndex != -1) {
                             int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
-                            lastEnd = event.getEndMark().getIndex();
+                        }
+                        lastEnd = event.getEndMark().getIndex();
+                        if (shouldUseYamlParserBugWorkaround(sse)) {
+                            lastEnd--;
                         }
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor));
                         break;
@@ -375,6 +378,17 @@ public class YamlParser implements org.openrewrite.Parser {
         }
     }
 
+    /*
+    The yaml-parser library unfortunately returns inconsistent marks.
+    If the dashes of the sequence have an indentation, the end mark and the start mark point to the dash.
+    If the dashes of the sequence do not have an indentation, the end mark will point to the character AFTER the dash.
+    */
+    private boolean shouldUseYamlParserBugWorkaround(SequenceStartEvent event) {
+        int startChar = event.getStartMark().getBuffer()[event.getStartMark().getPointer()];
+        int endChar = event.getEndMark().getBuffer()[event.getEndMark().getPointer()];
+        return startChar == '-' && endChar != '-';
+    }
+
     private Yaml.Anchor buildYamlAnchor(FormatPreservingReader reader, int lastEnd, String eventPrefix, String anchorKey, int eventEndIndex, boolean isForScalar) {
         int anchorLength = isForScalar ? anchorKey.length() + 1 : anchorKey.length();
         String whitespaceAndScalar = reader.prefix(
@@ -398,16 +412,7 @@ public class YamlParser implements org.openrewrite.Parser {
     }
 
     private static int commentAwareIndexOf(char target, String s) {
-        return commentAwareIndexOf(target, s, FindIndexStrategy.FIRST);
-    }
-
-    /**
-     * Return the first or last index of the target character that appears in a non-comment portion of the String,
-     * or -1 if it does not appear.
-     */
-    private static int commentAwareIndexOf(char target, String s, FindIndexStrategy strategy) {
         boolean inComment = false;
-        int lastFoundIndex = -1;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (inComment) {
@@ -416,21 +421,13 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             } else {
                 if (c == target) {
-                    if (strategy == FindIndexStrategy.FIRST) {
-                        return i;
-                    }
-                    lastFoundIndex = i;
+                    return i;
                 } else if (c == '#') {
                     inComment = true;
                 }
             }
         }
-        return lastFoundIndex;
-    }
-
-    private enum FindIndexStrategy {
-        FIRST,
-        LAST
+        return -1;
     }
 
     @Override
@@ -527,7 +524,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
         public void push(Yaml.Block block, @Nullable String commaPrefix) {
             String rawPrefix = block.getPrefix();
-            int dashIndex = commentAwareIndexOf('-', rawPrefix, FindIndexStrategy.LAST);
+            int dashIndex = commentAwareIndexOf('-', rawPrefix);
             String entryPrefix;
             String blockPrefix;
             boolean hasDash = dashIndex != -1;

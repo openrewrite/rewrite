@@ -163,6 +163,115 @@ class AddPropertyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void ifRemoteParentIsDefined() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+              </project>
+              ""","""
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+
+          )
+        );
+    }
+
+    @Test
+    void ifRemoteParentIsDefined_2() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                  <relativePath></relativePath>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+              </project>
+              ""","""
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                  <relativePath></relativePath>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+
+          )
+        );
+    }
+
+    @Test
+    void ifRemoteParentIsDefined_3() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+              </project>
+              ""","""
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void addFirstProperty() {

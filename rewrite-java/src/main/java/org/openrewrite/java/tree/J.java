@@ -1159,10 +1159,6 @@ public interface J extends Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
-        @Nullable
-        @NonFinal
-        transient WeakReference<Annotations> annotations;
-
         @With
         @Getter
         @EqualsAndHashCode.Include
@@ -1191,11 +1187,11 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withKind(Kind.Type type) {
-            Kind k = getAnnotations().getKind();
+            Kind k = getPadding().getKind();
             if (k.type == type) {
                 return this;
             } else {
-                return getAnnotations().withKind(k.withType(type));
+                return getPadding().withKind(k.withType(type));
             }
         }
 
@@ -1418,34 +1414,6 @@ public interface J extends Tree {
 
             public ClassDeclaration withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
                 return t.typeParameters == typeParameters ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
-            }
-        }
-
-        public Annotations getAnnotations() {
-            Annotations a;
-            if (this.annotations == null) {
-                a = new Annotations(this);
-                this.annotations = new WeakReference<>(a);
-            } else {
-                a = this.annotations.get();
-                if (a == null || a.t != this) {
-                    a = new Annotations(this);
-                    this.annotations = new WeakReference<>(a);
-                }
-            }
-            return a;
-        }
-
-        @RequiredArgsConstructor
-        public static class Annotations {
-            private final ClassDeclaration t;
-
-            public Kind getKind() {
-                return t.kind;
-            }
-
-            public ClassDeclaration withKind(Kind kind) {
-                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
             }
         }
     }
@@ -3389,6 +3357,11 @@ public interface J extends Tree {
             }
             return false;
         }
+
+        @Override
+        public String toString() {
+            return String.valueOf(value);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3586,19 +3559,20 @@ public interface J extends Tree {
         }
 
         public MethodDeclaration withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
+            Annotations annotations = getAnnotations();
             if (typeParameters == null) {
-                if (this.getAnnotations().getTypeParameters() == null) {
+                if (annotations.getTypeParameters() == null) {
                     return this;
                 } else {
-                    return this.getAnnotations().withTypeParameters(null);
+                    return annotations.withTypeParameters(null);
                 }
             } else {
-                TypeParameters currentTypeParameters = this.getAnnotations().getTypeParameters();
+                TypeParameters currentTypeParameters = annotations.getTypeParameters();
                 if (currentTypeParameters == null) {
-                    return getAnnotations().withTypeParameters(new TypeParameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                    return annotations.withTypeParameters(new TypeParameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
                             null, typeParameters.stream().map(JRightPadded::build).collect(toList())));
                 } else {
-                    return getAnnotations().withTypeParameters(currentTypeParameters.withTypeParameters(typeParameters));
+                    return annotations.withTypeParameters(currentTypeParameters.withTypeParameters(typeParameters));
                 }
             }
         }

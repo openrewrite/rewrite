@@ -497,8 +497,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         for (Modifier m : classDecl.getModifiers()) {
             visitModifier(m, p);
         }
-        visit(classDecl.getAnnotations().getKind().getAnnotations(), p);
-        visitSpace(classDecl.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
+        visit(classDecl.getPadding().getKind().getAnnotations(), p);
+        visitSpace(classDecl.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
         p.append(kind);
         visit(classDecl.getName(), p);
         visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
