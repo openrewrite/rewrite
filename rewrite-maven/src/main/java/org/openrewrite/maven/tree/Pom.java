@@ -26,13 +26,15 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.ListUtils.concatAll;
 
 /**
@@ -47,6 +49,8 @@ import static org.openrewrite.internal.ListUtils.concatAll;
 @Builder
 @AllArgsConstructor
 public class Pom {
+
+    private static final List<String> JAR_PACKAGING_TYPES = Arrays.asList("jar", "bundle");
 
     /**
      * The model version can be used to verify the structure of the serialized object, in cache, is compatible
@@ -155,4 +159,7 @@ public class Pom {
         return ResolvedPom.placeholderHelper.replacePlaceholders(value, this.properties::get);
     }
 
+    public boolean hasJarPackaging() {
+        return JAR_PACKAGING_TYPES.contains(packaging);
+    }
 }
