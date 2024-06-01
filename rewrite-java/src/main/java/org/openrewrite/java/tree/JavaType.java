@@ -657,7 +657,7 @@ public interface JavaType {
         }
 
         Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type,
-                             @Nullable JavaType[] typeParameters) {
+                      @Nullable JavaType[] typeParameters) {
             this.managedReference = managedReference;
             this.type = unknownIfNull(type);
             this.typeParameters = nullIfEmpty(typeParameters);
@@ -1148,9 +1148,9 @@ public interface JavaType {
         }
 
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
-               @Nullable JavaType returnType, @Nullable String[] parameterNames,
-               @Nullable JavaType[] parameterTypes, @Nullable FullyQualified[] thrownExceptions,
-               @Nullable FullyQualified[] annotations, @Nullable List<String> defaultValue) {
+                      @Nullable JavaType returnType, @Nullable String[] parameterNames,
+                      @Nullable JavaType[] parameterTypes, @Nullable FullyQualified[] thrownExceptions,
+                      @Nullable FullyQualified[] annotations, @Nullable List<String> defaultValue) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = unknownIfNull(declaringType);
@@ -1207,9 +1207,10 @@ public interface JavaType {
             return declaringType;
         }
 
-        public boolean isOverride() {
+        @Nullable
+        public JavaType.Method getOverride() {
             if (declaringType instanceof JavaType.Unknown) {
-                return false;
+                return null;
             }
 
             Stack<FullyQualified> interfaces = new Stack<>();
@@ -1231,11 +1232,15 @@ public interface JavaType {
                                 continue nextMethod;
                             }
                         }
-                        return true;
+                        return method;
                     }
                 }
             }
-            return false;
+            return null;
+        }
+
+        public boolean isOverride() {
+            return getOverride() != null;
         }
 
         public boolean isInheritedFrom(String fullyQualifiedTypeName) {
@@ -1397,7 +1402,7 @@ public interface JavaType {
         }
 
         Variable(@Nullable Integer managedReference, long flagsBitMap, String name, @Nullable JavaType owner,
-                        @Nullable JavaType type, @Nullable FullyQualified[] annotations) {
+                 @Nullable JavaType type, @Nullable FullyQualified[] annotations) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.name = name;
