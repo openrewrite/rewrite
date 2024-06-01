@@ -17,10 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.JavaType;
@@ -40,6 +38,15 @@ public class ReplaceAnnotation extends Recipe {
             example = "@org.jetbrains.annotations.NotNull(\"Null not permitted\")")
     String annotationTemplateToInsert;
 
+    @Option(displayName = "Classpath resource",
+            description = "If the annotation's type is defined by a jar within the META-INF/rewrite/classpath directory provide its name here " +
+                          "so that it can be loaded. " +
+                          "When this parameter is not passed the runtime classpath of the recipe is provided to the parser producing the new annotation. " +
+                          "This is necessary when the annotation is not on the runtime classpath of the recipe and isn't in the Java standard library.",
+            required = false)
+    @Nullable
+    String classpathResourceName;
+
     @Override
     public String getDisplayName() {
         return "Replace Annotation";
@@ -53,9 +60,19 @@ public class ReplaceAnnotation extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ReplaceAnnotationVisitor(
-                new AnnotationMatcher(annotationPatternToReplace),
-                JavaTemplate.builder(annotationTemplateToInsert).javaParser(JavaParser.fromJavaVersion()).build());
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(annotationTemplateToInsert);
+                if (classpathResourceName == null) {
+                    templateBuilder.javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
+                } else {
+                    templateBuilder.javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, classpathResourceName));
+                }
+                return new ReplaceAnnotationVisitor(new AnnotationMatcher(annotationPatternToReplace), templateBuilder.build())
+                        .visit(tree, ctx);
+            }
+        };
     }
 
     public static class ReplaceAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
