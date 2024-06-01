@@ -129,14 +129,20 @@ public class Pom {
         return Stream.concat(Stream.of(getRepository()), getRepositories().stream())
                 .filter(Objects::nonNull)
                 .map(r -> {
-                    if(r.getUri().startsWith("~")) {
-                        r = r.withUri(Paths.get(System.getProperty("user.home") + r.getUri().substring(1)).toUri().toString());
+                    if (r.getUri().startsWith("~")) {
+                        r = r.withUri(Paths.get(System.getProperty("user.home") + r.getUri().substring(1))
+                                .toUri()
+                                .toString());
                     }
-                    if(r.getId() != null && ResolvedPom.placeholderHelper.hasPlaceholders(r.getUri())) {
-                        r = r.withId(ResolvedPom.placeholderHelper.replacePlaceholders(r.getId(), this.properties::get));
+                    if (r.getId() != null && ResolvedPom.placeholderHelper.hasPlaceholders(r.getUri())) {
+                        r = r.withId(ResolvedPom.placeholderHelper.replacePlaceholders(
+                                r.getId(),
+                                this.properties::get));
                     }
-                    if(ResolvedPom.placeholderHelper.hasPlaceholders(r.getUri())) {
-                        r = r.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(r.getUri(), this.properties::get));
+                    if (ResolvedPom.placeholderHelper.hasPlaceholders(r.getUri())) {
+                        r = r.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(
+                                r.getUri(),
+                                this.properties::get));
                     }
                     return r;
                 })
@@ -150,12 +156,26 @@ public class Pom {
      * @return A new instance with dependencies resolved.
      * @throws MavenDownloadingException When problems are encountered downloading dependencies or parents.
      */
-    public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
+    public ResolvedPom resolve(Iterable<String> activeProfiles,
+                               MavenPomDownloader downloader,
+                               ExecutionContext ctx) throws MavenDownloadingException {
         return resolve(activeProfiles, downloader, emptyList(), ctx);
     }
 
-    public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, List<MavenRepository> initialRepositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles, properties, emptyList(), concatAll(initialRepositories, getEffectiveRepositories()), repositories, dependencies, plugins, pluginManagement)
+    public ResolvedPom resolve(Iterable<String> activeProfiles,
+                               MavenPomDownloader downloader,
+                               List<MavenRepository> initialRepositories,
+                               ExecutionContext ctx) throws MavenDownloadingException {
+        return new ResolvedPom(
+                this,
+                activeProfiles,
+                properties,
+                emptyList(),
+                concatAll(initialRepositories, getEffectiveRepositories()),
+                repositories,
+                dependencies,
+                plugins,
+                pluginManagement)
                 .resolve(ctx, downloader);
     }
 
