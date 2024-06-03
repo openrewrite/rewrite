@@ -855,4 +855,31 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void unknownConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openapitools", "openapi-generator-cli", "5.2.1", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id "org.hidetake.swagger.generator" version "2.18.2"
+              }
+              dependencies {
+                  swaggerCodegen "org.openapitools:openapi-generator-cli:5.2.0"
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id "org.hidetake.swagger.generator" version "2.18.2"
+              }
+              dependencies {
+                  swaggerCodegen "org.openapitools:openapi-generator-cli:5.2.1"
+              }
+              """
+          )
+        );
+    }
 }

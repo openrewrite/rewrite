@@ -42,6 +42,12 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void finalKeyword() {
+        rewriteRun(
+          groovy("final a = 1")
+        );
+    }
 
     @Test
     void singleVariableDeclaration() {

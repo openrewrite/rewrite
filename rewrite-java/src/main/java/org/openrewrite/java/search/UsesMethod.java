@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Tree;
@@ -34,6 +35,8 @@ import static org.openrewrite.Tree.randomId;
 
 public class UsesMethod<P> extends JavaIsoVisitor<P> {
     private final String methodPattern;
+
+    @Getter
     private final MethodMatcher methodMatcher;
 
     public UsesMethod(String methodPattern) {

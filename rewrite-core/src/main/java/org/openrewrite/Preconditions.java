@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 
@@ -136,13 +137,15 @@ public class Preconditions {
             this.check = check;
         }
 
-        public Recipe getCheck() {
+        public Recipe getRecipe() {
             return check;
         }
     }
 
     public static class Check extends TreeVisitor<Tree, ExecutionContext> {
+        @Getter
         private final TreeVisitor<?, ExecutionContext> check;
+
         private final TreeVisitor<?, ExecutionContext> v;
 
         public Check(TreeVisitor<?, ExecutionContext> check, TreeVisitor<?, ExecutionContext> v) {
