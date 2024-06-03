@@ -21,7 +21,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 @Value
@@ -75,35 +74,25 @@ public class ReplaceAnnotation extends Recipe {
         };
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false)
     public static class ReplaceAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private final AnnotationMatcher matcher;
-        private final JavaTemplate replacement;
-
-        public ReplaceAnnotationVisitor(AnnotationMatcher annotationMatcher, JavaTemplate replacement) {
-            super();
-            this.matcher = annotationMatcher;
-            this.replacement = replacement;
-        }
+        AnnotationMatcher matcher;
+        JavaTemplate replacement;
 
         @Override
-        public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext ctx) {
-            J.Annotation maybeReplacingAnnotation = super.visitAnnotation(a, ctx);
+        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+            J.Annotation a = super.visitAnnotation(annotation, ctx);
 
-            boolean keepAnnotation = !matcher.matches(maybeReplacingAnnotation);
-            if (keepAnnotation) {
-                return maybeReplacingAnnotation;
+            if (!matcher.matches(a)) {
+                return a;
             }
 
-
-            JavaType.FullyQualified replacedAnnotationType = TypeUtils.asFullyQualified(maybeReplacingAnnotation.getType());
-            maybeRemoveImport(replacedAnnotationType);
-
-            JavaCoordinates replaceCoordinate = maybeReplacingAnnotation.getCoordinates().replace();
-            J.Annotation replacement = this.replacement.apply(getCursor(), replaceCoordinate);
-
-            doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(replacement));
-
-            return replacement;
+            maybeRemoveImport(TypeUtils.asFullyQualified(a.getType()));
+            JavaCoordinates replaceCoordinate = a.getCoordinates().replace();
+            a = replacement.apply(getCursor(), replaceCoordinate);
+            doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(a));
+            return a;
         }
     }
 }
