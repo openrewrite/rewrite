@@ -32,7 +32,7 @@ import java.util.Set;
 public class FindTags extends Recipe {
     @Option(displayName = "XPath",
             description = "An XPath expression used to find matching tags.",
-            example = "/dependencies/dependency")
+            example = "//dependencies/dependency")
     String xpath;
 
     @Override
