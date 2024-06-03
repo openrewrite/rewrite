@@ -74,13 +74,13 @@ public class DependencyMatcher {
         return Validated.valid("pattern", new DependencyMatcher(patternPieces[0], patternPieces[1], validatedVersion.getValue()));
     }
 
-    public boolean matches(String groupId, String artifactId, String version) {
+    public boolean matches(@Nullable String groupId, String artifactId, String version) {
         return StringUtils.matchesGlob(groupId, groupPattern)
                 && StringUtils.matchesGlob(artifactId, artifactPattern)
                 && (versionComparator == null || versionComparator.isValid(null, version));
     }
 
-    public boolean matches(String groupId, String artifactId) {
+    public boolean matches(@Nullable String groupId, String artifactId) {
         return StringUtils.matchesGlob(groupId, groupPattern) && StringUtils.matchesGlob(artifactId, artifactPattern);
     }
 

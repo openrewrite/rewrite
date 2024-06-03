@@ -98,7 +98,7 @@ public class ChangeDependencyClassifier extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
-                        if (dependency.getVersion() != null && dependency.getClassifier() != null && !newClassifier.equals(dependency.getClassifier()) &&
+                        if (dependency != null && dependency.getVersion() != null && dependency.getClassifier() != null && !newClassifier.equals(dependency.getClassifier()) &&
                             depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
                             Dependency newDependency = dependency.withClassifier(newClassifier);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));

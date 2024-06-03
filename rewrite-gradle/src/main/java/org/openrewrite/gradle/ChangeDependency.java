@@ -202,7 +202,7 @@ public class ChangeDependency extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency original = DependencyStringNotationConverter.parse(gav);
-                        if (depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
+                        if (original != null && depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
@@ -236,7 +236,7 @@ public class ChangeDependency extends Recipe {
 
                         J.Literal literal = (J.Literal) strings.get(0);
                         Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
-                        if (depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
+                        if (original != null && depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
