@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.TypeUtils;
@@ -91,7 +92,7 @@ public class ReplaceAnnotation extends Recipe {
             maybeRemoveImport(TypeUtils.asFullyQualified(a.getType()));
             JavaCoordinates replaceCoordinate = a.getCoordinates().replace();
             a = replacement.apply(getCursor(), replaceCoordinate);
-            doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(a));
+            doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(a));
             return a;
         }
     }
