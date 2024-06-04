@@ -18,6 +18,7 @@ package org.openrewrite.gradle.plugins;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
@@ -26,7 +27,6 @@ import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
@@ -35,17 +35,15 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.nio.file.Paths;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.gradle.plugins.AddPluginVisitor.resolvePluginVersion;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -158,7 +156,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                         return cu;
                     }
                     GradleSettings gradleSettings = maybeGradleSettings.get();
-                    cu = withPlugin(cu, "com.gradle.enterprise", versionComparator, gradleSettings.getPluginRepositories(), ctx);
+                    cu = withPlugin(cu, "com.gradle.enterprise", versionComparator, null, gradleSettings, ctx);
                 } else if (!gradleSixOrLater && cu.getSourcePath().toString().equals("build.gradle")) {
                     // Older than 6.0 goes in root build.gradle only, not in build.gradle of subprojects
                     Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
@@ -167,7 +165,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     }
                     GradleProject gradleProject = maybeGradleProject.get();
 
-                    cu = withPlugin(cu, "com.gradle.build-scan", versionComparator, gradleProject.getMavenPluginRepositories(), ctx);
+                    cu = withPlugin(cu, "com.gradle.build-scan", versionComparator, gradleProject, null, ctx);
                 }
 
                 return cu;
@@ -175,14 +173,15 @@ public class AddDevelocityGradlePlugin extends Recipe {
         });
     }
 
-    private G.CompilationUnit withPlugin(G.CompilationUnit cu, String pluginId, VersionComparator versionComparator, List<MavenRepository> repositories, ExecutionContext ctx) {
+    private G.CompilationUnit withPlugin(G.CompilationUnit cu, String pluginId, VersionComparator versionComparator, @Nullable GradleProject gradleProject, @Nullable GradleSettings gradleSettings, ExecutionContext ctx) {
         try {
-            Optional<String> maybeNewVersion = resolvePluginVersion(pluginId, "0", StringUtils.isBlank(version) ? "latest.release" : version, null, repositories, ctx);
-            if (!maybeNewVersion.isPresent()) {
+            String newVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
+                    .select(new GroupArtifact("com.gradle.enterprise", "com.gradle.enterprise.gradle.plugin"), "classpath", version, null, ctx);
+            if (newVersion == null) {
                 return cu;
             }
-            String newVersion = maybeNewVersion.get();
-            cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null, repositories)
+
+            cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null, null)
                     .visitNonNull(cu, ctx);
             cu = (G.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
                     .visitNonNull(cu, ctx);

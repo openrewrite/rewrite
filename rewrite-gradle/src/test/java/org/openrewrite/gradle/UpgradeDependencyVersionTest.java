@@ -49,11 +49,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 compileOnly 'com.google.guava:guava:29.0-jre'
                 runtimeOnly ('com.google.guava:guava:29.0-jre')
@@ -63,11 +63,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 compileOnly 'com.google.guava:guava:30.1.1-jre'
                 runtimeOnly ('com.google.guava:guava:30.1.1-jre')
@@ -104,7 +104,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               dependencies {
                 compileOnly 'com.google.guava:guava:29.0-jre'
               }
@@ -113,7 +113,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               dependencies {
                 /*~~(com.google.guava:guava failed. Unable to download metadata.)~~>*/compileOnly 'com.google.guava:guava:29.0-jre'
               }
@@ -136,7 +136,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               dependencies {
                 compileOnly "com.google.guava:guava:${guavaVersion}"
               }
@@ -145,7 +145,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               dependencies {
                 /*~~(com.google.guava:guava failed. Unable to download metadata.)~~>*/compileOnly "com.google.guava:guava:${guavaVersion}"
               }
@@ -162,13 +162,13 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               def guavaVersion = '29.0-jre'
               def otherVersion = "latest.release"
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
                 implementation "com.fasterxml.jackson.core:jackson-databind:$otherVersion"
@@ -178,13 +178,13 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               def guavaVersion = '30.1.1-jre'
               def otherVersion = "latest.release"
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
                 implementation "com.fasterxml.jackson.core:jackson-databind:$otherVersion"
@@ -202,11 +202,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation(
                   'com.google.guava:guava-gwt:29.0-jre',
@@ -217,11 +217,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation(
                   'com.google.guava:guava-gwt:29.0-jre',
@@ -239,12 +239,12 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               def guavaVersion = '29.0-jre'
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation group: "com.google.guava", name: "guava", version: guavaVersion
               }
@@ -253,12 +253,12 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               def guavaVersion = '30.1.1-jre'
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation group: "com.google.guava", name: "guava", version: guavaVersion
               }
@@ -275,11 +275,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation (group: "com.google.guava", name: "guava", version: '29.0-jre')
               }
@@ -288,11 +288,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation (group: "com.google.guava", name: "guava", version: '30.1.1-jre')
               }
@@ -310,11 +310,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation platform("com.google.guava:guava:29.0-jre")
               }
@@ -323,11 +323,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation platform("com.google.guava:guava:30.1.1-jre")
               }
@@ -352,19 +352,19 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       classpath("com.google.guava:guava:${guavaVersion}")
                   }
               }
-
+              
               plugins {
                   id "java"
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               ext {
                   guavaVersion2 = "29.0-jre"
               }
-
+              
               dependencies {
                   implementation "com.google.guava:guava:${guavaVersion2}"
               }
@@ -381,19 +381,19 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       classpath("com.google.guava:guava:${guavaVersion}")
                   }
               }
-
+              
               plugins {
                   id "java"
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               ext {
                   guavaVersion2 = "30.1.1-jre"
               }
-
+              
               dependencies {
                   implementation "com.google.guava:guava:${guavaVersion2}"
               }
@@ -411,15 +411,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   id "java"
               }
-                            
+              
               repositories {
                   mavenCentral()
               }
-                            
+              
               ext {
                   guavaVersion = "29.0-jre"
               }
-                            
+              
               def guavaVersion2 = "29.0-jre"
               dependencies {
                   implementation("com.google.guava:guava:29.0-jre")
@@ -432,15 +432,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   id "java"
               }
-                            
+              
               repositories {
                   mavenCentral()
               }
-                            
+              
               ext {
                   guavaVersion = "30.1.1-jre"
               }
-                            
+              
               def guavaVersion2 = "30.1.1-jre"
               dependencies {
                   implementation("com.google.guava:guava:30.1.1-jre")
@@ -462,11 +462,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation 'com.google.guava:guava:29.0-jre'
               }
@@ -481,11 +481,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   plugins {
                     id 'java-library'
                   }
-                                    
+                  
                   repositories {
                     mavenCentral()
                   }
-                                    
+                  
                   dependencies {
                     implementation 'com.google.guava:guava:%s'
                   }
@@ -512,11 +512,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                   mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
               }
@@ -539,11 +539,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                   mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation ("com.google.guava:guava:30.1.1-jre")
               }
@@ -578,11 +578,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                   mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
               }
@@ -594,11 +594,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                   mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
               }
@@ -626,16 +626,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                       mavenCentral()
               }
-                  
+              
               subprojects {
                   repositories {
                       mavenCentral()
                   }
-                  
+              
                   dependencies {
                     implementation ("com.google.guava:guava:$guavaVersion")
                   }
@@ -671,11 +671,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                   mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation ("com.google.guava:guava:$guavaVersion")
               }
@@ -706,7 +706,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation group: "com.google.guava", name: "guava", version: guavaVersion
               }
@@ -732,11 +732,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation group: "com.google.guava", name: "guava", version: "${guavaVersion}"
               }
@@ -762,18 +762,18 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           ),
           buildGradle(
             """
-                plugins {
-                    id 'java'
-                }
-                
-                repositories {
-                    mavenCentral()
-                }
-                
-                dependencies {
-                    implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
-                    implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
-                }
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
+                  implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
+              }
               """
           )
         );
@@ -792,18 +792,18 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           ),
           buildGradle(
             """
-                plugins {
-                    id 'java'
-                }
-                
-                repositories {
-                    mavenCentral()
-                }
-                
-                dependencies {
-                    implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
-                    implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
-                }
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
+                  implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
+              }
               """
           )
         );
@@ -818,13 +818,65 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                 mavenCentral()
               }
-                            
+              
               dependencies {
                 implementation 'com.google.guava:guava:29.0-jre'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveConstraintsAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0", "-jre")),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.google.guava:guava:28.0-jre")
+                  }
+                  implementation("com.google.guava:guava")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unknownConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openapitools", "openapi-generator-cli", "5.2.1", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id "org.hidetake.swagger.generator" version "2.18.2"
+              }
+              dependencies {
+                  swaggerCodegen "org.openapitools:openapi-generator-cli:5.2.0"
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id "org.hidetake.swagger.generator" version "2.18.2"
+              }
+              dependencies {
+                  swaggerCodegen "org.openapitools:openapi-generator-cli:5.2.1"
               }
               """
           )

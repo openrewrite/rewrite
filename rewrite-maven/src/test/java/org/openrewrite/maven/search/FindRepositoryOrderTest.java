@@ -16,6 +16,7 @@
 package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -31,6 +32,7 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class FindRepositoryOrderTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findRepositoryOrder() {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());

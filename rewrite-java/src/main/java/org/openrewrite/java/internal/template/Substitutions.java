@@ -120,20 +120,12 @@ public class Substitutions {
                 }
             }
 
-            s = "(/*__p" + index + "__*/new ";
-
-            StringBuilder extraDim = new StringBuilder();
+            int dimensions = 1;
             for (; arrayType.getElemType() instanceof JavaType.Array; arrayType = (JavaType.Array) arrayType.getElemType()) {
-                extraDim.append("[0]");
+                dimensions++;
             }
 
-            if (arrayType.getElemType() instanceof JavaType.Primitive) {
-                s += ((JavaType.Primitive) arrayType.getElemType()).getKeyword();
-            } else if (arrayType.getElemType() instanceof JavaType.FullyQualified) {
-                s += ((JavaType.FullyQualified) arrayType.getElemType()).getFullyQualifiedName().replace("$", ".");
-            }
-
-            s += "[0]" + extraDim + ")";
+            s = "(" + newArrayParameter(arrayType.getElemType(), dimensions, index) + ")";
         } else if ("any".equals(matcherName)) {
             JavaType type;
             if (param != null) {
@@ -151,17 +143,37 @@ public class Substitutions {
             }
 
             String fqn = getTypeName(type);
-            JavaType.Primitive primitive = type instanceof JavaType.Primitive ? (JavaType.Primitive) type : null;
-            s = "__P__." + (primitive == null || primitive.equals(JavaType.Primitive.String) ?
-                    "<" + fqn + ">/*__p" + index + "__*/p()" :
-                    "/*__p" + index + "__*/" + fqn + "p()"
-            );
+            JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
+            s = primitive == null || primitive.equals(JavaType.Primitive.String) ?
+                    newObjectParameter(fqn, index) :
+                    newPrimitiveParameter(fqn, index);
 
             parameters[index] = ((J) parameter).withPrefix(Space.EMPTY);
         } else {
             throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
         }
         return s;
+    }
+
+    protected String newObjectParameter(String fqn, int index) {
+        return "__P__." + "<" + fqn + ">/*__p" + index + "__*/p()";
+    }
+
+    protected String newPrimitiveParameter(String fqn, int index) {
+        return "__P__./*__p" + index + "__*/" + fqn + "p()";
+    }
+
+    protected String newArrayParameter(JavaType elemType, int dimensions, int index) {
+        StringBuilder builder = new StringBuilder("/*__p" + index + "__*/" + "new ");
+        if (elemType instanceof JavaType.Primitive) {
+            builder.append(((JavaType.Primitive) elemType).getKeyword());
+        } else if (elemType instanceof JavaType.FullyQualified) {
+            builder.append(((JavaType.FullyQualified) elemType).getFullyQualifiedName().replace("$", "."));
+        }
+        for (int i = 0; i < dimensions; i++) {
+            builder.append("[0]");
+        }
+        return builder.toString();
     }
 
     private String getTypeName(@Nullable JavaType type) {

@@ -34,11 +34,11 @@ public class ChangePropertyValue extends Recipe {
             example = "management.metrics.binders.*.enabled")
     String propertyKey;
 
-    @Option(displayName = "New value",
+    @Option(example = "newValue", displayName = "New value",
             description = "The new value to be used for key specified by `propertyKey`.")
     String newValue;
 
-    @Option(displayName = "Old value",
+    @Option(example = "oldValue", displayName = "Old value",
             required = false,
             description = "Only change the property value if it matches the configured `oldValue`.")
     @Nullable

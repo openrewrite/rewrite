@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Getter;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -33,8 +34,11 @@ import static java.util.Objects.requireNonNull;
 public class UsesType<P> extends JavaIsoVisitor<P> {
 
     @Nullable
+    @Getter
     private final String fullyQualifiedType;
+
     @Nullable
+    @Getter
     private final Predicate<JavaType> typePattern;
 
     @Nullable

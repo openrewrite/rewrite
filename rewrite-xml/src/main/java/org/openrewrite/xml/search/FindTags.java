@@ -32,8 +32,8 @@ import java.util.Set;
 public class FindTags extends Recipe {
     @Option(displayName = "XPath",
             description = "An XPath expression used to find matching tags.",
-            example = "/dependencies/dependency")
-    String xPath;
+            example = "//dependencies/dependency")
+    String xpath;
 
     @Override
     public String getDisplayName() {
@@ -47,7 +47,7 @@ public class FindTags extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        XPathMatcher matcher = new XPathMatcher(xPath);
+        XPathMatcher matcher = new XPathMatcher(xpath);
         return new XmlVisitor<ExecutionContext>() {
 
             @Override
@@ -79,6 +79,7 @@ public class FindTags extends Recipe {
     /**
      * Returns <code>null</code> if there is not exactly one tag matching this xPath
      */
+    @SuppressWarnings("unused")
     @Nullable
     @Incubating(since = "7.33.0")
     public static Xml.Tag findSingle(Xml x, String xPath) {

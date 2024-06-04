@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.ci.GithubActionsBuildEnvironment;
 import org.openrewrite.maven.search.FindPlugin;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
@@ -167,6 +168,7 @@ public class UpgradePluginVersion extends Recipe {
     }
 
     @Value
+    @EqualsAndHashCode(callSuper = false)
     private static class ChangePluginVersionVisitor extends MavenVisitor<ExecutionContext> {
         String groupId;
         String artifactId;

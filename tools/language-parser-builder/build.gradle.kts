@@ -27,6 +27,12 @@ dependencies {
     modelImplementation("ch.qos.logback:logback-classic:latest.release")
 }
 
+tasks.register<JavaExec>("runGenerator") {
+    mainClass = "generate.GenerateModel"
+    classpath = sourceSets.getByName("model").runtimeClasspath
+    workingDir = file("../..")
+}
+
 license {
     header = file("../../gradle/licenseHeader.txt")
 }

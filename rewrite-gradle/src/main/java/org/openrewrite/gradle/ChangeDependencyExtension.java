@@ -98,7 +98,7 @@ public class ChangeDependencyExtension extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
-                        if (!newExtension.equals(dependency.getExt()) &&
+                        if (dependency != null && !newExtension.equals(dependency.getExt()) &&
                             ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
                              (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
                             Dependency newDependency = dependency.withExt(newExtension);

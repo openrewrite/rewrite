@@ -731,9 +731,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitClassExpression(ClassExpression clazz) {
-            queue.add(TypeTree.build(clazz.getType().getUnresolvedName())
+            String unresolvedName = clazz.getType().getUnresolvedName().replace('$', '.');
+            queue.add(TypeTree.build(unresolvedName)
                     .withType(typeMapping.type(clazz.getType()))
-                    .withPrefix(sourceBefore(clazz.getType().getUnresolvedName())));
+                    .withPrefix(sourceBefore(unresolvedName)));
         }
 
         @Override
@@ -1175,6 +1176,10 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.String;
                     // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
                     int length = sourceLengthOfNext(expression);
+                    // this is an attribute selector
+                    if (source.startsWith("@"+value, cursor)) {
+                        length += 1;
+                    }
                     text = source.substring(cursor, cursor + length);
                     int delimiterLength = 0;
                     if (text.startsWith("$/")) {
@@ -1702,6 +1707,27 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitAttributeExpression(AttributeExpression attr) {
+            Space fmt = whitespace();
+            Expression target = visit(attr.getObjectExpression());
+            Space beforeDot = attr.isSafe() ? sourceBefore("?.") :
+                    sourceBefore(attr.isSpreadSafe() ? "*." : ".");
+            J name = visit(attr.getProperty());
+            if (name instanceof J.Literal) {
+                String nameStr = ((J.Literal) name).getValueSource();
+                assert nameStr != null;
+                name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameStr, null, null);
+            }
+            if (attr.isSpreadSafe()) {
+                name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
+            }
+            if (attr.isSafe()) {
+                name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
+            }
+            queue.add(new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null));
+        }
+
+        @Override
         public void visitPropertyExpression(PropertyExpression prop) {
             Space fmt = whitespace();
             Expression target = visit(prop.getObjectExpression());
@@ -1927,13 +1953,18 @@ public class GroovyParserVisitor {
 
             if (expression.isDynamicTyped()) {
                 Space prefix = whitespace();
-                String defOrVar = source.substring(cursor, cursor + 3);
-                cursor += 3;
+                String keyword;
+                if(source.substring(cursor).startsWith("final")) {
+                    keyword = "final";
+                } else {
+                    keyword = source.substring(cursor, cursor + 3);
+                }
+               cursor += keyword.length();
                 return new J.Identifier(randomId(),
                         prefix,
                         Markers.EMPTY,
                         emptyList(),
-                        defOrVar,
+                        keyword,
                         type, null);
             }
             Space prefix = sourceBefore(expression.getOriginType().getUnresolvedName());
@@ -2039,7 +2070,7 @@ public class GroovyParserVisitor {
             String packageName = importNode.getPackageName();
             J.FieldAccess qualid;
             if (packageName == null) {
-                String type = importNode.getType().getName();
+                String type = importNode.getType().getName().replace('$', '.');
                 if (importNode.isStar()) {
                     type += ".*";
                 } else if (importNode.getFieldName() != null) {

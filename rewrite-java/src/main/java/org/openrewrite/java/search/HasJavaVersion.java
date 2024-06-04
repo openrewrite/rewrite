@@ -50,8 +50,8 @@ public class HasJavaVersion extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds Java source files matching a particular language level. This is useful especially as an " +
-               "applicable test for other recipes.";
+        return "Finds Java source files matching a particular language level. " +
+               "This is useful especially as a precondition for other recipes.";
     }
 
     @SuppressWarnings("ConstantConditions")

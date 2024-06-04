@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.test.RecipeSpec;
@@ -32,6 +33,7 @@ class CopyValueTest implements RewriteTest {
         spec.executionContext(ctx);
     }
 
+    @DocumentExample
     @Test
     void changeCurrentFileWhenNull() {
         rewriteRun(

@@ -19,22 +19,20 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.GradleParser;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.gradle.search.FindPlugins;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.semver.*;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Paths;
@@ -57,43 +55,8 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     @Nullable
     String versionPattern;
 
-    List<MavenRepository> repositories;
-
-    public static Optional<String> resolvePluginVersion(String pluginId, String currentVersion, @Nullable String newVersion, @Nullable String versionPattern,
-                                                        List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-        VersionComparator versionComparator = StringUtils.isBlank(newVersion) ?
-                new LatestRelease(null) :
-                requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
-
-        Optional<String> version;
-        if (versionComparator instanceof ExactVersion) {
-            version = versionComparator.upgrade(currentVersion, Collections.singletonList(newVersion));
-        } else if (versionComparator instanceof LatestPatch && !versionComparator.isValid(currentVersion, currentVersion)) {
-            // in the case of "latest.patch", a new version can only be derived if the
-            // current version is a semantic version
-            return Optional.empty();
-        } else {
-            version = findNewerVersion(pluginId, pluginId + ".gradle.plugin", currentVersion, versionComparator, repositories, ctx);
-        }
-        return version;
-    }
-
-    private static Optional<String> findNewerVersion(String groupId, String artifactId, String version, VersionComparator versionComparator,
-                                                     List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-        try {
-            MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, repositories, ctx);
-            return versionComparator.upgrade(version, mavenMetadata.getVersioning().getVersions());
-        } catch (IllegalStateException e) {
-            // this can happen when we encounter exotic versions
-            return Optional.empty();
-        }
-    }
-
-    private static MavenMetadata downloadMetadata(String groupId, String artifactId, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new MavenPomDownloader(ctx)
-                .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
-                        repositories);
-    }
+    @Nullable
+    Boolean apply;
 
     private static @Nullable Comment getLicenseHeader(G.CompilationUnit cu) {
         if (!cu.getStatements().isEmpty()) {
@@ -133,13 +96,19 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
         if (FindPlugins.find(cu, pluginId).isEmpty()) {
-            Optional<String> version;
+            String version;
             if (newVersion == null) {
                 // We have been requested to add a versionless plugin
-                version = Optional.empty();
+                version = null;
             } else {
+                Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
+                Optional<GradleSettings> maybeGs = cu.getMarkers().findFirst(GradleSettings.class);
+                if (!maybeGp.isPresent() && !maybeGs.isPresent()) {
+                    return cu;
+                }
+
                 try {
-                    version = resolvePluginVersion(pluginId, "0", newVersion, versionPattern, repositories, ctx);
+                    version = new DependencyVersionSelector(null, maybeGp.orElse(null), maybeGs.orElse(null)).select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
                 } catch (MavenDownloadingException e) {
                     return e.warn(cu);
                 }
@@ -170,7 +139,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
             String delimiter = singleQuote.get() < doubleQuote.get() ? "\"" : "'";
             String source = "plugins {\n" +
-                            "    id " + delimiter + pluginId + delimiter + (version.map(s -> " version " + delimiter + s + delimiter).orElse("")) + "\n" +
+                            "    id " + delimiter + pluginId + delimiter + (version != null ? " version " + delimiter + version + delimiter : "") + (version != null && Boolean.FALSE.equals(apply) ? " apply " + apply : "") + "\n" +
                             "}";
             Statement statement = GradleParser.builder().build()
                     .parseInputs(singletonList(Parser.Input.fromString(source)), null, ctx)

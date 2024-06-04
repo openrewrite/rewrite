@@ -18,10 +18,7 @@ package org.openrewrite.config;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
@@ -41,6 +38,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class DeclarativeRecipeTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void precondition() {
         rewriteRun(

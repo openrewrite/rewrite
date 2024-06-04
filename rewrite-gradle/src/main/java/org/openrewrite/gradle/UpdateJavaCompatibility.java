@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -42,14 +43,14 @@ public class UpdateJavaCompatibility extends Recipe {
             example = "11")
     Integer version;
 
-    @Option(displayName = "Compatibility Type",
+    @Option(displayName = "Compatibility type",
             description = "The compatibility type to change",
             valid = {"source", "target"},
             required = false)
     @Nullable
     CompatibilityType compatibilityType;
 
-    @Option(displayName = "Declaration Style",
+    @Option(displayName = "Declaration style",
             description = "The desired style to write the new version as when being written to the `sourceCompatibility` " +
                     "or `targetCompatibility` variables. Default, match current source style. " +
                     "(ex. Enum: `JavaVersion.VERSION_11`, Number: 11, or String: \"11\")",
@@ -58,14 +59,14 @@ public class UpdateJavaCompatibility extends Recipe {
     @Nullable
     DeclarationStyle declarationStyle;
 
-    @Option(displayName = "Allow Downgrade",
+    @Option(displayName = "Allow downgrade",
             description = "Allow downgrading the Java version.",
             required = false)
     @Nullable
     Boolean allowDowngrade;
 
-    @Option(displayName = "Add Compatibility Type if missing",
-            description = "Adds the specified Compatibility Type if one is not found.",
+    @Option(displayName = "Add compatibility type if missing",
+            description = "Adds the specified compatibility type if one is not found.",
             required = false)
     @Nullable
     Boolean addIfMissing;
@@ -84,7 +85,7 @@ public class UpdateJavaCompatibility extends Recipe {
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate().and(Validated.test("version", "Version must be > 0.", version, v -> v > 0));
     }
 
@@ -97,8 +98,8 @@ public class UpdateJavaCompatibility extends Recipe {
             final MethodMatcher javaVersionToVersionMatcher = new MethodMatcher("org.gradle.api.JavaVersion toVersion(..)");
 
             @Override
-            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
-                G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, executionContext);
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
                 if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
                     c = addCompatibilityTypeToSourceFile(c, "source");
                 }
@@ -214,7 +215,10 @@ public class UpdateJavaCompatibility extends Recipe {
                 return m;
             }
 
-            private int getMajorVersion(String version) {
+            private int getMajorVersion(@Nullable String version) {
+                if(version == null) {
+                    return -1;
+                }
                 try {
                     return Integer.parseInt(normalize(version));
                 } catch (NumberFormatException e) {
@@ -229,9 +233,9 @@ public class UpdateJavaCompatibility extends Recipe {
                     if (type == JavaType.Primitive.String) {
                         return getMajorVersion((String) argument.getValue());
                     } else if (type == JavaType.Primitive.Int) {
-                        return (int) argument.getValue();
+                        return (int) requireNonNull(argument.getValue());
                     } else if (type == JavaType.Primitive.Double) {
-                        return getMajorVersion(argument.getValue().toString());
+                        return getMajorVersion(requireNonNull(argument.getValue()).toString());
                     }
                 } else if (expression instanceof J.FieldAccess) {
                     J.FieldAccess field = (J.FieldAccess) expression;
@@ -383,7 +387,7 @@ public class UpdateJavaCompatibility extends Recipe {
         if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
             G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse("\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
                     .findFirst()
-                    .get();
+                    .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
             sourceFile.getStatements();
             c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
         }

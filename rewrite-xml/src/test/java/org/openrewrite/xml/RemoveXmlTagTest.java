@@ -20,10 +20,9 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-
 import static org.openrewrite.xml.Assertions.xml;
 
-class RemoveXmlTagTest implements RewriteTest {
+ class RemoveXmlTagTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {spec.recipe(new RemoveXmlTag("//bean", "**/beans.xml"));}
 

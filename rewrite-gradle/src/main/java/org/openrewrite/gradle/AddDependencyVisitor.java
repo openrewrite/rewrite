@@ -41,6 +41,7 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.tree.ParseError;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -75,6 +76,9 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
     @Nullable
     private String resolvedVersion;
+
+    @Nullable
+    private final Predicate<Cursor> insertPredicate;
 
     @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
@@ -220,6 +224,10 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 return m;
             }
 
+            if (insertPredicate != null && !insertPredicate.test(getCursor())) {
+                return m;
+            }
+
             J.Lambda dependenciesBlock = (J.Lambda) m.getArguments().get(0);
             if (!(dependenciesBlock.getBody() instanceof J.Block)) {
                 return m;
@@ -230,7 +238,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     resolvedVersion = version;
                 } else {
                     try {
-                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gp)
+                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gp, null)
                                 .select(new GroupArtifact(groupId, artifactId), configuration, version, versionPattern, ctx);
                     } catch (MavenDownloadingException e) {
                         return e.warn(m);

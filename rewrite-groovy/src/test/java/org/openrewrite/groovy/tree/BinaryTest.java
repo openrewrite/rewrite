@@ -157,7 +157,8 @@ class BinaryTest implements RewriteTest {
     @Test
     void instanceOf() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             def isString = "" instanceof java.lang.String
             """)
         );

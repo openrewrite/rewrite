@@ -50,6 +50,10 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency compileOnly(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency implementation(Object... dependencyNotation)
     Dependency implementation(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency providedCompile(Object... dependencyNotation)
+    Dependency providedCompile(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency providedRuntime(Object... dependencyNotation)
+    Dependency providedRuntime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency runtime(Object... dependencyNotation)
     Dependency runtime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency runtimeOnly(Object... dependencyNotation)
@@ -66,6 +70,10 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency testRuntime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency testRuntimeOnly(Object... dependencyNotation)
     Dependency testRuntimeOnly(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency deploy(Object... dependencyNotation)
+    Dependency deploy(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency earlib(Object... dependencyNotation)
+    Dependency earlib(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
 
     void constraints(Action<? super DependencyConstraintHandler> configureAction)
 }

@@ -202,7 +202,7 @@ public class ChangeDependency extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency original = DependencyStringNotationConverter.parse(gav);
-                        if (depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
+                        if (original != null && depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
@@ -213,7 +213,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(original.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
                                 String resolvedVersion;
                                 try {
-                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject)
+                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
                                             .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
@@ -236,7 +236,7 @@ public class ChangeDependency extends Recipe {
 
                         J.Literal literal = (J.Literal) strings.get(0);
                         Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
-                        if (depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
+                        if (original != null && depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
@@ -247,7 +247,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newVersion)) {
                                 String resolvedVersion;
                                 try {
-                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject)
+                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
                                             .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
@@ -320,7 +320,7 @@ public class ChangeDependency extends Recipe {
                     if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(version) || Boolean.TRUE.equals(overrideManagedVersion))) {
                         String resolvedVersion;
                         try {
-                            resolvedVersion = new DependencyVersionSelector(null, gradleProject)
+                            resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
                                     .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);

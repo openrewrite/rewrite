@@ -49,7 +49,7 @@ class TreeObserverTest implements RewriteTest {
                     }
                     return newTree;
                 }
-            }).subscribeToType(PlainText.class))),
+            }, true).subscribeToType(PlainText.class))),
           text(
             "hello jon",
             "hello jonathan"

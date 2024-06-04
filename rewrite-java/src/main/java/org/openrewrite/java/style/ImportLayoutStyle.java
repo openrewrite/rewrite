@@ -120,29 +120,20 @@ public class ImportLayoutStyle implements JavaStyle {
             return singletonList(paddedToAdd);
         }
 
+        // Do not add the import if it is already present.
+        JavaType addedType = paddedToAdd.getElement().getQualid().getType();
+        for (JRightPadded<J.Import> originalImport : originalImports) {
+            if (addedType != null && TypeUtils.isOfType(addedType, originalImport.getElement().getQualid().getType())) {
+                return originalImports;
+            }
+        }
+
         // don't star fold just yet, because we are only going to star fold adjacent imports along with
         // the import to add at most. we don't even want to star fold other non-adjacent imports in the same
         // block that should be star folded according to the layout style (minimally invasive change).
         List<JRightPadded<J.Import>> ideallyOrdered =
                 new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layout, packagesToFold)
                         .orderImports(ListUtils.concat(originalImports, paddedToAdd), new HashSet<>());
-
-        if (ideallyOrdered.size() == originalImports.size()) {
-            Set<String> originalPaths = new HashSet<>();
-            for (JRightPadded<J.Import> originalImport : originalImports) {
-                originalPaths.add(originalImport.getElement().getTypeName());
-            }
-            int sharedImports = 0;
-            for (JRightPadded<J.Import> importJRightPadded : ideallyOrdered) {
-                if (originalPaths.contains(importJRightPadded.getElement().getTypeName())) {
-                    sharedImports++;
-                }
-            }
-            if (sharedImports == originalImports.size()) {
-                // must be a duplicate of an existing import
-                return originalImports;
-            }
-        }
 
         JRightPadded<J.Import> before = null;
         JRightPadded<J.Import> after = null;
@@ -542,7 +533,8 @@ public class ImportLayoutStyle implements JavaStyle {
 
         private void setJVMClassNames() {
             for (JavaType.FullyQualified fqn : classpath) {
-                if ("java.lang".equals(fqn.getPackageName())) {
+                // first check `getFullyQualifiedName()` to avoid unnecessary allocations
+                if (fqn.getFullyQualifiedName().startsWith("java.lang.") && "java.lang".equals(fqn.getPackageName())) {
                     jvmClasspathNames.add(fqn.getClassName());
                 }
             }
@@ -554,7 +546,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
             for (JRightPadded<J.Import> anImport : originalImports) {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
-                nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>())
+                nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>(3))
                                 .add(anImport.getElement().getPackageName());
             }
 
@@ -562,24 +554,18 @@ public class ImportLayoutStyle implements JavaStyle {
                 String packageName = classGraphFqn.getPackageName();
                 if (checkPackageForClasses.contains(packageName)) {
                     String className = classGraphFqn.getClassName();
-                    Set<String> packages = nameToPackages.getOrDefault(className, new HashSet<>());
-                    packages.add(packageName);
-                    nameToPackages.put(className, packages);
+                    nameToPackages.computeIfAbsent(className, p -> new HashSet<>(3)).add(packageName);
                 } else if (checkPackageForClasses.contains(classGraphFqn.getFullyQualifiedName())) {
                     packageName = classGraphFqn.getFullyQualifiedName();
                     for (JavaType.Variable member : classGraphFqn.getMembers()) {
-                        if (member.getFlags().contains(Flag.Static)) {
-                            Set<String> packages = nameToPackages.getOrDefault(member.getName(), new HashSet<>());
-                            packages.add(packageName);
-                            nameToPackages.put(member.getName(), packages);
+                        if (member.hasFlags(Flag.Static)) {
+                            nameToPackages.computeIfAbsent(member.getName(), p -> new HashSet<>(3)).add(packageName);
                         }
                     }
 
                     for (JavaType.Method method : classGraphFqn.getMethods()) {
-                        if (method.getFlags().contains(Flag.Static)) {
-                            Set<String> packages = nameToPackages.getOrDefault(method.getName(), new HashSet<>());
-                            packages.add(packageName);
-                            nameToPackages.put(method.getName(), packages);
+                        if (method.hasFlags(Flag.Static)) {
+                            nameToPackages.computeIfAbsent(method.getName(), p -> new HashSet<>(3)).add(packageName);
                         }
                     }
                 }

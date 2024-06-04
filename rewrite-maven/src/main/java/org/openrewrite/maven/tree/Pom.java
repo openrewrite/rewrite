@@ -25,11 +25,15 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
+import static org.openrewrite.internal.ListUtils.concatAll;
 
 /**
  * The minimum information required about a POM to resolve it.
@@ -65,6 +69,14 @@ public class Pom {
     Parent parent;
 
     ResolvedGroupArtifactVersion gav;
+
+    /**
+     * Old Maven Poms had a "pomVersion" field which was replaced by "modelVersion" in newer versions of Maven.
+     * When Maven encounters a pom with this field, it refuses to resolve its dependencies.
+     * We keep track of this field so that we can match Maven's behavior.
+     */
+    @Nullable
+    String obsoletePomVersion;
 
     @Nullable
     String name;
@@ -107,17 +119,40 @@ public class Pom {
     }
 
     /**
+     * @return the repositories with any property placeholders resolved.
+     */
+    public List<MavenRepository> getEffectiveRepositories() {
+        return Stream.concat(Stream.of(getRepository()), getRepositories().stream())
+                .filter(Objects::nonNull)
+                .map(r -> {
+                    if(r.getUri().startsWith("~")) {
+                        r = r.withUri(Paths.get(System.getProperty("user.home") + r.getUri().substring(1)).toUri().toString());
+                    }
+                    if(r.getId() != null && ResolvedPom.placeholderHelper.hasPlaceholders(r.getUri())) {
+                        r = r.withId(ResolvedPom.placeholderHelper.replacePlaceholders(r.getId(), this.properties::get));
+                    }
+                    if(ResolvedPom.placeholderHelper.hasPlaceholders(r.getUri())) {
+                        r = r.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(r.getUri(), this.properties::get));
+                    }
+                    return r;
+                })
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    /**
      * @param downloader A POM downloader to download dependencies and parents.
      * @param ctx        An execution context containing any maven-specific requirements.
      * @return A new instance with dependencies resolved.
      * @throws MavenDownloadingException When problems are encountered downloading dependencies or parents.
      */
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles).resolve(ctx, downloader);
+        return resolve(activeProfiles, downloader, emptyList(), ctx);
     }
 
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, List<MavenRepository> initialRepositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList()).resolve(ctx, downloader);
+        return new ResolvedPom(this, activeProfiles, properties, emptyList(), concatAll(initialRepositories, getEffectiveRepositories()), repositories, dependencies, plugins, pluginManagement)
+                .resolve(ctx, downloader);
     }
 
     @Nullable

@@ -1126,7 +1126,7 @@ public class Autodetect extends NamedStyles {
         public J.Lambda visitLambda(J.Lambda lambda, SpacesStatistics stats) {
             List<J> parameters = lambda.getParameters().getParameters();
             if (parameters.size() > 1) {
-                List<JRightPadded<J>> paddedParameters = lambda.getParameters().getPadding().getParams();
+                List<JRightPadded<J>> paddedParameters = lambda.getParameters().getPadding().getParameters();
                 for (int i = 0; i < paddedParameters.size() - 1; i++) {
                     stats.beforeComma += hasSpace(paddedParameters.get(i).getAfter());
                 }

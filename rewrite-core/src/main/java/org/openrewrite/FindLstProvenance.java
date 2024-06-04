@@ -20,9 +20,6 @@ import lombok.Value;
 import org.openrewrite.marker.LstProvenance;
 import org.openrewrite.table.LstProvenanceTable;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import static java.time.ZoneOffset.UTC;
 
 @Value
@@ -42,7 +39,8 @@ public class FindLstProvenance extends ScanningRecipe<FindLstProvenance.Accumula
     transient LstProvenanceTable provenanceTable = new LstProvenanceTable(this);
 
     public static class Accumulator {
-        Set<LstProvenance> seenProvenance = new HashSet<>();
+        // There will only ever be one LstProvenance per repository, so after we have seen one we don't need to see more
+        boolean foundLstProvenance;
     }
 
     @Override
@@ -56,16 +54,18 @@ public class FindLstProvenance extends ScanningRecipe<FindLstProvenance.Accumula
             @Override
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
+                if(acc.foundLstProvenance) {
+                    return tree;
+                }
                 LstProvenance lstProvenance = tree.getMarkers().findFirst(LstProvenance.class).orElse(null);
                 if (lstProvenance == null) {
                     return tree;
                 }
-                if (acc.seenProvenance.add(lstProvenance)) {
-                    provenanceTable.insertRow(ctx, new LstProvenanceTable.Row(lstProvenance.getBuildToolType(),
-                            lstProvenance.getBuildToolVersion(), lstProvenance.getLstSerializerVersion(),
-                            lstProvenance.getTimestampUtc() == null ? null : lstProvenance.getTimestampUtc().toEpochMilli(),
-                            lstProvenance.getTimestampUtc() == null ? null : lstProvenance.getTimestampUtc().atZone(UTC).toString()));
-                }
+                provenanceTable.insertRow(ctx, new LstProvenanceTable.Row(lstProvenance.getBuildToolType(),
+                        lstProvenance.getBuildToolVersion(), lstProvenance.getLstSerializerVersion(),
+                        lstProvenance.getTimestampUtc() == null ? null : lstProvenance.getTimestampUtc().toEpochMilli(),
+                        lstProvenance.getTimestampUtc() == null ? null : lstProvenance.getTimestampUtc().atZone(UTC).toString()));
+                acc.foundLstProvenance = true;
                 return tree;
             }
         };

@@ -104,7 +104,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
 
                     Dependency dependency = DependencyStringNotationConverter.parse((String) arg.getValue());
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else if (args.get(0) instanceof G.GString) {
@@ -119,7 +119,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
 
                     Dependency dependency = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else if (args.get(0) instanceof G.MapEntry && args.size() >= 2) {
@@ -158,7 +158,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                         dependency = DependencyStringNotationConverter.parse((String) value.getValue());
                     }
 
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else {

@@ -85,10 +85,6 @@ public class ResolvedDependency implements Serializable {
         this.effectiveExclusions = effectiveExclusions;
     }
 
-    public ResolvedGroupArtifactVersion getGav() {
-        return gav;
-    }
-
     public String getGroupId() {
         return gav.getGroupId();
     }

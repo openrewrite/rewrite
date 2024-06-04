@@ -71,4 +71,3 @@ class EndOfLineAtEndOfFileTest implements RewriteTest {
         );
     }
 }
-
