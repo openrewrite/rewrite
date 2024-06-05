@@ -136,6 +136,10 @@ public class DependencyUseStringNotation extends Recipe {
                     String version = coerceToStringNotation(mapNotation.get("version"));
                     if (version != null) {
                         stringNotation += ":" + version;
+                        String classifier = coerceToStringNotation(mapNotation.get("classifier"));
+                        if (classifier != null) {
+                            stringNotation += ":" + classifier;
+                        }
                     }
 
                     return new J.Literal(randomId(), prefix, markers, stringNotation, "\"" + stringNotation + "\"", Collections.emptyList(), JavaType.Primitive.String);
