@@ -32,7 +32,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveRedundantDependencyVersions(null, null, null, null, null));
+        spec.recipe(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, null));
     }
 
     @Test
@@ -954,7 +954,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void onlyIfVersionsMatchFalse() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null, null)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
           pomXml(
             """
               <project>

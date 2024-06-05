@@ -229,7 +229,7 @@ public class ChangeParentPom extends Recipe {
                                     doAfterVisit(visitor);
                                 }
                                 maybeUpdateModel();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null,
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null,
                                         RemoveRedundantDependencyVersions.Comparator.GTE, null).getVisitor());
                             }
                         } catch (MavenDownloadingException e) {
