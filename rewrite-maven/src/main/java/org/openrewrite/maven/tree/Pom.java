@@ -26,13 +26,15 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.ListUtils.concatAll;
 
 /**
@@ -47,6 +49,8 @@ import static org.openrewrite.internal.ListUtils.concatAll;
 @Builder
 @AllArgsConstructor
 public class Pom {
+
+    private static final List<String> JAR_PACKAGING_TYPES = Arrays.asList("jar", "bundle");
 
     /**
      * The model version can be used to verify the structure of the serialized object, in cache, is compatible
@@ -125,14 +129,20 @@ public class Pom {
         return Stream.concat(Stream.of(getRepository()), getRepositories().stream())
                 .filter(Objects::nonNull)
                 .map(r -> {
-                    if(r.getUri().startsWith("~")) {
-                        r = r.withUri(Paths.get(System.getProperty("user.home") + r.getUri().substring(1)).toUri().toString());
+                    if (r.getUri().startsWith("~")) {
+                        r = r.withUri(Paths.get(System.getProperty("user.home") + r.getUri().substring(1))
+                                .toUri()
+                                .toString());
                     }
-                    if(r.getId() != null && ResolvedPom.placeholderHelper.hasPlaceholders(r.getUri())) {
-                        r = r.withId(ResolvedPom.placeholderHelper.replacePlaceholders(r.getId(), this.properties::get));
+                    if (r.getId() != null && ResolvedPom.placeholderHelper.hasPlaceholders(r.getUri())) {
+                        r = r.withId(ResolvedPom.placeholderHelper.replacePlaceholders(
+                                r.getId(),
+                                this.properties::get));
                     }
-                    if(ResolvedPom.placeholderHelper.hasPlaceholders(r.getUri())) {
-                        r = r.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(r.getUri(), this.properties::get));
+                    if (ResolvedPom.placeholderHelper.hasPlaceholders(r.getUri())) {
+                        r = r.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(
+                                r.getUri(),
+                                this.properties::get));
                     }
                     return r;
                 })
@@ -146,12 +156,26 @@ public class Pom {
      * @return A new instance with dependencies resolved.
      * @throws MavenDownloadingException When problems are encountered downloading dependencies or parents.
      */
-    public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
+    public ResolvedPom resolve(Iterable<String> activeProfiles,
+                               MavenPomDownloader downloader,
+                               ExecutionContext ctx) throws MavenDownloadingException {
         return resolve(activeProfiles, downloader, emptyList(), ctx);
     }
 
-    public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, List<MavenRepository> initialRepositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new ResolvedPom(this, activeProfiles, properties, emptyList(), concatAll(initialRepositories, getEffectiveRepositories()), repositories, dependencies, plugins, pluginManagement)
+    public ResolvedPom resolve(Iterable<String> activeProfiles,
+                               MavenPomDownloader downloader,
+                               List<MavenRepository> initialRepositories,
+                               ExecutionContext ctx) throws MavenDownloadingException {
+        return new ResolvedPom(
+                this,
+                activeProfiles,
+                properties,
+                emptyList(),
+                concatAll(initialRepositories, getEffectiveRepositories()),
+                repositories,
+                dependencies,
+                plugins,
+                pluginManagement)
                 .resolve(ctx, downloader);
     }
 
@@ -163,4 +187,7 @@ public class Pom {
         return ResolvedPom.placeholderHelper.replacePlaceholders(value, this.properties::get);
     }
 
+    public boolean hasJarPackaging() {
+        return JAR_PACKAGING_TYPES.contains(packaging);
+    }
 }
