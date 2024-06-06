@@ -1228,8 +1228,22 @@ public interface JavaType {
                             continue;
                         }
                         for (int i = 0; i < params.size(); i++) {
-                            if (!TypeUtils.isOfType(getParameterTypes().get(i), params.get(i))) {
-                                continue nextMethod;
+                            JavaType param = params.get(i);
+                            JavaType subtypeParam = getParameterTypes().get(i);
+                            if (!TypeUtils.isOfType(subtypeParam, param)) {
+                                if (param instanceof GenericTypeVariable) {
+                                    GenericTypeVariable genericParam = (GenericTypeVariable) param;
+                                    if (genericParam.getBounds().isEmpty()) {
+                                        continue;
+                                    }
+                                    for (JavaType bound : genericParam.getBounds()) {
+                                        if (!TypeUtils.isAssignableTo(bound, subtypeParam)) {
+                                            continue nextMethod;
+                                        }
+                                    }
+                                } else {
+                                    continue nextMethod;
+                                }
                             }
                         }
                         return method;
