@@ -366,6 +366,9 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         String because;
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            if ("version".equals(method.getSimpleName())) {
+                return method;
+            }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             Optional<G.CompilationUnit> withConstraint = GradleParser.builder().build().parse(String.format(
                     "plugins {\n" +
@@ -419,6 +422,9 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            if ("version".equals(method.getSimpleName())) {
+                return method;
+            }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if(existingConstraint.isScope(m)) {
                 AtomicBoolean updatedBecause = new AtomicBoolean(false);

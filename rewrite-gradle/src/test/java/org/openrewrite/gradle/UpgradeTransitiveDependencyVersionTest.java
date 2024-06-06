@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -441,6 +442,61 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   deploy 'org.openrewrite:rewrite-java:7.0.0'
               
                   constraints {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4228")
+    void constraintDoesNotGetAddedInsideConstraint() {
+        rewriteRun(
+          spec -> spec
+            .beforeRecipe(withToolingApi())
+            .recipe(new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-core","2.12.5", null, "CVE-2024-BAD")),
+          //language=groovy
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              
+                  constraints {
+                      implementation("org.apache.logging.log4j:log4j-core") {
+                          version {
+                              strictly("2.17.0")
+                          }
+                          because 'security'
+                      }
+                  }
+              }
+              """, """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                      implementation("org.apache.logging.log4j:log4j-core") {
+                          version {
+                              strictly("2.17.0")
+                          }
+                          because 'security'
+                      }
                   }
               }
               """
