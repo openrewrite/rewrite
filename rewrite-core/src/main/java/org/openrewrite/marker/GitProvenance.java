@@ -18,6 +18,8 @@ package org.openrewrite.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.Incubating;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.jgit.lib.*;
@@ -25,8 +27,6 @@ import org.openrewrite.jgit.revwalk.RevCommit;
 import org.openrewrite.jgit.transport.RemoteConfig;
 import org.openrewrite.jgit.transport.URIish;
 import org.openrewrite.jgit.treewalk.WorkingTreeOptions;
-import org.openrewrite.Incubating;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.IncompleteGitConfigException;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;

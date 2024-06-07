@@ -235,6 +235,7 @@ public interface J extends Tree {
             return v.visitAnnotation(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Annotation getCoordinates() {
             return new CoordinateBuilder.Annotation(this);
@@ -304,6 +305,7 @@ public interface J extends Tree {
             return v.visitArrayAccess(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -711,6 +713,7 @@ public interface J extends Tree {
             return v.visitBinary(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -838,6 +841,7 @@ public interface J extends Tree {
             return v.visitBlock(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Block getCoordinates() {
             return new CoordinateBuilder.Block(this);
@@ -1481,20 +1485,24 @@ public interface J extends Tree {
         JRightPadded<Package> packageDeclaration;
 
         @Nullable
+        @Override
         public Package getPackageDeclaration() {
             return packageDeclaration == null ? null : packageDeclaration.getElement();
         }
 
+        @Override
         public CompilationUnit withPackageDeclaration(Package packageDeclaration) {
             return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
         }
 
         List<JRightPadded<Import>> imports;
 
+        @Override
         public List<Import> getImports() {
             return JRightPadded.getElements(imports);
         }
 
+        @Override
         public CompilationUnit withImports(List<Import> imports) {
             return getPadding().withImports(JRightPadded.withElements(this.imports, imports));
         }
@@ -1569,6 +1577,7 @@ public interface J extends Tree {
             return new JavaPrinter<>();
         }
 
+        @Override
         @Transient
         public TypesInUse getTypesInUse() {
             TypesInUse cache;
@@ -1585,6 +1594,7 @@ public interface J extends Tree {
             return cache;
         }
 
+        @Override
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -1687,10 +1697,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public DoWhileLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
@@ -2064,10 +2076,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public ForEachLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
@@ -2231,10 +2245,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public ForLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
@@ -2476,6 +2492,7 @@ public interface J extends Tree {
             return v.visitIdentifier(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Identifier getCoordinates() {
             return new CoordinateBuilder.Identifier(this);
@@ -3318,6 +3335,7 @@ public interface J extends Tree {
             return v.visitLiteral(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -3651,6 +3669,7 @@ public interface J extends Tree {
             return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, type);
         }
 
+        @Override
         public JavaType getType() {
             return methodType == null ? null : methodType.getReturnType();
         }
@@ -4221,6 +4240,7 @@ public interface J extends Tree {
             return v.visitNewArray(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -4417,6 +4437,7 @@ public interface J extends Tree {
          * @return The constructor type.
          */
         @Nullable
+        @Override
         public JavaType.Method getMethodType() {
             return getConstructorType();
         }
@@ -4618,6 +4639,7 @@ public interface J extends Tree {
             return v.visitPackage(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Package getCoordinates() {
             return new CoordinateBuilder.Package(this);
@@ -5913,6 +5935,7 @@ public interface J extends Tree {
             @Getter
             JavaType.Variable variableType;
 
+            @Override
             public JavaType getType() {
                 return variableType != null ? variableType.getType() : null;
             }
@@ -6043,10 +6066,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public WhileLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));

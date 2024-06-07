@@ -141,4 +141,3 @@ public class Plugin {
         return MavenXmlMapper.readMapper().convertValue(current, new TypeReference<List<T>>() {});
     }
 }
-

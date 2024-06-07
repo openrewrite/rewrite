@@ -360,7 +360,7 @@ public class FileUtils {
         }
 
         //Find files
-        Collection<File> files = new java.util.LinkedList<File>();
+        Collection<File> files = new java.util.LinkedList<>();
         innerListFiles(files, directory,
                 FileFilterUtils.or(effFileFilter, effDirFilter));
         return files;
@@ -1030,7 +1030,7 @@ public class FileUtils {
         if (canonicalDestDir.startsWith(srcDir.getCanonicalPath())) {
             File[] srcFiles = filter == null ? srcDir.listFiles() : srcDir.listFiles(filter);
             if (srcFiles != null && srcFiles.length > 0) {
-                exclusionList = new ArrayList<String>(srcFiles.length);
+                exclusionList = new ArrayList<>(srcFiles.length);
                 for (File srcFile : srcFiles) {
                     File copiedFile = new File(destDir, srcFile.getName());
                     exclusionList.add(copiedFile.getCanonicalPath());

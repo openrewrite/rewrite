@@ -312,6 +312,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
         return syntax;
     }
 
+    @Override
     public Space visitSpace(Space space, PrintOutputCapture<P> p) {
         p.append(space.getWhitespace());
         for (Comment comment : space.getComments()) {

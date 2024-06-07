@@ -84,7 +84,7 @@ class JavaVisitorTest implements RewriteTest {
 
     @Test
     void topVisitor() {
-        final JavaIsoVisitor<ExecutionContext> afterVisitor = new JavaIsoVisitor<ExecutionContext>() {
+        final JavaIsoVisitor<ExecutionContext> afterVisitor = new JavaIsoVisitor<>() {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                 for (Cursor parent = getCursor().getParent(); parent != null; parent = parent.getParent()) {

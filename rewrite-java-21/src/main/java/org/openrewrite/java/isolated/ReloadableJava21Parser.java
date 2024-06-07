@@ -250,6 +250,7 @@ public class ReloadableJava21Parser implements JavaParser {
         return this;
     }
 
+    @Override
     public void setClasspath(Collection<Path> classpath) {
         this.classpath = classpath;
     }
