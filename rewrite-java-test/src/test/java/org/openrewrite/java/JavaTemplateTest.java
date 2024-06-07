@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnnecessaryBoxing", "StatementWithEmptyBody", "UnusedAssignment"})
+@SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnnecessaryBoxing", "StatementWithEmptyBody", "UnusedAssignment", "SizeReplaceableByIsEmpty", "ResultOfMethodCallIgnored", "RedundantOperationOnEmptyContainer"})
 class JavaTemplateTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
@@ -297,7 +297,7 @@ class JavaTemplateTest implements RewriteTest {
                   void m() {
                       hashCode();
                   }
-                  
+              
                   void m2() {
                       hashCode();
                   }
@@ -720,20 +720,20 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   public enum Type {
                       One;
-                            
+              
                       public Type(String t) {
                       }
-                            
+              
                       String t;
-                            
+              
                       public static Type fromType(String type) {
                           return null;
                       }
                   }
-                            
+              
                   public A(Type type) {}
                   public A() {}
-                            
+              
                   public void method(Type type) {
                       new A(type);
                   }
@@ -743,20 +743,20 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   public enum Type {
                       One;
-                            
+              
                       public Type(String t) {
                       }
-                            
+              
                       String t;
-                            
+              
                       public static Type fromType(String type) {
                           return null;
                       }
                   }
-                            
+              
                   public A(Type type) {}
                   public A() {}
-                            
+              
                   public void method(Type type) {
                       new A();
                   }
@@ -864,7 +864,7 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import java.util.Collection;
-
+              
               class Test {
                   void doSomething(Collection<Object> c) {
                       assert c.size() > 0;
@@ -873,7 +873,7 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Collection;
-
+              
               class Test {
                   void doSomething(Collection<Object> c) {
                       assert !c.isEmpty();
@@ -1192,6 +1192,26 @@ class JavaTemplateTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void finalMethodParameter() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+          java("""
+                    import org.jetbrains.annotations.NotNull;
+                    
+                    class A {
+                        String testMethod(@NotNull final String test) {}
+                    }
+                    """, """
+                    import lombok.NonNull;
+                    
+                    class A {
+                        String testMethod(@NonNull final String test) {}
+                    }
+                    """)
         );
     }
 }

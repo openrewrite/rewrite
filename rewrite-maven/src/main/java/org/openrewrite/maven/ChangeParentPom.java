@@ -229,7 +229,7 @@ public class ChangeParentPom extends Recipe {
                                     doAfterVisit(visitor);
                                 }
                                 maybeUpdateModel();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null,
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null,
                                         RemoveRedundantDependencyVersions.Comparator.GTE, null).getVisitor());
                             }
                         } catch (MavenDownloadingException e) {
@@ -300,12 +300,17 @@ public class ChangeParentPom extends Recipe {
                             resolvedPom = getResolutionResult().getPom();
                         }
                         String propertyName = m.group(1).trim();
-                        if (resolvedPom.getProperties().containsKey(propertyName)) {
+                        if (resolvedPom.getProperties().containsKey(propertyName) && !isGlobalProperty(propertyName)) {
                             properties.put(m.group(1).trim(), resolvedPom.getProperties().get(propertyName));
                         }
                     }
                 }
                 return t;
+            }
+
+            private boolean isGlobalProperty(String propertyName) {
+                return propertyName.startsWith("project.") || propertyName.startsWith("env.")
+                        || propertyName.startsWith("settings.") || propertyName.equals("basedir");
             }
         }.visit(pomXml, ctx);
         return properties;

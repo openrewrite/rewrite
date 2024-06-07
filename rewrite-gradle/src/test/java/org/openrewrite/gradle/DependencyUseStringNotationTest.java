@@ -59,6 +59,34 @@ class DependencyUseStringNotationTest implements RewriteTest {
     }
 
     @Test
+    void withClassifier() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources')
+                  implementation group: 'group', name: 'artifact', version: 'version', classifier: 'sources'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              dependencies {
+                  api("org.openrewrite:rewrite-core:latest.release:sources")
+                  implementation "group:artifact:version:sources"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void basicMapLiteral() {
         rewriteRun(
           buildGradle(

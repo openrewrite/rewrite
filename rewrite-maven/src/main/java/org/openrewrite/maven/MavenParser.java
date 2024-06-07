@@ -213,6 +213,7 @@ public class MavenParser implements Parser {
             return this;
         }
 
+        @Override
         public MavenParser build() {
             return new MavenParser(activeProfiles, skipDependencyResolution);
         }

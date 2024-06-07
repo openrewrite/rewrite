@@ -117,4 +117,3 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
                 .visitNonNull(parentScope, null, parentCursor);
     }
 }
-

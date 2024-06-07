@@ -73,6 +73,7 @@ public class AddProperty extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         final String keyToReplace = key.replace("${", "").replace("}", "");
         return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 String parentValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
                 if ((Boolean.TRUE.equals(trustParent) && (parentValue == null || value.equals(parentValue)))
@@ -99,4 +100,3 @@ public class AddProperty extends Recipe {
         };
     }
 }
-

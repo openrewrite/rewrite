@@ -69,12 +69,14 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         return "Replace String literal with constant, adding import on class if needed.";
     }
 
+    @Nullable
     public String getLiteralValue() {
         if (this.literalValue == null && this.fullyQualifiedConstantName != null) {
             try {
                 this.literalValue = (String) getConstantValueByFullyQualifiedName(this.fullyQualifiedConstantName);
             } catch (ClassNotFoundException | IllegalAccessException | NoSuchFieldException e) {
-                throw new IllegalArgumentException("Failed to retrieve value from the configured constant", e);
+                // Failed to retrieve unspecified value; field might be missing in this version of the class
+                return null;
             }
         }
         return this.literalValue;
@@ -107,7 +109,8 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ReplaceStringLiteralVisitor(getLiteralValue(), getFullyQualifiedConstantName());
+        String value = getLiteralValue();
+        return value == null ? TreeVisitor.noop() : new ReplaceStringLiteralVisitor(value, fullyQualifiedConstantName);
     }
 
     private static class ReplaceStringLiteralVisitor extends JavaVisitor<ExecutionContext> {

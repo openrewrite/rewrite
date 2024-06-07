@@ -134,7 +134,7 @@ public class ChangeDependencyArtifactId extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
-                        if (!newArtifactId.equals(dependency.getArtifactId()) &&
+                        if (dependency != null && !newArtifactId.equals(dependency.getArtifactId()) &&
                             ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
                              (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
                             Dependency newDependency = dependency.withArtifactId(newArtifactId);
@@ -147,7 +147,7 @@ public class ChangeDependencyArtifactId extends Recipe {
                     if (strings.size() >= 2 &&
                         strings.get(0) instanceof J.Literal) {
                         Dependency dependency = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) strings.get(0)).getValue()));
-                        if (!newArtifactId.equals(dependency.getArtifactId())
+                        if (dependency != null && !newArtifactId.equals(dependency.getArtifactId())
                             && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                             Dependency newDependency = dependency.withArtifactId(newArtifactId);
                             updatedDependencies.put(dependency.getGav().asGroupArtifact(), newDependency.getGav().asGroupArtifact());

@@ -286,6 +286,7 @@ public class GroovyParser implements Parser {
             return classpath;
         }
 
+        @Override
         public GroovyParser build() {
             return new GroovyParser(resolvedClasspath(), styles, logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
         }

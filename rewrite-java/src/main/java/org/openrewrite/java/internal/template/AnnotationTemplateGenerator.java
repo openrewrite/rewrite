@@ -188,11 +188,6 @@ public class AnnotationTemplateGenerator {
                 }
                 after.append('}');
             }
-        } else if (j instanceof J.VariableDeclarations) {
-            J.VariableDeclarations v = (J.VariableDeclarations) j;
-            if (v.hasModifier(J.Modifier.Type.Final)) {
-                before.insert(0, variable((J.VariableDeclarations) j, cursor) + '=');
-            }
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
             n = n.withBody(null).withPrefix(Space.EMPTY);

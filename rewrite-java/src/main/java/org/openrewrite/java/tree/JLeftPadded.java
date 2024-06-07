@@ -76,7 +76,8 @@ public class JLeftPadded<T> {
         TRY_FINALLY(Space.Location.TRY_FINALLY),
         UNARY_OPERATOR(Space.Location.UNARY_OPERATOR),
         VARIABLE_INITIALIZER(Space.Location.VARIABLE_INITIALIZER),
-        WHILE_CONDITION(Space.Location.WHILE_CONDITION);
+        WHILE_CONDITION(Space.Location.WHILE_CONDITION),
+        WILDCARD_BOUND(Space.Location.WILDCARD_BOUND);
 
         private final Space.Location beforeLocation;
 

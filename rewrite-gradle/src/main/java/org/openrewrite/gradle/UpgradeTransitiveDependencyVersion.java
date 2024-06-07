@@ -98,6 +98,13 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     @Nullable
     String because;
 
+    @Option(displayName = "Include configurations",
+            description = "A list of configurations to consider during the upgrade. For example, For example using `implementation, runtimeOnly`, we could be responding to a deployable asset vulnerability only (ignoring test scoped vulnerabilities).",
+            required = false,
+            example = "implementation, runtimeOnly")
+    @Nullable
+    List<String> onlyForConfigurations;
+
     @Override
     public String getDisplayName() {
         return "Upgrade transitive Gradle dependencies";
@@ -253,10 +260,23 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         break;
                 }
 
+                if (onlyForConfigurations != null) {
+                    if (!onlyForConfigurations.contains(constraintConfigName)) {
+                        return null;
+                    }
+                } else {
+                    for (GradleDependencyConfiguration extended : config.getExtendsFrom()) {
+                        if (extended.getName().equals(constraintConfigName)) {
+                            return extended;
+                        }
+                    }
+                }
+
                 GradleDependencyConfiguration configuration = gradleProject.getConfiguration(constraintConfigName);
                 if (configuration != null && configuration.isTransitive()) {
                     return configuration;
                 }
+
                 return null;
             }
         });
@@ -366,6 +386,9 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         String because;
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            if ("version".equals(method.getSimpleName())) {
+                return method;
+            }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             Optional<G.CompilationUnit> withConstraint = GradleParser.builder().build().parse(String.format(
                     "plugins {\n" +
@@ -419,6 +442,9 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            if ("version".equals(method.getSimpleName())) {
+                return method;
+            }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if(existingConstraint.isScope(m)) {
                 AtomicBoolean updatedBecause = new AtomicBoolean(false);

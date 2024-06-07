@@ -59,6 +59,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
                     annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
+                    if (gen.isEmpty()) {
+                        throw new IllegalStateException("Unable to parse annotation from template: \n" +
+                                                        substitutedTemplate +
+                                                        "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
+                    }
                     return gen.get(0).withPrefix(annotation.getPrefix());
                 } else if (loc.equals(ANNOTATION_ARGUMENTS) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
                            annotation.isScope(insertionPoint)) {

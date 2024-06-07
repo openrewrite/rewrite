@@ -22,11 +22,7 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.config.DeclarativeNamedStyles;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.io.IOException;

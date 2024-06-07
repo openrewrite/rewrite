@@ -224,7 +224,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                 if (t != tag && PROJECT_MATCHER.matches(getCursor())) {
                     maybeUpdateModel();
-                    doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, null, null, null).getVisitor());
+                    doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
                 }
 
                 return t;
@@ -239,11 +239,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
                                 retainVersions();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null,
-                                        retainVersions).getVisitor());
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, retainVersions).getVisitor());
                                 doAfterVisit(upgradeManagedDependency);
                                 maybeUpdateModel();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null, null).getVisitor());
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
                             }
                         }
                     } catch (MavenDownloadingException e) {

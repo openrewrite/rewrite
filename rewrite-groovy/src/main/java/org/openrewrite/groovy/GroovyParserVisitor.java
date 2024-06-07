@@ -36,9 +36,9 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.Semicolon;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -1953,13 +1953,18 @@ public class GroovyParserVisitor {
 
             if (expression.isDynamicTyped()) {
                 Space prefix = whitespace();
-                String defOrVar = source.substring(cursor, cursor + 3);
-                cursor += 3;
+                String keyword;
+                if(source.substring(cursor).startsWith("final")) {
+                    keyword = "final";
+                } else {
+                    keyword = source.substring(cursor, cursor + 3);
+                }
+               cursor += keyword.length();
                 return new J.Identifier(randomId(),
                         prefix,
                         Markers.EMPTY,
                         emptyList(),
-                        defOrVar,
+                        keyword,
                         type, null);
             }
             Space prefix = sourceBefore(expression.getOriginType().getUnresolvedName());

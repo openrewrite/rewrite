@@ -32,4 +32,3 @@ public class TemplateParameter implements Marker {
     @Nullable
     String name;
 }
-

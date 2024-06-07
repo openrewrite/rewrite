@@ -53,4 +53,3 @@ public class JavaParserExecutionContextView extends DelegatingExecutionContext {
         return target;
     }
 }
-
