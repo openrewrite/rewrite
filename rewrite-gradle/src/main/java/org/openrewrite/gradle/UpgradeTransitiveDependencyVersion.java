@@ -98,6 +98,13 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     @Nullable
     String because;
 
+    @Option(displayName = "Exclude configurations",
+            description = "A list of configurations to exclude from the upgrade. For example, `testCompile`. \n This is useful when you have certain plugins applied that create configurations that you don't want to apply constraints to.",
+            required = false,
+            example = "testCompile, testRuntime")
+    @Nullable
+    List<String> ignoreConfigurations;
+
     @Override
     public String getDisplayName() {
         return "Upgrade transitive Gradle dependencies";
@@ -251,6 +258,9 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     case "testRuntime":
                         constraintConfigName = "testRuntimeOnly";
                         break;
+                }
+                if (ignoreConfigurations != null && ignoreConfigurations.contains(constraintConfigName)) {
+                    return null;
                 }
 
                 GradleDependencyConfiguration configuration = gradleProject.getConfiguration(constraintConfigName);

@@ -21,6 +21,8 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
@@ -31,7 +33,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         spec
           .beforeRecipe(withToolingApi())
           .recipe(new UpgradeTransitiveDependencyVersion(
-            "com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD"));
+            "com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null));
     }
 
     @DocumentExample
@@ -455,7 +457,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .beforeRecipe(withToolingApi())
-            .recipe(new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-core","2.12.5", null, "CVE-2024-BAD")),
+            .recipe(new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-core","2.12.5", null, "CVE-2024-BAD", null)),
           //language=groovy
           buildGradle(
             """
@@ -498,6 +500,77 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                           because 'security'
                       }
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void pluginCreatedConfigurationsReceiveConstraint() {
+        rewriteRun(
+          spec -> spec
+            .beforeRecipe(withToolingApi())
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.apache.commons", "commons-lang3", "3.14.0", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'info.solidsoft.pitest' version '1.15.0'
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+              }
+              """, """
+              plugins {
+                  id 'info.solidsoft.pitest' version '1.15.0'
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  constraints {
+                      pitest('org.apache.commons:commons-lang3:3.14.0')
+                      testImplementation('org.apache.commons:commons-lang3:3.14.0')
+                  }
+    
+                  testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ExcludedConfigurationsDoNotReceiveConstraint() {
+        rewriteRun(
+          spec -> spec
+            .beforeRecipe(withToolingApi())
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("pitest"))),
+          buildGradle(
+            """
+              plugins {
+                  id 'info.solidsoft.pitest' version '1.15.0'
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+              }
+              """, """
+              plugins {
+                  id 'info.solidsoft.pitest' version '1.15.0'
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  constraints {
+                      testImplementation('org.apache.commons:commons-lang3:3.14.0')
+                  }
+    
+                  testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """
           )
