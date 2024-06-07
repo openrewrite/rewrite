@@ -54,8 +54,10 @@ public interface JavaSourceFile extends J, SourceFile {
     /**
      * @return An absolute or relative file path.
      */
+    @Override
     Path getSourcePath();
 
+    @Override
     @SuppressWarnings("unchecked")
     JavaSourceFile withSourcePath(Path path);
 

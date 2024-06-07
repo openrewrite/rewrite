@@ -438,6 +438,7 @@ public interface JavaType {
         Class() {
         }
 
+        @Override
         public List<FullyQualified> getAnnotations() {
             return annotations == null ? emptyList() : Arrays.asList(annotations);
         }
@@ -455,6 +456,7 @@ public interface JavaType {
         @NonFinal
         FullyQualified[] interfaces;
 
+        @Override
         public List<FullyQualified> getInterfaces() {
             return interfaces == null ? emptyList() : Arrays.asList(interfaces);
         }
@@ -472,6 +474,7 @@ public interface JavaType {
         @NonFinal
         Variable[] members;
 
+        @Override
         public List<Variable> getMembers() {
             return members == null ? emptyList() : Arrays.asList(members);
         }
@@ -489,6 +492,7 @@ public interface JavaType {
         @NonFinal
         Method[] methods;
 
+        @Override
         public List<Method> getMethods() {
             return methods == null ? emptyList() : Arrays.asList(methods);
         }
@@ -709,6 +713,7 @@ public interface JavaType {
             return type.getFullyQualifiedName();
         }
 
+        @Override
         public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
             return type.withFullyQualifiedName(fullyQualifiedName);
         }
@@ -749,6 +754,7 @@ public interface JavaType {
         }
 
         @Nullable
+        @Override
         public FullyQualified getOwningClass() {
             return type.getOwningClass();
         }

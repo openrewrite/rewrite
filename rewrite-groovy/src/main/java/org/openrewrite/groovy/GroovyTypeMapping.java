@@ -43,6 +43,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeCache);
     }
 
+    @Override
     public JavaType type(@Nullable ASTNode type) {
         if (type == null) {
             return JavaType.Class.Unknown.getInstance();

@@ -894,6 +894,7 @@ public class MavenPomDownloader {
             return responseCode != 408 && responseCode != 425 && responseCode != 429;
         }
 
+        @Override
         public String getMessage() {
             return responseCode == null ?
                     requireNonNull(getCause()).getMessage() :

@@ -354,6 +354,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
+    @Override
     @SuppressWarnings("ConstantConditions")
     public JavaType type(@Nullable Tree tree) {
         if (tree == null) {
