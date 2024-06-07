@@ -277,4 +277,3 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
         return super.visit(tree, p);
     }
 }
-

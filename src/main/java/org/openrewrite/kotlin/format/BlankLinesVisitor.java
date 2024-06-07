@@ -431,4 +431,3 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
         return super.postVisit(tree, p);
     }
 }
-
