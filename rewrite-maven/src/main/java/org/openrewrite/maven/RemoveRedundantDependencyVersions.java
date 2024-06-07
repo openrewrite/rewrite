@@ -229,7 +229,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
              */
             private boolean matchesVersion(ResolvedManagedDependency d, ExecutionContext ctx) {
                 MavenResolutionResult mrr = getResolutionResult();
-                if (d.getRequested().getVersion() == null || d.getRequested().getVersion().contains("${") || mrr.getPom().getRequested().getParent() == null) {
+                if (d.getRequested().getVersion() == null || mrr.getPom().getRequested().getParent() == null) {
                     return false;
                 }
                 try {
@@ -255,7 +255,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             private boolean matchesVersion(ResolvedDependency d) {
-                if (d.getRequested().getVersion() == null || d.getRequested().getVersion().contains("${")) {
+                if (d.getRequested().getVersion() == null) {
                     return false;
                 }
                 String managedVersion = getResolutionResult().getPom().getManagedVersion(d.getGroupId(),
@@ -264,7 +264,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             private boolean matchesVersion(Plugin p) {
-                if (p.getVersion() == null || p.getVersion().contains("${")) {
+                if (p.getVersion() == null) {
                     return false;
                 }
                 String managedVersion = getManagedPluginVersion(getResolutionResult().getPom(), p.getGroupId(), p.getArtifactId());
@@ -279,7 +279,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     return true;
                 }
                 int comparison = new LatestIntegration(null)
-                        .compare(null, managedVersion, requestedVersion);
+                        .compare(null, managedVersion,
+                                Objects.requireNonNull(getResolutionResult().getPom().getValue(requestedVersion)));
                 if (comparison < 0) {
                     return comparator.equals(Comparator.LT) || comparator.equals(Comparator.LTE);
                 } else if (comparison > 0) {
