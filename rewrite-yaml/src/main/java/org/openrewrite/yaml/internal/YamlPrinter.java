@@ -148,6 +148,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         return scalar;
     }
 
+    @Override
     public Yaml visitAnchor(Yaml.Anchor anchor, PrintOutputCapture<P> p) {
         visitMarkers(anchor.getMarkers(), p);
         p.append(anchor.getPrefix());
@@ -158,6 +159,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         return anchor;
     }
 
+    @Override
     public Yaml visitAlias(Yaml.Alias alias, PrintOutputCapture<P> p) {
         beforeSyntax(alias, p);
         p.append("*");

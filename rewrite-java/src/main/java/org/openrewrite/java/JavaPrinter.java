@@ -563,6 +563,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         return else_;
     }
 
+    @Override
     public J visitEmpty(J.Empty empty, PrintOutputCapture<P> p) {
         beforeSyntax(empty, Space.Location.EMPTY_PREFIX, p);
         afterSyntax(empty, p);
@@ -1042,6 +1043,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         return tryable;
     }
 
+    @Override
     public J visitTypeCast(J.TypeCast typeCast, PrintOutputCapture<P> p) {
         beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
         visit(typeCast.getClazz(), p);

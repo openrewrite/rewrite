@@ -57,8 +57,10 @@ public interface G extends J {
         return v.defaultValue(this, p);
     }
 
+    @Override
     Space getPrefix();
 
+    @Override
     default List<Comment> getComments() {
         return getPrefix().getComments();
     }
@@ -132,10 +134,12 @@ public interface G extends J {
         JRightPadded<Package> packageDeclaration;
 
         @Nullable
+        @Override
         public Package getPackageDeclaration() {
             return packageDeclaration == null ? null : packageDeclaration.getElement();
         }
 
+        @Override
         public G.CompilationUnit withPackageDeclaration(Package packageDeclaration) {
             return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
         }
@@ -175,6 +179,7 @@ public interface G extends J {
         @Getter
         Space eof;
 
+        @Override
         @Transient
         public List<Import> getImports() {
             return statements.stream()
@@ -184,10 +189,12 @@ public interface G extends J {
                     .collect(Collectors.toList());
         }
 
+        @Override
         public G.CompilationUnit withImports(List<Import> imports) {
             return getPadding().withImports(JRightPadded.withElements(this.getPadding().getImports(), imports));
         }
 
+        @Override
         @Transient
         public List<ClassDeclaration> getClasses() {
             return statements.stream()
@@ -212,6 +219,7 @@ public interface G extends J {
             return new GroovyPrinter<>();
         }
 
+        @Override
         @Transient
         public TypesInUse getTypesInUse() {
             TypesInUse cache;
@@ -228,6 +236,7 @@ public interface G extends J {
             return cache;
         }
 
+        @Override
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {

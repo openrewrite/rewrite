@@ -1509,7 +1509,8 @@ public class JsonPathParser extends Parser {
 		return _localctx;
 	}
 
-	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
+    @Override
+    public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
 		switch (ruleIndex) {
 		case 7:
 			return binaryExpression_sempred((BinaryExpressionContext)_localctx, predIndex);

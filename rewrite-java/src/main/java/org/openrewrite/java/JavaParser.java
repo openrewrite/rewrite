@@ -295,6 +295,7 @@ public interface JavaParser extends Parser {
      * Clear any in-memory parser caches that may prevent re-parsing of classes with the same fully qualified name in
      * different rounds
      */
+    @Override
     JavaParser reset();
 
     JavaParser reset(Collection<URI> uris);
@@ -405,6 +406,7 @@ public interface JavaParser extends Parser {
             return classpath;
         }
 
+        @Override
         public abstract P build();
 
         @Override

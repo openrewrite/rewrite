@@ -77,6 +77,7 @@ public class TreeVisitorAdapterClassLoader extends ClassLoader implements ClassO
         );
     }
 
+    @Override
     public Writer getSourceWriter(String className) {
         return new Writer() {
             @Override

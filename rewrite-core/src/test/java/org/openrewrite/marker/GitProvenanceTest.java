@@ -15,6 +15,12 @@
  */
 package org.openrewrite.marker;
 
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.jgit.lib.Constants;
@@ -22,12 +28,6 @@ import org.openrewrite.jgit.lib.RepositoryCache;
 import org.openrewrite.jgit.transport.TagOpt;
 import org.openrewrite.jgit.transport.URIish;
 import org.openrewrite.jgit.util.FS;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.marker.ci.*;
 
 import java.io.ByteArrayOutputStream;
@@ -44,9 +44,9 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION;
 
 @SuppressWarnings({"ConstantConditions", "HttpUrlsUsage"})
 class GitProvenanceTest {

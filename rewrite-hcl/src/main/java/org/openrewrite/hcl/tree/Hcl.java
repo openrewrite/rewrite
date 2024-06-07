@@ -436,6 +436,7 @@ public interface Hcl extends Tree {
         @With
         Space end;
 
+        @Override
         public CoordinateBuilder.Block getCoordinates() {
             return new CoordinateBuilder.Block(this);
         }
