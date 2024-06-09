@@ -121,4 +121,50 @@ class ImportLayoutStyleTest {
                 .containsExactlyInAnyOrder(
                         import1, import1, new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4241")
+    void addImportWithNewLineInUnsortedImportList() {
+        ImportLayoutStyle style = new ImportLayoutStyle(
+          Integer.MAX_VALUE, Integer.MAX_VALUE, Collections.emptyList(), Collections.emptyList());
+        JRightPadded<J.Import> import0 = new JRightPadded<>(
+          new J.Import(
+            randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+            TypeTree.build("pkg.AAA.MEMBER_0").withPrefix(Space.SINGLE_SPACE),
+            null),
+          Space.EMPTY,
+          Markers.EMPTY);
+        JRightPadded<J.Import> import1 = new JRightPadded<>(
+          new J.Import(
+            randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+            TypeTree.build("pkg.Clazz.MEMBER_3").withPrefix(Space.SINGLE_SPACE),
+            null),
+          Space.EMPTY,
+          Markers.EMPTY);
+        JRightPadded<J.Import> import3 = new JRightPadded<>(
+          new J.Import(
+            randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+            TypeTree.build("pkg.Clazz.MEMBER_1").withPrefix(Space.SINGLE_SPACE),
+            null),
+          Space.EMPTY,
+          Markers.EMPTY);
+        J.Import importToAdd = new J.Import(
+          randomId(),
+          Space.EMPTY,
+          Markers.EMPTY,
+          new JLeftPadded<>(Space.EMPTY, true, Markers.EMPTY),
+          TypeTree.build("pkg.Clazz.MEMBER_2").withPrefix(Space.SINGLE_SPACE),
+          null);
+
+        assertThat(style.addImport(List.of(import0, import1, import3), importToAdd, null, Collections.emptyList()).get(1).getElement().getPrefix()).isEqualTo(Space.format("\n"));
+    }
 }
