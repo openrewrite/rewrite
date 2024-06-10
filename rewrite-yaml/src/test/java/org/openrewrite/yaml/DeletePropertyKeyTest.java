@@ -269,11 +269,11 @@ class DeletePropertyKeyTest implements RewriteTest {
           spec -> spec.recipe(new DeleteProperty("my.key", false, null)),
           yaml(
             """
-                my.key: qwe
-                seq: []
+              my.key: qwe
+              seq: []
               """,
             """
-                seq: []
+              seq: []
               """
           )
         );
