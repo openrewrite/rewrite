@@ -249,10 +249,10 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>(){
               @Override
-              public @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
+              public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                   // Circumvent validation to match use in rewrite-spring's ReplaceStringLiteralsWithMediaTypeConstants
                   doAfterVisit(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_FQN + "_xyz").getVisitor());
-                  return super.visit(tree, executionContext);
+                  return super.visit(tree, ctx);
               }
           })),
           java(

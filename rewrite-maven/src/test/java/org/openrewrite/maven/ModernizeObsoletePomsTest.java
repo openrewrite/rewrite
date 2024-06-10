@@ -16,22 +16,25 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class ModernizeObsoletePomsTest implements RewriteTest {
+class ModernizeObsoletePomsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ModernizeObsoletePoms());
     }
 
+    @DocumentExample
     @Test
     void oldPom() {
         rewriteRun(
-          pomXml("""
+          pomXml(
+                """
           <project>
               <pomVersion>3</pomVersion>
               <groupId>org.jvnet.staxex</groupId>

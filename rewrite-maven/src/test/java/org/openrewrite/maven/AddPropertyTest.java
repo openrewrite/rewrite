@@ -178,7 +178,8 @@ class AddPropertyTest implements RewriteTest {
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
               </project>
-              ""","""
+              """,
+                """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -214,7 +215,8 @@ class AddPropertyTest implements RewriteTest {
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
               </project>
-              ""","""
+              """,
+                """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -251,7 +253,8 @@ class AddPropertyTest implements RewriteTest {
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
               </project>
-              ""","""
+              """,
+                """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>

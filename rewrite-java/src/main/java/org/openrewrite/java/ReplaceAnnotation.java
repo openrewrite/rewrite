@@ -40,9 +40,10 @@ public class ReplaceAnnotation extends Recipe {
 
     @Option(displayName = "Classpath resource",
             description = "If the annotation's type is defined by a jar within the META-INF/rewrite/classpath directory provide its name here " +
-                          "so that it can be loaded. " +
-                          "When this parameter is not passed the runtime classpath of the recipe is provided to the parser producing the new annotation. " +
-                          "This is necessary when the annotation is not on the runtime classpath of the recipe and isn't in the Java standard library.",
+                    "so that it can be loaded. " +
+                    "When this parameter is not passed the runtime classpath of the recipe is provided to the parser producing the new annotation. " +
+                    "This is necessary when the annotation is not on the runtime classpath of the recipe and isn't in the Java standard library.",
+            example = "annotations",
             required = false)
     @Nullable
     String classpathResourceName;
