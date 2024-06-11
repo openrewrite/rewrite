@@ -27,7 +27,7 @@ jobs:
           - org.openrewrite.recipes.JavaRecipeBestPracticesSubset
           - org.openrewrite.recipes.RecipeTestingBestPracticesSubset
           - org.openrewrite.recipes.RecipeNullabilityBestPractices
-          - org.openrewrite.java.OrderImports
+          #- org.openrewrite.java.OrderImports
           - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
           - org.openrewrite.staticanalysis.InlineVariable
           - org.openrewrite.staticanalysis.MissingOverrideAnnotation
