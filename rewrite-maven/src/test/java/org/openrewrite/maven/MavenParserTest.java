@@ -1176,7 +1176,7 @@ class MavenParserTest implements RewriteTest {
                                 </dependency>
                             </dependencies>
                         </dependencyManagement>
-                    </pro               ject>
+                    </project>
                 """
             )
           ),
