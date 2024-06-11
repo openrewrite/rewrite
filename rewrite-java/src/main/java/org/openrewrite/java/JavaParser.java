@@ -109,29 +109,14 @@ public interface JavaParser extends Parser {
     }
 
     static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
+        if(artifactNamesWithVersions.length == 0) {
+            return Collections.emptyList();
+        }
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
         Set<String> missingArtifactNames = new LinkedHashSet<>(artifactNamesWithVersions.length);
+        missingArtifactNames.addAll(Arrays.asList(artifactNamesWithVersions));
         File resourceTarget = JavaParserExecutionContextView.view(ctx)
                 .getParserClasspathDownloadTarget();
-
-        nextArtifact:
-        for (String artifactName : artifactNamesWithVersions) {
-            Pattern jarPattern = Pattern.compile("[/\\\\]" + artifactName + "-?.*\\.jar$");
-            File[] extracted = resourceTarget.listFiles();
-            if (extracted != null) {
-                for (File file : extracted) {
-                    if (jarPattern.matcher(file.getPath()).find()) {
-                        artifacts.add(file.toPath());
-                        continue nextArtifact;
-                    }
-                }
-            }
-            missingArtifactNames.add(artifactName);
-        }
-
-        if (missingArtifactNames.isEmpty()) {
-            return artifacts;
-        }
 
         Class<?> caller;
         try {
