@@ -30,6 +30,7 @@ import java.util.UUID;
 public class AlreadyReplaced implements Marker {
     UUID id;
     String find;
+
     @Nullable
     String replace;
 }

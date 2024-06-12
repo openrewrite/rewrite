@@ -26,8 +26,10 @@ import java.net.URI;
 @Value
 public class DistributionInfos {
     String downloadUrl;
+
     @Nullable
     Checksum checksum;
+
     @Nullable
     Checksum wrapperJarChecksum;
 

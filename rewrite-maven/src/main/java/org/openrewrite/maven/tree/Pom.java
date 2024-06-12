@@ -90,18 +90,25 @@ public class Pom {
 
     @Builder.Default
     Map<String, String> properties = emptyMap();
+
     @Builder.Default
     List<ManagedDependency> dependencyManagement = emptyList();
+
     @Builder.Default
     List<Dependency> dependencies = emptyList();
+
     @Builder.Default
     List<MavenRepository> repositories = emptyList();
+
     @Builder.Default
     List<License> licenses = emptyList();
+
     @Builder.Default
     List<Profile> profiles = emptyList();
+
     @Builder.Default
     List<Plugin> plugins = emptyList();
+
     @Builder.Default
     List<Plugin> pluginManagement = emptyList();
 

@@ -32,6 +32,7 @@ import static org.openrewrite.Tree.randomId;
 public class BitbucketBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
+
     String httpOrigin;
     String branch;
     String sha;

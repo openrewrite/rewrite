@@ -35,12 +35,15 @@ public class CommitsByDay extends DataTable<CommitsByDay.Row> {
         @Column(displayName = "Name",
                 description = "The name of the committer.")
         String name;
+
         @Column(displayName = "Email",
                 description = "The email of the committer.")
         String email;
+
         @Column(displayName = "Date",
                 description = "The date of the day.")
         LocalDate day;
+
         @Column(displayName = "Number of commits",
                 description = "The number of commits made by this committer on this day.")
         int commits;

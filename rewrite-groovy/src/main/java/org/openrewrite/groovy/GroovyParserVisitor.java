@@ -65,8 +65,10 @@ import static org.openrewrite.java.tree.Space.format;
  */
 public class GroovyParserVisitor {
     private final Path sourcePath;
+
     @Nullable
     private final FileAttributes fileAttributes;
+
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
@@ -75,6 +77,7 @@ public class GroovyParserVisitor {
     private int cursor = 0;
 
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
+
     @SuppressWarnings("RegExpSimplifiable")
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 

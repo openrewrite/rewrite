@@ -45,6 +45,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     @Nullable
     private final FileAttributes fileAttributes;
+
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;

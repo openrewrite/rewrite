@@ -213,6 +213,7 @@ public interface Xml extends Tree {
     class XmlDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
         UUID id;
+
         String prefixUnsafe;
 
         @Override

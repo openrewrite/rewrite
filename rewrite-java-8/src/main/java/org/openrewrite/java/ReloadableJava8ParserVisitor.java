@@ -74,6 +74,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     @Nullable
     private final FileAttributes fileAttributes;
+
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;

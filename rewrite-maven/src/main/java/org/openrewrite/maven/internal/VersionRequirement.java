@@ -214,6 +214,7 @@ public class VersionRequirement {
     @Value
     private static class Range {
         boolean lowerClosed;
+
         @Nullable
         Version lower;
 
