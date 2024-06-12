@@ -123,9 +123,9 @@ public class AddPluginRepository extends Recipe {
                 if (PLUGIN_REPOS_MATCHER.matches(getCursor())) {
                     Optional<Xml.Tag> maybePluginRepo = pluginRepositories.getChildren().stream()
                             .filter(pluginRepo ->
-                                    "pluginRepository".equals(pluginRepo.getName()) &&
-                                    (id.equals(pluginRepo.getChildValue("id").orElse(null)) || (isReleasesEqual(pluginRepo) && isSnapshotsEqual(pluginRepo))) &&
-                                    url.equals(pluginRepo.getChildValue("url").orElse(null))
+                                    "pluginRepository".equals(pluginRepo.getName())
+                                            && (id.equals(pluginRepo.getChildValue("id").orElse(null)) || (isReleasesEqual(pluginRepo) && isSnapshotsEqual(pluginRepo)))
+                                            && url.equals(pluginRepo.getChildValue("url").orElse(null))
                             )
                             .findAny();
 
@@ -172,13 +172,13 @@ public class AddPluginRepository extends Recipe {
                     } else {
                         @Language("xml")
                         String sb = "<pluginRepository>\n" +
-                                    assembleTagWithValue("id", id) +
-                                    assembleTagWithValue("url", url) +
-                                    assembleTagWithValue("name", pluginRepoName) +
-                                    assembleTagWithValue("layout", layout) +
-                                    assembleReleases() +
-                                    assembleSnapshots() +
-                                    "</pluginRepository>\n";
+                                assembleTagWithValue("id", id) +
+                                assembleTagWithValue("url", url) +
+                                assembleTagWithValue("name", pluginRepoName) +
+                                assembleTagWithValue("layout", layout) +
+                                assembleReleases() +
+                                assembleSnapshots() +
+                                "</pluginRepository>\n";
 
                         Xml.Tag pluginRepoTag = Xml.Tag.build(sb);
                         pluginRepositories = (Xml.Tag) new AddToTagVisitor<>(pluginRepositories, pluginRepoTag).visitNonNull(pluginRepositories, ctx, getCursor().getParentOrThrow());
@@ -246,8 +246,8 @@ public class AddPluginRepository extends Recipe {
             return isNoReleases();
         } else {
             return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null))
-                   && Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null))
-                   && Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
+                    && Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null))
+                    && Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
         }
     }
 
@@ -261,8 +261,8 @@ public class AddPluginRepository extends Recipe {
             return isNoSnapshots();
         } else {
             return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null))
-                   && Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null))
-                   && Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
+                    && Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null))
+                    && Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
         }
     }
 
