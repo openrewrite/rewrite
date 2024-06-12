@@ -80,6 +80,7 @@ public class RemoveTrailingSemicolon extends Recipe {
 
             @Nullable
             private Integer mark;
+
             @Nullable
             private Marker semicolonMarker;
 

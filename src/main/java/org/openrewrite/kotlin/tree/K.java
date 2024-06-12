@@ -1695,6 +1695,7 @@ public interface K extends J {
          */
         @Deprecated
         List<J.Annotation> annotations;
+
         J.Return expression;
 
         @Nullable

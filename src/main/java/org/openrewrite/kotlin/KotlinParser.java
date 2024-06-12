@@ -244,6 +244,7 @@ public class KotlinParser implements Parser {
     public static class Builder extends Parser.Builder {
         @Nullable
         private Collection<String> artifactNames = emptyList();
+
         @Nullable
         private Collection<Path> classpath = emptyList();
 
