@@ -715,7 +715,12 @@ public interface JavaType {
 
         @Override
         public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
-            return type.withFullyQualifiedName(fullyQualifiedName);
+            FullyQualified qualified = type.withFullyQualifiedName(fullyQualifiedName);
+            if (type.equals(qualified)) {
+                return this;
+            }
+
+            return new Parameterized(managedReference, qualified, typeParameters);
         }
 
         @Override

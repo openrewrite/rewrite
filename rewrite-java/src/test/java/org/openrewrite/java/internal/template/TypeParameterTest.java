@@ -89,6 +89,25 @@ class TypeParameterTest {
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
 
+	@ParameterizedTest
+	@ValueSource(strings = {
+	  "java.util.List<java.lang.String>",
+	  "java.util.Map<java.lang.String, java.lang.Integer>",
+	  "java.util.List<? extends java.lang.Object>",
+	  "java.util.List<? super java.lang.Integer>",
+	  "java.util.List<java.util.List<? super java.lang.Integer>>",
+	})
+	void parameterizedWithModifierShouldNeverHideParametrizedType(String name) {
+		TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
+		  CharStreams.fromString(name))));
+		JavaType type = TypeParameter.toFullyQualifiedName(parser.type());
+
+		JavaType.Parameterized pType = (JavaType.Parameterized) type;
+		assertThat(pType.withFullyQualifiedName("test")).isInstanceOf(JavaType.Parameterized.class);
+		assertThat(pType.withFullyQualifiedName("test")).isNotSameAs(pType);
+		assertThat(pType.withFullyQualifiedName(pType.getFullyQualifiedName())).isSameAs(pType);
+	}
+
     @ParameterizedTest
     @ValueSource(strings = {
       "java.util.List<?>",
