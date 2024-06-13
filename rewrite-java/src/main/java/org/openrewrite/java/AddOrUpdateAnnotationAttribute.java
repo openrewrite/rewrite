@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Override
     public String getDisplayName() {

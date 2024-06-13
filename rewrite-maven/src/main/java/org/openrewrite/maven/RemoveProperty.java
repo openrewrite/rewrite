@@ -21,10 +21,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveProperty extends Recipe {
 
     @Option(displayName = "Property name",
@@ -51,7 +52,8 @@ public class RemoveProperty extends Recipe {
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isPropertyTag() && propertyName.equals(tag.getName())) {
-                return null;
+                doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                maybeUpdateModel();
             }
             return super.visitTag(tag, ctx);
         }

@@ -17,6 +17,7 @@ package org.openrewrite.gradle.util;
 
 import lombok.Value;
 import org.openrewrite.Checksum;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 
 import java.io.IOException;
@@ -25,7 +26,11 @@ import java.net.URI;
 @Value
 public class DistributionInfos {
     String downloadUrl;
+
+    @Nullable
     Checksum checksum;
+
+    @Nullable
     Checksum wrapperJarChecksum;
 
     static DistributionInfos fetch(HttpSender httpSender, GradleWrapper.DistributionType distributionType,

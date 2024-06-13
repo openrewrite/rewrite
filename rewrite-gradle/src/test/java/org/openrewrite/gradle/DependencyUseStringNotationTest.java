@@ -59,6 +59,34 @@ class DependencyUseStringNotationTest implements RewriteTest {
     }
 
     @Test
+    void withClassifier() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources')
+                  implementation group: 'group', name: 'artifact', version: 'version', classifier: 'sources'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              dependencies {
+                  api("org.openrewrite:rewrite-core:latest.release:sources")
+                  implementation "group:artifact:version:sources"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void basicMapLiteral() {
         rewriteRun(
           buildGradle(
@@ -97,6 +125,36 @@ class DependencyUseStringNotationTest implements RewriteTest {
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: version)
                   implementation group: 'group', name: 'artifact', version: version
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              def version = "latest.release"
+              dependencies {
+                  api("org.openrewrite:rewrite-core:$version")
+                  implementation "group:artifact:$version"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withGStringLiteral() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              def version = "latest.release"
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', version: "$version")
+                  implementation group: 'group', name: 'artifact', version: "$version"
               }
               """,
             """

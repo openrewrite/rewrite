@@ -30,7 +30,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddProfile extends Recipe {
     private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
 
@@ -76,7 +76,6 @@ public class AddProfile extends Recipe {
     }
 
     private class AddProfileVisitor extends MavenIsoVisitor<ExecutionContext> {
-
 
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {

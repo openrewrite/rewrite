@@ -26,7 +26,7 @@ import java.util.Objects;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeExtraProperty extends Recipe {
 
     @Override

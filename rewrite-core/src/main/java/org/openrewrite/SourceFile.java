@@ -108,8 +108,14 @@ public interface SourceFile extends Tree {
         return printAllTrimmed(0);
     }
 
+    @Override
     default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
         throw new UnsupportedOperationException("SourceFile implementations should override this method");
+    }
+
+    @Incubating(since = "8.2.0")
+    default <S, T extends S> T service(Class<S> service) {
+        throw new UnsupportedOperationException("Service " + service + " not supported");
     }
 
     /**

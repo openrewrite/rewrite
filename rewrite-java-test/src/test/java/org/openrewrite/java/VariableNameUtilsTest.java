@@ -185,7 +185,24 @@ class VariableNameUtilsTest implements RewriteTest {
               """
           )
         );
+    }
 
+    @Test
+    void detectInstanceOf() {
+        rewriteRun(
+          baseTest("ifBlock", "ifBlock,pattern,methodParam"),
+          java(
+            """
+              class Test {
+                  void method(Object methodParam) {
+                      if (methodParam instanceof String pattern) {
+                          boolean ifBlock;
+                      }
+                  }
+              }
+              """
+          )
+        );
     }
 
     @Test

@@ -27,12 +27,12 @@ import org.openrewrite.yaml.tree.Yaml;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeValue extends Recipe {
     @Option(displayName = "Key path",
             description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML entry.",
             example = "$.subjects.kind")
-    String oldKeyPath;
+    String keyPath;
 
     @Option(displayName = "New value",
             description = "The new value to set for the key identified by the `oldKeyPath`.",
@@ -46,7 +46,7 @@ public class ChangeValue extends Recipe {
 
     @Override
     public String getInstanceNameSuffix() {
-        return String.format("`%s` to `%s`", oldKeyPath, value);
+        return String.format("`%s` to `%s`", keyPath, value);
     }
 
     @Override
@@ -56,7 +56,7 @@ public class ChangeValue extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
+        JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {

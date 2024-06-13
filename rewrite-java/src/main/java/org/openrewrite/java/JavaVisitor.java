@@ -457,14 +457,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
         c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> visitAndCast(m, p)));
         //Kind can have annotations associated with it, need to visit those.
-        c = c.getAnnotations().withKind(
-                classDecl.getAnnotations().getKind().withAnnotations(
-                        ListUtils.map(classDecl.getAnnotations().getKind().getAnnotations(), a -> visitAndCast(a, p))
+        c = c.getPadding().withKind(
+                classDecl.getPadding().getKind().withAnnotations(
+                        ListUtils.map(classDecl.getPadding().getKind().getAnnotations(), a -> visitAndCast(a, p))
                 )
         );
-        c = c.getAnnotations().withKind(
-                c.getAnnotations().getKind().withPrefix(
-                        visitSpace(c.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p)
+        c = c.getPadding().withKind(
+                c.getPadding().getKind().withPrefix(
+                        visitSpace(c.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p)
                 )
         );
         c = c.withName(visitAndCast(c.getName(), p));
@@ -743,7 +743,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             i = (J.InstanceOf) temp;
         }
-        i = i.getPadding().withExpr(visitRightPadded(i.getPadding().getExpr(), JRightPadded.Location.INSTANCEOF, p));
+        i = i.getPadding().withExpression(visitRightPadded(i.getPadding().getExpression(), JRightPadded.Location.INSTANCEOF, p));
         i = i.withClazz(visitAndCast(i.getClazz(), p));
         i = i.withPattern(visitAndCast(i.getPattern(), p));
         i = i.withType(visitType(i.getType(), p));
@@ -790,8 +790,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 )
         );
         l = l.withParameters(
-                l.getParameters().getPadding().withParams(
-                        ListUtils.map(l.getParameters().getPadding().getParams(),
+                l.getParameters().getPadding().withParameters(
+                        ListUtils.map(l.getParameters().getPadding().getParameters(),
                                 param -> visitRightPadded(param, JRightPadded.Location.LAMBDA_PARAM, p)
                         )
                 )
@@ -1332,13 +1332,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             w = (J.Wildcard) temp;
         }
-        if (w.getPadding().getBound() != null) {
-            w = w.getPadding().withBound(
-                    w.getPadding().getBound().withBefore(
-                            visitSpace(w.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p)
-                    )
-            );
-        }
+        w = w.getPadding().withBound(visitLeftPadded(w.getPadding().getBound(), JLeftPadded.Location.WILDCARD_BOUND, p));
         w = w.withBoundedType(visitAndCast(w.getBoundedType(), p));
         if (w.getBoundedType() != null) {
             // i.e. not a "wildcard" type
@@ -1404,16 +1398,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
 
         setCursor(getCursor().getParent());
-        if (t == null) {
-            // If nothing changed leave AST node the same
-            if (left.getElement() == null && before == left.getBefore()) {
-                return left;
-            }
-            //noinspection ConstantConditions
-            return null;
+        // If nothing changed leave AST node the same
+        if (left.getElement() == t && before == left.getBefore()) {
+            return left;
         }
 
-        return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
+        //noinspection ConstantConditions
+        return t == null ? null : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
     public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,

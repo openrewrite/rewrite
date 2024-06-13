@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,11 @@
  */
 // Generated from java-escape by ANTLR 4.11.1
 package org.openrewrite.java.internal.grammar;
-import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.misc.*;

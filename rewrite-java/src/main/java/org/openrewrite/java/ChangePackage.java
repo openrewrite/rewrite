@@ -40,7 +40,7 @@ import static java.util.Objects.requireNonNull;
  * is defined on the super class.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePackage extends Recipe {
     @Option(displayName = "Old package name",
             description = "The package name to replace.",
@@ -146,9 +146,11 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+        public J visitPackage(J.Package pkg, ExecutionContext ctx) {
             String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_FROM_KEY, original);
+
+            pkg = pkg.withAnnotations(ListUtils.map(pkg.getAnnotations(), a -> visitAndCast(a, ctx)));
 
             if (original.equals(oldPackageName)) {
                 getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_TO_KEY, newPackageName);
@@ -337,7 +339,10 @@ public class ChangePackage extends Recipe {
         }
 
         private boolean isTargetRecursivePackageName(String packageName) {
-            return (recursive == null || recursive) && packageName.startsWith(oldPackageName) && !packageName.startsWith(newPackageName);
+            return (recursive == null || recursive)
+                   && packageName.startsWith(oldPackageName + ".")
+                   && !packageName.startsWith(newPackageName);
         }
+
     }
 }

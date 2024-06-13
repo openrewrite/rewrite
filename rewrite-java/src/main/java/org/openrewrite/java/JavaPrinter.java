@@ -497,8 +497,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         for (Modifier m : classDecl.getModifiers()) {
             visitModifier(m, p);
         }
-        visit(classDecl.getAnnotations().getKind().getAnnotations(), p);
-        visitSpace(classDecl.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
+        visit(classDecl.getPadding().getKind().getAnnotations(), p);
+        visitSpace(classDecl.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
         p.append(kind);
         visit(classDecl.getName(), p);
         visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
@@ -563,6 +563,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         return else_;
     }
 
+    @Override
     public J visitEmpty(J.Empty empty, PrintOutputCapture<P> p) {
         beforeSyntax(empty, Space.Location.EMPTY_PREFIX, p);
         afterSyntax(empty, p);
@@ -676,7 +677,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitInstanceOf(InstanceOf instanceOf, PrintOutputCapture<P> p) {
         beforeSyntax(instanceOf, Space.Location.INSTANCEOF_PREFIX, p);
-        visitRightPadded(instanceOf.getPadding().getExpr(), JRightPadded.Location.INSTANCEOF, "instanceof", p);
+        visitRightPadded(instanceOf.getPadding().getExpression(), JRightPadded.Location.INSTANCEOF, "instanceof", p);
         visit(instanceOf.getClazz(), p);
         visit(instanceOf.getPattern(), p);
         afterSyntax(instanceOf, p);
@@ -707,10 +708,10 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitMarkers(lambda.getParameters().getMarkers(), p);
         if (lambda.getParameters().isParenthesized()) {
             p.append('(');
-            visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+            visitRightPadded(lambda.getParameters().getPadding().getParameters(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
             p.append(')');
         } else {
-            visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+            visitRightPadded(lambda.getParameters().getPadding().getParameters(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
         }
         visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
         p.append("->");
@@ -1042,6 +1043,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         return tryable;
     }
 
+    @Override
     public J visitTypeCast(J.TypeCast typeCast, PrintOutputCapture<P> p) {
         beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
         visit(typeCast.getClazz(), p);

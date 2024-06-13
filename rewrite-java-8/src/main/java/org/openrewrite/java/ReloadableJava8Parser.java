@@ -29,7 +29,6 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.tree.ParseError;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
@@ -38,6 +37,7 @@ import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 

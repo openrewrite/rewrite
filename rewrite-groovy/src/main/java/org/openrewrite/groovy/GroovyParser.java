@@ -207,6 +207,7 @@ public class GroovyParser implements Parser {
     public static class Builder extends Parser.Builder {
         @Nullable
         private Collection<Path> classpath = Collections.emptyList();
+
         @Nullable
         protected Collection<String> artifactNames = Collections.emptyList();
 
@@ -286,6 +287,7 @@ public class GroovyParser implements Parser {
             return classpath;
         }
 
+        @Override
         public GroovyParser build() {
             return new GroovyParser(resolvedClasspath(), styles, logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
         }

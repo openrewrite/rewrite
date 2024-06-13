@@ -235,6 +235,7 @@ public interface J extends Tree {
             return v.visitAnnotation(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Annotation getCoordinates() {
             return new CoordinateBuilder.Annotation(this);
@@ -304,6 +305,7 @@ public interface J extends Tree {
             return v.visitArrayAccess(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -711,6 +713,7 @@ public interface J extends Tree {
             return v.visitBinary(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -838,6 +841,7 @@ public interface J extends Tree {
             return v.visitBlock(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Block getCoordinates() {
             return new CoordinateBuilder.Block(this);
@@ -1159,10 +1163,6 @@ public interface J extends Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
-        @Nullable
-        @NonFinal
-        transient WeakReference<Annotations> annotations;
-
         @With
         @Getter
         @EqualsAndHashCode.Include
@@ -1191,11 +1191,11 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withKind(Kind.Type type) {
-            Kind k = getAnnotations().getKind();
+            Kind k = getPadding().getKind();
             if (k.type == type) {
                 return this;
             } else {
-                return getAnnotations().withKind(k.withType(type));
+                return getPadding().withKind(k.withType(type));
             }
         }
 
@@ -1420,34 +1420,6 @@ public interface J extends Tree {
                 return t.typeParameters == typeParameters ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
             }
         }
-
-        public Annotations getAnnotations() {
-            Annotations a;
-            if (this.annotations == null) {
-                a = new Annotations(this);
-                this.annotations = new WeakReference<>(a);
-            } else {
-                a = this.annotations.get();
-                if (a == null || a.t != this) {
-                    a = new Annotations(this);
-                    this.annotations = new WeakReference<>(a);
-                }
-            }
-            return a;
-        }
-
-        @RequiredArgsConstructor
-        public static class Annotations {
-            private final ClassDeclaration t;
-
-            public Kind getKind() {
-                return t.kind;
-            }
-
-            public ClassDeclaration withKind(Kind kind) {
-                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
-            }
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1513,20 +1485,24 @@ public interface J extends Tree {
         JRightPadded<Package> packageDeclaration;
 
         @Nullable
+        @Override
         public Package getPackageDeclaration() {
             return packageDeclaration == null ? null : packageDeclaration.getElement();
         }
 
+        @Override
         public CompilationUnit withPackageDeclaration(Package packageDeclaration) {
             return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
         }
 
         List<JRightPadded<Import>> imports;
 
+        @Override
         public List<Import> getImports() {
             return JRightPadded.getElements(imports);
         }
 
+        @Override
         public CompilationUnit withImports(List<Import> imports) {
             return getPadding().withImports(JRightPadded.withElements(this.imports, imports));
         }
@@ -1601,6 +1577,7 @@ public interface J extends Tree {
             return new JavaPrinter<>();
         }
 
+        @Override
         @Transient
         public TypesInUse getTypesInUse() {
             TypesInUse cache;
@@ -1617,6 +1594,7 @@ public interface J extends Tree {
             return cache;
         }
 
+        @Override
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -1719,10 +1697,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public DoWhileLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
@@ -2096,10 +2076,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public ForEachLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
@@ -2263,10 +2245,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public ForLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
@@ -2508,6 +2492,7 @@ public interface J extends Tree {
             return v.visitIdentifier(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Identifier getCoordinates() {
             return new CoordinateBuilder.Identifier(this);
@@ -2792,10 +2777,12 @@ public interface J extends Tree {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
                                        "." + name);
                     break;
-                } else {
+                } else if (part.getTarget() instanceof J.FieldAccess) {
                     part = (FieldAccess) part.getTarget();
                     String delim = Character.isUpperCase(part.getSimpleName().charAt(0)) ? "$" : ".";
                     typeName.insert(0, delim + name);
+                } else {
+                    break;
                 }
             }
 
@@ -2931,7 +2918,7 @@ public interface J extends Tree {
         }
 
         public InstanceOf withExpression(Expression expression) {
-            return getPadding().withExpr(this.expression.withElement(expression));
+            return getPadding().withExpression(this.expression.withElement(expression));
         }
 
         @With
@@ -2989,10 +2976,20 @@ public interface J extends Tree {
         public static class Padding {
             private final InstanceOf t;
 
+            public JRightPadded<Expression> getExpression() {
+                return t.expression;
+            }
+
+            public InstanceOf withExpression(JRightPadded<Expression> expression) {
+                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+            }
+
+            @Deprecated
             public JRightPadded<Expression> getExpr() {
                 return t.expression;
             }
 
+            @Deprecated
             public InstanceOf withExpr(JRightPadded<Expression> expression) {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
             }
@@ -3242,7 +3239,7 @@ public interface J extends Tree {
             }
 
             public Parameters withParameters(List<J> parameters) {
-                return getPadding().withParams(JRightPadded.withElements(this.parameters, parameters));
+                return getPadding().withParameters(JRightPadded.withElements(this.parameters, parameters));
             }
 
             @Transient
@@ -3269,10 +3266,20 @@ public interface J extends Tree {
             public static class Padding {
                 private final Parameters t;
 
+                public List<JRightPadded<J>> getParameters() {
+                    return t.parameters;
+                }
+
+                public Parameters withParameters(List<JRightPadded<J>> parameters) {
+                    return t.parameters == parameters ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, parameters);
+                }
+
+                @Deprecated
                 public List<JRightPadded<J>> getParams() {
                     return t.parameters;
                 }
 
+                @Deprecated
                 public Parameters withParams(List<JRightPadded<J>> parameters) {
                     return t.parameters == parameters ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, parameters);
                 }
@@ -3328,6 +3335,7 @@ public interface J extends Tree {
             return v.visitLiteral(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -3366,6 +3374,11 @@ public interface J extends Tree {
                 return literal.getValue() != null && literal.getValue().equals(value);
             }
             return false;
+        }
+
+        @Override
+        public String toString() {
+            return String.valueOf(value);
         }
     }
 
@@ -3564,19 +3577,20 @@ public interface J extends Tree {
         }
 
         public MethodDeclaration withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
+            Annotations annotations = getAnnotations();
             if (typeParameters == null) {
-                if (this.getAnnotations().getTypeParameters() == null) {
+                if (annotations.getTypeParameters() == null) {
                     return this;
                 } else {
-                    return this.getAnnotations().withTypeParameters(null);
+                    return annotations.withTypeParameters(null);
                 }
             } else {
-                TypeParameters currentTypeParameters = this.getAnnotations().getTypeParameters();
+                TypeParameters currentTypeParameters = annotations.getTypeParameters();
                 if (currentTypeParameters == null) {
-                    return getAnnotations().withTypeParameters(new TypeParameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                    return annotations.withTypeParameters(new TypeParameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
                             null, typeParameters.stream().map(JRightPadded::build).collect(toList())));
                 } else {
-                    return getAnnotations().withTypeParameters(currentTypeParameters.withTypeParameters(typeParameters));
+                    return annotations.withTypeParameters(currentTypeParameters.withTypeParameters(typeParameters));
                 }
             }
         }
@@ -3655,6 +3669,7 @@ public interface J extends Tree {
             return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, type);
         }
 
+        @Override
         public JavaType getType() {
             return methodType == null ? null : methodType.getReturnType();
         }
@@ -4058,7 +4073,7 @@ public interface J extends Tree {
 
         /**
          * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
-         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-1124">JLS</a>.
+         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-S1124">JLS</a>.
          */
         public enum Type {
             Default,
@@ -4225,6 +4240,7 @@ public interface J extends Tree {
             return v.visitNewArray(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -4421,6 +4437,7 @@ public interface J extends Tree {
          * @return The constructor type.
          */
         @Nullable
+        @Override
         public JavaType.Method getMethodType() {
             return getConstructorType();
         }
@@ -4622,6 +4639,7 @@ public interface J extends Tree {
             return v.visitPackage(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Package getCoordinates() {
             return new CoordinateBuilder.Package(this);
@@ -5917,6 +5935,7 @@ public interface J extends Tree {
             @Getter
             JavaType.Variable variableType;
 
+            @Override
             public JavaType getType() {
                 return variableType != null ? variableType.getType() : null;
             }
@@ -6047,10 +6066,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public WhileLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));

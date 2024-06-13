@@ -26,6 +26,7 @@ import java.util.List;
  */
 public interface MethodCall extends Expression {
     @Nullable
+    @Override
     JavaType getType();
 
     @Override

@@ -30,7 +30,8 @@ import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.Assertions.*;
+import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangePluginTest implements RewriteTest {
     @Override
@@ -122,6 +123,19 @@ class ChangePluginTest implements RewriteTest {
                   }
                   """.formatted(version);
             })
+          )
+        );
+    }
+
+    @Test
+    void dontChangeExisting() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'io.moderne.rewrite' version '1.0.34'
+              }
+              """
           )
         );
     }

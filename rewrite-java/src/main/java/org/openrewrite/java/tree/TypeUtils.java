@@ -31,6 +31,11 @@ public class TypeUtils {
     private TypeUtils() {
     }
 
+    public static boolean isObject(@Nullable JavaType type) {
+        return type instanceof JavaType.FullyQualified &&
+               "java.lang.Object".equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
+    }
+
     public static boolean isString(@Nullable JavaType type) {
         return type == JavaType.Primitive.String ||
                (type instanceof JavaType.FullyQualified &&
@@ -240,6 +245,8 @@ public class TypeUtils {
                         }
                     }
                     return true;
+                } else if (toBounds.isEmpty()) {
+                    return from instanceof JavaType.FullyQualified;
                 }
                 return false;
             } else if (to instanceof JavaType.Variable) {
@@ -618,5 +625,68 @@ public class TypeUtils {
 
     static boolean deepEquals(@Nullable JavaType t, @Nullable JavaType t2) {
         return t == null ? t2 == null : t == t2 || t.equals(t2);
+    }
+
+    public static String toString(JavaType type) {
+        if (type instanceof JavaType.Primitive) {
+            return ((JavaType.Primitive) type).getKeyword();
+        } else if (type instanceof JavaType.Class) {
+            return ((JavaType.Class) type).getFullyQualifiedName();
+        } else if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            StringBuilder builder = new StringBuilder();
+            builder.append(toString(parameterized.getType()));
+            builder.append('<');
+            List<JavaType> typeParameters = parameterized.getTypeParameters();
+            for (int i = 0, typeParametersSize = typeParameters.size(); i < typeParametersSize; i++) {
+                JavaType parameter = typeParameters.get(i);
+                builder.append(toString(parameter));
+                if (i < typeParametersSize - 1) {
+                    builder.append(", ");
+                }
+            }
+            builder.append('>');
+            return builder.toString();
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable genericTypeVariable = (JavaType.GenericTypeVariable) type;
+            StringBuilder builder = new StringBuilder();
+            builder.append(genericTypeVariable.getName());
+            if (genericTypeVariable.getVariance() != JavaType.GenericTypeVariable.Variance.INVARIANT) {
+                builder.append(' ');
+                builder.append(toString(genericTypeVariable.getVariance()));
+            }
+
+            List<JavaType> bounds = genericTypeVariable.getBounds();
+            if (!bounds.isEmpty()) {
+                builder.append(' ');
+                int boundsSize = bounds.size();
+                if (boundsSize == 1) {
+                    builder.append(toString(bounds.get(0)));
+                } else {
+                    for (int i = 0; i < boundsSize; i++) {
+                        JavaType bound = bounds.get(i);
+                        builder.append(toString(bound));
+                        if (i < boundsSize - 1) {
+                            builder.append(" & ");
+                        }
+                    }
+                }
+            }
+            return builder.toString();
+        } else if (type instanceof JavaType.Array) {
+            return toString(((JavaType.Array) type).getElemType()) + "[]";
+        }
+        return type.toString();
+    }
+
+    private static String toString(JavaType.GenericTypeVariable.Variance variance) {
+        switch (variance) {
+            case COVARIANT:
+                return "extends";
+            case CONTRAVARIANT:
+                return "super";
+            default:
+                return "";
+        }
     }
 }

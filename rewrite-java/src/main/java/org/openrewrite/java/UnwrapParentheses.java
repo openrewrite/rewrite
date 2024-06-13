@@ -66,4 +66,3 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
         return true;
     }
 }
-

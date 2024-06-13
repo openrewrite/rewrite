@@ -23,7 +23,7 @@ import java.lang.annotation.RetentionPolicy;
 @AnnotationWithSourceRetention
 public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
 
-    public static final PT<TypeA> parameterizedField = new PT<TypeA>() {
+    public static final PT<TypeA> parameterizedField = new PT<>() {
     };
 
     public static abstract class InheritedJavaTypeGoat<T, U extends PT<U> & C> extends JavaTypeGoat<T, U> {

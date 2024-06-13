@@ -34,10 +34,10 @@ import java.util.Iterator;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindDeprecatedFields extends Recipe {
 
-    private static final AnnotationMatcher DEPRECATED_MATCHER = new AnnotationMatcher("java.lang.Deprecated");
+    private static final AnnotationMatcher DEPRECATED_MATCHER = new AnnotationMatcher("@java.lang.Deprecated");
 
     @Option(displayName = "Type pattern",
             description = "A type pattern that is used to find matching field uses.",

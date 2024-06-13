@@ -28,7 +28,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class ParentPomInsight extends Recipe {
     transient ParentPomsInUse inUse = new ParentPomsInUse(this);

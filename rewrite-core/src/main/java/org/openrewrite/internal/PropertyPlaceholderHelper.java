@@ -56,6 +56,14 @@ public class PropertyPlaceholderHelper {
         this.valueSeparator = valueSeparator;
     }
 
+    public boolean hasPlaceholders(@Nullable String value) {
+        if (value == null) {
+            return false;
+        }
+        int startIndex = value.indexOf(placeholderPrefix);
+        return startIndex > -1 && value.indexOf(placeholderSuffix, startIndex) > startIndex;
+    }
+
     public String replacePlaceholders(String value, final Properties properties) {
         return replacePlaceholders(value, properties::getProperty);
     }

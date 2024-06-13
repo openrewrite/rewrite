@@ -32,6 +32,7 @@ import java.util.function.Predicate;
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
+@SuppressWarnings("unused")
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

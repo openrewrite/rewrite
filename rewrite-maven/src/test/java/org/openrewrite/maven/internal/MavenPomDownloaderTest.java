@@ -36,6 +36,7 @@ import org.openrewrite.maven.tree.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -46,9 +47,13 @@ import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static org.assertj.core.api.Assertions.*;
+import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 
 @SuppressWarnings({"HttpUrlsUsage"})
 class MavenPomDownloaderTest {
@@ -72,6 +77,16 @@ class MavenPomDownloaderTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    void ossSonatype() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        MavenRepository ossSonatype = new MavenRepository("oss", "https://oss.sonatype.org/content/repositories/snapshots/",
+          null, "true", false, null, null, null);
+        MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
+          MavenExecutionContextView.view(ctx), null);
+        assertThat(repo).isNotNull().extracting((MavenRepository::getUri)).isEqualTo(ossSonatype.getUri());
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/3908")
@@ -117,7 +132,7 @@ class MavenPomDownloaderTest {
     }
 
     @Test
-    void listenerRecordsAttemptedUris() {
+    void listenerRecordsRepository() {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
         // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
         for (MavenRepository repository : ctx.getRepositories()) {
@@ -141,7 +156,7 @@ class MavenPomDownloaderTest {
 
         try {
             new MavenPomDownloader(ctx)
-              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, Collections.singletonList(nonexistentRepo));
+              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
         } catch (Exception e) {
             // not expected to succeed
         }
@@ -151,16 +166,91 @@ class MavenPomDownloaderTest {
           .containsExactly(nonexistentRepo);
     }
 
+    @Test
+    void listenerRecordsFailedRepositoryAccess() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        // Avoid actually trying to reach a made-up URL
+        String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
+        MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null);
+        Map<String, Throwable> attemptedUris = new HashMap<>();
+        List<MavenRepository> discoveredRepositories = new ArrayList<>();
+        ctx.setResolutionListener(new ResolutionEventListener() {
+            @Override
+            public void repositoryAccessFailed(String uri, Throwable e) {
+                attemptedUris.put(uri, e);
+            }
+        });
+
+        try {
+            new MavenPomDownloader(ctx)
+              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
+        } catch (Exception e) {
+            // not expected to succeed
+        }
+        assertThat(attemptedUris).isNotEmpty();
+        assertThat(attemptedUris.get(httpUrl)).isInstanceOf(UnknownHostException.class);
+        assertThat(discoveredRepositories).isEmpty();
+    }
+
+    @Test
+    void mirrorsOverrideRepositoriesInPom() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+          //language=xml
+          """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                                  https://maven.apache.org/xsd/settings-1.0.0.xsd">
+              <mirrors>
+                <mirror>
+                  <id>mirror</id>
+                  <url>https://artifactory.moderne.ninja/artifactory/moderne-cache</url>
+                  <mirrorOf>*</mirrorOf>
+                </mirror>
+              </mirrors>
+            </settings>
+            """.getBytes()
+        )), ctx));
+
+        Path pomPath = Paths.get("pom.xml");
+        Pom pom = Pom.builder()
+          .sourcePath(pomPath)
+          .repository(MAVEN_CENTRAL)
+          .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+          .gav(new ResolvedGroupArtifactVersion(
+            "${REPO_URL}", "org.openrewrite", "rewrite-core", "7.0.0", null))
+          .build();
+        ResolvedPom resolvedPom = ResolvedPom.builder()
+          .requested(pom)
+          .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+          .repositories(singletonList(MAVEN_CENTRAL))
+          .build();
+
+        Map<Path, Pom> pomsByPath = new HashMap<>();
+        pomsByPath.put(pomPath, pom);
+
+        MavenPomDownloader mpd = new MavenPomDownloader(pomsByPath, ctx);
+        MavenRepository normalized = mpd.normalizeRepository(
+          MavenRepository.builder().id("whatever").uri("${REPO_URL}").build(),
+          ctx,
+          resolvedPom
+        );
+        assertThat(normalized)
+          .extracting(MavenRepository::getUri)
+          .isEqualTo("https://artifactory.moderne.ninja/artifactory/moderne-cache/");
+    }
+
     @Disabled("Flaky on CI")
     @Test
     void normalizeOssSnapshots() {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         MavenRepository oss = downloader.normalizeRepository(
           MavenRepository.builder().id("oss").uri("https://oss.sonatype.org/content/repositories/snapshots").build(),
-          null);
+          MavenExecutionContextView.view(ctx), null);
 
         assertThat(oss).isNotNull();
-        assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
+        assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots/");
     }
 
     @ParameterizedTest
@@ -170,7 +260,7 @@ class MavenPomDownloaderTest {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         MavenRepository oss = downloader.normalizeRepository(
           MavenRepository.builder().id("myRepo").uri(url).build(),
-          null, null);
+          MavenExecutionContextView.view(ctx), null);
 
         assertThat(oss).isNull();
     }
@@ -184,7 +274,7 @@ class MavenPomDownloaderTest {
               .id("id")
               .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
               .build();
-            var normalizedRepo = downloader.normalizeRepository(originalRepo, null);
+            var normalizedRepo = downloader.normalizeRepository(originalRepo, MavenExecutionContextView.view(ctx), null);
             assertThat(normalizedRepo).isEqualTo(originalRepo);
         });
     }
@@ -207,8 +297,7 @@ class MavenPomDownloaderTest {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         var normalizedRepository = downloader.normalizeRepository(
           MavenRepository.builder().id("id").uri("https//localhost").build(),
-          null
-        );
+          MavenExecutionContextView.view(ctx), null);
         assertThat(normalizedRepository).isEqualTo(null);
     }
 
@@ -651,6 +740,20 @@ class MavenPomDownloaderTest {
         var result = downloader.download(gav, null, null, List.of());
         assertThat(result.getRepository()).isNotNull();
         assertThat(result.getRepository().getUri()).startsWith(tempDir.toUri().toString());
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4080")
+    @Test
+    void connectTimeout() {
+        var downloader = new MavenPomDownloader(ctx);
+        var gav = new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0");
+        var repos = singletonList(MavenRepository.builder()
+          .id("non-routable").uri("http://10.0.0.0/maven").knownToExist(true).build());
+
+        assertThatThrownBy(() -> downloader.download(gav, null, null, repos))
+          .isInstanceOf(MavenDownloadingException.class)
+          .hasMessageContaining("rewrite-core")
+          .hasMessageContaining("10.0.0.0");
     }
 
     private static GroupArtifactVersion createArtifact(Path repository) throws IOException {

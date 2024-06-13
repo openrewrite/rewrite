@@ -43,6 +43,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeCache);
     }
 
+    @Override
     public JavaType type(@Nullable ASTNode type) {
         if (type == null) {
             return JavaType.Class.Unknown.getInstance();
@@ -83,12 +84,12 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
     }
 
-    private JavaType.Class classType(ClassNode node, String signature) {
-        JavaType.Class clazz;
+    private JavaType.FullyQualified classType(ClassNode node, String signature) {
         try {
             JavaType type = reflectionTypeMapping.type(node.getTypeClass());
-            clazz = (JavaType.Class) (type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type);
+            return (JavaType.FullyQualified) (type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type);
         } catch (GroovyBugError | NoClassDefFoundError ignored1) {
+            JavaType.Class clazz;
             clazz = new JavaType.Class(null, Flag.Public.getBitMask(), node.getName(), JavaType.Class.Kind.Class,
                     null, null, null, null, null, null, null);
             typeCache.put(signature, clazz);
@@ -130,16 +131,16 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             List<JavaType.FullyQualified> annotations = getAnnotations(node);
 
             clazz.unsafeSet(null, supertype, owner, annotations, interfaces, fields, methods);
+            return clazz;
         }
 
-        return clazz;
     }
 
     private JavaType parameterizedType(ClassNode type, String signature) {
         JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
         typeCache.put(signature, pt);
 
-        JavaType.Class clazz = classType(type, type.getPlainNodeReference().getName());
+        JavaType.FullyQualified clazz = classType(type, type.getPlainNodeReference().getName());
 
         List<JavaType> typeParameters = emptyList();
         if (type.getGenericsTypes() != null && type.getGenericsTypes().length > 0) {

@@ -6,7 +6,7 @@ plugins {
 
 dependencies {
     constraints {
-        rootProject.subprojects.filter { it != project && !it.name.contains("benchmark") }.sortedBy { it.name }.forEach {
+        rootProject.subprojects.filter { it != project && !it.name.contains("benchmark") && it.name != "tools" }.sortedBy { it.name }.forEach {
             api(it)
         }
     }

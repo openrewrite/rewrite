@@ -16,19 +16,21 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class ChangeProjectVersionTest implements RewriteTest {
+class ChangeProjectVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-maven", "8.4.2", null));
     }
 
+    @DocumentExample
     @Test
     void changeProjectVersion() {
         rewriteRun(
