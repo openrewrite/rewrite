@@ -16,12 +16,13 @@
 package org.openrewrite.java.recipes;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class BlankLinesAroundFieldsWithAnnotationsTest implements RewriteTest {
+class BlankLinesAroundFieldsWithAnnotationsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -29,6 +30,7 @@ public class BlankLinesAroundFieldsWithAnnotationsTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
     void spaceBetweenFields() {
         rewriteRun(
           java(
