@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,27 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.config;
+package org.openrewrite;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import org.openrewrite.NlsRewrite;
+public class MyRecipe extends Recipe {
 
-import java.util.List;
+    @Override
+    public String getDisplayName() {
+        return "My Title";
+    }
 
-@Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class DataTableDescriptor {
-
-    @EqualsAndHashCode.Include
-    String name;
-
-    @NlsRewrite.DisplayName
-    String displayName;
-
-    @NlsRewrite.Description
-    String description;
-
-    @EqualsAndHashCode.Include
-    List<ColumnDescriptor> columns;
+    @Override
+    public String getDescription() {
+        return "";
+    }
 }
