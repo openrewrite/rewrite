@@ -77,6 +77,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @JsonIgnore
     private Validated<Object> validation = Validated.none();
+
     @JsonIgnore
     private Validated<Object> initValidation = null;
 

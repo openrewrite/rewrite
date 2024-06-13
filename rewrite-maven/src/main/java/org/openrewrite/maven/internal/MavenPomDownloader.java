@@ -76,6 +76,7 @@ public class MavenPomDownloader {
 
     @Nullable
     private MavenSettings mavenSettings;
+
     private Collection<MavenRepositoryMirror> mirrors;
 
     @Nullable

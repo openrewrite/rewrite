@@ -63,13 +63,16 @@ public interface Properties extends Tree {
 
         @With
         String prefix;
+
         @With
         Markers markers;
+
         @With
         Path sourcePath;
 
         @With
         List<Content> content;
+
         @With
         String eof;
 

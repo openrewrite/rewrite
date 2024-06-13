@@ -54,6 +54,7 @@ public class Plugin {
     public static class Execution {
 
         String id;
+
         @Nullable
         List<String> goals;
 

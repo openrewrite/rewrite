@@ -91,10 +91,13 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
         private final String groupId;
         private final String artifactId;
         private final String version;
+
         @Nullable
         private final String type;
+
         @Nullable
         private final String scope;
+
         @Nullable
         private final String classifier;
 

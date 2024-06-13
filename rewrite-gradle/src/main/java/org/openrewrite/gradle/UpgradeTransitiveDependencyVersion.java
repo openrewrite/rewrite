@@ -382,6 +382,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
         String config;
         GroupArtifactVersion gav;
+
         @Nullable
         String because;
         @Override
@@ -437,6 +438,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     private static class UpdateConstraintVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
         GroupArtifactVersion gav;
         J.MethodInvocation existingConstraint;
+
         @Nullable
         String because;
 
