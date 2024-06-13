@@ -145,7 +145,7 @@ public class AddRepository extends Recipe {
                 if (REPOS_MATCHER.matches(getCursor())) {
                     Optional<Xml.Tag> maybeRepo = repositories.getChildren().stream()
                             .filter(repo ->
-                                    type.xmlTagSingle.equals(repo.getName()) &&
+                                    getType().xmlTagSingle.equals(repo.getName()) &&
                                     (id.equals(repo.getChildValue("id").orElse(null)) || (isReleasesEqual(repo) && isSnapshotsEqual(repo))) &&
                                     url.equals(repo.getChildValue("url").orElse(null))
                             )

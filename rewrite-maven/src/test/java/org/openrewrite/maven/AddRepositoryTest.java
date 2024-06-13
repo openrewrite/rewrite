@@ -29,7 +29,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, null, null,
-            null, null, null, AddRepository.Type.Repository)),
+            null, null, null, null)),
           pomXml(
             """
               <project>
@@ -91,7 +91,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", "bb", null,
             null, null, null,
-            null, null, null, AddRepository.Type.Repository)),
+            null, null, null, null)),
           pomXml(
             """
               <project>
@@ -130,7 +130,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, null, null,
-            null, null, null, AddRepository.Type.Repository)),
+            null, null, null, null)),
           pomXml(
             """
               <project>
@@ -155,7 +155,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, null, null,
-            null, null, null, AddRepository.Type.Repository)),
+            null, null, null, null)),
           pomXml(
             """
               <project>
@@ -195,7 +195,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             false, "whatever", null,
-            null, null, null, AddRepository.Type.Repository)),
+            null, null, null, null)),
           pomXml(
             """
               <project>
@@ -239,7 +239,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, "whatever", null,
-            null, null, null, AddRepository.Type.Repository)),
+            null, null, null, null)),
           pomXml(
             """
               <project>
@@ -282,7 +282,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             true, null, null,
-            null, null, null, AddRepository.Type.Repository)),
+            null, null, null, null)),
           pomXml(
             """
               <project>
@@ -311,7 +311,7 @@ class AddRepositoryTest implements RewriteTest {
           spec -> spec.recipes(
             new AddRepository("boot-snapshots", "https://repo.spring.io/snapshot", null, null,
               true, null, null,
-              null, null, null, AddRepository.Type.Repository),
+              null, null, null, null),
             new UpgradeParentVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0-SNAPSHOT", null)
           ),
           pomXml(
