@@ -20,11 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,7 +43,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                 } else if (c.getPadding().getTypeParameters() != null) {
                     c = c.getPadding().withTypeParameters(c.getPadding().getTypeParameters().withBefore(c.getPadding().getTypeParameters().getBefore().withWhitespace("")));
                 } else {
-                    c = c.getAnnotations().withKind(c.getAnnotations().getKind().withPrefix(c.getAnnotations().getKind().getPrefix().withWhitespace("")));
+                    c = c.getPadding().withKind(c.getPadding().getKind().withPrefix(c.getPadding().getKind().getPrefix().withWhitespace("")));
                 }
             } else {
                 List<J.Annotation> newLeadingAnnotations = removeAnnotationOrEmpty(leadingAnnotations, annotationRemoved);

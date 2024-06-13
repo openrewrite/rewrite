@@ -337,6 +337,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         return kind;
     }
 
+    @Override
     @SuppressWarnings("ConstantConditions")
     public JavaType type(@Nullable Tree tree) {
         if (tree == null) {
@@ -432,7 +433,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             resolvedOwner = type instanceof Type.MethodType ?
-                    methodInvocationType(type, sym) :
+                    methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type)) :
                     type(type);
             assert resolvedOwner != null;
         }

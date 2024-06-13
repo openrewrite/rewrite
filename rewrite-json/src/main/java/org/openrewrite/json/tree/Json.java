@@ -82,7 +82,7 @@ public interface Json extends Tree {
         }
 
         public Array withValues(List<JsonValue> values) {
-            return getPadding().withParameters(JsonRightPadded.withElements(this.values, values));
+            return getPadding().withValues(JsonRightPadded.withElements(this.values, values));
         }
 
         @Override
@@ -113,7 +113,7 @@ public interface Json extends Tree {
                 return t.values;
             }
 
-            public Array withParameters(List<JsonRightPadded<JsonValue>> values) {
+            public Array withValues(List<JsonRightPadded<JsonValue>> values) {
                 return t.values == values ? t : new Array(t.id, t.prefix, t.markers, values);
             }
         }
@@ -141,6 +141,7 @@ public interface Json extends Tree {
         Markers markers;
 
         @Nullable // for backwards compatibility
+        @Getter
         @With(AccessLevel.PRIVATE)
         String charsetName;
 

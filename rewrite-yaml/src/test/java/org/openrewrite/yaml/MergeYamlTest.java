@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
+@SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
 class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/support-public/issues/5")
@@ -166,7 +167,7 @@ class MergeYamlTest implements RewriteTest {
               widget:
                 list:
                   - item 1
-                """,
+              """,
             """
               widget:
                 list:
@@ -585,7 +586,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapAddAdditionalObject() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
               //language=yaml
@@ -621,7 +621,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapAddObject() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
               //language=yaml
@@ -683,7 +682,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapWhenOneIdenticalObjectExistsTheSecondIsAdded() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
               //language=yaml
@@ -721,7 +719,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapWhenOneDifferentObjectExistsValuesAreChanged() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
               //language=yaml
@@ -750,12 +747,41 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mergeMappingIntoNewMapping() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.testing",
+              //language=yaml
+              """
+                table:
+                  - name: jdk_version
+                    value: 17
+                """,
+              false,
+              "name"
+            )),
+          yaml(
+            """
+              foo: bar
+              """,
+            """
+              foo: bar
+              testing:
+                table:
+                  - name: jdk_version
+                    value: 17
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2157")
     @Test
     void mergeSequenceMapAddComplexMapping() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.spec",
               //language=yaml
@@ -803,7 +829,6 @@ class MergeYamlTest implements RewriteTest {
     void mergeSequenceMapChangeComplexMapping() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.spec",
               //language=yaml
@@ -841,4 +866,125 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mergeScalar() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.name",
+              //language=yaml
+              """
+                sam
+                """,
+              false,
+              null
+            )),
+          yaml(
+            """
+              name: jon
+              """,
+            """
+              name: sam
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertScalar() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.name",
+              //language=yaml
+              """
+                sam
+                """,
+              false,
+              null
+            )),
+          yaml(
+            """
+              """,
+            """
+              name: sam
+              """
+          )
+        );
+    }
+
+    @Test
+    void addNewEntryToSequence() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups",
+              // language=yaml
+              """
+                - name: newName
+                  jobs:
+                    - newJob
+                """,
+              false, "name")),
+          yaml(
+            """
+              groups:
+                - name: analysis
+                  jobs:
+                    - analysis
+                - name: update
+                  jobs:
+                    - update
+              """,
+            """
+              groups:
+                - name: analysis
+                  jobs:
+                    - analysis
+                - name: update
+                  jobs:
+                    - update
+                - name: newName
+                  jobs:
+                    - newJob
+              """)
+        );
+    }
+
+    @Test
+    // Mimics `org.openrewrite.java.micronaut.UpdateSecurityYamlIfNeeded`
+    void mergeEmptyStructureFollowedByCopyValue() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new MergeYaml(
+              "$.spec",
+              //language=yaml
+              """
+                empty:
+                  initially:
+                """,
+              false,
+              null
+            ),
+            new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
+            .expectedCyclesThatMakeChanges(2),
+          yaml(
+            """
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                level1:
+                  level2: true
+              """,
+            """
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                level1:
+                  level2: true
+                empty:
+                  initially: true
+              """
+          )
+        );
+    }
 }

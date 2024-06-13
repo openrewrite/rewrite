@@ -27,8 +27,6 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
@@ -39,7 +37,6 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
 
 public class ClasspathScanningLoader implements ResourceLoader {
-    private static final Logger logger = LoggerFactory.getLogger(ClasspathScanningLoader.class);
 
     private final LinkedHashSet<Recipe> recipes = new LinkedHashSet<>();
     private final List<NamedStyles> styles = new ArrayList<>();
@@ -147,15 +144,16 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
                 Class<?> styleClass = classInfo.loadClass();
-                try {
                     Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
                     if (constructor != null) {
                         constructor.setAccessible(true);
-                        styles.add((NamedStyles) constructor.newInstance());
+                        try {
+                            styles.add((NamedStyles) constructor.newInstance());
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
                     }
-                } catch (Throwable e) {
-                    logger.warn("Unable to configure {}", styleClass.getName(), e);
-                }
+
             }
         }
     }
@@ -178,7 +176,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 MetricsHelper.successTags(builder.tags("recipe", "elided"));
             } catch (Throwable e) {
                 MetricsHelper.errorTags(builder.tags("recipe", recipeClass.getName()), e);
-                logger.warn("Unable to configure {}", recipeClass.getName(), e);
             } finally {
                 sample.stop(builder.register(Metrics.globalRegistry));
             }

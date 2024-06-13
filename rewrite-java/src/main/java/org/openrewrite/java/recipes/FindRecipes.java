@@ -36,7 +36,6 @@ import org.openrewrite.table.RewriteRecipeSource;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
@@ -153,7 +152,7 @@ public class FindRecipes extends Recipe {
                 } else if (value == null) {
                     return JsonNodeFactory.instance.nullNode();
                 }
-                throw new IllegalArgumentException(Objects.toString(value));
+                throw new IllegalArgumentException(String.valueOf(value));
             }
         });
     }

@@ -21,8 +21,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.table.ParseFailures;
 
+import java.util.Objects;
+
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindParseFailures extends Recipe {
 
     @Option(displayName = "Max snippet length",
@@ -39,7 +41,7 @@ public class FindParseFailures extends Recipe {
     @Nullable
     String parserType;
 
-    @Option(displayName = "Stack trace",
+    @Option(example = "RuntimeException", displayName = "Stack trace",
             description = "Only mark stack traces with a message containing this text.",
             required = false)
     @Nullable
@@ -66,7 +68,7 @@ public class FindParseFailures extends Recipe {
             public Tree postVisit(Tree tree, ExecutionContext ctx) {
                 return tree.getMarkers().findFirst(ParseExceptionResult.class)
                         .map(exceptionResult -> {
-                            if (parserType != null && !exceptionResult.getParserType().equals(parserType)) {
+                            if (parserType != null && !Objects.equals(exceptionResult.getParserType(), parserType)) {
                                 return tree;
                             }
 

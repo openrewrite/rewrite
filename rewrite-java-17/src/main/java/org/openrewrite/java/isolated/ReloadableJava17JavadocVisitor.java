@@ -15,14 +15,14 @@
  */
 package org.openrewrite.java.isolated;
 
+import com.sun.source.doctree.*;
 import com.sun.source.doctree.ErroneousTree;
 import com.sun.source.doctree.LiteralTree;
 import com.sun.source.doctree.ProvidesTree;
 import com.sun.source.doctree.ReturnTree;
 import com.sun.source.doctree.UsesTree;
-import com.sun.source.doctree.*;
-import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.*;
+import com.sun.source.tree.IdentifierTree;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
@@ -1164,7 +1164,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
             } else {
                 cursor = saveCursor;
-                return elemType;
+                return elemType.withPrefix(fmt);
             }
 
             return new J.ArrayType(

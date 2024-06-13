@@ -46,6 +46,7 @@ public class Semver {
                 }
         ).and(Validated.<VersionComparator>none()
                 .or(LatestRelease.buildLatestRelease(toVersion, metadataPattern))
+                .or(LatestIntegration.build(toVersion, metadataPattern))
                 .or(LatestPatch.build(toVersion, metadataPattern))
                 .or(HyphenRange.build(toVersion, metadataPattern))
                 .or(XRange.build(toVersion, metadataPattern))

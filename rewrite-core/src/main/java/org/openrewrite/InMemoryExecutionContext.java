@@ -73,6 +73,7 @@ public class InMemoryExecutionContext implements ExecutionContext {
         return (T) messages.remove(key);
     }
 
+    @Override
     public Consumer<Throwable> getOnError() {
         return onError;
     }

@@ -26,7 +26,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-public class AnnotationServiceTest implements RewriteTest {
+class AnnotationServiceTest implements RewriteTest {
 
     @Test
     void classAnnotations() {

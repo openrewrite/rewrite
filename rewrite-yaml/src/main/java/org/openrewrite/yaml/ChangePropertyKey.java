@@ -43,7 +43,7 @@ import static org.openrewrite.Tree.randomId;
  * interprets application.yml files.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePropertyKey extends Recipe {
 
     @Option(displayName = "Old property key",
@@ -63,7 +63,7 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Option(displayName = "Except",
+    @Option(example = "List.of(\"group\")", displayName = "Except",
             description = "If any of these property keys exist as direct children of `oldPropertyKey`, then they will not be moved to `newPropertyKey`.",
             required = false)
     @Nullable

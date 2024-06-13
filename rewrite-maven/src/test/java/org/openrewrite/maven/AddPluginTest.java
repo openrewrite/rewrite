@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class AddPluginTest implements RewriteTest {
+class AddPluginTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -336,7 +336,8 @@ public class AddPluginTest implements RewriteTest {
     void addPluginWithExistingPlugin() {
         rewriteRun(
           spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>

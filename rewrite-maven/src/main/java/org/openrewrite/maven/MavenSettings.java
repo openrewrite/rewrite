@@ -151,20 +151,22 @@ public class MavenSettings {
     }
 
     public List<RawRepositories.Repository> getActiveRepositories(Iterable<String> activeProfiles) {
-        List<RawRepositories.Repository> activeRepositories = new ArrayList<>();
+        LinkedHashMap<String, RawRepositories.Repository> activeRepositories = new LinkedHashMap<>();
 
         if (profiles != null) {
             for (Profile profile : profiles.getProfiles()) {
                 if (profile.isActive(activeProfiles) || (this.activeProfiles != null &&
                                                          profile.isActive(this.activeProfiles.getActiveProfiles()))) {
                     if (profile.repositories != null) {
-                        activeRepositories.addAll(profile.repositories.getRepositories());
+                        for (RawRepositories.Repository repository : profile.repositories.getRepositories()) {
+                            activeRepositories.put(repository.getId(), repository);
+                        }
                     }
                 }
             }
         }
 
-        return activeRepositories;
+        return new ArrayList<>(activeRepositories.values());
     }
 
     public MavenRepository getMavenLocal() {
@@ -197,7 +199,7 @@ public class MavenSettings {
             if (key.startsWith("env.")) {
                 return System.getenv().get(key.substring(4));
             }
-            return null;
+            return System.getenv().get(key);
         };
 
         public MavenSettings interpolate(MavenSettings mavenSettings) {

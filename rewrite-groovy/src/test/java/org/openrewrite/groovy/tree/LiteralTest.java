@@ -110,7 +110,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void gStringMultiPropertyAccess() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             "$System.env.BAR_BAZ"
             """)
         );
@@ -119,7 +120,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void emptyGString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             "${}"
             """)
         );
@@ -128,7 +130,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void nestedGString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             " ${ " ${ " " } " } "
             """)
         );
@@ -137,7 +140,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void gStringInterpolateString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             " ${""}\\n${" "} "
             """)
         );

@@ -32,10 +32,10 @@ import org.openrewrite.marker.SearchResult;
 import java.util.Iterator;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindDeprecatedClasses extends Recipe {
 
-    private static final AnnotationMatcher DEPRECATED_MATCHER = new AnnotationMatcher("java.lang.Deprecated");
+    private static final AnnotationMatcher DEPRECATED_MATCHER = new AnnotationMatcher("@java.lang.Deprecated");
 
     @Option(displayName = "Type pattern",
             description = "A type pattern that is used to find matching classes.",

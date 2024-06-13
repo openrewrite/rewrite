@@ -43,7 +43,9 @@ import static org.openrewrite.Tree.randomId;
 
 @RequiredArgsConstructor
 public class MavenParser implements Parser {
+
     private final Collection<String> activeProfiles;
+    private final boolean skipDependencyResolution;
 
     @Override
     public Stream<SourceFile> parse(@Language("xml") String... sources) {
@@ -109,8 +111,10 @@ public class MavenParser implements Parser {
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             try {
                 ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
-                MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles())
-                        .resolveDependencies(downloader, ctx);
+                MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles());
+                if (!skipDependencyResolution) {
+                    model = model.resolveDependencies(downloader, ctx);
+                }
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
             } catch (MavenDownloadingExceptions e) {
                 ParseExceptionResult parseExceptionResult = new ParseExceptionResult(
@@ -173,9 +177,15 @@ public class MavenParser implements Parser {
 
     public static class Builder extends Parser.Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
+        private boolean skipDependencyResolution;
 
         public Builder() {
             super(Xml.Document.class);
+        }
+
+        public Builder skipDependencyResolution(boolean skip) {
+            skipDependencyResolution = skip;
+            return this;
         }
 
         public Builder activeProfiles(@Nullable String... profiles) {
@@ -203,8 +213,9 @@ public class MavenParser implements Parser {
             return this;
         }
 
+        @Override
         public MavenParser build() {
-            return new MavenParser(activeProfiles);
+            return new MavenParser(activeProfiles, skipDependencyResolution);
         }
 
         @Override

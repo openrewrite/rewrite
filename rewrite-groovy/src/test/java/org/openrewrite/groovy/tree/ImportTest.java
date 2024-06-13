@@ -74,9 +74,7 @@ class ImportTest implements RewriteTest {
             """
               import java.util.List as L
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getEof()).isEqualTo(Space.EMPTY);
-            })
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getEof()).isEqualTo(Space.EMPTY))
           )
         );
     }
@@ -88,9 +86,7 @@ class ImportTest implements RewriteTest {
             """
               import static java.util.Collections.singletonList as listOf
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getEof()).isEqualTo(Space.EMPTY);
-            })
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getEof()).isEqualTo(Space.EMPTY))
           )
         );
     }

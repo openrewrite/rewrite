@@ -147,6 +147,7 @@ public class GradleParser implements Parser {
             return this;
         }
 
+        @Override
         public GradleParser build() {
             return new GradleParser(this);
         }
@@ -155,7 +156,6 @@ public class GradleParser implements Parser {
         public String getDslName() {
             return "gradle";
         }
-
     }
 
     private static List<Path> loadDefaultClasspath() {

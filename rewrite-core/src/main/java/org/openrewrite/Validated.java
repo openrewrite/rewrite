@@ -206,6 +206,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
      */
     class Valid<T> implements Validated<T> {
         protected final String property;
+
         @Nullable
         private final T value;
 

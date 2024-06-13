@@ -2,6 +2,10 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
+val antlrGeneration by configurations.creating {
+    extendsFrom(configurations.implementation.get())
+}
+
 tasks.register<JavaExec>("generateAntlrSources") {
     mainClass.set("org.antlr.v4.Tool")
 
@@ -11,7 +15,7 @@ tasks.register<JavaExec>("generateAntlrSources") {
             "-visitor"
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
-    classpath = sourceSets["main"].runtimeClasspath
+    classpath = antlrGeneration
 }
 
 dependencies {
@@ -22,6 +26,7 @@ dependencies {
     api("io.micrometer:micrometer-core:1.9.+")
     api("org.jetbrains:annotations:latest.release")
 
+    antlrGeneration("org.antlr:antlr4:4.11.1")
     implementation("org.antlr:antlr4-runtime:4.11.1")
     compileOnly("com.puppycrawl.tools:checkstyle:9.+") { // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
         isTransitive = false
@@ -54,8 +59,10 @@ dependencies {
 
     // For use in ClassGraphTypeMappingTest
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")
-
     testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
+
+    // For use in ReplaceAnnotationTest
+    testRuntimeOnly("org.projectlombok:lombok:latest.release")
 }
 
 tasks.withType<Javadoc> {

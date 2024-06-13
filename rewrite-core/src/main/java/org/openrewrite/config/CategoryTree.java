@@ -72,6 +72,7 @@ public class CategoryTree<G> {
             super();
         }
 
+        @Override
         public CategoryTree.Root<G> removeAll(G group) {
             // increase visibility and cast
             return (Root<G>) super.removeAll(group);

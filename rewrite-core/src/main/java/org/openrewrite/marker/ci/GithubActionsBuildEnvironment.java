@@ -32,6 +32,7 @@ import static org.openrewrite.Tree.randomId;
 public class GithubActionsBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
+
     String buildNumber;
     String buildId;
     String host;

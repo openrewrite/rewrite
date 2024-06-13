@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     @Option(displayName = "Relative File Name",
             description = "File name, using a relative path. If a non-plaintext file already exists at this location, then this recipe will do nothing.",
@@ -71,7 +72,11 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public String getDescription() {
-        return "Appends or replaces content of an existing plain text file, or creates a new one if it doesn't already exist.";
+        return "Appends or replaces content of an existing plain text file, or creates a new one if it doesn't already exist. " +
+               "Please note that this recipes requires existing plain text files' format to be successfully parsable by OpenRewrite. " +
+               "If a file is left unchanged, it might be parsed as a `Quark` rather than plain text. In such case, use the `plainTextMask` option. " +
+               "See the [Gradle](https://docs.openrewrite.org/reference/gradle-plugin-configuration#configuring-the-rewrite-dsl) or " +
+               "[Maven](https://openrewrite.github.io/rewrite-maven-plugin/run-mojo.html#plainTextMasks) plugin configuration page.";
     }
 
     @Override
@@ -105,9 +110,10 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
         String preamble = this.preamble != null ? this.preamble + maybeNewline : "";
 
         boolean exists = fileExists.get();
+        Path path = Paths.get(relativeFileName);
         if (!exists) {
             for (SourceFile generated : generatedInThisCycle) {
-                if (generated.getSourcePath().toString().equals(Paths.get(relativeFileName).toString())) {
+                if (generated.getSourcePath().toString().equals(path.toString())) {
                     exists = true;
                     break;
                 }
@@ -118,7 +124,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
                 Collections.emptyList() :
                 Collections.singletonList(PlainText.builder()
                         .text(preamble + content)
-                        .sourcePath(Paths.get(relativeFileName))
+                        .sourcePath(path)
                         .build());
     }
 

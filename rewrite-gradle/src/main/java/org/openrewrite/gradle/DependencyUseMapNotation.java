@@ -78,6 +78,9 @@ public class DependencyUseMapNotation extends Recipe {
                     return m;
                 }
                 Dependency dependency = DependencyStringNotationConverter.parse(dependencyString);
+                if (dependency == null) {
+                    return m;
+                }
                 List<Expression> arguments = new ArrayList<>();
                 arguments.add(mapEntry("group", dependency.getGroupId())
                         .withMarkers(arg.getMarkers())

@@ -31,7 +31,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindFields extends Recipe {
     @Option(displayName = "Fully-qualified type name",
             description = "A fully-qualified Java type name, that is used to find matching fields.",

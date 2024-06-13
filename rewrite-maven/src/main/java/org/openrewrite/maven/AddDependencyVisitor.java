@@ -169,6 +169,8 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                                 "<version>" + versionToUse + "</version>\n") +
                         (classifier == null ? "" :
                                 "<classifier>" + classifier + "</classifier>\n") +
+                        (type == null || "jar".equals(type) ? "" :
+                                "<type>" + type + "</type>\n") +
                         (scope == null || "compile".equals(scope) ? "" :
                                 "<scope>" + scope + "</scope>\n") +
                         (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +

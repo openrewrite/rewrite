@@ -261,4 +261,21 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4204")
+    @Test
+    void preserveEmptySequencesWithOtherKeys() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("my.key", false, null)),
+          yaml(
+            """
+              my.key: qwe
+              seq: []
+              """,
+            """
+              seq: []
+              """
+          )
+        );
+    }
 }

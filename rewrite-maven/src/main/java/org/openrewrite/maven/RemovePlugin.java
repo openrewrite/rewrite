@@ -26,7 +26,7 @@ import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemovePlugin extends Recipe {
 
     @Option(displayName = "Group",

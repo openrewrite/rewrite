@@ -17,9 +17,11 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
@@ -75,6 +77,21 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
+    void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
+        assertThatExceptionOfType(AssertionError.class)
+          .isThrownBy(() -> rewriteRun(
+            spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+              "javax.activation",
+              "javax.activation-api",
+              "javax.activation",
+              "javax.activation-api",
+              null
+            ))
+          )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
+    }
+
+    @Test
     void changeManagedDependencyWithDynamicVersion() {
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
@@ -106,6 +123,56 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 assertThat(pom).containsPattern("<version>2.1.(\\d+)</version>");
                 return pom;
             })
+          )
+        );
+    }
+
+    @Test
+    void latestPatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "latest.patch",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.2</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
           )
         );
     }

@@ -27,12 +27,12 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.HashSet;
 import java.util.Set;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class FindTags extends Recipe {
     @Option(displayName = "XPath",
             description = "An XPath expression used to find matching tags.",
-            example = "/dependencies/dependency")
+            example = "//dependencies/dependency")
     String xPath;
 
     @Override
@@ -79,6 +79,7 @@ public class FindTags extends Recipe {
     /**
      * Returns <code>null</code> if there is not exactly one tag matching this xPath
      */
+    @SuppressWarnings("unused")
     @Nullable
     @Incubating(since = "7.33.0")
     public static Xml.Tag findSingle(Xml x, String xPath) {

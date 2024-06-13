@@ -29,8 +29,6 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Predicate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class StringUtils {
     private StringUtils() {
@@ -637,9 +635,6 @@ public class StringUtils {
         return true;
     }
 
-    private static final Pattern SINGLE_DOT_OR_DOLLAR = Pattern.compile("(?:([^.]+)|^)\\.(?:([^.]+)|$)");
-    private static final String SINGLE_DOT_OR_DOLLAR_REPLACEMENT = "$1" + Matcher.quoteReplacement("[.$]") + "$2";
-
     /**
      * See <a href="https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns">https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns</a>
      * <p>
@@ -651,13 +646,34 @@ public class StringUtils {
      * the code is in any declaration of a type whose name begins with "com.xerox.".
      */
     public static String aspectjNameToPattern(String name) {
-        String replaced = name
-                .replace("$", "\\$")
-                .replace("[", "\\[")
-                .replace("]", "\\]");
-        return SINGLE_DOT_OR_DOLLAR.matcher(replaced).replaceAll(SINGLE_DOT_OR_DOLLAR_REPLACEMENT)
-                .replace("*", "[^.]*")
-                .replace("..", "\\.(.+\\.)?");
+        int length = name.length();
+        StringBuilder sb = new StringBuilder(length);
+        char prev = 0;
+        for (int i = 0; i < length; i++) {
+            boolean isLast = i == length - 1;
+            char c = name.charAt(i);
+            switch (c) {
+                case '.':
+                    if (prev != '.' && (isLast || name.charAt(i + 1) != '.')) {
+                        sb.append("[.$]");
+                    } else if (prev == '.') {
+                        sb.append("\\.(.+\\.)?");
+                    }
+                    break;
+                case '*':
+                    sb.append("[^.]*");
+                    break;
+                case '$':
+                case '[':
+                case ']':
+                    sb.append('\\');
+                    // fall-through
+                default:
+                    sb.append(c);
+            }
+            prev = c;
+        }
+        return sb.toString();
     }
 
     /**
@@ -739,5 +755,9 @@ public class StringUtils {
             }
         }
         return cursor;
+    }
+
+    public static String formatUriForPropertiesFile(String uri) {
+        return uri.replaceAll("(?<!\\\\)://", "\\\\://");
     }
 }

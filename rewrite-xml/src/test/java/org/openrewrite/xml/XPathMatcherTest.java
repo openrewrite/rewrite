@@ -15,8 +15,10 @@
  */
 package org.openrewrite.xml;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
@@ -91,6 +93,22 @@ class XPathMatcherTest {
         """
     ).toList().get(0);
 
+    private final SourceFile namespacedXml = new XmlParser().parse(
+      """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <root xmlns="http://www.example.com/namespace1"
+              xmlns:ns2="http://www.example.com/namespace2"
+              xmlns:ns3="http://www.example.com/namespace3"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://www.example.com/namespace1 http://www.example.com/namespace1.xsd
+                                  http://www.example.com/namespace2 http://www.example.com/namespace2.xsd
+                                  http://www.example.com/namespace3 http://www.example.com/namespace3.xsd">
+          <element1 ns3:attribute1="content3">content1</element1>
+          <ns2:element2>content2</ns2:element2>
+        </root>
+        """
+    ).toList().get(0);
+
     @Test
     void matchAbsolute() {
         assertThat(match("/dependencies/dependency", xmlDoc)).isTrue();
@@ -129,12 +147,80 @@ class XPathMatcherTest {
           pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='maven-compiler-plugin']/configuration/source",
           pomXml1)).isTrue();
+        assertThat(match("//plugin[artifactId='maven-compiler-plugin']/configuration/source",
+          pomXml1)).isTrue();
+        assertThat(match("/project/build/plugins/plugin[groupId='org.apache.maven.plugins']/configuration/source",
+          pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='somethingElse']/configuration/source",
           pomXml1)).isFalse();
         assertThat(match("/project/build//plugins/plugin/configuration/source",
           pomXml1)).isTrue();
         assertThat(match("/project/build//plugins/plugin/configuration/source",
           pomXml2)).isTrue();
+    }
+
+    @Test
+    void attributePredicate() {
+        SourceFile xml = new XmlParser().parse(
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <root>
+              <element1 foo="bar"><foo>baz</foo></element1>
+            </root>
+            """
+        ).toList().get(0);
+        assertThat(match("/root/element1[@foo='bar']", xml)).isTrue();
+        assertThat(match("/root/element1[@foo='baz']", xml)).isFalse();
+        assertThat(match("/root/element1[foo='bar']", xml)).isFalse();
+        assertThat(match("/root/element1[foo='baz']", xml)).isTrue();
+    }
+
+    @Test
+    void relativePathsWithConditions() {
+        SourceFile xml = new XmlParser().parse(
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <root>
+              <element1 foo="bar">
+                <foo>baz</foo>
+                <test>asdf</test>
+              </element1>
+            </root>
+            """
+        ).toList().get(0);
+        assertThat(match("//element1[@foo='bar']", xml)).isTrue();
+        assertThat(match("//element1[foo='baz']/test", xml)).isTrue();
+        assertThat(match("//element1[foo='baz']/baz", xml)).isFalse();
+        assertThat(match("//element1[foo='bar']/test", xml)).isFalse();
+    }
+
+    @Test
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/3919")
+    void matchFunctions() {
+        assertThat(match("/root/element1", namespacedXml)).isTrue();
+        assertThat(match("/root/ns2:element2", namespacedXml)).isTrue();
+        assertThat(match("/root/dne", namespacedXml)).isFalse();
+
+        // Namespace functions
+        assertThat(match("/*[local-name()='element1']", namespacedXml)).isFalse();
+        assertThat(match("//*[local-name()='element1']", namespacedXml)).isFalse();
+        assertThat(match("/root/*[local-name()='element1']", namespacedXml)).isTrue();
+        assertThat(match("/root/*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
+        assertThat(match("/*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
+        assertThat(match("//*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
+        assertThat(match("//@*[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
+
+        // Other common XPath functions
+        assertThat(match("contains(/root/element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("not(contains(/root/element1, 'content1'))", namespacedXml)).isFalse();
+        assertThat(match("string-length(/root/element1) > 2", namespacedXml)).isTrue();
+        assertThat(match("starts-with(/root/element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("ends-with(/root/element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("substring-before(/root/element1, '1') = 'content'", namespacedXml)).isTrue();
+        assertThat(match("substring-after(/root/element1, 'content') = '1'", namespacedXml)).isTrue();
+        assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
+        assertThat(match("count(/root/*)", namespacedXml)).isTrue();
     }
 
     private boolean match(String xpath, SourceFile x) {

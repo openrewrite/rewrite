@@ -15,15 +15,19 @@
  */
 package org.openrewrite.java;
 
-import com.sun.source.tree.Tree;
-import com.sun.tools.javac.code.*;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.JCTree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.StringJoiner;
 
 class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
@@ -236,7 +240,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s += "{name=<constructor>,return=" + s;
         } else {
             s += "{name=" + symbol.getSimpleName().toString() +
-                    ",return=" + signature(selectType.getReturnType());
+                 ",return=" + signature(selectType.getReturnType());
         }
 
         return s + ",parameters=" + methodArgumentSignature(selectType) + '}';
@@ -256,7 +260,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s += "{name=<constructor>,return=" + s;
         } else {
             s += "{name=" + symbol.getSimpleName().toString() +
-                    ",return=" + returnType;
+                 ",return=" + returnType;
         }
 
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';

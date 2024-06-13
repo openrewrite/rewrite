@@ -17,12 +17,37 @@ package org.openrewrite.text;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.dir;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class FindTest implements RewriteTest {
+
+    @Test
+    void dataTable() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("text", null, null, null, null, null))
+            .dataTable(TextMatches.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                assertThat(rows.get(0).getMatch()).isEqualTo("This is ~~>text.");
+            }),
+          text(
+            """
+              This is a line above.
+              This is text.
+              This is a line below.
+              """,
+            """
+              This is a line above.
+              This is ~~>text.
+              This is a line below.
+              """
+          )
+        );
+    }
 
     @DocumentExample
     @Test

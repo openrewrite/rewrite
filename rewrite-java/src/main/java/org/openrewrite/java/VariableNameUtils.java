@@ -244,6 +244,17 @@ public class VariableNameUtils {
         }
 
         @Override
+        public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, Set<String> strings) {
+            if (instanceOf.getPattern() instanceof J.Identifier) {
+                Set<String> names = nameScopes.get(currentScope.peek());
+                if (names != null) {
+                    names.add(((J.Identifier)instanceOf.getPattern()).getSimpleName());
+                }
+            }
+            return super.visitInstanceOf(instanceOf, strings);
+        }
+
+        @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Set<String> strings) {
             Set<String> names = nameScopes.get(currentScope.peek());
             if (names != null) {

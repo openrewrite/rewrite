@@ -29,10 +29,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -139,6 +136,10 @@ public class DependencyUseStringNotation extends Recipe {
                     String version = coerceToStringNotation(mapNotation.get("version"));
                     if (version != null) {
                         stringNotation += ":" + version;
+                        String classifier = coerceToStringNotation(mapNotation.get("classifier"));
+                        if (classifier != null) {
+                            stringNotation += ":" + classifier;
+                        }
                     }
 
                     return new J.Literal(randomId(), prefix, markers, stringNotation, "\"" + stringNotation + "\"", Collections.emptyList(), JavaType.Primitive.String);
@@ -153,6 +154,21 @@ public class DependencyUseStringNotation extends Recipe {
                     return (String) ((J.Literal) expression).getValue();
                 } else if (expression instanceof J.Identifier) {
                     return "$" + ((J.Identifier) expression).getSimpleName();
+                } else if (expression instanceof G.GString) {
+                    List<J> str = ((G.GString) expression).getStrings();
+                    StringBuilder sb = new StringBuilder();
+                    for (J valuePart : str) {
+                        if (valuePart instanceof Expression) {
+                            sb.append(coerceToStringNotation((Expression) valuePart));
+                        } else if (valuePart instanceof G.GString.Value) {
+                            J tree = ((G.GString.Value) valuePart).getTree();
+                            if (tree instanceof Expression) {
+                                sb.append(coerceToStringNotation((Expression) tree));
+                            }
+                            //Can it be something else? If so, what?
+                        }
+                    }
+                    return sb.toString();
                 }
                 return null;
             }

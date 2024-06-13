@@ -140,6 +140,7 @@ public interface Javadoc extends Tree {
 
         String suffix;
 
+        @Override
         @SuppressWarnings("unchecked")
         public DocComment withSuffix(String suffix) {
             if (!suffix.equals(this.suffix)) {
@@ -309,6 +310,7 @@ public interface Javadoc extends Tree {
             return new LineBreak(this.id, margin, this.markers);
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public LineBreak withMarkers(Markers markers) {
             if (markers == this.markers) {
@@ -700,6 +702,7 @@ public interface Javadoc extends Tree {
         @Nullable
         Markers markers;
 
+        @Override
         public Markers getMarkers() {
             return markers == null ? Markers.EMPTY : markers;
         }

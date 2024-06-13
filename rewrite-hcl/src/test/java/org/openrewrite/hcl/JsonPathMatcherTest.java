@@ -267,9 +267,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = a.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitAttribute");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -282,9 +279,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = a.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitAttributeAccess");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -297,9 +291,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = b.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitBinary");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -312,9 +303,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = b.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitBlock");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -327,9 +315,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = c.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitConditional");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -342,9 +327,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = c.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitConfigFile");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -357,9 +339,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = e.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitEmpty");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -372,9 +351,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = f.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitForIntro");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -387,9 +363,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = f.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitForObject");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -402,9 +375,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = f.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitForTuple");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -417,9 +387,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = f.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitFunctionCall");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -432,9 +399,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = h.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitHeredocTemplate");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -447,9 +411,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = i.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitIdentifier");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -462,9 +423,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = i.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitIndex");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -477,9 +435,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = i.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitIndexPosition");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -492,9 +447,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = l.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitLiteral");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -507,9 +459,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = o.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitObjectValue");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -522,9 +471,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = pp.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitParentheses");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -537,9 +483,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = q.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitQuotedTemplate");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -552,9 +495,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = s.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitSplat");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -567,9 +507,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = s.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitSplatOperator");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -582,9 +519,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = t.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitSplatOperator");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -597,9 +531,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = t.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitSplatOperator");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -612,9 +543,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = u.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitSplatOperator");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }
@@ -627,9 +555,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     if (matcher.matches(getCursor())) {
                         var match = v.printTrimmed(getCursor().getParentOrThrow());
                         if (printMatches) {
-                            System.out.println("matched in visitVariableExpression");
-                            System.out.println(match);
-                            System.out.println();
                         }
                         p.add(match);
                     }

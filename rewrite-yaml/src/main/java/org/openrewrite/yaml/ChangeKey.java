@@ -24,7 +24,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeKey extends Recipe {
     @Option(displayName = "Old key path",
             description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML entry.",
