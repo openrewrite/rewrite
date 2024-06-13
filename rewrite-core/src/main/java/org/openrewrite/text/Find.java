@@ -46,7 +46,7 @@ public class Find extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Search for text, treating all textual sources as plain text.";
+        return "Textual search, optionally using Regular Expression (regex) to query.";
     }
 
     @Option(displayName = "Find",
@@ -55,7 +55,7 @@ public class Find extends Recipe {
     String find;
 
     @Option(displayName = "Regex",
-            description = "If true, `find` will be interpreted as a Regular Expression. Default `false`.",
+            description = "If true, `find` will be interpreted as a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression). Default `false`.",
             required = false)
     @Nullable
     Boolean regex;
