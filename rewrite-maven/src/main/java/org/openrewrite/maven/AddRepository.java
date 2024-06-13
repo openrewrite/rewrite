@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
@@ -35,7 +36,6 @@ import java.util.Optional;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddRepository extends Recipe {
-    private static final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/repositories");
 
     @Option(example = "repo-id", displayName = "Repository ID",
             description = "A unique name to describe the repository.")
@@ -93,6 +93,26 @@ public class AddRepository extends Recipe {
     @Nullable
     String releasesUpdatePolicy;
 
+    @Option(displayName = "Repository type",
+            description = "The type of repository to add.",
+            example = "Repository",
+            required = false)
+    @Nullable
+    Type type;
+
+    @RequiredArgsConstructor
+    public enum Type {
+        Repository("repository", "repositories"),
+        PluginRepository("pluginRepository", "pluginRepositories");
+
+        final String xmlTagSingle;
+        final String xmlTagPlural;
+    }
+
+    public Type getType() {
+        return type == null ? Type.Repository : type;
+    }
+
     @Override
     public String getDisplayName() {
         return "Add repository";
@@ -106,11 +126,13 @@ public class AddRepository extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
+            private final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/" + getType().xmlTagPlural);
+
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Tag root = document.getRoot();
-                if (!root.getChild("repositories").isPresent()) {
-                    document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<repositories/>"))
+                if (!root.getChild(getType().xmlTagPlural).isPresent()) {
+                    document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<" + getType().xmlTagPlural + "/>"))
                             .visitNonNull(document, ctx, getCursor().getParentOrThrow());
                 }
                 return super.visitDocument(document, ctx);
@@ -123,7 +145,7 @@ public class AddRepository extends Recipe {
                 if (REPOS_MATCHER.matches(getCursor())) {
                     Optional<Xml.Tag> maybeRepo = repositories.getChildren().stream()
                             .filter(repo ->
-                                    "repository".equals(repo.getName()) &&
+                                    getType().xmlTagSingle.equals(repo.getName()) &&
                                     (id.equals(repo.getChildValue("id").orElse(null)) || (isReleasesEqual(repo) && isSnapshotsEqual(repo))) &&
                                     url.equals(repo.getChildValue("url").orElse(null))
                             )
@@ -171,14 +193,14 @@ public class AddRepository extends Recipe {
                         }
                     } else {
                         @Language("xml")
-                        String sb = "<repository>\n" +
+                        String sb = "<" + getType().xmlTagSingle + ">\n" +
                                     assembleTagWithValue("id", id) +
                                     assembleTagWithValue("url", url) +
                                     assembleTagWithValue("name", repoName) +
                                     assembleTagWithValue("layout", layout) +
                                     assembleReleases() +
                                     assembleSnapshots() +
-                                    "</repository>\n";
+                                    "</" + getType().xmlTagSingle + ">\n";
 
                         Xml.Tag repoTag = Xml.Tag.build(sb);
                         repositories = (Xml.Tag) new AddToTagVisitor<>(repositories, repoTag).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
