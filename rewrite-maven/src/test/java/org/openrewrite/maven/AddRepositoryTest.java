@@ -29,7 +29,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, null, null,
-            null, null, null)),
+            null, null, null, AddRepository.Type.Repository)),
           pomXml(
             """
               <project>
@@ -56,11 +56,42 @@ class AddRepositoryTest implements RewriteTest {
     }
 
     @Test
+    void addSimplePluginRepo() {
+        rewriteRun(
+          spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+            null, null, null,
+            null, null, null, AddRepository.Type.PluginRepository)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                  </pluginRepository>
+                </pluginRepositories>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void updateExistingRepo() {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", "bb", null,
             null, null, null,
-            null, null, null)),
+            null, null, null, AddRepository.Type.Repository)),
           pomXml(
             """
               <project>
@@ -99,7 +130,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, null, null,
-            null, null, null)),
+            null, null, null, AddRepository.Type.Repository)),
           pomXml(
             """
               <project>
@@ -124,7 +155,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, null, null,
-            null, null, null)),
+            null, null, null, AddRepository.Type.Repository)),
           pomXml(
             """
               <project>
@@ -164,7 +195,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             false, "whatever", null,
-            null, null, null)),
+            null, null, null, AddRepository.Type.Repository)),
           pomXml(
             """
               <project>
@@ -208,7 +239,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, "whatever", null,
-            null, null, null)),
+            null, null, null, AddRepository.Type.Repository)),
           pomXml(
             """
               <project>
@@ -251,7 +282,7 @@ class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             true, null, null,
-            null, null, null)),
+            null, null, null, AddRepository.Type.Repository)),
           pomXml(
             """
               <project>
@@ -280,7 +311,7 @@ class AddRepositoryTest implements RewriteTest {
           spec -> spec.recipes(
             new AddRepository("boot-snapshots", "https://repo.spring.io/snapshot", null, null,
               true, null, null,
-              null, null, null),
+              null, null, null, AddRepository.Type.Repository),
             new UpgradeParentVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0-SNAPSHOT", null)
           ),
           pomXml(
