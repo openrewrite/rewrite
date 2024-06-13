@@ -716,7 +716,7 @@ public interface JavaType {
         @Override
         public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
             FullyQualified qualified = type.withFullyQualifiedName(fullyQualifiedName);
-            if (type.equals(qualified)) {
+            if (type == qualified) {
                 return this;
             }
 
