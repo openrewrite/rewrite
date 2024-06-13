@@ -95,7 +95,9 @@ public class AddRepository extends Recipe {
 
     @Option(displayName = "Repository type",
             description = "The type of repository to add.",
-            example = "Repository")
+            example = "Repository",
+            required = false)
+    @Nullable
     Type type;
 
     @RequiredArgsConstructor
@@ -105,6 +107,10 @@ public class AddRepository extends Recipe {
 
         final String xmlTagSingle;
         final String xmlTagPlural;
+    }
+
+    public Type getType() {
+        return type == null ? Type.Repository : type;
     }
 
     @Override
@@ -120,13 +126,13 @@ public class AddRepository extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
-            private final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/" + type.xmlTagPlural);
+            private final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/" + getType().xmlTagPlural);
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Tag root = document.getRoot();
-                if (!root.getChild(type.xmlTagPlural).isPresent()) {
-                    document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<" + type.xmlTagPlural + "/>"))
+                if (!root.getChild(getType().xmlTagPlural).isPresent()) {
+                    document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<" + getType().xmlTagPlural + "/>"))
                             .visitNonNull(document, ctx, getCursor().getParentOrThrow());
                 }
                 return super.visitDocument(document, ctx);
@@ -187,14 +193,14 @@ public class AddRepository extends Recipe {
                         }
                     } else {
                         @Language("xml")
-                        String sb = "<" + type.xmlTagSingle + ">\n" +
+                        String sb = "<" + getType().xmlTagSingle + ">\n" +
                                     assembleTagWithValue("id", id) +
                                     assembleTagWithValue("url", url) +
                                     assembleTagWithValue("name", repoName) +
                                     assembleTagWithValue("layout", layout) +
                                     assembleReleases() +
                                     assembleSnapshots() +
-                                    "</" + type.xmlTagSingle + ">\n";
+                                    "</" + getType().xmlTagSingle + ">\n";
 
                         Xml.Tag repoTag = Xml.Tag.build(sb);
                         repositories = (Xml.Tag) new AddToTagVisitor<>(repositories, repoTag).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
