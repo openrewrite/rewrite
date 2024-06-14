@@ -178,6 +178,9 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             private boolean isVersionMatch(Xml.Attribute attribute) {
+                if (versionMatcher == null) {
+                    return true;
+                }
                 String[] versions = versionMatcher.split(",");
                 double dversion = Double.parseDouble(attribute.getValueAsString());
                 for (String splitVersion : versions) {
@@ -226,7 +229,7 @@ public class ChangeNamespaceValue extends Recipe {
             private Xml.Tag maybeAddNamespace(Xml.Tag root) {
                 Namespaces namespaces = root.getNamespaces();
                 if (namespaces.containsUri(newValue) && !namespaces.containsUri(XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI)) {
-                    namespaces.add(XmlNamespaceUtils.XML_SCHEMA_INSTANCE_PREFIX, XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI);
+                    namespaces = namespaces.add(XmlNamespaceUtils.XML_SCHEMA_INSTANCE_PREFIX, XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI);
                     root = root.withNamespaces(namespaces);
                 }
                 return root;

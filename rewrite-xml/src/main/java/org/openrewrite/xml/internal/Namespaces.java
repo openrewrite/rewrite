@@ -30,17 +30,27 @@ public class Namespaces {
     }
 
     public Namespaces(String prefix, String uri) {
-        add(prefix, uri);
+        this.namespaces.put(prefix, uri);
+    }
+
+    public Namespaces(Map<String, String> namespaces) {
+        this.namespaces.putAll(namespaces);
     }
 
     public Namespaces add(String prefix, String uri) {
-        namespaces.put(prefix, uri);
-        return this;
+        Map<String, String> combinedNamespaces = new HashMap<>(namespaces);
+        combinedNamespaces.put(prefix, uri);
+        return new Namespaces(combinedNamespaces);
+    }
+
+    public Namespaces add(Map<String, String> namespaces) {
+        Map<String, String> combinedNamespaces = new HashMap<>(this.namespaces);
+        combinedNamespaces.putAll(namespaces);
+        return new Namespaces(combinedNamespaces);
     }
 
     public Namespaces combine(Namespaces namespaces) {
-        this.namespaces.putAll(namespaces.getNamespaces());
-        return this;
+        return add(namespaces.getNamespaces());
     }
 
     public String get(String prefix) {

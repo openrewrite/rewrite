@@ -21,6 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 
 public class XmlNamespaceUtils {
@@ -75,7 +76,7 @@ public class XmlNamespaceUtils {
     }
 
     public static Namespaces extractNamespaces(Collection<Xml.Attribute> attributes) {
-        final Namespaces namespaces = new Namespaces();
+        final Map<String, String> namespaces = new HashMap<>(attributes.size());
         if (!attributes.isEmpty()) {
                 attributes.stream()
                     .filter(attribute -> isNamespaceDefinitionAttribute(attribute.getKeyAsString()))
@@ -84,9 +85,9 @@ public class XmlNamespaceUtils {
                             attribute.getValueAsString()
                     ))
                     .distinct()
-                    .forEach(prefixUri -> namespaces.add(prefixUri.getPrefix(), prefixUri.getUri()));
+                    .forEach(prefixUri -> namespaces.put(prefixUri.getPrefix(), prefixUri.getUri()));
         }
-        return namespaces;
+        return new Namespaces(namespaces);
     }
 
     /**
@@ -99,7 +100,7 @@ public class XmlNamespaceUtils {
     public static Namespaces findNamespaces(Cursor cursor, @Nullable Xml.Tag currentTag) {
         Namespaces namespaces = new Namespaces();
         if (currentTag != null) {
-            namespaces.combine(currentTag.getNamespaces());
+            namespaces = namespaces.combine(currentTag.getNamespaces());
         }
 
         while (cursor != null) {
@@ -109,7 +110,7 @@ public class XmlNamespaceUtils {
                     if (namespaces.containsUri(ns.getKey())) {
                         throw new IllegalStateException(java.lang.String.format("Cannot have two namespaces with the same prefix (%s): '%s' and '%s'", ns.getKey(), namespaces.get(ns.getKey()), ns.getValue()));
                     }
-                    namespaces.add(ns.getKey(), ns.getValue());
+                    namespaces = namespaces.add(ns.getKey(), ns.getValue());
                 }
             }
             cursor = cursor.getParent();
