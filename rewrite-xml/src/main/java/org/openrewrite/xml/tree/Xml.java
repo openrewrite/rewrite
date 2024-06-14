@@ -116,10 +116,12 @@ public interface Xml extends Tree {
             return withRoot(root.withNamespaces(namespaces));
         }
 
+        @Override
         public Document withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -224,10 +226,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public Prolog withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -253,12 +257,15 @@ public interface Xml extends Tree {
     class XmlDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
         UUID id;
+
         String prefixUnsafe;
 
+        @Override
         public XmlDecl withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -287,10 +294,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public ProcessingInstruction withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -400,10 +409,12 @@ public interface Xml extends Tree {
                     beforeTagDelimiterPrefix);
         }
 
+        @Override
         public Tag withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -617,10 +628,12 @@ public interface Xml extends Tree {
 
             String prefixUnsafe;
 
+            @Override
             public Closing withPrefix(String prefix) {
                 return WithPrefix.onlyIfNotEqual(this, prefix);
             }
 
+            @Override
             public String getPrefix() {
                 return prefixUnsafe;
             }
@@ -654,10 +667,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public Attribute withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -704,10 +719,12 @@ public interface Xml extends Tree {
 
             String prefixUnsafe;
 
+            @Override
             public Value withPrefix(String prefix) {
                 return WithPrefix.onlyIfNotEqual(this, prefix);
             }
 
+            @Override
             public String getPrefix() {
                 return prefixUnsafe;
             }
@@ -749,10 +766,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public CharData withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -787,10 +806,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public Comment withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -818,10 +839,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public DocTypeDecl withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -851,10 +874,12 @@ public interface Xml extends Tree {
 
             String prefixUnsafe;
 
+            @Override
             public ExternalSubsets withPrefix(String prefix) {
                 return WithPrefix.onlyIfNotEqual(this, prefix);
             }
 
+            @Override
             public String getPrefix() {
                 return prefixUnsafe;
             }
@@ -884,10 +909,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public Element withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -915,10 +942,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public Ident withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -975,10 +1004,12 @@ public interface Xml extends Tree {
         @With
         String prefixUnsafe;
 
+        @Override
         public JspDirective withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }

@@ -109,6 +109,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     public static class MethodMatch implements Marker {
         UUID id;
+
         @EqualsAndHashCode.Include
         String methodMatcher;
     }

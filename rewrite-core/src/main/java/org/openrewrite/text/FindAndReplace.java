@@ -37,6 +37,19 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = false)
 public class FindAndReplace extends Recipe {
 
+    @Override
+    public String getDisplayName() {
+        return "Find and replace";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Textual find and replace, optionally interpreting the search query as a Regular Expression (regex). " +
+               "When operating on source files that are language-specific Lossless Semantic " +
+               "Tree, such as Java or XML, this operation converts the source file to plain text for the rest of the recipe run. " +
+               "So if you are combining this recipe with language-specific recipes in a single recipe run put all the language-specific recipes before this recipe.";
+    }
+
     @Option(displayName = "Find",
             description = "The text to find (and replace). This snippet can be multiline.",
             example = "blacklist")
@@ -50,7 +63,7 @@ public class FindAndReplace extends Recipe {
     String replace;
 
     @Option(displayName = "Regex",
-            description = "Default false. If true, `find` will be interpreted as a Regular Expression, and capture group contents will be available in `replace`.",
+            description = "Default false. If true, `find` will be interpreted as a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression), and capture group contents will be available in `replace`.",
             required = false)
     @Nullable
     Boolean regex;
@@ -85,18 +98,6 @@ public class FindAndReplace extends Recipe {
             example = "**/*.java")
     @Nullable
     String filePattern;
-
-    @Override
-    public String getDisplayName() {
-        return "Find and replace";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Simple text find and replace. When the original source file is a language-specific Lossless Semantic " +
-               "Tree, this operation irreversibly converts the source file to a plain text file. Subsequent recipes " +
-               "will not be able to operate on language-specific type.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

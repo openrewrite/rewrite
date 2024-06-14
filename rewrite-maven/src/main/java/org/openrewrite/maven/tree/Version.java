@@ -198,14 +198,17 @@ public class Version implements Comparable<Version> {
             return rel;
         }
 
+        @Override
         public boolean equals(Object obj) {
             return obj instanceof Version.Item && this.compareTo((Version.Item) obj) == 0;
         }
 
+        @Override
         public int hashCode() {
             return this.value.hashCode() + this.kind * 31;
         }
 
+        @Override
         public String toString() {
             return String.valueOf(this.value);
         }
@@ -277,6 +280,7 @@ public class Version implements Comparable<Version> {
             }
         }
 
+        @Override
         public String toString() {
             return String.valueOf(this.token);
         }

@@ -503,6 +503,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
     private static class SequenceBuilder implements BlockBuilder {
         private final String prefix;
+
         @Nullable
         private final String startBracketPrefix;
 

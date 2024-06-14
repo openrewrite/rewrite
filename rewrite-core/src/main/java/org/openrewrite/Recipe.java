@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.Setter;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.annotations.Nls;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -103,7 +104,7 @@ public abstract class Recipe implements Cloneable {
      * @return The display name.
      */
     @Language("markdown")
-    public abstract String getDisplayName();
+    public abstract @NlsRewrite.DisplayName String getDisplayName();
 
     /**
      * A human-readable display name for this recipe instance, including some descriptive
@@ -179,7 +180,7 @@ public abstract class Recipe implements Cloneable {
      * @return The display name.
      */
     @Language("markdown")
-    public abstract String getDescription();
+    public abstract @NlsRewrite.Description String getDescription();
 
     /**
      * A set of strings used for categorizing related recipes. For example

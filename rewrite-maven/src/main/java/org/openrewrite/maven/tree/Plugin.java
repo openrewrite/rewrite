@@ -54,6 +54,7 @@ public class Plugin {
     public static class Execution {
 
         String id;
+
         @Nullable
         List<String> goals;
 
@@ -141,4 +142,3 @@ public class Plugin {
         return MavenXmlMapper.readMapper().convertValue(current, new TypeReference<List<T>>() {});
     }
 }
-

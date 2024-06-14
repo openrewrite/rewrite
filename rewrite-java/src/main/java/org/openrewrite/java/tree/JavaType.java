@@ -438,6 +438,7 @@ public interface JavaType {
         Class() {
         }
 
+        @Override
         public List<FullyQualified> getAnnotations() {
             return annotations == null ? emptyList() : Arrays.asList(annotations);
         }
@@ -455,6 +456,7 @@ public interface JavaType {
         @NonFinal
         FullyQualified[] interfaces;
 
+        @Override
         public List<FullyQualified> getInterfaces() {
             return interfaces == null ? emptyList() : Arrays.asList(interfaces);
         }
@@ -472,6 +474,7 @@ public interface JavaType {
         @NonFinal
         Variable[] members;
 
+        @Override
         public List<Variable> getMembers() {
             return members == null ? emptyList() : Arrays.asList(members);
         }
@@ -489,6 +492,7 @@ public interface JavaType {
         @NonFinal
         Method[] methods;
 
+        @Override
         public List<Method> getMethods() {
             return methods == null ? emptyList() : Arrays.asList(methods);
         }
@@ -709,8 +713,14 @@ public interface JavaType {
             return type.getFullyQualifiedName();
         }
 
+        @Override
         public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
-            return type.withFullyQualifiedName(fullyQualifiedName);
+            FullyQualified qualified = type.withFullyQualifiedName(fullyQualifiedName);
+            if (type == qualified) {
+                return this;
+            }
+
+            return new Parameterized(managedReference, qualified, typeParameters);
         }
 
         @Override
@@ -749,6 +759,7 @@ public interface JavaType {
         }
 
         @Nullable
+        @Override
         public FullyQualified getOwningClass() {
             return type.getOwningClass();
         }
@@ -1228,8 +1239,22 @@ public interface JavaType {
                             continue;
                         }
                         for (int i = 0; i < params.size(); i++) {
-                            if (!TypeUtils.isOfType(getParameterTypes().get(i), params.get(i))) {
-                                continue nextMethod;
+                            JavaType param = params.get(i);
+                            JavaType subtypeParam = getParameterTypes().get(i);
+                            if (!TypeUtils.isOfType(subtypeParam, param)) {
+                                if (param instanceof GenericTypeVariable) {
+                                    GenericTypeVariable genericParam = (GenericTypeVariable) param;
+                                    if (genericParam.getBounds().isEmpty()) {
+                                        continue;
+                                    }
+                                    for (JavaType bound : genericParam.getBounds()) {
+                                        if (!TypeUtils.isAssignableTo(bound, subtypeParam)) {
+                                            continue nextMethod;
+                                        }
+                                    }
+                                } else {
+                                    continue nextMethod;
+                                }
                             }
                         }
                         return method;

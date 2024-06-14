@@ -65,7 +65,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                     .sorted()
                     .collect(Collectors.toList());
             if (this.matchExistingSequenceValuesInAnyOrder) {
-                List<String> sorted = new ArrayList<String>(this.existingSequenceValues);
+                List<String> sorted = new ArrayList<>(this.existingSequenceValues);
                 Collections.sort(sorted);
                 return values.equals(sorted);
             } else {

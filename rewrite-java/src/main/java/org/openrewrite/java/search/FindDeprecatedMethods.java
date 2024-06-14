@@ -35,7 +35,7 @@ import static java.util.Objects.requireNonNull;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindDeprecatedMethods extends Recipe {
-    private static final AnnotationMatcher DEPRECATED_MATCHER = new AnnotationMatcher("java.lang.Deprecated");
+    private static final AnnotationMatcher DEPRECATED_MATCHER = new AnnotationMatcher("@java.lang.Deprecated");
 
     transient MethodCalls deprecatedMethodCalls = new MethodCalls(this);
 

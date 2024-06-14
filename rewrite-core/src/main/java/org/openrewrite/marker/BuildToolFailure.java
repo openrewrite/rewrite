@@ -37,6 +37,7 @@ public class BuildToolFailure implements Marker {
      * The name of the build tool that failed, possibly a wrapper.
      */
     String type;
+
     @Nullable
     String version;
 

@@ -1332,13 +1332,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             w = (J.Wildcard) temp;
         }
-        if (w.getPadding().getBound() != null) {
-            w = w.getPadding().withBound(
-                    w.getPadding().getBound().withBefore(
-                            visitSpace(w.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p)
-                    )
-            );
-        }
+        w = w.getPadding().withBound(visitLeftPadded(w.getPadding().getBound(), JLeftPadded.Location.WILDCARD_BOUND, p));
         w = w.withBoundedType(visitAndCast(w.getBoundedType(), p));
         if (w.getBoundedType() != null) {
             // i.e. not a "wildcard" type

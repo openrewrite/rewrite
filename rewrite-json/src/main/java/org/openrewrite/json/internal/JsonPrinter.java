@@ -92,6 +92,7 @@ public class JsonPrinter<P> extends JsonVisitor<PrintOutputCapture<P>> {
         return obj;
     }
 
+    @Override
     public Space visitSpace(Space space, PrintOutputCapture<P> p) {
         p.append(space.getWhitespace());
 

@@ -444,10 +444,10 @@ class ChangePackageTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.test.other.Test;
-              class A {
-                  Test test = null;
-              }
+            import org.openrewrite.test.other.Test;
+            class A {
+                Test test = null;
+            }
             """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty();
@@ -502,10 +502,10 @@ class ChangePackageTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.test.other.Test;
-              class A {
-                  Test test = null;
-              }
+            import org.openrewrite.test.other.Test;
+            class A {
+                Test test = null;
+            }
             """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty();
@@ -560,10 +560,10 @@ class ChangePackageTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.test.other.Test;
-              class A {
-                  Test test = null;
-              }
+            import org.openrewrite.test.other.Test;
+            class A {
+                Test test = null;
+            }
             """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty();

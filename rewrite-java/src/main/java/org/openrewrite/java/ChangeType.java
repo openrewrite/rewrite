@@ -99,8 +99,10 @@ public class ChangeType extends Recipe {
     private static class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
+
         @Nullable
         private J.Identifier importAlias;
+
         @Nullable
         private final Boolean ignoreDefinition;
 

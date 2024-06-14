@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -29,29 +30,30 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
         spec.recipe(new RemoveEnableFeaturePreview("ONE_LOCKFILE_PER_PROJECT"));
     }
 
+    @DocumentExample
     @Test
     void singleQuotes() {
         //language=gradle
         rewriteRun(
           settingsGradle(
             """
-                pluginManagement {
-                    repositories {
-                        gradlePluginPortal()
-                    }
-                }
-              
-                rootProject.name = 'merge-service'
-                enableFeaturePreview('ONE_LOCKFILE_PER_PROJECT')
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+            
+              rootProject.name = 'merge-service'
+              enableFeaturePreview('ONE_LOCKFILE_PER_PROJECT')
               """,
             """
-                pluginManagement {
-                    repositories {
-                        gradlePluginPortal()
-                    }
-                }
-              
-                rootProject.name = 'merge-service'
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+            
+              rootProject.name = 'merge-service'
               """
           )
         );

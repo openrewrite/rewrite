@@ -39,6 +39,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     @Nullable
     private final FileAttributes fileAttributes;
+
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;

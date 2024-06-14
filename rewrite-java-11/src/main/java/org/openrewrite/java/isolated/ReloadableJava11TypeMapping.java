@@ -337,6 +337,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         return kind;
     }
 
+    @Override
     @SuppressWarnings("ConstantConditions")
     public JavaType type(@Nullable Tree tree) {
         if (tree == null) {

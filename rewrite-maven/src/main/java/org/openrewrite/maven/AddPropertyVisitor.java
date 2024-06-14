@@ -31,6 +31,7 @@ import java.util.Optional;
 public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
     String key;
     String value;
+
     @Nullable Boolean preserveExistingValue;
 
     @Override

@@ -40,6 +40,7 @@ public class TextComment implements Comment {
 
     String suffix;
 
+    @Override
     @SuppressWarnings("unchecked")
     public TextComment withSuffix(String suffix) {
         if(!suffix.equals(this.suffix)) {

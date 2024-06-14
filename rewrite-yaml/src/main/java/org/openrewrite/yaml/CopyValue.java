@@ -80,6 +80,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     public static class Accumulator {
         @Nullable
         String snippet;
+
         Path path;
     }
 

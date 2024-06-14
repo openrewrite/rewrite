@@ -15,9 +15,9 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.jgit.lib.FileMode;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.jgit.lib.FileMode;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;

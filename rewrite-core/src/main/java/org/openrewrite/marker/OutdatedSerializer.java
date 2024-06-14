@@ -27,6 +27,7 @@ import java.util.UUID;
 public class OutdatedSerializer implements Marker {
     @EqualsAndHashCode.Include
     UUID id;
+
     String language;
     String minimumVersion;
     String actualVersion;
