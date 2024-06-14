@@ -32,7 +32,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class HasNamespacePrefix extends Recipe {
 
     @Option(displayName = "Namespace Prefix",
