@@ -344,7 +344,7 @@ public interface Xml extends Tree {
 
             List<Xml.Attribute> attributes = this.attributes;
             if (attributes.isEmpty()) {
-                for (Map.Entry<String, String> ns : namespaces.entrySet()) {
+                for (Map.Entry<String, String> ns : namespaces) {
                     String key = XmlNamespaceUtils.getAttributeNameForPrefix(ns.getKey());
                     attributes = ListUtils.concat(attributes, new Xml.Attribute(
                             randomId(),
@@ -372,7 +372,7 @@ public interface Xml extends Tree {
                                 a -> a
                         ));
 
-                for (Map.Entry<String, String> ns : namespaces.entrySet()) {
+                for (Map.Entry<String, String> ns : namespaces) {
                     String key = XmlNamespaceUtils.getAttributeNameForPrefix(ns.getKey());
                     if (attributeByKey.containsKey(key)) {
                         Xml.Attribute attribute = attributeByKey.get(key);

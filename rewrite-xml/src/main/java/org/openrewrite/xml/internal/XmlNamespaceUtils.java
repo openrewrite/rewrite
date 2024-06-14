@@ -106,7 +106,7 @@ public class XmlNamespaceUtils {
         while (cursor != null) {
             Xml.Tag enclosing = cursor.firstEnclosing(Xml.Tag.class);
             if (enclosing != null) {
-                for (Map.Entry<String, String> ns : enclosing.getNamespaces().entrySet()) {
+                for (Map.Entry<String, String> ns : enclosing.getNamespaces()) {
                     if (namespaces.containsUri(ns.getKey())) {
                         throw new IllegalStateException(java.lang.String.format("Cannot have two namespaces with the same prefix (%s): '%s' and '%s'", ns.getKey(), namespaces.get(ns.getKey()), ns.getValue()));
                     }

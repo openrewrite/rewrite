@@ -16,13 +16,14 @@
 package org.openrewrite.xml.internal;
 
 import lombok.Value;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 
 @Value
-public class Namespaces {
+public class Namespaces implements Iterable<Map.Entry<String, String>> {
 
     Map<String, String> namespaces = new HashMap<>();
 
@@ -65,7 +66,33 @@ public class Namespaces {
         return namespaces.containsValue(uri);
     }
 
-    public Set<Map.Entry<String, String>> entrySet() {
-        return namespaces.entrySet();
+    @NotNull
+    @Override
+    public Iterator<Map.Entry<String, String>> iterator() {
+        return new NamespacesIterator(this.namespaces);
+    }
+
+    private static class NamespacesIterator implements Iterator<Map.Entry<String, String>> {
+
+        private final Iterator<Map.Entry<String, String>> entriesIterator;
+
+        public NamespacesIterator(Map<String, String> map) {
+            this.entriesIterator = map.entrySet().iterator();
+        }
+
+        @Override
+        public boolean hasNext() {
+            return entriesIterator.hasNext();
+        }
+
+        @Override
+        public Map.Entry<String, String> next() {
+            return entriesIterator.next();
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException("Removal not supported");
+        }
     }
 }
