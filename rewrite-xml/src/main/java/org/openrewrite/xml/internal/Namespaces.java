@@ -16,7 +16,7 @@
 package org.openrewrite.xml.internal;
 
 import lombok.Value;
-import org.jetbrains.annotations.NotNull;
+import org.openrewrite.internal.lang.NonNull;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -66,7 +66,7 @@ public class Namespaces implements Iterable<Map.Entry<String, String>> {
         return namespaces.containsValue(uri);
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Iterator<Map.Entry<String, String>> iterator() {
         return new NamespacesIterator(this.namespaces);
