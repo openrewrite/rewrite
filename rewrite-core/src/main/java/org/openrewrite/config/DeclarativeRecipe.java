@@ -343,9 +343,13 @@ public class DeclarativeRecipe extends Recipe {
         for (Recipe childRecipe : getRecipeList()) {
             recipeList.add(childRecipe.getDescriptor());
         }
+        List<RecipeDescriptor> preconditionsList = new ArrayList<>();
+        for (Recipe childRecipe : preconditions) {
+            recipeList.add(childRecipe.getDescriptor());
+        }
         return new RecipeDescriptor(getName(), getDisplayName(), getDescription(),
                 getTags(), getEstimatedEffortPerOccurrence(),
-                emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
+                emptyList(), preconditionsList, recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
                 getExamples(), source);
     }
 

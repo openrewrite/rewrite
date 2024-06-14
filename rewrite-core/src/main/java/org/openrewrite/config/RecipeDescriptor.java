@@ -45,6 +45,8 @@ public class RecipeDescriptor {
     @EqualsAndHashCode.Include
     List<OptionDescriptor> options;
 
+    List<RecipeDescriptor> preconditions;
+
     @With
     List<RecipeDescriptor> recipeList;
 

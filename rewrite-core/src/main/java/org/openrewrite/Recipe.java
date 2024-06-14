@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.Setter;
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.annotations.Nls;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -222,7 +221,7 @@ public abstract class Recipe implements Cloneable {
         }
 
         return new RecipeDescriptor(getName(), getDisplayName(), getDescription(), getTags(),
-                getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
+                getEstimatedEffortPerOccurrence(), options, Collections.emptyList(), recipeList1, getDataTableDescriptors(),
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
