@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Nested;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -298,17 +299,59 @@ class SemanticallyEqualTest {
         );
     }
 
-    @Test
-    void generics() {
-        assertExpressionsEqual(
-          """
-            import java.util.List;
-            class T {
-                List<String> a = new java.util.ArrayList<String>();
-                List<String> b = new java.util.ArrayList<>();
-            }
-            """
-        );
+    @Nested
+    class Generics {
+        @Test
+        void firstEmpty() {
+            assertExpressionsEqual(
+              """
+                import java.util.List;
+                class T {
+                    List<String> a = new java.util.ArrayList<String>();
+                    List<String> b = new java.util.ArrayList<>();
+                }
+                """
+            );
+        }
+
+        @Test
+        void secondEmpty() {
+            assertExpressionsEqual(
+              """
+                import java.util.List;
+                class T {
+                    List<String> a = new java.util.ArrayList<>();
+                    List<String> b = new java.util.ArrayList<String>();
+                }
+                """
+            );
+        }
+
+        @Test
+        void bothEmpty() {
+            assertExpressionsEqual(
+              """
+                import java.util.List;
+                class T {
+                    List<String> a = new java.util.ArrayList<>();
+                    List<String> b = new java.util.ArrayList<>();
+                }
+                """
+            );
+        }
+
+        @Test
+        void bothEmptyButDifferent() {
+            assertExpressionsNotEqual(
+              """
+                import java.util.List;
+                class T {
+                    List<String> a = new java.util.ArrayList<>();
+                    List<Integer> b = new java.util.ArrayList<>();
+                }
+                """
+            );
+        }
     }
 
     private void assertEqualToSelf(@Language("java") String a) {
