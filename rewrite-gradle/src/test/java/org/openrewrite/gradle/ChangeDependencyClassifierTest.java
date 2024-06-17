@@ -265,4 +265,150 @@ class ChangeDependencyClassifierTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void noPreviousClassifier_1() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api 'org.openrewrite:rewrite-gradle:latest.release'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api 'org.openrewrite:rewrite-gradle:latest.release:classified'
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    void noPreviousClassifier_2(String group, String artifact) {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
+                  api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release")
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classified')
+                  api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noNewClassifier_1() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", null, "")),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api 'org.openrewrite:rewrite-gradle:latest.release:classified'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api 'org.openrewrite:rewrite-gradle:latest.release'
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    void noNewClassifier_2(String group, String artifact) {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classified')
+                  api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified")
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
+                  api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release")
+              }
+              """
+          )
+        );
+    }
 }
