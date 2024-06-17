@@ -167,7 +167,7 @@ public class ChangeDependencyClassifier extends Recipe {
                         List<Expression> args = m.getArguments();
                         J.Literal keyLiteral = new J.Literal(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getKey().getPrefix(), Markers.EMPTY, "classifier", "classifier", null, JavaType.Primitive.String);
                         J.Literal valueLiteral = new J.Literal(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getValue().getPrefix(), Markers.EMPTY, newClassifier, delimiter + newClassifier + delimiter, null, JavaType.Primitive.String);
-                        args.add(new G.MapEntry(UUID.randomUUID(), mapEntry == null ? Space.EMPTY : mapEntry.getPrefix(), Markers.EMPTY, JRightPadded.build(keyLiteral), valueLiteral, null));
+                        args.add(new G.MapEntry(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getPrefix(), Markers.EMPTY, JRightPadded.build(keyLiteral), valueLiteral, null));
                         m = m.withArguments(args);
                     } else {
                         G.MapEntry finalClassifier = classifierEntry;
