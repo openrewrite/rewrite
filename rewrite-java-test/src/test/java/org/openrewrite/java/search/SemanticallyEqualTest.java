@@ -298,6 +298,19 @@ class SemanticallyEqualTest {
         );
     }
 
+    @Test
+    void generics() {
+        assertExpressionsEqual(
+          """
+            import java.util.List;
+            class T {
+                List<String> a = new java.util.ArrayList<String>();
+                List<String> b = new java.util.ArrayList<>();
+            }
+            """
+        );
+    }
+
     private void assertEqualToSelf(@Language("java") String a) {
         assertEqual(a, a);
     }
