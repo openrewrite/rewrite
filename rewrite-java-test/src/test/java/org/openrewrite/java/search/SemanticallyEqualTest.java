@@ -302,6 +302,19 @@ class SemanticallyEqualTest {
     @Nested
     class Generics {
         @Test
+        void noneEmpty() {
+            assertExpressionsEqual(
+              """
+                import java.util.List;
+                class T {
+                    List<String> a = new java.util.ArrayList<String>();
+                    List<String> b = new java.util.ArrayList<String>();
+                }
+                """
+            );
+        }
+
+        @Test
         void firstEmpty() {
             assertExpressionsEqual(
               """
