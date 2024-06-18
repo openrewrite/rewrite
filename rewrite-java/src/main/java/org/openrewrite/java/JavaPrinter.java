@@ -138,6 +138,18 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             case Volatile:
                 keyword = "volatile";
                 break;
+            case Async:
+                keyword = "async";
+                break;
+            case Reified:
+                keyword = "reified";
+                break;
+            case Inline:
+                keyword = "inline";
+                break;
+            case LanguageExtension:
+                keyword = mod.getKeyword();
+                break;
         }
         beforeSyntax(mod, Space.Location.MODIFIER_PREFIX, p);
         p.append(keyword);
