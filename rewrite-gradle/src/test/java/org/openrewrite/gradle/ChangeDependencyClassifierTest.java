@@ -34,7 +34,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -47,7 +47,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -108,7 +108,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -122,7 +122,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -146,7 +146,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -160,7 +160,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -184,7 +184,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -200,7 +200,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -226,7 +226,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -246,7 +246,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -275,7 +275,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -288,7 +288,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -311,7 +311,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -325,7 +325,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -348,7 +348,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -361,7 +361,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -384,7 +384,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }
@@ -398,7 +398,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+              
               repositories {
                   mavenCentral()
               }

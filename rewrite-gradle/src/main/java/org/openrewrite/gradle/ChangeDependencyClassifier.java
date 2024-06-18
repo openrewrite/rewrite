@@ -33,7 +33,6 @@ import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 
@@ -172,12 +171,7 @@ public class ChangeDependencyClassifier extends Recipe {
                     } else {
                         G.MapEntry finalClassifier = classifierEntry;
                         if (newClassifier == null) {
-                            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                                if (arg == finalClassifier) {
-                                    return null;
-                                }
-                                return arg;
-                            }));
+                            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> arg == finalClassifier ? null : arg));
                         } else {
                             String delimiter = classifierStringDelimiter; // `classifierStringDelimiter` cannot be null
                             m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
