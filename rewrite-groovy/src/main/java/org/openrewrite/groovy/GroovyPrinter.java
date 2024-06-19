@@ -397,12 +397,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             return super.visitReturn(return_, p);
         }
 
-        protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {
-            if (paddedStat != null) {
-                visit(paddedStat.getElement(), p);
-                visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
-                visitMarkers(paddedStat.getMarkers(), p);
-            }
+        @Override
+        protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
+            // empty
         }
 
         @Override
