@@ -31,6 +31,7 @@ import java.net.URI;
 import java.nio.file.Paths;
 import java.time.Duration;
 
+@SuppressWarnings("JavadocReference")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -142,6 +143,7 @@ public class MavenRepository implements Serializable {
         return new Builder();
     }
 
+    @SuppressWarnings("unused")
     @Data
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Accessors(fluent = true, chain = true)

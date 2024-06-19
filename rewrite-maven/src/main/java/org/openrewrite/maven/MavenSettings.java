@@ -244,9 +244,9 @@ public class MavenSettings {
                 return null;
             }
             return new ServerConfiguration(
-                    configuration.httpHeaders == null ? null : ListUtils.map(configuration.httpHeaders, this::interpolate),
-                    configuration.connectTimeout == null ? null : configuration.connectTimeout,
-                    configuration.readTimeout == null ? null : configuration.readTimeout
+                    ListUtils.map(configuration.httpHeaders, this::interpolate),
+                    configuration.connectTimeout,
+                    configuration.readTimeout
             );
         }
 
@@ -411,6 +411,7 @@ public class MavenSettings {
         ServerConfiguration configuration;
     }
 
+    @SuppressWarnings("DefaultAnnotationParam")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     @With
@@ -420,8 +421,15 @@ public class MavenSettings {
         @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true) // wrapping is disabled by default on MavenXmlMapper
         @Nullable
         List<HttpHeader> httpHeaders;
+        /**
+         * Timeout in milliseconds for establishing a connection.
+         */
         @Nullable
         Long connectTimeout;
+
+        /**
+         * Timeout in milliseconds for reading from the connection.
+         */
         @Nullable
         Long readTimeout;
     }
