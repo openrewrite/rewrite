@@ -825,9 +825,10 @@ public class ResolvedPom {
             List<DependencyAndDependent> dependenciesAtNextDepth = new ArrayList<>();
 
             for (DependencyAndDependent dd : dependenciesAtDepth) {
-                //First get the dependency (relative to the pom it was defined in)
-                Dependency d = dd.getDefinedIn().getValues(dd.getDependency(), depth);
-                //The dependency may be modified by the current pom's managed dependencies
+                // First get the dependency (relative to the pom it was defined in)
+                // Depth 0 prevents its dependency management from overriding versions of its own direct dependencies
+                Dependency d = dd.getDefinedIn().getValues(dd.getDependency(), 0);
+                // The dependency may be modified by the current pom's dependency management
                 d = getValues(d, depth);
                 try {
                     if (d.getVersion() == null) {
