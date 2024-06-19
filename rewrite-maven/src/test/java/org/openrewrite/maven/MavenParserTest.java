@@ -2937,7 +2937,6 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1085")
     @Test
     void transitiveScopeDependencyResolution() {
         rewriteRun(
@@ -3000,7 +2999,6 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1085")
     @Test
     void runtimeClasspathOnly() {
         rewriteRun(
