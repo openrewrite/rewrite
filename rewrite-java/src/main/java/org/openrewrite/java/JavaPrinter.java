@@ -387,8 +387,11 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
         visit(paddedStat.getElement(), p);
         visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
+        printStatementTerminator(paddedStat.getElement(), p);
+        visitMarkers(paddedStat.getMarkers(), p);
+    }
 
-        Statement s = paddedStat.getElement();
+    protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
         while (true) {
             if (s instanceof Assert ||
                 s instanceof Assignment ||
@@ -427,9 +430,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                                                 c == Cursor.ROOT_VALUE
                                 )
                                 .getValue();
-                if (aSwitch instanceof J.SwitchExpression) {
+                if (aSwitch instanceof SwitchExpression) {
                     Case aCase = getCursor().getValue();
-                    if (!(aCase.getBody() instanceof J.Block)) {
+                    if (!(aCase.getBody() instanceof Block)) {
                         p.append(';');
                     }
                     return;
