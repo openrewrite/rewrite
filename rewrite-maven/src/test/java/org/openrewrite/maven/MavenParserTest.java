@@ -2936,4 +2936,99 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1085")
+    @Test
+    void transitiveScopeDependencyResolution() {
+        rewriteRun(
+          pomXml(
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>cache-2</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.0.13</version>
+                  </parent>
+  
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>jakarta.validation</groupId>
+                        <artifactId>jakarta.validation-api</artifactId>
+                        <version>3.1.0</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                
+                  <dependencies>
+                    <dependency>
+                      <groupId>jakarta.validation</groupId>
+                      <artifactId>jakarta.validation-api</artifactId>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-data-jpa</artifactId>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-validation</artifactId>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.glassfish.jaxb</groupId>
+                      <artifactId>jaxb-runtime</artifactId>
+                      <scope>runtime</scope>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.ehcache</groupId>
+                      <artifactId>ehcache</artifactId>
+                      <classifier>jakarta</classifier>
+                    </dependency>
+                  </dependencies>
+                </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Compile)).isEmpty();
+                assertThat(resolution.findDependencies("jakarta.xml.bind", "jakarta.xml.bind-api", Scope.Compile)).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1085")
+    @Test
+    void runtimeClasspathOnly() {
+        rewriteRun(
+          pomXml(
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>cache-2</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+  
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.glassfish.jaxb</groupId>
+                      <artifactId>jaxb-runtime</artifactId>
+                      <version>4.0.5</version>
+                      <scope>runtime</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Compile)).isEmpty();
+            })
+          )
+        );
+    }
+
 }

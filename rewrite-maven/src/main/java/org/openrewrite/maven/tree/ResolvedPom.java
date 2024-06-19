@@ -814,7 +814,7 @@ public class ResolvedPom {
         for (Dependency requestedDependency : getRequestedDependencies()) {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
-            if (dScope == scope || dScope.isInClasspathOf(scope)) {
+            if (dScope == scope || dScope.transitiveOf(scope) == scope) {
                 dependenciesAtDepth.add(new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
             }
         }
