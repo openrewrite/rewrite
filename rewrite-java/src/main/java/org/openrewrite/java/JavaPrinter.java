@@ -387,8 +387,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
         visit(paddedStat.getElement(), p);
         visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
-        printStatementTerminator(paddedStat.getElement(), p);
         visitMarkers(paddedStat.getMarkers(), p);
+        printStatementTerminator(paddedStat.getElement(), p);
     }
 
     protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
