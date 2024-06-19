@@ -98,7 +98,7 @@ public class MavenPomDownloader {
                               @Nullable MavenSettings mavenSettings,
                               @Nullable List<String> activeProfiles) {
         this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-        this.mavenSettings = mavenSettings;
+        this.mavenSettings = mavenSettings != null ? mavenSettings : MavenExecutionContextView.view(ctx).getSettings();
         this.mirrors = this.ctx.getMirrors(mavenSettings);
         this.activeProfiles = activeProfiles;
     }
@@ -137,6 +137,7 @@ public class MavenPomDownloader {
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
         this.ctx = MavenExecutionContextView.view(ctx);
+        this.mavenSettings = this.ctx.getSettings();
         this.mavenCache = this.ctx.getPomCache();
         this.addCentralRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
         this.addLocalRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
@@ -773,7 +774,9 @@ public class MavenPomDownloader {
                                         repository.getReleases(),
                                         repository.getSnapshots(),
                                         repository.getUsername(),
-                                        repository.getPassword());
+                                        repository.getPassword(),
+                                        repository.getConnectTimeout(),
+                                        repository.getReadTimeout());
                             } catch (HttpSenderResponseException e) {
                                 //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
                                 if (e.isServerReached()) {
@@ -783,7 +786,9 @@ public class MavenPomDownloader {
                                             repository.getReleases(),
                                             repository.getSnapshots(),
                                             repository.getUsername(),
-                                            repository.getPassword());
+                                            repository.getPassword(),
+                                            repository.getConnectTimeout(),
+                                            repository.getReadTimeout());
                                 }
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
@@ -812,7 +817,10 @@ public class MavenPomDownloader {
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         try {
-            return sendRequest(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
+            HttpSender.Request.Builder request = httpSender.get(uriString)
+                    .withConnectTimeout(repo.getConnectTimeout())
+                    .withReadTimeout(repo.getReadTimeout());
+            return sendRequest(applyAuthenticationToRequest(repo, request).build());
         } catch (HttpSenderResponseException e) {
             if (hasCredentials(repo) && e.isClientSideException()) {
                 return retryRequestAnonymously(uriString, e);
@@ -845,11 +853,20 @@ public class MavenPomDownloader {
      * Returns a request builder with Authorization header set if the provided repository specifies credentials
      */
     private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
-        if (ctx.getSettings() != null && ctx.getSettings().getServers() != null) {
-            for (MavenSettings.Server server : ctx.getSettings().getServers().getServers()) {
-                if (server.getId().equals(repository.getId()) && server.getConfiguration() != null && server.getConfiguration().getHttpHeaders() != null) {
-                    for (MavenSettings.HttpHeader header : server.getConfiguration().getHttpHeaders()) {
-                        request.withHeader(header.getName(), header.getValue());
+        if (mavenSettings != null && mavenSettings.getServers() != null) {
+            for (MavenSettings.Server server : mavenSettings.getServers().getServers()) {
+                if (server.getId().equals(repository.getId()) && server.getConfiguration() != null) {
+                    MavenSettings.ServerConfiguration configuration = server.getConfiguration();
+                    if (server.getConfiguration().getHttpHeaders() != null) {
+                        for (MavenSettings.HttpHeader header : configuration.getHttpHeaders()) {
+                            request.withHeader(header.getName(), header.getValue());
+                        }
+                    }
+                    if (configuration.getConnectTimeout() != null) {
+                        request.withConnectTimeout(Duration.ofMillis(configuration.getConnectTimeout()));
+                    }
+                    if (configuration.getReadTimeout() != null) {
+                        request.withReadTimeout(Duration.ofMillis(configuration.getReadTimeout()));
                     }
                 }
             }
