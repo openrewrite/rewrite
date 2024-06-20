@@ -144,13 +144,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             @Override
-            public Xml.Tag visitTag(final Xml.Tag tag, final ExecutionContext executionContext) {
+            public Xml.Tag visitTag(final Xml.Tag tag, final ExecutionContext ctx) {
                 ResolvedDependency d = findDependency(tag);
                 if (d != null && d.getRepository() != null) {
                     // if the resolved dependency exists AND it does not represent an artifact that was parsed
                     // as a source file, attempt to find a new version.
                     try {
-                        String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), executionContext);
+                        String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                         if (newerVersion != null) {
                             Optional<Xml.Tag> version = tag.getChild("version");
                             if (version.isPresent()) {
@@ -169,7 +169,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         return e.warn(tag);
                     }
                 }
-                return super.visitTag(tag, executionContext);
+                return super.visitTag(tag, ctx);
             }
 
             @Nullable
