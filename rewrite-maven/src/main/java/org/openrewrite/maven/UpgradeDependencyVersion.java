@@ -150,7 +150,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     // if the resolved dependency exists AND it does not represent an artifact that was parsed
                     // as a source file, attempt to find a new version.
                     try {
-                        String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
+                        String newerVersion = findNewerVersion(d.getVersion(),
+                                () -> downloadMetadata(d.getGroupId(), d.getArtifactId(), ctx), versionComparator, ctx);
                         if (newerVersion != null) {
                             Optional<Xml.Tag> version = tag.getChild("version");
                             if (version.isPresent()) {
@@ -172,12 +173,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return super.visitTag(tag, ctx);
             }
 
-            @Nullable
-            private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx)
-                    throws MavenDownloadingException {
-                return UpgradeDependencyVersion.this.findNewerVersion(
-                        version, ctx, () -> downloadMetadata(groupId, artifactId, ctx), versionComparator);
-            }
         };
     }
 
@@ -196,8 +191,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (!tag.getValue().map(newVersion::equals).orElse(false)) {
                             Path pomSourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
                             for (PomProperty pomProperty : accumulator.pomProperties) {
-                                if (pomProperty.pomFilePath.equals(pomSourcePath)
-                                        && pomProperty.property.equals(tag.getName())) {
+                                if (pomProperty.pomFilePath.equals(pomSourcePath) &&
+                                    pomProperty.property.equals(tag.getName())) {
                                     doAfterVisit(new ChangeTagValueVisitor<>(tag, newVersion));
                                     maybeUpdateModel();
                                 }
@@ -383,15 +378,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx)
                     throws MavenDownloadingException {
                 return UpgradeDependencyVersion.this.findNewerVersion(
-                        version, ctx, () -> downloadMetadata(groupId, artifactId, ctx), versionComparator);
+                        version, () -> downloadMetadata(groupId, artifactId, ctx), versionComparator, ctx);
             }
         };
     }
 
     @Nullable
     private String findNewerVersion(
-            String version, ExecutionContext ctx, MavenMetadataFailures.MavenMetadataDownloader download,
-            VersionComparator versionComparator) throws MavenDownloadingException {
+            String version, MavenMetadataFailures.MavenMetadataDownloader download, VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
         String finalVersion = !Semver.isVersion(version) ? "0.0.0" : version;
 
         // in the case of "latest.patch", a new version can only be derived if the
