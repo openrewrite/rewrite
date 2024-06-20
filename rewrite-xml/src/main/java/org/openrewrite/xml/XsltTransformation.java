@@ -15,11 +15,8 @@
  */
 package org.openrewrite.xml;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.extern.slf4j.Slf4j;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FindSourceFiles;
@@ -36,7 +33,6 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
-@Slf4j
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class XsltTransformation extends Recipe {
@@ -44,12 +40,14 @@ public class XsltTransformation extends Recipe {
     @Nullable
     @Language("xml")
     @Option(displayName = "XSLT Configuration transformation",
-            description = "The transformation to be applied.")
+            description = "The transformation to be applied.",
+            required = false)
     String xslt;
 
     @Nullable
     @Option(displayName = "XSLT Configuration transformation classpath resource",
-            description = "Recipe transformation provided as a classpath resource.")
+            description = "Recipe transformation provided as a classpath resource.",
+            required = false)
     String xsltResource;
 
     @Option(displayName = "File pattern",
@@ -67,17 +65,6 @@ public class XsltTransformation extends Recipe {
     @Override
     public String getDescription() {
         return "Apply the specified XSLT transformation on.";
-    }
-
-    @JsonCreator
-    public XsltTransformation(
-            @Nullable @JsonProperty("xslt") @Language("xml") String xslt,
-            @Nullable @JsonProperty("xsltResource") String xsltResource,
-            @JsonProperty("filePattern") String filePattern
-    ) {
-        this.xslt = xslt;
-        this.xsltResource = xsltResource;
-        this.filePattern = filePattern;
     }
 
     @Override
