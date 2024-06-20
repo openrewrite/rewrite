@@ -3014,20 +3014,20 @@ class MavenParserTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>cache-2</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-  
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.glassfish.jaxb</groupId>
-                      <artifactId>jaxb-runtime</artifactId>
-                      <version>4.0.5</version>
-                      <scope>runtime</scope>
-                    </dependency>
-                  </dependencies>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>cache-2</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.glassfish.jaxb</groupId>
+                    <artifactId>jaxb-runtime</artifactId>
+                    <version>4.0.5</version>
+                    <scope>runtime</scope>
+                  </dependency>
+                </dependencies>
+              </project>
                 </project>
               """,
             spec -> spec.afterRecipe(pomXml -> {
