@@ -18,7 +18,6 @@ package org.openrewrite.xml;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.internal.Namespaces;
 import org.openrewrite.xml.search.FindTags;
 import org.openrewrite.xml.tree.Xml;
 
@@ -41,18 +40,12 @@ public class XPathMatcher {
     private static final Pattern PATTERN = Pattern.compile("([-\\w]+|\\*)\\[((local-name|namespace-uri)\\(\\)|(@)?([-\\w]+|\\*))='([-\\w.]+)']");
 
     private final String expression;
-    private final Namespaces namespaces;
     private final boolean startsWithSlash;
     private final boolean startsWithDoubleSlash;
     private final String[] parts;
 
     public XPathMatcher(String expression) {
-        this(expression, new Namespaces());
-    }
-
-    public XPathMatcher(String expression, Namespaces namespaces) {
         this.expression = expression;
-        this.namespaces = namespaces;
         startsWithSlash = expression.startsWith("/");
         startsWithDoubleSlash = expression.startsWith("//");
         parts = expression.substring(startsWithDoubleSlash ? 2 : startsWithSlash ? 1 : 0).split("/");

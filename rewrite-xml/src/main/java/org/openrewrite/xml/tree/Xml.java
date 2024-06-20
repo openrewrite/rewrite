@@ -27,20 +27,14 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
-import org.openrewrite.xml.internal.Namespaces;
 import org.openrewrite.xml.internal.WithPrefix;
-import org.openrewrite.xml.internal.XmlNamespaceUtils;
 import org.openrewrite.xml.internal.XmlPrinter;
 import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -80,41 +74,63 @@ public interface Xml extends Tree {
      */
     Xml withPrefixUnsafe(String prefix);
 
+    static boolean isNamespaceDefinitionAttribute(String name) {
+        return name.startsWith("xmlns");
+    }
+
+    static String getAttributeNameForPrefix(String namespacePrefix) {
+        return namespacePrefix.isEmpty() ? "xmlns" : "xmlns:" + namespacePrefix;
+    }
+
+    /**
+     * Extract the namespace prefix from a namespace definition attribute name (xmlns* attributes).
+     *
+     * @param name the attribute name or null if not a namespace definition attribute
+     * @return the namespace prefix
+     */
+    static @Nullable String extractPrefixFromNamespaceDefinition(String name) {
+        if (!isNamespaceDefinitionAttribute(name)) {
+            return null;
+        }
+        return "xmlns".equals(name) ? "" : extractLocalName(name);
+    }
+
+    /**
+     * Extract the namespace prefix from a tag or attribute name.
+     *
+     * @param name the tag or attribute name
+     * @return the namespace prefix (empty string for the default namespace)
+     */
+    static String extractNamespacePrefix(String name) {
+        int colon = name.indexOf(':');
+        return colon == -1 ? "" : name.substring(0, colon);
+    }
+
+    /**
+     * Extract the local name from a tag or attribute name.
+     *
+     * @param name the tag or attribute name
+     * @return the local name
+     */
+    static String extractLocalName(String name) {
+        int colon = name.indexOf(':');
+        return colon == -1 ? name : name.substring(colon + 1);
+    }
+
+    @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     class Document implements Xml, SourceFile {
-        @Getter
         @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @Getter
         @With
         Path sourcePath;
 
-        @Getter
         @With
         String prefixUnsafe;
-
-        /**
-         * @return a map of namespace prefixes (without the <code>xmlns</code> prefix) to URIs for this document.
-         */
-        public Namespaces getNamespaces() {
-            if (root == null) {
-                throw new IllegalStateException("Cannot get namespaces if root tag is null");
-            }
-
-            return root.getNamespaces();
-        }
-
-        public Document withNamespaces(Namespaces namespaces) {
-            if (root == null) {
-                throw new IllegalStateException("Cannot add namespaces if root tag is null");
-            }
-
-            return withRoot(root.withNamespaces(namespaces));
-        }
 
         @Override
         public Document withPrefix(String prefix) {
@@ -126,26 +142,21 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
-        @Getter
         @With
         Markers markers;
 
-        @Getter
         @Nullable // for backwards compatibility
         @With(AccessLevel.PRIVATE)
         String charsetName;
 
         @With
-        @Getter
         boolean charsetBomMarked;
 
         @With
-        @Getter
         @Nullable
         Checksum checksum;
 
         @With
-        @Getter
         @Nullable
         FileAttributes fileAttributes;
 
@@ -154,16 +165,15 @@ public interface Xml extends Tree {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
-        public SourceFile withCharset(Charset charset) {
+        public Xml.Document withCharset(Charset charset) {
             return withCharsetName(charset.name());
         }
 
-        @Getter
         @With
         Prolog prolog;
 
-        @Getter
         Tag root;
 
         public Document withRoot(Tag root) {
@@ -173,7 +183,6 @@ public interface Xml extends Tree {
             return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
         }
 
-        @Getter
         String eof;
 
         public Document withEof(String eof) {
@@ -181,20 +190,6 @@ public interface Xml extends Tree {
                 return this;
             }
             return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
-        }
-
-        /**
-         * @return The namespace prefix of the root tag of this document, if any.
-         */
-        public Optional<String> getNamespacePrefix() {
-            return root == null ? Optional.empty() : root.getNamespacePrefix();
-        }
-
-        /**
-         * @return The namespace URI of the root tag of this document, if any.
-         */
-        public Optional<String> getNamespaceUri(Cursor cursor) {
-            return root == null ? Optional.empty() : root.getNamespaceUri(cursor);
         }
 
         @Override
@@ -319,6 +314,7 @@ public interface Xml extends Tree {
         }
     }
 
+    @SuppressWarnings("unused")
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     class Tag implements Xml, Content {
@@ -330,22 +326,59 @@ public interface Xml extends Tree {
         String prefixUnsafe;
 
         /**
+         * The map returned by this method is a view of the Tag's attributes.
+         * Modifying the map will NOT modify the tag's attributes.
+         *
          * @return a map of namespace prefixes (without the <code>xmlns</code> prefix) to URIs for this tag.
          */
-        public Namespaces getNamespaces() {
-            return XmlNamespaceUtils.extractNamespaces(attributes);
+        public Map<String, String> getNamespaces() {
+            final Map<String, String> namespaces = new LinkedHashMap<>(attributes.size());
+            if (!attributes.isEmpty()) {
+                for (Attribute attribute : attributes) {
+                    if(isNamespaceDefinitionAttribute(attribute.getKeyAsString())) {
+                        namespaces.put(
+                                extractPrefixFromNamespaceDefinition(attribute.getKeyAsString()),
+                                attribute.getValueAsString());
+                    }
+                }
+            }
+            return namespaces;
         }
 
-        public Tag withNamespaces(Namespaces namespaces) {
-            Namespaces currentNamespaces = getNamespaces();
+        /**
+         * Gets a map containing all namespaces defined in the current scope, including all parent scopes.
+         *
+         * @param cursor     the cursor to search from
+         * @return a map containing all namespaces defined in the current scope, including all parent scopes.
+         */
+        public Map<String, String> getAllNamespaces(Cursor cursor) {
+            Map<String, String> namespaces = getNamespaces();
+            while (cursor != null) {
+                Xml.Tag enclosing = cursor.firstEnclosing(Xml.Tag.class);
+                if (enclosing != null) {
+                    for (Map.Entry<String, String> ns : enclosing.getNamespaces().entrySet()) {
+                        if (namespaces.containsValue(ns.getKey())) {
+                            throw new IllegalStateException(java.lang.String.format("Cannot have two namespaces with the same prefix (%s): '%s' and '%s'", ns.getKey(), namespaces.get(ns.getKey()), ns.getValue()));
+                        }
+                        namespaces.put(ns.getKey(), ns.getValue());
+                    }
+                }
+                cursor = cursor.getParent();
+            }
+
+            return namespaces;
+        }
+
+        public Tag withNamespaces(Map<String, String> namespaces) {
+            Map<String, String> currentNamespaces = getNamespaces();
             if (currentNamespaces.equals(namespaces)) {
                 return this;
             }
 
             List<Xml.Attribute> attributes = this.attributes;
             if (attributes.isEmpty()) {
-                for (Map.Entry<String, String> ns : namespaces) {
-                    String key = XmlNamespaceUtils.getAttributeNameForPrefix(ns.getKey());
+                for (Map.Entry<String, String> ns : namespaces.entrySet()) {
+                    String key = getAttributeNameForPrefix(ns.getKey());
                     attributes = ListUtils.concat(attributes, new Xml.Attribute(
                             randomId(),
                             "",
@@ -372,8 +405,8 @@ public interface Xml extends Tree {
                                 a -> a
                         ));
 
-                for (Map.Entry<String, String> ns : namespaces) {
-                    String key = XmlNamespaceUtils.getAttributeNameForPrefix(ns.getKey());
+                for (Map.Entry<String, String> ns : namespaces.entrySet()) {
+                    String key = getAttributeNameForPrefix(ns.getKey());
                     if (attributeByKey.containsKey(key)) {
                         Xml.Attribute attribute = attributeByKey.get(key);
                         if (!ns.getValue().equals(attribute.getValueAsString())) {
@@ -589,14 +622,14 @@ public interface Xml extends Tree {
          * @return The local name for this tag, without any namespace prefix.
          */
         public String getLocalName() {
-            return XmlNamespaceUtils.extractLocalName(name);
+            return extractLocalName(name);
         }
 
         /**
          * @return The namespace prefix for this tag, if any.
          */
         public Optional<String> getNamespacePrefix() {
-            String extractedNamespacePrefix = XmlNamespaceUtils.extractNamespacePrefix(name);
+            String extractedNamespacePrefix = extractNamespacePrefix(name);
             return Optional.ofNullable(StringUtils.isNotEmpty(extractedNamespacePrefix) ? extractedNamespacePrefix : null);
         }
 
@@ -605,7 +638,7 @@ public interface Xml extends Tree {
          */
         public Optional<String> getNamespaceUri(Cursor cursor) {
             Optional<String> maybeNamespacePrefix = getNamespacePrefix();
-            return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(XmlNamespaceUtils.findNamespaces(cursor, null).get(s)));
+            return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(getAllNamespaces(cursor).get(s)));
         }
 
         @Override
@@ -682,25 +715,6 @@ public interface Xml extends Tree {
         String beforeEquals;
         Value value;
 
-        /**
-         * @return The namespace prefix for this attribute, if any.
-         */
-        public Optional<String> getNamespacePrefix() {
-            if (XmlNamespaceUtils.isNamespaceDefinitionAttribute(key.getName())) {
-                return Optional.empty();
-            }
-            String extractedNamespacePrefix = XmlNamespaceUtils.extractNamespacePrefix(key.getName());
-            return Optional.ofNullable(StringUtils.isNotEmpty(extractedNamespacePrefix) ? extractedNamespacePrefix : null);
-        }
-
-        /**
-         * @return The namespace URI for this attribute, if any.
-         */
-        public Optional<String> getNamespaceUri(Cursor cursor) {
-            Optional<String> maybeNamespacePrefix = getNamespacePrefix();
-            return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(XmlNamespaceUtils.findNamespaces(cursor, null).get(s)));
-        }
-
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitAttribute(this, p);
@@ -741,10 +755,6 @@ public interface Xml extends Tree {
 
         public String getKeyAsString() {
             return key.getName();
-        }
-
-        public String getKeyLocalName() {
-            return key.getLocalName();
         }
 
         public String getValueAsString() {
@@ -958,34 +968,6 @@ public interface Xml extends Tree {
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitIdent(this, p);
-        }
-
-        /**
-         * @return the namespace prefix of this ident (empty string for the default namespace)
-         */
-        public Optional<String> getNamespacePrefix() {
-            String extractedNamespacePrefix = XmlNamespaceUtils.extractNamespacePrefix(name);
-            return Optional.ofNullable(StringUtils.isNotEmpty(extractedNamespacePrefix) ? extractedNamespacePrefix : null);
-        }
-
-        /**
-         * Extract the local name from the identifier.
-         *
-         * @return the local name
-         */
-        public String getLocalName() {
-            return XmlNamespaceUtils.extractLocalName(name);
-        }
-
-        /**
-         * @return The namespace URI of the root tag of this ident, if any.
-         */
-        public Optional<String> getNamespaceUri(Cursor cursor) {
-            Optional<String> maybeNamespacePrefix = getNamespacePrefix();
-            if (!maybeNamespacePrefix.isPresent()) {
-                return Optional.empty();
-            }
-            return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(XmlNamespaceUtils.findNamespaces(cursor, null).get(s)));
         }
 
         @Override

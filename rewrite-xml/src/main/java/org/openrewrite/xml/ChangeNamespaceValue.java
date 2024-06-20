@@ -22,10 +22,9 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.xml.internal.Namespaces;
-import org.openrewrite.xml.internal.XmlNamespaceUtils;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -78,7 +77,7 @@ public class ChangeNamespaceValue extends Recipe {
     String versionMatcher;
 
     @Nullable
-    @Option(displayName = "Search All Namespaces",
+    @Option(displayName = "Search all namespaces",
             description = "Specify whether evaluate all namespaces. Defaults to true",
             example = "true",
             required = false)
@@ -90,12 +89,39 @@ public class ChangeNamespaceValue extends Recipe {
             example = "2.0")
     String newVersion;
 
-    @Option(displayName = "Schema Location",
+    @Option(displayName = "Schema location",
             description = "The new value to be used for the namespace schema location.",
             example = "newfoo.bar.attribute.value.string",
             required = false)
     @Nullable
     String newSchemaLocation;
+
+    public static final String XML_SCHEMA_INSTANCE_PREFIX = "xsi";
+    public static final String XML_SCHEMA_INSTANCE_URI = "http://www.w3.org/2001/XMLSchema-instance";
+
+    /**
+     * Find the tag that contains the declaration of the {@link #XML_SCHEMA_INSTANCE_URI} namespace.
+     *
+     * @param cursor the cursor to search from
+     * @return the tag that contains the declaration of the given namespace URI.
+     */
+    public static Xml.Tag findTagContainingXmlSchemaInstanceNamespace(Cursor cursor) {
+        while (cursor != null) {
+            if (cursor.getValue() instanceof Xml.Document) {
+                return ((Xml.Document) cursor.getValue()).getRoot();
+            }
+            Xml.Tag tag = cursor.firstEnclosing(Xml.Tag.class);
+            if (tag != null) {
+                if (tag.getNamespaces().containsValue(XML_SCHEMA_INSTANCE_URI)) {
+                    return tag;
+                }
+            }
+            cursor = cursor.getParent();
+        }
+
+        // Should never happen
+        throw new IllegalArgumentException("Could not find tag containing namespace '" + XML_SCHEMA_INSTANCE_URI + "' or the enclosing Xml.Document instance.");
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -103,11 +129,11 @@ public class ChangeNamespaceValue extends Recipe {
         return new XmlIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                document = super.visitDocument(document, ctx);
+                Xml.Document d = super.visitDocument(document, ctx);
                 if (ctx.pollMessage(MSG_TAG_UPDATED, false)) {
-                    document = document.withRoot(addOrUpdateSchemaLocation(document.getRoot(), getCursor()));
+                    d = d.withRoot(addOrUpdateSchemaLocation(d.getRoot(), getCursor()));
                 }
-                return document;
+                return d;
             }
 
             @Override
@@ -217,25 +243,32 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             private Optional<Xml.Attribute> maybeGetSchemaLocation(Cursor cursor, Xml.Tag tag) {
-                Xml.Tag schemaLocationTag = XmlNamespaceUtils.findTagContainingXmlSchemaInstanceNamespace(cursor, tag);
-                Namespaces namespaces = tag.getNamespaces();
-                return schemaLocationTag.getAttributes().stream().filter(attribute -> {
-                    String attributeNamespace = namespaces.get(XmlNamespaceUtils.extractNamespacePrefix(attribute.getKeyAsString()));
-                    return XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI.equals(attributeNamespace)
-                           && attribute.getKeyAsString().endsWith("schemaLocation");
-                }).findFirst();
+                Xml.Tag schemaLocationTag = findTagContainingXmlSchemaInstanceNamespace(cursor);
+                Map<String, String> namespaces = tag.getNamespaces();
+                for (Xml.Attribute attribute : schemaLocationTag.getAttributes()) {
+                    String attributeNamespace = namespaces.get(Xml.extractNamespacePrefix(attribute.getKeyAsString()));
+                    if(XML_SCHEMA_INSTANCE_URI.equals(attributeNamespace)
+                       && attribute.getKeyAsString().endsWith("schemaLocation")) {
+                        return Optional.of(attribute);
+                    }
+                }
+
+                return Optional.empty();
             }
 
             private Xml.Tag maybeAddNamespace(Xml.Tag root) {
-                Namespaces namespaces = root.getNamespaces();
-                if (namespaces.containsUri(newValue) && !namespaces.containsUri(XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI)) {
-                    namespaces = namespaces.add(XmlNamespaceUtils.XML_SCHEMA_INSTANCE_PREFIX, XmlNamespaceUtils.XML_SCHEMA_INSTANCE_URI);
+                Map<String, String> namespaces = root.getNamespaces();
+                if (namespaces.containsValue(newValue) && !namespaces.containsValue(XML_SCHEMA_INSTANCE_URI)) {
+                    namespaces.put(XML_SCHEMA_INSTANCE_PREFIX, XML_SCHEMA_INSTANCE_URI);
                     root = root.withNamespaces(namespaces);
                 }
                 return root;
             }
 
             private Xml.Tag updateSchemaLocation(Xml.Tag newRoot, Xml.Attribute attribute) {
+                if(oldValue == null) {
+                    return newRoot;
+                }
                 String oldSchemaLocation = attribute.getValueAsString();
                 Matcher pattern = Pattern.compile(String.format(SCHEMA_LOCATION_MATCH_PATTERN, Pattern.quote(oldValue)))
                         .matcher(oldSchemaLocation);
@@ -261,7 +294,7 @@ public class ChangeNamespaceValue extends Recipe {
                                                 randomId(),
                                                 "",
                                                 Markers.EMPTY,
-                                                String.format("%s:schemaLocation", XmlNamespaceUtils.XML_SCHEMA_INSTANCE_PREFIX)
+                                                String.format("%s:schemaLocation", XML_SCHEMA_INSTANCE_PREFIX)
                                         ),
                                         "",
                                         new Xml.Attribute.Value(

@@ -65,7 +65,7 @@ public class HasNamespaceUri extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-                if (tag.getNamespaces().containsUri(namespaceUri) && (matcher == null || matcher.matches(getCursor()))) {
+                if (tag.getNamespaces().containsValue(namespaceUri) && (matcher == null || matcher.matches(getCursor()))) {
                     t = SearchResult.found(t);
                 }
                 return t;
@@ -79,7 +79,7 @@ public class HasNamespaceUri extends Recipe {
         new XmlVisitor<Set<Xml.Tag>>() {
             @Override
             public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> ts) {
-                if (tag.getNamespaces().containsUri(namespaceUri) && (matcher == null || matcher.matches(getCursor()))) {
+                if (tag.getNamespaces().containsValue(namespaceUri) && (matcher == null || matcher.matches(getCursor()))) {
                     ts.add(tag);
                 }
                 return super.visitTag(tag, ts);

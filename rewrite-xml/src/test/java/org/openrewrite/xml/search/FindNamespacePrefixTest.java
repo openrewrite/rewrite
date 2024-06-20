@@ -24,13 +24,13 @@ import org.openrewrite.xml.tree.Xml;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
-class HasNamespacePrefixTest implements RewriteTest {
+class FindNamespacePrefixTest implements RewriteTest {
 
     @DocumentExample
     @Test
     void rootElement() {
         rewriteRun(
-          spec -> spec.recipe(new HasNamespacePrefix("xsi", null)),
+          spec -> spec.recipe(new FindNamespacePrefix("xsi", null)),
           xml(
             source,
             """
@@ -54,7 +54,7 @@ class HasNamespacePrefixTest implements RewriteTest {
     @Test
     void nestedElement() {
         rewriteRun(
-          spec -> spec.recipe(new HasNamespacePrefix("jaxws", null)),
+          spec -> spec.recipe(new FindNamespacePrefix("jaxws", null)),
           xml(
             source,
             """
@@ -78,7 +78,7 @@ class HasNamespacePrefixTest implements RewriteTest {
     @Test
     void noMatchOnNamespacePrefix() {
         rewriteRun(
-          spec -> spec.recipe(new HasNamespacePrefix("foo", null)),
+          spec -> spec.recipe(new FindNamespacePrefix("foo", null)),
           xml(source)
         );
     }
@@ -86,7 +86,7 @@ class HasNamespacePrefixTest implements RewriteTest {
     @Test
     void noMatchOnXPath() {
         rewriteRun(
-          spec -> spec.recipe(new HasNamespacePrefix("xsi", "/jaxws:client")),
+          spec -> spec.recipe(new FindNamespacePrefix("xsi", "/jaxws:client")),
           xml(source)
         );
     }
@@ -96,7 +96,7 @@ class HasNamespacePrefixTest implements RewriteTest {
         rewriteRun(
           xml(
             source,
-            spec -> spec.beforeRecipe(xml -> assertThat(HasNamespacePrefix.find(xml, "xsi", null))
+            spec -> spec.beforeRecipe(xml -> assertThat(FindNamespacePrefix.find(xml, "xsi", null))
               .isNotEmpty()
               .hasSize(1)
               .hasOnlyElementsOfType(Xml.Tag.class)
