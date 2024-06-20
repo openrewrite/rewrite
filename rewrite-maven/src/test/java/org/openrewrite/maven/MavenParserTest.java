@@ -3028,7 +3028,6 @@ class MavenParserTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-                </project>
               """,
             spec -> spec.afterRecipe(pomXml -> {
                 MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
@@ -3039,5 +3038,4 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
-
 }
