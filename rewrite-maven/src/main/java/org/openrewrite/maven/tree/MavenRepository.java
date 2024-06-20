@@ -29,7 +29,9 @@ import java.io.File;
 import java.io.Serializable;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.time.Duration;
 
+@SuppressWarnings("JavadocReference")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -37,9 +39,9 @@ import java.nio.file.Paths;
 @RequiredArgsConstructor
 public class MavenRepository implements Serializable {
 
-    public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), "true", "true", true, null, null, false);
-    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", Paths.get(System.getProperty("user.home"), ".m2", "repository").toUri().toString(), "true", "true", true, null, null, false);
-    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", "true", "false", true, null, null, true);
+    public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), "true", "true", true, null, null, null, null, false);
+    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", Paths.get(System.getProperty("user.home"), ".m2", "repository").toUri().toString(), "true", "true", true, null, null, null, null, false);
+    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", "true", "false", true, null, null, null, null, true);
 
     @EqualsAndHashCode.Include
     @With
@@ -79,14 +81,51 @@ public class MavenRepository implements Serializable {
     @Nullable
     String password;
 
+    @With
+    @Nullable
+    Duration connectTimeout;
+
+    @With
+    @Nullable
+    Duration readTimeout;
+
     @Nullable
     @NonFinal
     Boolean deriveMetadataIfMissing;
 
+    /**
+     * Constructor required by {@link org.openrewrite.maven.tree.OpenRewriteModelSerializableTest}.
+     *
+     * @deprecated Use {@link #MavenRepository(String, String, String, String, boolean, String, String, Duration, Duration, Boolean)}
+     */
+    @Deprecated
+    @JsonIgnore
+    public MavenRepository(
+            @Nullable String id, String uri, @Nullable String releases, @Nullable String snapshots,
+            @Nullable String username, @Nullable String password
+    ) {
+        this(id, uri, releases, snapshots, false, username, password, null, null, null);
+    }
+
+    /**
+     * Constructor required by {@link org.openrewrite.gradle.marker.GradleProject}.
+     *
+     * @deprecated Use {@link #MavenRepository(String, String, String, String, boolean, String, String, Duration, Duration, Boolean)}
+     */
+    @Deprecated
     @JsonIgnore
     public MavenRepository(
             @Nullable String id, String uri, @Nullable String releases, @Nullable String snapshots, boolean knownToExist,
             @Nullable String username, @Nullable String password, @Nullable Boolean deriveMetadataIfMissing
+    ) {
+        this(id, uri, releases, snapshots, knownToExist, username, password, null, null, deriveMetadataIfMissing);
+    }
+
+    @JsonIgnore
+    public MavenRepository(
+            @Nullable String id, String uri, @Nullable String releases, @Nullable String snapshots, boolean knownToExist,
+            @Nullable String username, @Nullable String password, @Nullable Duration connectTimeout,
+            @Nullable Duration readTimeout, @Nullable Boolean deriveMetadataIfMissing
     ) {
         this.id = id;
         this.uri = uri;
@@ -95,6 +134,8 @@ public class MavenRepository implements Serializable {
         this.knownToExist = knownToExist;
         this.username = username;
         this.password = password;
+        this.connectTimeout = connectTimeout;
+        this.readTimeout = readTimeout;
         this.deriveMetadataIfMissing = deriveMetadataIfMissing;
     }
 
@@ -102,6 +143,7 @@ public class MavenRepository implements Serializable {
         return new Builder();
     }
 
+    @SuppressWarnings("unused")
     @Data
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Accessors(fluent = true, chain = true)
@@ -115,12 +157,14 @@ public class MavenRepository implements Serializable {
         String username;
         String password;
         Boolean deriveMetadataIfMissing;
+        Duration connectTimeout;
+        Duration readTimeout;
 
         private Builder() {
         }
 
         public MavenRepository build() {
-            return new MavenRepository(id, uri, releases, snapshots, knownToExist, username, password, deriveMetadataIfMissing);
+            return new MavenRepository(id, uri, releases, snapshots, knownToExist, username, password, connectTimeout, readTimeout, deriveMetadataIfMissing);
         }
 
         public Builder releases(boolean releases) {
@@ -160,6 +204,16 @@ public class MavenRepository implements Serializable {
             }
 
             this.password = password;
+            return this;
+        }
+
+        public Builder connectTimeout(Duration connectTimeout) {
+            this.connectTimeout = connectTimeout;
+            return this;
+        }
+
+        public Builder readTimeout(Duration readTimeout) {
+            this.readTimeout = readTimeout;
             return this;
         }
 

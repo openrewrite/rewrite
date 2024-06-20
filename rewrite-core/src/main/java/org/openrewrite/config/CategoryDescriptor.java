@@ -18,6 +18,7 @@ package org.openrewrite.config;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.NlsRewrite;
 
 import java.util.Set;
 
@@ -29,11 +30,13 @@ public class CategoryDescriptor {
     public static final int HIGHEST_PRECEDENCE = Integer.MAX_VALUE;
 
     @Language("markdown")
+    @NlsRewrite.DisplayName
     String displayName;
 
     String packageName;
 
     @Language("markdown")
+    @NlsRewrite.Description
     String description;
 
     Set<String> tags;
