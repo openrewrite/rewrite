@@ -3008,4 +3008,34 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void runtimeClasspathOnly() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>cache-2</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.glassfish.jaxb</groupId>
+                    <artifactId>jaxb-runtime</artifactId>
+                    <version>4.0.5</version>
+                    <scope>runtime</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Compile)).isEmpty();
+                assertThat(resolution.findDependencies("jakarta.xml.bind", "jakarta.xml.bind-api", Scope.Compile)).isEmpty();
+            })
+          )
+        );
+    }
 }
