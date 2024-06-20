@@ -207,6 +207,7 @@ public class GroovyParser implements Parser {
     public static class Builder extends Parser.Builder {
         @Nullable
         private Collection<Path> classpath = Collections.emptyList();
+
         @Nullable
         protected Collection<String> artifactNames = Collections.emptyList();
 

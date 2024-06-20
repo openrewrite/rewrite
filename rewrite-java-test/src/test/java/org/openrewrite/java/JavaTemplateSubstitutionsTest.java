@@ -141,7 +141,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               """,
             """
               class Test {
-                            
+              
                   @SuppressWarnings("ALL")
                   void test2() {
                   }
@@ -412,10 +412,10 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               """,
             """
               import java.util.Arrays;
-                            
+              
               abstract class Test {
                   abstract String[] array();
-                  
+              
                   void test(boolean condition) {
                       Object any = Arrays.asList(condition ? array() : new String[]{"Hello!"});
                   }
@@ -452,6 +452,36 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                void test(Map<String, ?> map) {
                    System.out.println(map.get("test"));
                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void throwNewException() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation methodInvocation, ExecutionContext executionContext) {
+                  return JavaTemplate.builder("throw new RuntimeException()")
+                    .build()
+                    .apply(getCursor(), methodInvocation.getCoordinates().replace());
+              }
+          })),
+          java(
+            """
+              public class Test {
+                  void test() {
+                      System.out.println("Hello");
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void test() {
+                      throw new RuntimeException();
+                  }
               }
               """
           )

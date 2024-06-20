@@ -30,6 +30,7 @@ import java.util.UUID;
 public class DeserializationError implements Marker {
     @EqualsAndHashCode.Include
     UUID id;
+
     String message;
     String detail;
 

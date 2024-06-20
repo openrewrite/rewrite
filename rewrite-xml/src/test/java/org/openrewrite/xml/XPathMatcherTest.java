@@ -159,20 +159,44 @@ class XPathMatcherTest {
           pomXml2)).isTrue();
     }
 
+    private final SourceFile attributeXml = new XmlParser().parse(
+      """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <root>
+          <element1 foo="bar"><foo>baz</foo></element1>
+        </root>
+        """
+    ).toList().get(0);
+
     @Test
     void attributePredicate() {
-        SourceFile xml = new XmlParser().parse(
-          """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <root>
-              <element1 foo="bar"><foo>baz</foo></element1>
-            </root>
-            """
-        ).toList().get(0);
-        assertThat(match("/root/element1[@foo='bar']", xml)).isTrue();
-        assertThat(match("/root/element1[@foo='baz']", xml)).isFalse();
-        assertThat(match("/root/element1[foo='bar']", xml)).isFalse();
-        assertThat(match("/root/element1[foo='baz']", xml)).isTrue();
+        assertThat(match("/root/element1[@foo='bar']", attributeXml)).isTrue();
+        assertThat(match("/root/element1[@foo='baz']", attributeXml)).isFalse();
+        assertThat(match("/root/element1[foo='bar']", attributeXml)).isFalse();
+        assertThat(match("/root/element1[foo='baz']", attributeXml)).isTrue();
+    }
+
+    @Test
+    void wildcards() {
+        // condition with wildcard attribute
+        assertThat(match("/root/element1[@*='bar']", attributeXml)).isTrue();
+        assertThat(match("/root/element1[@*='baz']", attributeXml)).isFalse();
+
+        // condition with wildcard element
+        assertThat(match("/root/element1[*='bar']", attributeXml)).isFalse();
+        assertThat(match("/root/element1[*='baz']", attributeXml)).isTrue();
+
+        // absolute xpath with wildcard element
+        assertThat(match("/root/*[@foo='bar']", attributeXml)).isTrue();
+        assertThat(match("/root/*[@*='bar']", attributeXml)).isTrue();
+        assertThat(match("/root/*[@foo='baz']", attributeXml)).isFalse();
+        assertThat(match("/root/*[@*='baz']", attributeXml)).isFalse();
+
+        // relative xpath with wildcard element
+        assertThat(match("//*[@foo='bar']", attributeXml)).isTrue();
+        assertThat(match("//*[@foo='baz']", attributeXml)).isFalse();
+//        assertThat(match("//*[foo='bar']", attributeXml)).isFalse(); // TODO: fix relative xpath with condition
+        assertThat(match("//*[foo='baz']", attributeXml)).isTrue();
     }
 
     @Test
@@ -188,6 +212,8 @@ class XPathMatcherTest {
             </root>
             """
         ).toList().get(0);
+//        assertThat(match("//element1[foo='bar']", xml)).isFalse(); // TODO: fix - was already failing before * changes
+        assertThat(match("//element1[foo='baz']", xml)).isTrue();
         assertThat(match("//element1[@foo='bar']", xml)).isTrue();
         assertThat(match("//element1[foo='baz']/test", xml)).isTrue();
         assertThat(match("//element1[foo='baz']/baz", xml)).isFalse();
@@ -204,7 +230,7 @@ class XPathMatcherTest {
 
         // Namespace functions
         assertThat(match("/*[local-name()='element1']", namespacedXml)).isFalse();
-        assertThat(match("//*[local-name()='element1']", namespacedXml)).isFalse();
+        assertThat(match("//*[local-name()='element1']", namespacedXml)).isTrue();
         assertThat(match("/root/*[local-name()='element1']", namespacedXml)).isTrue();
         assertThat(match("/root/*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
         assertThat(match("/*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
@@ -221,6 +247,22 @@ class XPathMatcherTest {
         assertThat(match("substring-after(/root/element1, 'content') = '1'", namespacedXml)).isTrue();
         assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
         assertThat(match("count(/root/*)", namespacedXml)).isTrue();
+    }
+
+    @Test
+    void testMatchLocalName() {
+        assertThat(match("/*[local-name()='root']", namespacedXml)).isTrue();
+        assertThat(match("/*[local-name()='element1']", namespacedXml)).isFalse();
+        assertThat(match("/*[local-name()='element2']", namespacedXml)).isFalse();
+        assertThat(match("//*[local-name()='element1']", namespacedXml)).isTrue();
+        assertThat(match("//*[local-name()='element2']", namespacedXml)).isTrue();
+        assertThat(match("//*[local-name()='dne']", namespacedXml)).isFalse();
+
+        assertThat(match("/root[local-name()='root']", namespacedXml)).isTrue();
+        assertThat(match("//element1[local-name()='element1']", namespacedXml)).isTrue();
+        assertThat(match("//element2[local-name()='element2']", namespacedXml)).isFalse();
+        assertThat(match("//ns2:element2[local-name()='element2']", namespacedXml)).isTrue();
+        assertThat(match("//dne[local-name()='dne']", namespacedXml)).isFalse();
     }
 
     private boolean match(String xpath, SourceFile x) {

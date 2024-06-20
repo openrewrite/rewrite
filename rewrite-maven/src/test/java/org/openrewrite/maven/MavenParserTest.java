@@ -1130,17 +1130,17 @@ class MavenParserTest implements RewriteTest {
               """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
-
+                
                         <artifactId>b</artifactId>
                         <groupId>org.openrewrite.maven</groupId>
                         <version>0.1.0-SNAPSHOT</version>
                         <packaging>pom</packaging>
-
+                
                         <properties>
                             <maven.compiler.source>1.8</maven.compiler.source>
                             <maven.compiler.target>1.8</maven.compiler.target>
                         </properties>
-
+                
                         <dependencyManagement>
                             <dependencies>
                                 <dependency>
@@ -1161,12 +1161,12 @@ class MavenParserTest implements RewriteTest {
               """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
-
+                
                         <artifactId>c</artifactId>
                         <groupId>org.openrewrite.maven</groupId>
                         <version>0.1.0-SNAPSHOT</version>
                         <packaging>pom</packaging>
-
+                
                         <dependencyManagement>
                             <dependencies>
                                 <dependency>
@@ -1185,11 +1185,11 @@ class MavenParserTest implements RewriteTest {
               """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
-
+                
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>d</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-
+                
                         <properties>
                             <maven.compiler.source>1.8</maven.compiler.source>
                             <maven.compiler.target>1.8</maven.compiler.target>
@@ -1532,7 +1532,7 @@ class MavenParserTest implements RewriteTest {
                         <artifactId>a</artifactId>
                         <version>1.0.0</version>
                         <packaging>jar</packaging>
-
+                
                         <dependencyManagement>
                             <dependencies>
                                 <dependency>
@@ -1606,7 +1606,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-
+              
                   <profiles>
                       <profile>
                           <id>old-jdk</id>
@@ -2474,7 +2474,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>a</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-  
+              
                   <build>
                     <pluginManagement>
                       <plugins>
@@ -2933,6 +2933,108 @@ class MavenParserTest implements RewriteTest {
                 </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void transitiveDependencyManagement() {
+        rewriteRun(
+          mavenProject("depends-on-guava",
+            pomXml("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>depends-on-guava</artifactId>
+                    <version>0.0.1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>30.0-jre</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  //noinspection OptionalGetWithoutIsPresent
+                  List<ResolvedDependency> guava = pom.getMarkers().findFirst(MavenResolutionResult.class)
+                    .map(mrr -> mrr.findDependencies("com.google.guava", "guava", Scope.Compile))
+                    .get();
+
+                  assertThat(guava)
+                    .singleElement()
+                    .as("Dependency management cannot override the version of a direct dependency")
+                    .matches(it -> "29.0-jre".equals(it.getVersion()));
+              })
+            )),
+          mavenProject("transitively-depends-on-guava",
+            pomXml("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>transitively-depends-on-guava</artifactId>
+                    <version>0.0.1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>depends-on-guava</artifactId>
+                            <version>0.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  //noinspection OptionalGetWithoutIsPresent
+                  List<ResolvedDependency> guava = pom.getMarkers().findFirst(MavenResolutionResult.class)
+                    .map(mrr -> mrr.findDependencies("com.google.guava", "guava", Scope.Compile))
+                    .get();
+
+                  assertThat(guava)
+                    .singleElement()
+                    .as("The dependency management of dependency does not override the versions of its own direct dependencies")
+                    .matches(it -> "29.0-jre".equals(it.getVersion()));
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void runtimeClasspathOnly() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>cache-2</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.glassfish.jaxb</groupId>
+                    <artifactId>jaxb-runtime</artifactId>
+                    <version>4.0.5</version>
+                    <scope>runtime</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Compile)).isEmpty();
+                assertThat(resolution.findDependencies("jakarta.xml.bind", "jakarta.xml.bind-api", Scope.Compile)).isEmpty();
+            })
           )
         );
     }

@@ -31,6 +31,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
 
     @Getter
     private Statement afterDependency;
+
     @Getter
     private Statement beforeDependency;
 

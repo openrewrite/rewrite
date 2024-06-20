@@ -698,6 +698,7 @@ class RewriteTestUtils {
 class DelegateSourceFileForDiff implements SourceFile {
     @Delegate(excludes = PrintAll.class)
     private final SourceFile delegate;
+
     private final String expected;
 
     @Override

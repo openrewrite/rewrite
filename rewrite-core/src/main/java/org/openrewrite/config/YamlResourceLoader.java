@@ -64,6 +64,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Nullable
     private final ClassLoader classLoader;
+
     private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
     @Nullable

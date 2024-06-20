@@ -136,8 +136,10 @@ public interface Parser {
     class Input {
         @Getter
         private final boolean synthetic;
+
         @Getter
         private final Path path;
+
         private final Supplier<InputStream> source;
 
         @Getter

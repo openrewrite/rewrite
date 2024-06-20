@@ -150,7 +150,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
 
     static class MavenWrapperState {
         boolean needsWrapperUpdate = false;
+
         @Nullable BuildTool updatedMarker;
+
         boolean addMavenWrapperProperties = true;
         boolean addMavenWrapperDownloader = true;
         boolean addMavenWrapperJar = true;

@@ -33,7 +33,7 @@ public class FindTags extends Recipe {
     @Option(displayName = "XPath",
             description = "An XPath expression used to find matching tags.",
             example = "//dependencies/dependency")
-    String xpath;
+    String xPath;
 
     @Override
     public String getDisplayName() {
@@ -47,7 +47,7 @@ public class FindTags extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        XPathMatcher matcher = new XPathMatcher(xpath);
+        XPathMatcher matcher = new XPathMatcher(xPath);
         return new XmlVisitor<ExecutionContext>() {
 
             @Override
