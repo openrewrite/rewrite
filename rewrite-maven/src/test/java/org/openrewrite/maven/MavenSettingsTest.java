@@ -23,6 +23,7 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
@@ -43,7 +44,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SuppressWarnings({"HttpUrlsUsage", "ConstantConditions"})
+@SuppressWarnings({"HttpUrlsUsage", "ConstantConditions", "OptionalGetWithoutIsPresent"})
 class MavenSettingsTest {
 
     private final MavenExecutionContextView ctx = MavenExecutionContextView.view(
@@ -373,8 +374,7 @@ class MavenSettingsTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1688")
     class LocalRepositoryTest {
         @Test
-        void parsesLocalRepositoryPathFromSettingsXml() {
-            var localRepoPath = System.getProperty("java.io.tmpdir");
+        void parsesLocalRepositoryPathFromSettingsXml(@TempDir Path localRepoPath) {
             ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
               //language=xml
               """
@@ -387,12 +387,11 @@ class MavenSettingsTest {
             )), ctx));
             assertThat(ctx.getLocalRepository().getUri())
               .startsWith("file://")
-              .containsSubsequence(Paths.get(localRepoPath).toUri().toString().split("/"));
+              .containsSubsequence(localRepoPath.toUri().toString().split("/"));
         }
 
         @Test
-        void parsesLocalRepositoryUriFromSettingsXml() {
-            var localRepoPath = Paths.get(System.getProperty("java.io.tmpdir")).toUri().toString();
+        void parsesLocalRepositoryUriFromSettingsXml(@TempDir Path localRepoPath) {
             ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
               //language=xml
               """
@@ -406,7 +405,7 @@ class MavenSettingsTest {
 
             assertThat(ctx.getLocalRepository().getUri())
               .startsWith("file://")
-              .containsSubsequence(localRepoPath.split("/"));
+              .containsSubsequence(localRepoPath.toUri().toString().split("/"));
         }
 
         @Test
@@ -784,20 +783,20 @@ class MavenSettingsTest {
     void canDeserializeSettingsCorrectly() throws IOException {
         Xml.Document parsed = (Xml.Document) XmlParser.builder().build().parse("""
             <settings>
-                <servers>
-                    <server>
-                        <id>maven-snapshots</id>
-                        <configuration>
-                            <connectTimeout>10000</connectTimeout>
-                            <httpHeaders>
-                                <property>
-                                    <name>X-JFrog-Art-Api</name>
-                                    <value>myApiToken</value>
-                                </property>
-                            </httpHeaders>
-                        </configuration>
-                    </server>
-                </servers>
+              <servers>
+                <server>
+                  <id>maven-snapshots</id>
+                  <configuration>
+                    <connectTimeout>10000</connectTimeout>
+                    <httpHeaders>
+                      <property>
+                        <name>X-JFrog-Art-Api</name>
+                        <value>myApiToken</value>
+                      </property>
+                    </httpHeaders>
+                  </configuration>
+                </server>
+              </servers>
             </settings>
             """).findFirst().get();
 
@@ -817,7 +816,7 @@ class MavenSettingsTest {
           .isPresent()
           .get(InstanceOfAssertFactories.type(Xml.Document.class))
           .isNotNull()
-            .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue());
-            //.satisfies(serialized -> assertThat(serialized.printAll()).isEqualTo(parsed.printAll()));
+            .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue())
+            .satisfies(serialized -> assertThat(serialized.printAll().replace("\r", "")).isEqualTo(parsed.printAll()));
     }
 }
