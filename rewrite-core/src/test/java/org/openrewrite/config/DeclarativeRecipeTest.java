@@ -72,6 +72,57 @@ class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
+    void uninitializedFailsValidation() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
+          null, null, true, null);
+        dr.addUninitializedPrecondition(
+          toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                  if ("1".equals(text.getText())) {
+                      return SearchResult.found(text);
+                  }
+                  return text;
+              }
+          })
+        );
+        dr.addUninitialized(
+          new ChangeText("2")
+        );
+        dr.addUninitialized(
+          new ChangeText("3")
+        );
+        Validated<Object> validation = dr.validate();
+        assertThat(validation.isValid()).isFalse();
+        assertThat(validation.failures().size()).isEqualTo(2);
+        assertThat(validation.failures().get(0).getProperty()).isEqualTo("initialization");
+    }
+
+    @Test
+    void uninitializedWithInitializedRecipesPassesValidation() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
+          null, null, true, null);
+        dr.setPreconditions(
+          List.of(
+            toRecipe(() -> new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    if ("1".equals(text.getText())) {
+                        return SearchResult.found(text);
+                    }
+                    return text;
+                }
+            }))
+        );
+        dr.setRecipeList(List.of(
+          new ChangeText("2"),
+          new ChangeText("3")
+        ));
+        Validated<Object> validation = dr.validate();
+        assertThat(validation.isValid()).isTrue();
+    }
+
+    @Test
     void yamlPrecondition() {
         rewriteRun(
           spec -> spec.recipeFromYaml("""
@@ -96,17 +147,17 @@ class DeclarativeRecipeTest implements RewriteTest {
     void yamlPreconditionWithScanningRecipe() {
         rewriteRun(
           spec -> spec.recipeFromYaml("""
-            ---
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.openrewrite.PreconditionTest
-            preconditions:
-              - org.openrewrite.text.Find:
-                  find: 1
-            recipeList:
-              - org.openrewrite.text.CreateTextFile:
-                 relativeFileName: test.txt
-                 fileContents: "test"
-            """, "org.openrewrite.PreconditionTest")
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionTest
+              preconditions:
+                - org.openrewrite.text.Find:
+                    find: 1
+              recipeList:
+                - org.openrewrite.text.CreateTextFile:
+                   relativeFileName: test.txt
+                   fileContents: "test"
+              """, "org.openrewrite.PreconditionTest")
             .afterRecipe(run -> {
                 assertThat(run.getChangeset().getAllResults()).anySatisfy(
                   s -> {

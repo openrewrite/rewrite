@@ -2936,4 +2936,76 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void transitiveDependencyManagement() {
+        rewriteRun(
+          mavenProject("depends-on-guava",
+            pomXml("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>depends-on-guava</artifactId>
+                    <version>0.0.1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>30.0-jre</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  //noinspection OptionalGetWithoutIsPresent
+                  List<ResolvedDependency> guava = pom.getMarkers().findFirst(MavenResolutionResult.class)
+                    .map(mrr -> mrr.findDependencies("com.google.guava", "guava", Scope.Compile))
+                    .get();
+
+                  assertThat(guava)
+                    .singleElement()
+                    .as("Dependency management cannot override the version of a direct dependency")
+                    .matches(it -> "29.0-jre".equals(it.getVersion()));
+              })
+            )),
+          mavenProject("transitively-depends-on-guava",
+            pomXml("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>transitively-depends-on-guava</artifactId>
+                    <version>0.0.1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>depends-on-guava</artifactId>
+                            <version>0.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  //noinspection OptionalGetWithoutIsPresent
+                  List<ResolvedDependency> guava = pom.getMarkers().findFirst(MavenResolutionResult.class)
+                    .map(mrr -> mrr.findDependencies("com.google.guava", "guava", Scope.Compile))
+                    .get();
+
+                  assertThat(guava)
+                    .singleElement()
+                    .as("The dependency management of dependency does not override the versions of its own direct dependencies")
+                    .matches(it -> "29.0-jre".equals(it.getVersion()));
+              })
+            )
+          )
+        );
+    }
 }
