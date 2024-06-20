@@ -882,4 +882,29 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4275")
+    void noActionForNonStringLiterals() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation(gradleApi())
+                jar {
+                  enabled(true)
+                }
+              }
+              """
+          )
+        );
+    }
 }
