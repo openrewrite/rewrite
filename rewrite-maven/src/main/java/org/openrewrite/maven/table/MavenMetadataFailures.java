@@ -38,27 +38,35 @@ public class MavenMetadataFailures extends DataTable<MavenMetadataFailures.Row> 
 
     @Value
     public static class Row {
+
         @Column(displayName = "Group id",
                 description = "The groupId of the artifact for which the metadata download failed.")
         String group;
+
         @Column(displayName = "Artifact id",
                 description = "The artifactId of the artifact for which the metadata download failed.")
         String artifactId;
+
         @Column(displayName = "Version",
                 description = "The version of the artifact for which the metadata download failed.")
         String version;
+
         @Column(displayName = "Maven repository",
                 description = "The URL of the Maven repository that the metadata download failed on.")
         String mavenRepositoryUri;
+
         @Column(displayName = "Snapshots",
                 description = "Does the repository support snapshots.")
         String snapshots;
+
         @Column(displayName = "Releases",
                 description = "Does the repository support releases.")
         String releases;
+
         @Column(displayName = "Failure",
                 description = "The reason the metadata download failed.")
         String failure;
+
     }
 
     public interface MavenMetadataDownloader {
