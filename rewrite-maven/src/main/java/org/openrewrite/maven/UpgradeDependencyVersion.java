@@ -160,8 +160,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
                                     if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
                                         getPomDeclaringProperty(getResolutionResult(), propertyName)
-                                                .ifPresent(pom -> accumulator.pomProperties.add(
-                                                        new PomProperty(requireNonNull(pom.getSourcePath()), propertyName)));
+                                                .map(Pom::getSourcePath)
+                                                .filter(Objects::nonNull)
+                                                .ifPresent(pomSourcePath -> accumulator.pomProperties.add(
+                                                        new PomProperty(pomSourcePath, propertyName, newerVersion)));
                                     }
                                 }
                             }
@@ -192,8 +194,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             Path pomSourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
                             for (PomProperty pomProperty : accumulator.pomProperties) {
                                 if (pomProperty.pomFilePath.equals(pomSourcePath) &&
-                                    pomProperty.property.equals(tag.getName())) {
-                                    doAfterVisit(new ChangeTagValueVisitor<>(tag, newVersion));
+                                    pomProperty.propertyName.equals(tag.getName())) {
+                                    doAfterVisit(new ChangeTagValueVisitor<>(tag, pomProperty.propertyValue));
                                     maybeUpdateModel();
                                 }
                             }
@@ -435,6 +437,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Value
     public static class PomProperty {
         Path pomFilePath;
-        String property;
+        String propertyName;
+        String propertyValue;
     }
 }
