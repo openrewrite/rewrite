@@ -15,7 +15,6 @@
  */
 package org.openrewrite.text;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
@@ -106,34 +105,6 @@ public class FindAndReplace extends Recipe {
             required = false)
     @Nullable
     Boolean plaintextOnly;
-
-    @Deprecated
-    public FindAndReplace(final String find, @Nullable final String replace, @Nullable final Boolean regex,
-            @Nullable final Boolean caseSensitive, @Nullable final Boolean multiline, @Nullable final Boolean dotAll,
-            @Nullable final String filePattern) {
-        this.find = find;
-        this.replace = replace;
-        this.regex = regex;
-        this.caseSensitive = caseSensitive;
-        this.multiline = multiline;
-        this.dotAll = dotAll;
-        this.filePattern = filePattern;
-        this.plaintextOnly = null;
-    }
-
-    @JsonCreator
-    public FindAndReplace(final String find, @Nullable final String replace, @Nullable final Boolean regex,
-            @Nullable final Boolean caseSensitive, @Nullable final Boolean multiline, @Nullable final Boolean dotAll,
-            @Nullable final String filePattern, @Nullable final Boolean plaintextOnly) {
-        this.find = find;
-        this.replace = replace;
-        this.regex = regex;
-        this.caseSensitive = caseSensitive;
-        this.multiline = multiline;
-        this.dotAll = dotAll;
-        this.filePattern = filePattern;
-        this.plaintextOnly = plaintextOnly;
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
