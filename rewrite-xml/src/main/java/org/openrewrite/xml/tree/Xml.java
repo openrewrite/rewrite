@@ -174,14 +174,8 @@ public interface Xml extends Tree {
         @With
         Prolog prolog;
 
+        @With
         Tag root;
-
-        public Document withRoot(Tag root) {
-            if (this.root == root) {
-                return this;
-            }
-            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
-        }
 
         String eof;
 
