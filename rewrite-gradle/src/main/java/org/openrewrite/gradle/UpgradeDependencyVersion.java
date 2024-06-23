@@ -435,6 +435,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
                 } else if (arg instanceof J.Literal) {
                     J.Literal literal = (J.Literal) arg;
+                    if (literal.getType() != JavaType.Primitive.String) {
+                        return arg;
+                    }
                     String gav = (String) literal.getValue();
                     if (gav == null) {
                         getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, new IllegalStateException("Unable to update version"));
