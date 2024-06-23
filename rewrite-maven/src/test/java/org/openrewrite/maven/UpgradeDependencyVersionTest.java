@@ -854,7 +854,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeVersionDefinedViaImplicitPropertyInRemoteParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.x", "", true, null)),
           pomXml(
             """
               <project>
@@ -904,7 +904,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeVersionDefinedViaExplicitPropertyInRemoteParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.x", "", true, null)),
           pomXml(
             """
               <project>
