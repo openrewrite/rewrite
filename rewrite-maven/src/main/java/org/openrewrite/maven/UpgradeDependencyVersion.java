@@ -151,27 +151,29 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     // if the resolved dependency exists AND it does not represent an artifact that was parsed
                     // as a source file, attempt to find a new version.
                     ResolvedDependency d = findDependency(tag);
-                    try {
-                        String newerVersion = findNewerVersion(d.getVersion(),
-                                () -> downloadMetadata(d.getGroupId(), d.getArtifactId(), ctx), versionComparator, ctx);
-                        if (newerVersion != null) {
-                            Optional<Xml.Tag> version = tag.getChild("version");
-                            if (version.isPresent()) {
-                                String requestedVersion = d.getRequested().getVersion();
-                                if (requestedVersion != null && requestedVersion.startsWith("${") && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
-                                    String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
-                                    if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
-                                        getPomDeclaringProperty(getResolutionResult(), propertyName)
-                                                .map(Pom::getSourcePath)
-                                                .filter(Objects::nonNull)
-                                                .ifPresent(pomSourcePath -> accumulator.pomProperties.add(
-                                                        new PomProperty(pomSourcePath, propertyName, newerVersion)));
+                    if (d != null && d.getRepository() != null) {
+                        try {
+                            String newerVersion = findNewerVersion(d.getVersion(),
+                                    () -> downloadMetadata(d.getGroupId(), d.getArtifactId(), ctx), versionComparator, ctx);
+                            if (newerVersion != null) {
+                                Optional<Xml.Tag> version = tag.getChild("version");
+                                if (version.isPresent()) {
+                                    String requestedVersion = d.getRequested().getVersion();
+                                    if (requestedVersion != null && requestedVersion.startsWith("${") && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
+                                        String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
+                                        if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
+                                            getPomDeclaringProperty(getResolutionResult(), propertyName)
+                                                    .map(Pom::getSourcePath)
+                                                    .filter(Objects::nonNull)
+                                                    .ifPresent(pomSourcePath -> accumulator.pomProperties.add(
+                                                            new PomProperty(pomSourcePath, propertyName, newerVersion)));
+                                        }
                                     }
                                 }
                             }
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(tag);
                         }
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(tag);
                     }
                 }
                 return super.visitTag(tag, ctx);
