@@ -145,13 +145,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
             @Override
             public Xml.Tag visitTag(final Xml.Tag tag, final ExecutionContext ctx) {
-                if (isDependencyTag(groupId, artifactId) ||
-                    isManagedDependencyTag(groupId, artifactId) ||
-                    isPluginDependencyTag(groupId, artifactId)) {
-                    // if the resolved dependency exists AND it does not represent an artifact that was parsed
-                    // as a source file, attempt to find a new version.
+                if (isDependencyTag(groupId, artifactId)) {
                     ResolvedDependency d = findDependency(tag);
                     if (d != null && d.getRepository() != null) {
+                        // if the resolved dependency exists AND it does not represent an artifact that was parsed
+                        // as a source file, attempt to find a new version.
                         try {
                             String newerVersion = findNewerVersion(d.getVersion(),
                                     () -> downloadMetadata(d.getGroupId(), d.getArtifactId(), ctx), versionComparator, ctx);
