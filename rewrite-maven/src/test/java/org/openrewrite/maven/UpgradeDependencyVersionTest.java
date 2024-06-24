@@ -810,6 +810,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <version>1</version>
                   <properties>
                     <guava.version>13.0</guava.version>
+                    <junit.version>4.13.2</junit.version>
                   </properties>
               </project>
               """,
@@ -820,6 +821,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <version>1</version>
                   <properties>
                     <guava.version>14.0</guava.version>
+                    <junit.version>4.13.2</junit.version>
                   </properties>
               </project>
               """
@@ -841,6 +843,12 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                             <groupId>com.google.guava</groupId>
                             <artifactId>guava</artifactId>
                             <version>${guava.version}</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                            <version>${junit.version}</version>
+                            <scope>test</scope>
                         </dependency>
                     </dependencies>
                 </project>
