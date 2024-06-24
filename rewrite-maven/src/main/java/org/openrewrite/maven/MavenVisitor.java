@@ -266,7 +266,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     @Nullable
     public ResolvedManagedDependency findManagedDependency(Xml.Tag tag) {
-        String groupId = getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()));
+        String groupId = getResolutionResult().getPom().getValue(tag.getChildValue("groupId")
+                .orElse(getResolutionResult().getPom().getGroupId()));
         String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
         String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
         if (groupId != null && artifactId != null) {
