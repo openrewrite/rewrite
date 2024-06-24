@@ -19,9 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
@@ -99,6 +101,11 @@ public class FindAndReplace extends Recipe {
     @Nullable
     String filePattern;
 
+    @Option(displayName = "Plaintext only", description = "Only alter files that are parsed as plaintext to prevent language-specific LST information loss. Defaults to false.",
+            required = false)
+    @Nullable
+    Boolean plaintextOnly;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
@@ -155,6 +162,15 @@ public class FindAndReplace extends Recipe {
                     .toArray(TreeVisitor[]::new));
 
             visitor = Preconditions.check(check, visitor);
+        }
+
+        if (Boolean.TRUE.equals(plaintextOnly)) {
+            visitor = Preconditions.check(new PlainTextVisitor<ExecutionContext>(){
+                @Override
+                public @NonNull PlainText visitText(@NonNull PlainText text, @NonNull ExecutionContext ctx) {
+                    return SearchResult.found(text);
+                }
+            }, visitor);
         }
         return visitor;
     }
