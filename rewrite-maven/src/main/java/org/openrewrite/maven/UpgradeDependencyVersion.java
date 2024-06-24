@@ -157,14 +157,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 Optional<Xml.Tag> version = tag.getChild("version");
                                 if (version.isPresent()) {
                                     String requestedVersion = d.getRequested().getVersion();
-                                    if (requestedVersion != null && requestedVersion.startsWith("${") && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
+                                    if (requestedVersion != null && requestedVersion.startsWith("${") &&
+                                        !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
                                         String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
                                         if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
-                                            getPomDeclaringProperty(getResolutionResult(), propertyName)
-                                                    .map(Pom::getSourcePath)
-                                                    .filter(Objects::nonNull)
-                                                    .ifPresent(pomSourcePath -> accumulator.pomProperties.add(
-                                                            new PomProperty(pomSourcePath, propertyName, newerVersion)));
+                                            storeParentPomProperty(getResolutionResult().getParent(), propertyName, newerVersion);
                                         }
                                     }
                                 }
@@ -177,16 +174,27 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return super.visitTag(tag, ctx);
             }
 
-            private Optional<Pom> getPomDeclaringProperty(
-                    @Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName) {
+            /**
+             * Recursively look for a parent POM that's still part of the sources, which contains the version property.
+             * If found, store the property in the accumulator, such that we can update that source file later.
+             * @param currentMavenResolutionResult the current Maven resolution result parent to search for the property
+             * @param propertyName the name of the property to update, if found in any the parent pom source file
+             * @param newerVersion the resolved newer version that any matching parent pom property should be updated to
+             */
+            private void storeParentPomProperty(
+                    @Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName, String newerVersion) {
                 if (currentMavenResolutionResult == null) {
-                    return Optional.empty();
+                    return; // No parent contained the property; might then be in the same source file, or an import BOM
                 }
                 Pom pom = currentMavenResolutionResult.getPom().getRequested();
-                if (pom.getProperties().containsKey(propertyName)) {
-                    return Optional.of(pom);
+                if (pom.getSourcePath() == null) {
+                    return; // Not a source file, so nothing to update
                 }
-                return getPomDeclaringProperty(currentMavenResolutionResult.getParent(), propertyName);
+                if (pom.getProperties().containsKey(propertyName)) {
+                    accumulator.pomProperties.add(new PomProperty(pom.getSourcePath(), propertyName, newerVersion));
+                    return; // Property found, so no further searching is needed
+                }
+                storeParentPomProperty(currentMavenResolutionResult.getParent(), propertyName, newerVersion);
             }
         };
     }
