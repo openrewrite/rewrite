@@ -201,6 +201,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     doAfterVisit(new ChangeTagValueVisitor<>(tag, pomProperty.propertyValue));
                                     maybeUpdateModel();
                                 }
+                                break;
                             }
                         }
                     } else if (isDependencyTag(groupId, artifactId)) {
