@@ -177,6 +177,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return super.visitTag(tag, ctx);
             }
 
+            private Optional<Pom> getPomDeclaringProperty(
+                    @Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName) {
+                if (currentMavenResolutionResult == null) {
+                    return Optional.empty();
+                }
+                Pom pom = currentMavenResolutionResult.getPom().getRequested();
+                if (pom.getProperties().containsKey(propertyName)) {
+                    return Optional.of(pom);
+                }
+                return getPomDeclaringProperty(currentMavenResolutionResult.getParent(), propertyName);
+            }
         };
     }
 
@@ -418,18 +429,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             // this can happen when we encounter exotic versions
             return null;
         }
-    }
-
-    private static Optional<Pom> getPomDeclaringProperty(
-            @Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName) {
-        if (currentMavenResolutionResult == null) {
-            return Optional.empty();
-        }
-        Pom pom = currentMavenResolutionResult.getPom().getRequested();
-        if (pom.getProperties().containsKey(propertyName)) {
-            return Optional.of(pom);
-        }
-        return getPomDeclaringProperty(currentMavenResolutionResult.getParent(), propertyName);
     }
 
     @Value
