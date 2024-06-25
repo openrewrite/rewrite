@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2020, 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -755,6 +755,7 @@ public interface Xml extends Tree {
             return value.getValue();
         }
 
+        @Override
         public String getName() {
             return key.getName();
         }
@@ -762,6 +763,7 @@ public interface Xml extends Tree {
         /**
          * @return The local name for this attribute, without any namespace prefix.
          */
+        @Override
         public String getLocalName() {
             return extractLocalName(getKeyAsString());
         }
@@ -769,6 +771,7 @@ public interface Xml extends Tree {
         /**
          * @return The namespace prefix for this attribute, if any.
          */
+        @Override
         public Optional<String> getNamespacePrefix() {
             String extractedNamespacePrefix = extractNamespacePrefix(getKeyAsString());
             return Optional.ofNullable(StringUtils.isNotEmpty(extractedNamespacePrefix) ? extractedNamespacePrefix : null);
@@ -777,6 +780,7 @@ public interface Xml extends Tree {
         /**
          * @return The namespace URI for this attribute, if any.
          */
+        @Override
         public Optional<String> getNamespaceUri(Cursor cursor) {
             Optional<String> maybeNamespacePrefix = getNamespacePrefix();
             return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(getAllNamespaces(cursor).get(s)));
@@ -788,6 +792,7 @@ public interface Xml extends Tree {
          * @param cursor     the cursor to search from
          * @return a map containing all namespaces defined in the current scope, including all parent scopes.
          */
+        @Override
         public Map<String, String> getAllNamespaces(Cursor cursor) {
             Map<String, String> namespaces = new HashMap<>();
             while (cursor != null) {
