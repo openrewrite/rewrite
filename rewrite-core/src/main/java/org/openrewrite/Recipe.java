@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.Setter;
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.annotations.Nls;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -131,7 +130,7 @@ public abstract class Recipe implements Cloneable {
             return getDisplayName() + " " + suffix;
         }
 
-        List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors(getClass()));
+        List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors(this.getRecipeClass()));
         options.removeIf(opt -> !opt.isRequired());
         if (options.isEmpty()) {
             return getDisplayName();
@@ -209,7 +208,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     protected RecipeDescriptor createRecipeDescriptor() {
-        List<OptionDescriptor> options = getOptionDescriptors(this.getClass());
+        List<OptionDescriptor> options = getOptionDescriptors(this.getRecipeClass());
         List<RecipeDescriptor> recipeList1 = new ArrayList<>();
         for (Recipe next : getRecipeList()) {
             recipeList1.add(next.getDescriptor());
@@ -226,7 +225,8 @@ public abstract class Recipe implements Cloneable {
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
-    private List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
+    private List<OptionDescriptor> getOptionDescriptors(Class<? extends Recipe> recipeClass) {
+
         List<OptionDescriptor> options = new ArrayList<>();
 
         for (Field field : recipeClass.getDeclaredFields()) {
@@ -415,5 +415,13 @@ public abstract class Recipe implements Cloneable {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Implement this when wrapping and delegating a {@link Recipe}.
+     * @return the class of the (possibly wrapped) {@link Recipe}
+     */
+    public Class<? extends Recipe> getRecipeClass(){
+        return this.getClass();
     }
 }

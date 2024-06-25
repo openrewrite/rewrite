@@ -202,6 +202,11 @@ public class DeclarativeRecipe extends Recipe {
         public boolean causesAnotherCycle() {
             return delegate.causesAnotherCycle();
         }
+
+        @Override
+        public Class<? extends Recipe> getRecipeClass() {
+            return delegate.getRecipeClass();
+        }
     }
 
     @Value
