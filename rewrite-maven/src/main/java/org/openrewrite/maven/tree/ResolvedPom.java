@@ -421,12 +421,12 @@ public class ResolvedPom {
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
-                    mergeDependencyManagement(profile.getDependencyManagement(), pom);
+                    mergeDependencyManagement(profile.getDependencyManagement(), pomAncestry);
                     mergeRequestedDependencies(profile.getDependencies());
                 }
             }
 
-            mergeDependencyManagement(pom.getDependencyManagement(), pom);
+            mergeDependencyManagement(pom.getDependencyManagement(), pomAncestry);
             mergeRequestedDependencies(pom.getDependencies());
 
             if (pom.getParent() != null) {
@@ -768,14 +768,19 @@ public class ResolvedPom {
             }
         }
 
-        private void mergeDependencyManagement(List<ManagedDependency> incomingDependencyManagement, Pom pom) throws MavenDownloadingException {
+        private void mergeDependencyManagement(List<ManagedDependency> incomingDependencyManagement, List<Pom> pomAncestry) throws MavenDownloadingException {
+            Pom pom = pomAncestry.get(0);
             if (!incomingDependencyManagement.isEmpty()) {
                 if (dependencyManagement == null || dependencyManagement.isEmpty()) {
                     dependencyManagement = new ArrayList<>();
                 }
                 for (ManagedDependency d : incomingDependencyManagement) {
                     if (d instanceof Imported) {
-                        ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, ResolvedPom.this, repositories)
+                        GroupArtifactVersion groupArtifactVersion = getValues(((Imported) d).getGav());
+                        if (isAlreadyResolved(pomAncestry, groupArtifactVersion)) {
+                            continue;
+                        }
+                        ResolvedPom bom = downloader.download(groupArtifactVersion, null, ResolvedPom.this, repositories)
                                 .resolve(activeProfiles, downloader, initialRepositories, ctx);
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
@@ -801,6 +806,15 @@ public class ResolvedPom {
                     }
                 }
             }
+        }
+
+        private boolean isAlreadyResolved(List<Pom> pomAncestry, GroupArtifactVersion groupArtifactVersion) {
+            return pomAncestry.stream()
+                              .skip(1) // skip current pom
+                              .map(Pom::getGav)
+                              .anyMatch(alreadyResolvedGav -> alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId())
+                                                              && alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId())
+                                                              && alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion()));
         }
     }
 
