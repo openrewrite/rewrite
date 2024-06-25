@@ -22,7 +22,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import lombok.*;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Value;
+import lombok.With;
 import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
@@ -156,7 +159,7 @@ public class ResolvedPom {
     @SuppressWarnings("DuplicatedCode")
     public ResolvedPom resolve(ExecutionContext ctx, MavenPomDownloader downloader) throws MavenDownloadingException {
         // If this resolved pom represents an obsolete pom format, refuse to resolve in same as Maven itself would
-        if(requested.getObsoletePomVersion() != null) {
+        if (requested.getObsoletePomVersion() != null) {
             return this;
         }
 
@@ -809,12 +812,21 @@ public class ResolvedPom {
         }
 
         private boolean isAlreadyResolved(List<Pom> pomAncestry, GroupArtifactVersion groupArtifactVersion) {
-            return pomAncestry.stream()
-                              .skip(1) // skip current pom
-                              .map(Pom::getGav)
-                              .anyMatch(alreadyResolvedGav -> alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId())
-                                                              && alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId())
-                                                              && alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion()));
+            // skip current pom
+            boolean first = true;
+            for (Pom pom : pomAncestry) {
+                if (first) {
+                    first = false;
+                    continue;
+                }
+                ResolvedGroupArtifactVersion alreadyResolvedGav = pom.getGav();
+                if (alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId())
+                    && alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId())
+                    && alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 
