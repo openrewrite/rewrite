@@ -80,9 +80,9 @@ public class MavenMetadata {
         }
     }
 
-    public static MavenMetadata parse(byte[] document) throws IOException {
+    public static @Nullable MavenMetadata parse(byte[] document) throws IOException {
         MavenMetadata metadata = MavenXmlMapper.readMapper().readValue(document, MavenMetadata.class);
-        if (metadata.getVersioning() != null && metadata.getVersioning().getVersions() == null) {
+        if (metadata != null && metadata.getVersioning() != null && metadata.getVersioning().getVersions() == null) {
             return new MavenMetadata(new Versioning(emptyList(), metadata.getVersioning().getSnapshotVersions(), metadata.getVersioning().getSnapshot()));
         }
         return metadata;
