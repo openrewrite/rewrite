@@ -780,7 +780,7 @@ public class ResolvedPom {
                 for (ManagedDependency d : incomingDependencyManagement) {
                     if (d instanceof Imported) {
                         GroupArtifactVersion groupArtifactVersion = getValues(((Imported) d).getGav());
-                        if (isAlreadyResolved(pomAncestry, groupArtifactVersion)) {
+                        if (isAlreadyResolved(groupArtifactVersion, pomAncestry)) {
                             continue;
                         }
                         ResolvedPom bom = downloader.download(groupArtifactVersion, null, ResolvedPom.this, repositories)
@@ -811,7 +811,7 @@ public class ResolvedPom {
             }
         }
 
-        private boolean isAlreadyResolved(List<Pom> pomAncestry, GroupArtifactVersion groupArtifactVersion) {
+        private boolean isAlreadyResolved(GroupArtifactVersion groupArtifactVersion, List<Pom> pomAncestry) {
             // skip current pom
             boolean first = true;
             for (Pom pom : pomAncestry) {
