@@ -64,11 +64,43 @@ class DeclarativeRecipeTest implements RewriteTest {
                 new ChangeText("3")
               );
               dr.initialize(List.of(), Map.of());
+              assertThat(dr.getDescriptor().getRecipeList().get(1).getOptions()).extracting(OptionDescriptor::getName).containsExactly("toText");
+              assertThat(dr.getDescriptor().getRecipeList().get(2).getOptions()).extracting(OptionDescriptor::getName).containsExactly("toText");
               spec.recipe(dr);
           },
           text("1", "3"),
           text("2")
         );
+    }
+
+    @Test
+    void addingPreconditionsWithOptions() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
+          null, null, true, null);
+        dr.addPrecondition(
+          toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                  if ("1".equals(text.getText())) {
+                      return SearchResult.found(text);
+                  }
+                  return text;
+              }
+          })
+        );
+        dr.addUninitialized(
+          new ChangeText("2")
+        );
+        dr.addUninitialized(
+          new ChangeText("3")
+        );
+        dr.initialize(List.of(), Map.of());
+        assertThat(dr.getDescriptor().getRecipeList())
+          .hasSize(3) // precondition + 2 recipes with options
+          .flatExtracting(RecipeDescriptor::getOptions)
+          .hasSize(2)
+          .extracting(OptionDescriptor::getName)
+          .containsOnly("toText");
     }
 
     @Test
