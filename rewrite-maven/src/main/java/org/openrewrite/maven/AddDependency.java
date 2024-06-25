@@ -29,10 +29,7 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -181,14 +178,14 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if (tree instanceof JavaSourceFile) {
                     if (onlyIfUsing == null || sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
                         acc.usingType = true;
-                        sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                                sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
-                                        acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
-                                                scope /* a `compile` scope dependency will also be available in test source set */ :
-                                                "test".equals(sourceSet.getName()) ? "test" : "compile"
-                                        )
-                                )
-                        );
+                        JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
+                        JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
+                        if(javaProject != null && javaSourceSet != null) {
+                            acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
+                                    scope /* a `compile` scope dependency will also be available in test source set */ :
+                                    "test".equals(javaSourceSet.getName()) ? "test" : "compile"
+                            );
+                        }
                     }
                 } else if(tree instanceof Xml.Document) {
                     Xml.Document doc = (Xml.Document) tree;
@@ -215,7 +212,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                 JavaProject javaProject = document.getMarkers().findFirst(JavaProject.class).orElse(null);
                 String maybeScope = javaProject == null ? null : acc.scopeByProject.get(javaProject);
-                if (maybeScope == null && !acc.scopeByProject.isEmpty()) {
+                if (onlyIfUsing != null && maybeScope == null && !acc.scopeByProject.isEmpty()) {
                     return maven;
                 }
 
