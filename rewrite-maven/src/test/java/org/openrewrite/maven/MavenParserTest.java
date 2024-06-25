@@ -3040,53 +3040,47 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4093")
     void circularImportDependency() {
         rewriteRun(
           mavenProject("root",
-                       pomXml(
-                         """
-                           <project>
-                           
-                             <groupId>com.example</groupId>
-                             <artifactId>circular-example-parent</artifactId>
-                             <version>0.0.1-SNAPSHOT</version>
-                           
-                             <modules>
-                               <module>circular-example-child</module>
-                             </modules>
-                           
-                             <dependencyManagement>
-                               <dependencies>
-                                 <dependency>
-                                   <groupId>com.example</groupId>
-                                   <artifactId>circular-example-child</artifactId>
-                                   <version>0.0.1-SNAPSHOT</version>
-                                   <scope>import</scope>
-                                 </dependency>
-                               </dependencies>
-                             </dependencyManagement>
-                           </project>
-                           """,
-                         spec -> spec.path("pom.xml")
-                       ),
-                       mavenProject("circular-example-child",
-                                    pomXml(
-                                      """
-                                        <project>
-                                          <parent>
-                                            <groupId>com.example</groupId>
-                                            <artifactId>circular-example-parent</artifactId>
-                                            <version>0.0.1-SNAPSHOT</version>
-                                          </parent>
-                                        
-                                          <artifactId>circular-example-child</artifactId>
-                                          <version>0.0.1-SNAPSHOT</version>
-                                        </project>
-                                        """,
-                                      spec -> spec.path("circular-example-child/pom.xml")
-                                    )
-                       )
-
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>circular-example-parent</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <modules>
+                    <module>circular-example-child</module>
+                  </modules>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.example</groupId>
+                        <artifactId>circular-example-child</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            ),
+            mavenProject("circular-example-child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>circular-example-parent</artifactId>
+                      <version>0.0.1-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>circular-example-child</artifactId>
+                    <version>0.0.1-SNAPSHOT</version>
+                  </project>
+                  """
+              )
+            )
           )
         );
     }
