@@ -812,13 +812,8 @@ public class ResolvedPom {
         }
 
         private boolean isAlreadyResolved(GroupArtifactVersion groupArtifactVersion, List<Pom> pomAncestry) {
-            // skip current pom
-            boolean first = true;
-            for (Pom pom : pomAncestry) {
-                if (first) {
-                    first = false;
-                    continue;
-                }
+            for (int i = 1; i < pomAncestry.size(); i++) { // skip current pom
+                Pom pom = pomAncestry.get(i);
                 ResolvedGroupArtifactVersion alreadyResolvedGav = pom.getGav();
                 if (alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId())
                     && alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId())

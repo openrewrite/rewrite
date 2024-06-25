@@ -3064,7 +3064,14 @@ class MavenParserTest implements RewriteTest {
                     </dependencies>
                   </dependencyManagement>
                 </project>
-                """
+                """,
+              spec -> spec.afterRecipe(pomXml -> {
+                  MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().get(0).getGav();
+                  assertThat(gav.getGroupId()).isEqualTo("junit");
+                  assertThat(gav.getArtifactId()).isEqualTo("junit");
+                  assertThat(gav.getVersion()).isEqualTo("4.13.2");
+              })
             ),
             mavenProject("circular-example-child",
               pomXml(
@@ -3077,8 +3084,24 @@ class MavenParserTest implements RewriteTest {
                     </parent>
                     <artifactId>circular-example-child</artifactId>
                     <version>0.0.1-SNAPSHOT</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>4.13.2</version>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
                   </project>
-                  """
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                    MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().get(0).getGav();
+                    assertThat(gav.getGroupId()).isEqualTo("junit");
+                    assertThat(gav.getArtifactId()).isEqualTo("junit");
+                    assertThat(gav.getVersion()).isEqualTo("4.13.2");
+                })
               )
             )
           )
