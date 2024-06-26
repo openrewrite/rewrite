@@ -113,7 +113,7 @@ public class AddParentPom extends Recipe {
 
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 if (filePattern == null || PathUtils.matchesGlob(document.getSourcePath(), filePattern)) {
                     return SearchResult.found(document);
                 }
