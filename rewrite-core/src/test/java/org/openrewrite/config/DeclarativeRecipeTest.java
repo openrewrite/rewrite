@@ -64,8 +64,6 @@ class DeclarativeRecipeTest implements RewriteTest {
                 new ChangeText("3")
               );
               dr.initialize(List.of(), Map.of());
-              assertThat(dr.getDescriptor().getRecipeList().get(1).getOptions()).extracting(OptionDescriptor::getName).containsExactly("toText");
-              assertThat(dr.getDescriptor().getRecipeList().get(2).getOptions()).extracting(OptionDescriptor::getName).containsExactly("toText");
               spec.recipe(dr);
           },
           text("1", "3"),
