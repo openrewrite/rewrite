@@ -271,7 +271,7 @@ public class XPathMatcher {
         } else if (selector.equals("local-name()")) {
             return tagOrAttribute.getLocalName().equals(value);
         } else if (selector.equals("namespace-uri()")) {
-            Optional<String> nsUri= tagOrAttribute.getNamespaceUri(cursor);
+            Optional<String> nsUri = tagOrAttribute.getNamespaceUri(cursor);
             return nsUri.isPresent() && nsUri.get().equals(value);
         }
         return false;

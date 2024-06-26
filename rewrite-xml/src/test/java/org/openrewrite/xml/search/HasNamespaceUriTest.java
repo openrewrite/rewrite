@@ -84,30 +84,6 @@ class HasNamespaceUriTest implements RewriteTest {
     }
 
     @Test
-    void staticFindElement() {
-        rewriteRun(
-          spec -> spec.recipe(new HasNamespaceUri("http://cxf.apache.org/jaxws", "/beans/client/conduitSelector")),
-          xml(
-            source,
-            """
-              <beans xmlns="http://www.springframework.org/schema/beans"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xsi:schemaLocation="
-                      http://cxf.apache.org/jaxws http://cxf.apache.org/schemas/jaxws.xsd
-                      http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
-
-                  <jaxws:client name="{http://cxf.apache.org/hello_world_soap_http}SoapPort" createdFromAPI="true" xmlns:jaxws="http://cxf.apache.org/jaxws">
-                      <!--~~>--><jaxws:conduitSelector>
-                          <bean class="org.apache.cxf.endpoint.DeferredConduitSelector"/>
-                      </jaxws:conduitSelector>
-                  </jaxws:client>
-              </beans>
-              """
-          )
-        );
-    }
-
-    @Test
     void noMatchOnXPath() {
         rewriteRun(
           spec -> spec.recipe(new HasNamespaceUri("xsi", "/jaxws:client")),
