@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
@@ -73,9 +73,9 @@ public class AddParentPom extends Recipe {
 
     @Option(displayName = "File pattern",
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
-                    "Multiple patterns may be specified, separated by a semicolon `;`. " +
-                    "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
-                    "When not set, all source files are searched. ",
+                          "Multiple patterns may be specified, separated by a semicolon `;`. " +
+                          "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
+                          "When not set, all source files are searched. ",
             required = false,
             example = "**/*-parent/grpc-*/pom.xml")
     @Nullable
@@ -113,11 +113,12 @@ public class AddParentPom extends Recipe {
 
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                if (filePattern != null) {
-                    return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, ctx);
+            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                if (filePattern == null || PathUtils.matchesGlob(document.getSourcePath(), filePattern)) {
+                    return SearchResult.found(document);
                 }
-                return super.isAcceptable(sourceFile, ctx);
+                return document;
+
             }
         }, new MavenIsoVisitor<ExecutionContext>() {
             @Nullable
@@ -174,14 +175,15 @@ public class AddParentPom extends Recipe {
 
             @Nullable
             ResolvedPom resolvedPom = null;
+
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if(t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
+                if (t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
                     String text = ((Xml.CharData) t.getContent().get(0)).getText().trim();
                     Matcher m = PROPERTY_PATTERN.matcher(text);
-                    while(m.find()) {
-                        if(resolvedPom == null) {
+                    while (m.find()) {
+                        if (resolvedPom == null) {
                             resolvedPom = getResolutionResult().getPom();
                         }
                         String propertyName = m.group(1).trim();
@@ -195,7 +197,7 @@ public class AddParentPom extends Recipe {
 
             private boolean isGlobalProperty(String propertyName) {
                 return propertyName.startsWith("project.") || propertyName.startsWith("env.")
-                        || propertyName.startsWith("settings.") || propertyName.equals("basedir");
+                       || propertyName.startsWith("settings.") || propertyName.equals("basedir");
             }
         }.visit(pomXml, ctx);
         return properties;
@@ -215,7 +217,7 @@ public class AddParentPom extends Recipe {
                 .map(dep -> new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), null))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        if(requestedWithoutExplicitVersion.isEmpty()) {
+        if (requestedWithoutExplicitVersion.isEmpty()) {
             return emptyList();
         }
 
@@ -226,7 +228,7 @@ public class AddParentPom extends Recipe {
                         .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getBomGav().getGroupId()) && localManagedDep.getArtifactId().equals(dep.getBomGav().getArtifactId())))
                 .collect(Collectors.toList());
 
-        if(depsWithoutExplicitVersion.isEmpty()) {
+        if (depsWithoutExplicitVersion.isEmpty()) {
             return emptyList();
         }
 
@@ -246,6 +248,7 @@ public class AddParentPom extends Recipe {
     private static class UnconditionalAddProperty extends MavenIsoVisitor<ExecutionContext> {
         String key;
         String value;
+
         @Override
         public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
             Xml.Document d = super.visitDocument(document, ctx);
@@ -268,7 +271,7 @@ public class AddParentPom extends Recipe {
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
             if (isPropertyTag() && key.equals(tag.getName())
-                    && !value.equals(tag.getValue().orElse(null))) {
+                && !value.equals(tag.getValue().orElse(null))) {
                 t = (Xml.Tag) new ChangeTagValueVisitor<>(tag, value).visitNonNull(t, ctx);
             }
             return t;
