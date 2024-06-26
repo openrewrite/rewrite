@@ -168,7 +168,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @EqualsAndHashCode(callSuper = false)
     @Value
-    static class BellwetherDecoratedRecipe extends DelegatingRecipe {
+    static class BellwetherDecoratedRecipe extends Recipe implements DelegatingRecipe {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         Recipe delegate;

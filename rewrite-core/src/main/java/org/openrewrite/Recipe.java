@@ -421,7 +421,7 @@ public abstract class Recipe implements Cloneable {
         }
     }
 
-    public abstract static class DelegatingRecipe extends Recipe {
-        public abstract Recipe getDelegate();
+    public interface DelegatingRecipe {
+        Recipe getDelegate();
     }
 }
