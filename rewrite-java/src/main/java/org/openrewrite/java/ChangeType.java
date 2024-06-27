@@ -310,6 +310,20 @@ public class ChangeType extends Recipe {
                         ident = ident.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
                     }
                 }
+
+                // Recreate any static imports as needed
+                JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+                for (J.Import anImport : cu.getImports()) {
+                    if (anImport.isStatic() && anImport.getQualid().getTarget().getType() != null) {
+                        JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
+                        if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
+                            ident.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
+                            JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
+                            maybeAddImport((targetFqn).getFullyQualifiedName(), ident.getSimpleName());
+                            break;
+                        }
+                    }
+                }
             }
             ident = ident.withType(updateType(ident.getType()));
             return visitAndCast(ident, ctx, super::visitIdentifier);
