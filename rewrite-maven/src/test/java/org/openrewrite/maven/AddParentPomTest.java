@@ -299,75 +299,20 @@ class AddParentPomTest implements RewriteTest {
     }
 
     @Test
-    void addParentWithVersionPattern() {
-        rewriteRun(
-          spec -> spec.recipe(new AddParentPom(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            null,
-            null,
-            "~1.5",
-            null
-          )),
-          pomXml(
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-              
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>1.5.12.RELEASE</version>
-                  <relativePath/> <!-- lookup parent from repository -->
-                </parent>
-              
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """,
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-              
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>1.5.22.RELEASE</version>
-                  <relativePath/> <!-- lookup parent from repository -->
-                </parent>
-              
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
     void wildcardVersion() {
         rewriteRun(
           spec -> spec.recipe(new AddParentPom(
             "org.springframework.boot",
             "spring-boot-starter-parent",
-            null,
-            null,
             "~1.5",
+            null,
+            null,
             null
           )),
           pomXml(
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-              
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>1.5.12.RELEASE</version>
-                  <relativePath/> <!-- lookup parent from repository -->
-                </parent>
               
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -377,12 +322,10 @@ class AddParentPomTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-              
                 <parent>
                   <groupId>org.springframework.boot</groupId>
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>1.5.22.RELEASE</version>
-                  <relativePath/> <!-- lookup parent from repository -->
                 </parent>
               
                 <groupId>com.mycompany.app</groupId>
@@ -589,8 +532,10 @@ class AddParentPomTest implements RewriteTest {
           pomXml(
             """
               <project>
-                  <artifactId>example</artifactId>
                   <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
                   <properties>
                       <jenkins.version>2.387.3</jenkins.version>
                   </properties>
@@ -627,7 +572,6 @@ class AddParentPomTest implements RewriteTest {
               """,
             """
               <project>
-                  <artifactId>example</artifactId>
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
                       <groupId>org.jenkins-ci.plugins</groupId>
@@ -635,6 +579,9 @@ class AddParentPomTest implements RewriteTest {
                       <version>4.81</version>
                       <relativePath/>
                   </parent>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
                   <properties>
                       <jenkins.version>2.387.3</jenkins.version>
                   </properties>
