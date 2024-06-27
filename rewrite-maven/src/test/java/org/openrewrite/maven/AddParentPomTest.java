@@ -41,11 +41,6 @@ class AddParentPomTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>1.5.12.RELEASE</version>
-                </parent>
               
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -55,6 +50,11 @@ class AddParentPomTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>1.5.12.RELEASE</version>
+                </parent>
               
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -90,9 +90,9 @@ class AddParentPomTest implements RewriteTest {
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
-                  <groupId>com.fasterxml.jackson</groupId>
-                  <artifactId>jackson-parent</artifactId>
-                  <version>2.12</version>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>1.5.12.RELEASE</version>
                   <relativePath>../../pom.xml</relativePath>
                 </parent>
               
@@ -130,10 +130,10 @@ class AddParentPomTest implements RewriteTest {
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
-                  <groupId>com.fasterxml.jackson</groupId>
-                  <artifactId>jackson-parent</artifactId>
-                  <version>2.12</version>
-                  <relativePath />
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>1.5.12.RELEASE</version>
+                  <relativePath/>
                 </parent>
               
                 <groupId>com.mycompany.app</groupId>
@@ -173,8 +173,8 @@ class AddParentPomTest implements RewriteTest {
                   <parent>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>2.6.7</version>
-                    <relativePath />
+                    <version>1.5.12.RELEASE</version>
+                    <relativePath/>
                   </parent>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
@@ -224,7 +224,7 @@ class AddParentPomTest implements RewriteTest {
 
     @Test
     void multiModuleRelativePathChangeChildrens() {
-        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "1.5.12.RELEASE", "", null, null);
+        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "1.5.12.RELEASE", null, null, null);
         rewriteRun(
           spec -> spec.recipe(recipe),
           mavenProject("parent",
@@ -233,6 +233,25 @@ class AddParentPomTest implements RewriteTest {
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <modules>
+                    <module>module1</module>
+                    <module>module2</module>
+                  </modules>
+                </project>
+                """,
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>1.5.12.RELEASE</version>
+                  </parent>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
@@ -257,19 +276,6 @@ class AddParentPomTest implements RewriteTest {
                     </parent>
                     <artifactId>module1</artifactId>
                   </project>
-                  """,
-                """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.5.0</version>
-                      <relativePath />
-                    </parent>
-                    <artifactId>module1</artifactId>
-                  </project>
                   """
               )),
             mavenProject("module2",
@@ -282,19 +288,6 @@ class AddParentPomTest implements RewriteTest {
                       <groupId>org.sample</groupId>
                       <artifactId>sample</artifactId>
                       <version>1.0.0</version>
-                    </parent>
-                    <artifactId>module2</artifactId>
-                  </project>
-                  """,
-                """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.5.0</version>
-                      <relativePath />
                     </parent>
                     <artifactId>module2</artifactId>
                   </project>
