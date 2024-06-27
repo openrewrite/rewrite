@@ -1852,9 +1852,14 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeOfStaticImportOfNestedEnumValue() {
         rewriteRun(
-          recipeSpec -> recipeSpec.recipe(new ChangeType(
-            "org.codehaus.jackson.map.SerializationConfig$Feature",
-            "com.fasterxml.jackson.databind.SerializationFeature", true)),
+          recipeSpec -> recipeSpec.recipes(
+            new ChangeType(
+              "org.codehaus.jackson.map.ObjectMapper",
+              "com.fasterxml.jackson.databind.ObjectMapper", true),
+            new ChangeType(
+              "org.codehaus.jackson.map.SerializationConfig$Feature",
+              "com.fasterxml.jackson.databind.SerializationFeature", true)
+            ),
           java(
             """
               package org.codehaus.jackson.map;
@@ -1868,37 +1873,37 @@ class ChangeTypeTest implements RewriteTest {
           ),
           java(
             """
-              package com.fasterxml.jackson.databind;
-              public enum SerializationFeature {
-                  WRAP_ROOT_VALUE
+              package org.codehaus.jackson.map;
+              public class ObjectMapper {
+                  public ObjectMapper configure(SerializationConfig.Feature f, boolean state) {
+                      return this;
+                  }
               }
               """,
             SourceSpec::skip
           ),
           java(
             """
-              import org.codehaus.jackson.map.SerializationConfig.Feature;
+              import org.codehaus.jackson.map.ObjectMapper;
 
               import static org.codehaus.jackson.map.SerializationConfig.Feature.WRAP_ROOT_VALUE;
 
               class A {
                   void test() {
-                      configure(WRAP_ROOT_VALUE, true);
-                  }
-                  void configure(Feature f, boolean b) {
+                      ObjectMapper mapper = new ObjectMapper();
+                      mapper.configure(WRAP_ROOT_VALUE, true);
                   }
               }
               """,
             """
-              import com.fasterxml.jackson.databind.SerializationFeature;
+              import com.fasterxml.jackson.databind.ObjectMapper;
 
               import static com.fasterxml.jackson.databind.SerializationFeature.WRAP_ROOT_VALUE;
 
               class A {
                   void test() {
-                      configure(WRAP_ROOT_VALUE, true);
-                  }
-                  void configure(SerializationFeature f, boolean b) {
+                      ObjectMapper mapper = new ObjectMapper();
+                      mapper.configure(WRAP_ROOT_VALUE, true);
                   }
               }
               """
