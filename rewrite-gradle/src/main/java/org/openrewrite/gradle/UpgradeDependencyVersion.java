@@ -655,7 +655,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
     }
 
-    static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav, Set<String> configurations) {
+    public static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav, Set<String> configurations) {
         try {
             if (gav.getGroupId() == null || gav.getArtifactId() == null) {
                 return gp;
@@ -689,6 +689,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         return resolved;
                     }
                     return resolved.withGav(resolvedGav)
+                            .withRequested(resolved.getRequested().withGav(gav))
                             .withDependencies(transitiveDependencies);
                 }));
                 anyChanged |= newGdc != gdc;
