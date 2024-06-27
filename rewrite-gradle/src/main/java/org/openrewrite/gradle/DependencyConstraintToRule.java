@@ -62,7 +62,7 @@ public class DependencyConstraintToRule extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
             @Override
-            public G.CompilationUnit visitCompilationUnit(G.CompilationUnit compilationUnit, ExecutionContext executionContext) {
+            public G.CompilationUnit visitCompilationUnit(G.CompilationUnit compilationUnit, ExecutionContext ctx) {
                 List<GroupArtifactVersionBecause> gavs = new ArrayList<>();
                 Cursor parent = requireNonNull(getCursor().getParent());
                 G.CompilationUnit cu = (G.CompilationUnit) new RemoveConstraints().visitNonNull(compilationUnit, gavs, parent);
@@ -80,9 +80,12 @@ public class DependencyConstraintToRule extends Recipe {
     static class GroupArtifactVersionBecause {
         @Nullable
         String groupId;
+
         String artifactId;
+
         @Nullable
         String version;
+
         @Nullable
         String because;
     }
