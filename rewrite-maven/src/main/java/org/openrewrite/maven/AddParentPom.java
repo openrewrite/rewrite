@@ -114,7 +114,9 @@ public class AddParentPom extends Recipe {
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                if (filePattern == null || PathUtils.matchesGlob(document.getSourcePath(), filePattern)) {
+                Xml.Tag root = document.getRoot();
+                if (!root.getChild("parent").isPresent() &&
+                        (filePattern == null || PathUtils.matchesGlob(document.getSourcePath(), filePattern))) {
                     return SearchResult.found(document);
                 }
                 return document;
@@ -127,43 +129,44 @@ public class AddParentPom extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Tag root = document.getRoot();
-                // TODO What to do when a parent is already present?
-                if (!root.getChild("parent").isPresent()) {
-                    document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<parent/>"))
+                assert !root.getChild("parent").isPresent();
+
+                document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<parent/>"), new MavenTagInsertionComparator(root.getChildren()))
                             .visitNonNull(document, ctx, getCursor().getParentOrThrow());
-                }
-                return document;
+
+                return super.visitDocument(document, ctx);
             }
 
-            @SuppressWarnings("OptionalGetWithoutIsPresent")
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                List<TreeVisitor<?, ExecutionContext>> changeParentTagVisitors = new ArrayList<>();
+                if (isParentTag()) {
+                    List<TreeVisitor<?, ExecutionContext>> addToTagVisitors = new ArrayList<>();
 
-                changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("groupId").get(), groupId));
-                changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), artifactId));
-                changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("version").get(), version));
+                    addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<groupId>" + groupId + "</groupId>")));
+                    addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<artifactId>" + artifactId + "</artifactId>")));
+                    addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<version>" + version + "</version>")));
 
-                final Xml.Tag relativePathTag;
-                if (StringUtils.isBlank(relativePath)) {
-                    relativePathTag = Xml.Tag.build("<relativePath />");
-                } else {
-                    relativePathTag = Xml.Tag.build("<relativePath>" + relativePath + "</relativePath>");
+                    if (relativePath != null) {
+                        final Xml.Tag relativePathTag;
+                        if (StringUtils.isBlank(relativePath)) {
+                            relativePathTag = Xml.Tag.build("<relativePath/>");
+                        } else {
+                            relativePathTag = Xml.Tag.build("<relativePath>" + relativePath + "</relativePath>");
+                        }
+                        addToTagVisitors.add(new AddToTagVisitor<>(t, relativePathTag));
+                    }
+
+                    for (TreeVisitor<?, ExecutionContext> visitor : addToTagVisitors) {
+                        doAfterVisit(visitor);
+                    }
+                    maybeUpdateModel();
+                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null,
+                            RemoveRedundantDependencyVersions.Comparator.GTE, null).getVisitor());
                 }
-                doAfterVisit(new AddToTagVisitor<>(t, relativePathTag, new MavenTagInsertionComparator(t.getChildren())));
-                maybeUpdateModel();
-
-                for (TreeVisitor<?, ExecutionContext> visitor : changeParentTagVisitors) {
-                    doAfterVisit(visitor);
-                }
-                maybeUpdateModel();
-                doAfterVisit(new RemoveRedundantDependencyVersions(null, null,
-                        RemoveRedundantDependencyVersions.Comparator.GTE, null).getVisitor());
                 return t;
             }
-
         });
     }
 
