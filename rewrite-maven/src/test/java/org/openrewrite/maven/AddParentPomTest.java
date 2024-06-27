@@ -622,7 +622,7 @@ class AddParentPomTest implements RewriteTest {
     @Test
     void doesNotAddMavenDefaultProperties() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, null)),
+          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, "dir/pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -662,7 +662,7 @@ class AddParentPomTest implements RewriteTest {
     @Test
     void doesNotAddGrandparentProperties() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, null)),
+          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, "dir/pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -745,6 +745,55 @@ class AddParentPomTest implements RewriteTest {
                 </properties>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void addParentPomWithMatchingFilePattern() {
+        rewriteRun(
+          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            spec -> spec.path("dir/pom.xml")
+          )
+        );
+    }
+
+    @Test
+    void addParentPomWithNonMatchingFilePattern() {
+        rewriteRun(
+          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, "dir/pom.xml")),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
           )
         );
     }
