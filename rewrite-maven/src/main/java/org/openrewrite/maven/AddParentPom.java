@@ -146,7 +146,15 @@ public class AddParentPom extends Recipe {
 
                     addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<groupId>" + groupId + "</groupId>")));
                     addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<artifactId>" + artifactId + "</artifactId>")));
-                    addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<version>" + version + "</version>")));
+
+                    try {
+                        Optional<String> targetVersion = findAcceptableVersion(groupId, artifactId, ctx);
+                        targetVersion.ifPresent((v) ->
+                                addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<version>" + v + "</version>")))
+                        );
+                    } catch (MavenDownloadingException e) {
+                        throw new RuntimeException(e);
+                    }
 
                     if (relativePath != null) {
                         final Xml.Tag relativePathTag;
@@ -166,6 +174,19 @@ public class AddParentPom extends Recipe {
                             RemoveRedundantDependencyVersions.Comparator.GTE, null).getVisitor());
                 }
                 return t;
+            }
+
+            private Optional<String> findAcceptableVersion(String groupId, String artifactId, ExecutionContext ctx)
+                    throws MavenDownloadingException {
+
+                if (availableVersions == null) {
+                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+                    //noinspection EqualsWithItself
+                    availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                            .filter(v -> versionComparator.isValid(null, v))
+                            .collect(Collectors.toList());
+                }
+                return availableVersions.stream().max(versionComparator);
             }
         });
     }
