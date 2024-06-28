@@ -89,13 +89,18 @@ public class XPathMatcher {
                     if (index < 0) {
                         return false;
                     }
-                    //if is Attribute
-                    if (part.charAt(index + 1) == '@') {
+                    if (part.startsWith("@")) { // is attribute selector
                         partWithCondition = part;
-                        tagForCondition = path.get(i);
-                    } else if (part.contains("(") && part.contains(")")) { //if is function
-                        partWithCondition = part;
-                        tagForCondition = path.get(i);
+                        tagForCondition = i > 0 ? path.get(i-1) : path.get(i);
+                    }
+                    else { // is element selector
+                        if (part.charAt(index + 1) == '@') { // is Attribute condition
+                            partWithCondition = part;
+                            tagForCondition = path.get(i);
+                        } else if (part.contains("(") && part.contains(")")) { // is function condition
+                            partWithCondition = part;
+                            tagForCondition = path.get(i);
+                        }
                     }
                 } else if (i < path.size() && i > 0 && parts[i - 1].endsWith("]")) {
                     String partBefore = parts[i - 1];
@@ -130,9 +135,11 @@ public class XPathMatcher {
 
                 if (part.startsWith("@")) {
                     if (!matchedCondition) {
-                        if (!(cursor.getValue() instanceof Xml.Attribute &&
-                              (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
-                              "*".equals(part.substring(1)))) {
+                        if (!(cursor.getValue() instanceof  Xml.Attribute)) {
+                            return false;
+                        }
+                        Xml.Attribute attribute = cursor.getValue();
+                        if (!attribute.getKeyAsString().equals(part.substring(1)) && !"*".equals(part.substring(1))) {
                             return false;
                         }
                     }
