@@ -91,9 +91,8 @@ public class XPathMatcher {
                     }
                     if (part.startsWith("@")) { // is attribute selector
                         partWithCondition = part;
-                        tagForCondition = i > 0 ? path.get(i-1) : path.get(i);
-                    }
-                    else { // is element selector
+                        tagForCondition = i > 0 ? path.get(i - 1) : path.get(i);
+                    } else { // is element selector
                         if (part.charAt(index + 1) == '@') { // is Attribute condition
                             partWithCondition = part;
                             tagForCondition = path.get(i);
@@ -135,7 +134,7 @@ public class XPathMatcher {
 
                 if (part.startsWith("@")) {
                     if (!matchedCondition) {
-                        if (!(cursor.getValue() instanceof  Xml.Attribute)) {
+                        if (!(cursor.getValue() instanceof Xml.Attribute)) {
                             return false;
                         }
                         Xml.Attribute attribute = cursor.getValue();
