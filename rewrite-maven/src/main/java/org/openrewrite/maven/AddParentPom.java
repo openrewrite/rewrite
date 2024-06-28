@@ -22,20 +22,15 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.TagNameComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -116,7 +111,7 @@ public class AddParentPom extends Recipe {
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Tag root = document.getRoot();
                 if (!root.getChild("parent").isPresent() &&
-                        (filePattern == null || PathUtils.matchesGlob(document.getSourcePath(), filePattern))) {
+                    (filePattern == null || PathUtils.matchesGlob(document.getSourcePath(), filePattern))) {
                     return SearchResult.found(document);
                 }
                 return document;
@@ -132,7 +127,7 @@ public class AddParentPom extends Recipe {
                 assert !root.getChild("parent").isPresent();
 
                 document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<parent/>"), new MavenTagInsertionComparator(root.getChildren()))
-                            .visitNonNull(document, ctx, getCursor().getParentOrThrow());
+                        .visitNonNull(document, ctx, getCursor().getParentOrThrow());
 
                 return super.visitDocument(document, ctx);
             }
@@ -195,116 +190,5 @@ public class AddParentPom extends Recipe {
                 return availableVersions.stream().max(versionComparator);
             }
         });
-    }
-
-    private static Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
-
-    private static Map<String, String> getPropertiesInUse(Xml.Document pomXml, ExecutionContext ctx) {
-        Map<String, String> properties = new HashMap<>();
-        new MavenIsoVisitor<ExecutionContext>() {
-
-            @Nullable
-            ResolvedPom resolvedPom = null;
-
-            @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = super.visitTag(tag, ctx);
-                if (t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
-                    String text = ((Xml.CharData) t.getContent().get(0)).getText().trim();
-                    Matcher m = PROPERTY_PATTERN.matcher(text);
-                    while (m.find()) {
-                        if (resolvedPom == null) {
-                            resolvedPom = getResolutionResult().getPom();
-                        }
-                        String propertyName = m.group(1).trim();
-                        if (resolvedPom.getProperties().containsKey(propertyName) && !isGlobalProperty(propertyName)) {
-                            properties.put(m.group(1).trim(), resolvedPom.getProperties().get(propertyName));
-                        }
-                    }
-                }
-                return t;
-            }
-
-            private boolean isGlobalProperty(String propertyName) {
-                return propertyName.startsWith("project.") || propertyName.startsWith("env.")
-                       || propertyName.startsWith("settings.") || propertyName.equals("basedir");
-            }
-        }.visit(pomXml, ctx);
-        return properties;
-    }
-
-    private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ResolvedPom newParent) {
-        ResolvedPom resolvedPom = mrr.getPom();
-
-        // Dependencies managed by the current pom's own dependency management are irrelevant to parent upgrade
-        List<ManagedDependency> locallyManaged = mrr.getPom().getRequested().getDependencyManagement();
-
-        Set<GroupArtifactVersion> requestedWithoutExplicitVersion = resolvedPom.getRequested().getDependencies().stream()
-                .filter(dep -> dep.getVersion() == null)
-                // Dependencies explicitly managed by the current pom require no changes
-                .filter(dep -> locallyManaged.stream()
-                        .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getGroupId()) && localManagedDep.getArtifactId().equals(dep.getArtifactId())))
-                .map(dep -> new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), null))
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-
-        if (requestedWithoutExplicitVersion.isEmpty()) {
-            return emptyList();
-        }
-
-        List<ResolvedManagedDependency> depsWithoutExplicitVersion = resolvedPom.getDependencyManagement().stream()
-                .filter(dep -> requestedWithoutExplicitVersion.contains(dep.getGav().withVersion(null)))
-                // Exclude dependencies managed by a bom imported by the current pom
-                .filter(dep -> dep.getBomGav() == null || locallyManaged.stream()
-                        .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getBomGav().getGroupId()) && localManagedDep.getArtifactId().equals(dep.getBomGav().getArtifactId())))
-                .collect(Collectors.toList());
-
-        if (depsWithoutExplicitVersion.isEmpty()) {
-            return emptyList();
-        }
-
-        // Remove from the list any that would still be managed under the new parent
-        Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
-                .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
-                .collect(Collectors.toSet());
-
-        depsWithoutExplicitVersion = depsWithoutExplicitVersion.stream()
-                .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))
-                .collect(Collectors.toList());
-        return depsWithoutExplicitVersion;
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false)
-    private static class UnconditionalAddProperty extends MavenIsoVisitor<ExecutionContext> {
-        String key;
-        String value;
-
-        @Override
-        public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-            Xml.Document d = super.visitDocument(document, ctx);
-            Xml.Tag root = d.getRoot();
-            Optional<Xml.Tag> properties = root.getChild("properties");
-            if (!properties.isPresent()) {
-                Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + value + "</" + key + ">\n</properties>");
-                d = (Xml.Document) new AddToTagVisitor<ExecutionContext>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())).visitNonNull(d, ctx);
-            } else if (!properties.get().getChildValue(key).isPresent()) {
-                Xml.Tag propertyTag = Xml.Tag.build("<" + key + ">" + value + "</" + key + ">");
-                d = (Xml.Document) new AddToTagVisitor<>(properties.get(), propertyTag, new TagNameComparator()).visitNonNull(d, ctx);
-            }
-            if (d != document) {
-                maybeUpdateModel();
-            }
-            return d;
-        }
-
-        @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            Xml.Tag t = super.visitTag(tag, ctx);
-            if (isPropertyTag() && key.equals(tag.getName())
-                && !value.equals(tag.getValue().orElse(null))) {
-                t = (Xml.Tag) new ChangeTagValueVisitor<>(tag, value).visitNonNull(t, ctx);
-            }
-            return t;
-        }
     }
 }

@@ -41,7 +41,7 @@ class AddParentPomTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -55,7 +55,7 @@ class AddParentPomTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>1.5.12.RELEASE</version>
                 </parent>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -80,7 +80,7 @@ class AddParentPomTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -95,7 +95,7 @@ class AddParentPomTest implements RewriteTest {
                   <version>1.5.12.RELEASE</version>
                   <relativePath>../../pom.xml</relativePath>
                 </parent>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -120,7 +120,7 @@ class AddParentPomTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -135,7 +135,7 @@ class AddParentPomTest implements RewriteTest {
                   <version>1.5.12.RELEASE</version>
                   <relativePath/>
                 </parent>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -159,7 +159,7 @@ class AddParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
-                
+
                   <modules>
                     <module>module1</module>
                     <module>module2</module>
@@ -236,7 +236,7 @@ class AddParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
-                
+
                   <modules>
                     <module>module1</module>
                     <module>module2</module>
@@ -255,7 +255,7 @@ class AddParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
-                
+
                   <modules>
                     <module>module1</module>
                     <module>module2</module>
@@ -313,7 +313,7 @@ class AddParentPomTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -327,7 +327,7 @@ class AddParentPomTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>1.5.22.RELEASE</version>
                 </parent>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -352,11 +352,11 @@ class AddParentPomTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -375,11 +375,11 @@ class AddParentPomTest implements RewriteTest {
                   <version>5.9.1</version>
                   <relativePath/>
                 </parent>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -407,11 +407,11 @@ class AddParentPomTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -430,11 +430,11 @@ class AddParentPomTest implements RewriteTest {
                   <version>5.9.1</version>
                   <relativePath/>
                 </parent>
-              
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -462,7 +462,7 @@ class AddParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
-                
+
                   <modules>
                     <module>module1</module>
                     <module>module2</module>
@@ -631,7 +631,7 @@ class AddParentPomTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
-              
+
                 <properties>
                   <my-cool-prop>${project.build.directory}</my-cool-prop>
                 </properties>
@@ -649,7 +649,7 @@ class AddParentPomTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
-              
+
                 <properties>
                   <my-cool-prop>${project.build.directory}</my-cool-prop>
                 </properties>
@@ -671,7 +671,7 @@ class AddParentPomTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
-              
+
                 <properties>
                   <my-cool-prop>${junit.version}</my-cool-prop>
                 </properties>
@@ -689,7 +689,7 @@ class AddParentPomTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
-              
+
                 <properties>
                   <my-cool-prop>${junit.version}</my-cool-prop>
                 </properties>
@@ -711,7 +711,7 @@ class AddParentPomTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
-              
+
                 <properties>
                   <my-basedir>${basedir}</my-basedir>
                   <my-project-basedir>${project.basedir}</my-project-basedir>
@@ -734,7 +734,7 @@ class AddParentPomTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
-              
+
                 <properties>
                   <my-basedir>${basedir}</my-basedir>
                   <my-project-basedir>${project.basedir}</my-project-basedir>
