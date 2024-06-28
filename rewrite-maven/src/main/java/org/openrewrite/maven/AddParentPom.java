@@ -149,11 +149,17 @@ public class AddParentPom extends Recipe {
 
                     try {
                         Optional<String> targetVersion = findAcceptableVersion(groupId, artifactId, ctx);
+                        // TODO What to do if not present?
                         targetVersion.ifPresent((v) ->
                                 addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<version>" + v + "</version>")))
                         );
                     } catch (MavenDownloadingException e) {
-                        throw new RuntimeException(e);
+                        for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
+                            MavenRepository repository = repositoryResponse.getKey();
+                            metadataFailures.insertRow(ctx, new MavenMetadataFailures.Row(groupId, artifactId, version,
+                                    repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
+                        }
+                        return e.warn(tag);
                     }
 
                     if (relativePath != null) {
