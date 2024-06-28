@@ -622,7 +622,7 @@ class AddParentPomTest implements RewriteTest {
     @Test
     void doesNotAddMavenDefaultProperties() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, "dir/pom.xml")),
+          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, null)),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -662,7 +662,7 @@ class AddParentPomTest implements RewriteTest {
     @Test
     void doesNotAddGrandparentProperties() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, "dir/pom.xml")),
+          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, null)),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -752,7 +752,7 @@ class AddParentPomTest implements RewriteTest {
     @Test
     void addParentPomWithMatchingFilePattern() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, null)),
+          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, "dir/pom.xml")),
           pomXml(
             """
               <project>
