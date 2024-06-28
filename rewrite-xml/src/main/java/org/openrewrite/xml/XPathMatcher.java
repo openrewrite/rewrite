@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
 public class XPathMatcher {
 
     // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']` or foo[@bar='baz']
-    private static final Pattern PATTERN = Pattern.compile("(@)?([-\\w]+|\\*)\\[((local-name|namespace-uri)\\(\\)|(@)?([-\\w]+|\\*))='(.*)']");
+    private static final Pattern PATTERN = Pattern.compile("(@)?([-:\\w]+|\\*)\\[((local-name|namespace-uri)\\(\\)|(@)?([-\\w]+|\\*))='(.*)']");
 
     private final String expression;
     private final boolean startsWithSlash;
@@ -197,7 +197,8 @@ public class XPathMatcher {
             for (int i = 0; i < parts.length; i++) {
                 String part = parts[i];
 
-                Xml.Tag tag = i < path.size() ? path.get(i) : null;
+                int isAttr = part.startsWith("@") ? 1 : 0;
+                Xml.Tag tag = i - isAttr < path.size() ? path.get(i - isAttr) : null;
                 String partName;
                 boolean matchedCondition = false;
 

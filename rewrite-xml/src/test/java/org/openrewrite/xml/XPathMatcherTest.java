@@ -105,6 +105,9 @@ class XPathMatcherTest {
                                   http://www.example.com/namespace3 http://www.example.com/namespace3.xsd">
           <element1 ns3:attribute1="content3">content1</element1>
           <ns2:element2>content2</ns2:element2>
+          <parent>
+              <element3 ns3:attr='test'>content3</element3>
+          </parent>
         </root>
         """
     ).toList().get(0);
@@ -159,6 +162,7 @@ class XPathMatcherTest {
           pomXml1)).isTrue();
         assertThat(match("/project/build//plugins/plugin/configuration/source",
           pomXml2)).isTrue();
+//        assertThat(match("/project/build//plugin/configuration/source", pomXml2)).isTrue(); // TODO: seems parser only handles // up to 1 level
 //        assertThat(match("/project//configuration/source", pomXml2)).isTrue(); // TODO: was already failing previously
     }
 
@@ -313,6 +317,11 @@ class XPathMatcherTest {
         assertThat(match("//element1/@*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
         assertThat(match("//ns2:element2/@*", namespacedXml)).isFalse();
         assertThat(match("/root/ns2:element2/@*", namespacedXml)).isFalse();
+
+        assertThat(match("/root/parent/element3/@attr", namespacedXml)).isFalse();
+        assertThat(match("/root/parent/element3/@ns3:attr", namespacedXml)).isTrue();
+        assertThat(match("/root/parent/element3/@ns3:attr[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
+        assertThat(match("//element3/@ns3:attr[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
 
         // TODO: fix mid-path // match with attribute element
 //        assertThat(match("/root//element1/@*", namespacedXml)).isTrue();
