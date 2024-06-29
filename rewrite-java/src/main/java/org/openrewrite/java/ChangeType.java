@@ -227,7 +227,10 @@ public class ChangeType extends Recipe {
                 }
 
                 if (sf != null) {
-                    sf = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
+                    sf = sf.withImports(ListUtils.map(sf.getImports(), originalImport -> {
+                        J.Import modifiedImport = visitAndCast(originalImport, ctx, super::visitImport);
+                        return modifiedImport; // FIXME Mangles import
+                    }));
                 }
 
                 j = sf;

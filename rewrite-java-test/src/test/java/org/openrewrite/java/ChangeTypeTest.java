@@ -1850,7 +1850,44 @@ class ChangeTypeTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-jackson/pull/6")
     @Test
-    void changeTypeOfStaticImportOfNestedEnumValue() {
+    void changeTypeOfStaticImportOfNestedEnumValueUnused() {
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipes(
+            new ChangeType(
+              "org.codehaus.jackson.map.SerializationConfig$Feature",
+              "com.fasterxml.jackson.databind.SerializationFeature", true)
+          ),
+          java(
+            """
+              package org.codehaus.jackson.map;
+              public class SerializationConfig {
+                  public static enum Feature {
+                      WRAP_ROOT_VALUE
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import static org.codehaus.jackson.map.SerializationConfig.Feature.WRAP_ROOT_VALUE;
+
+              class A {
+              }
+              """,
+            """
+              import static com.fasterxml.jackson.databind.SerializationFeature.WRAP_ROOT_VALUE;
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-jackson/pull/6")
+    @Test
+    void changeTypeOfStaticImportOfNestedEnumValueUsed() {
         rewriteRun(
           recipeSpec -> recipeSpec.recipes(
             new ChangeType(
@@ -1859,7 +1896,7 @@ class ChangeTypeTest implements RewriteTest {
             new ChangeType(
               "org.codehaus.jackson.map.SerializationConfig$Feature",
               "com.fasterxml.jackson.databind.SerializationFeature", true)
-            ),
+          ),
           java(
             """
               package org.codehaus.jackson.map;
