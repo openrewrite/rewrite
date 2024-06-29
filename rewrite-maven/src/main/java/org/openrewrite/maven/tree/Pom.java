@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -154,6 +155,28 @@ public class Pom {
                     return r;
                 })
                 .distinct()
+                .collect(Collectors.toList());
+    }
+
+    public List<Profile> activeProfiles(final Iterable<String> userSpecifiedProfiles) {
+        // pre-compute?  I think this is immutable, but not sure
+
+        // TODO This is should probably be coded differently or have methods renamed/etc.
+        // I just did this quickly before vacation starts:)
+        final List<Profile> explicitActiveProfiles =
+                getProfiles().stream()
+                        .filter(p -> p.isActive(userSpecifiedProfiles))
+                        .collect(Collectors.toList());
+
+        // activeByDefault profiles should be active even if they don't exist
+        // in userSpecifiedProfiles _unless_ a profile was active.
+        if (!explicitActiveProfiles.isEmpty()) {
+            return explicitActiveProfiles;
+        }
+
+        return getProfiles().stream()
+                .filter(p -> p.getActivation() != null &&
+                        Boolean.TRUE.equals(p.getActivation().getActiveByDefault()))
                 .collect(Collectors.toList());
     }
 

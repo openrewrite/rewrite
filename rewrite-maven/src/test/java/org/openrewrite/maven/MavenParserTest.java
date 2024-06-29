@@ -24,19 +24,24 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.tree.ParseError;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1195,6 +1200,147 @@ class MavenParserTest implements RewriteTest {
                             <maven.compiler.target>1.8</maven.compiler.target>
                         </properties>
                     </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4269")
+    @Test
+    void activeByDefault() {
+        // Trying to mimic settings.xml activeProfile or `mvn -Pfoobar`
+        final String activeProfile = "foobar";
+        rewriteRun(recipeSpec -> {
+            final ExecutionContext context = new InMemoryExecutionContext();
+            // I don't think this is having the affect I want:(
+            recipeSpec.executionContext(
+              MavenExecutionContextView.view(context)
+                .setActiveProfiles(Collections.singletonList(activeProfile))
+            );
+
+        }, mavenProject("c",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <profiles>
+                        <profile>
+                            <id>active-profile-1</id>
+                            <activation>
+                                <activeByDefault>true</activeByDefault>
+                            </activation>
+                            <properties>
+                                <d.version>0.1.0-SNAPSHOT</d.version>
+                            </properties>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>org.openrewrite.maven</groupId>
+                                        <artifactId>d</artifactId>
+                                        <version>${d.version}</version>
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                        </profile>
+                        <profile>
+                            <id>active-profile-2</id>
+                            <activation>
+                                <activeByDefault>true</activeByDefault>
+                            </activation>
+                            <properties>
+                                <e.version>0.2.0-SNAPSHOT</e.version>
+                            </properties>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>org.openrewrite.maven</groupId>
+                                        <artifactId>e</artifactId>
+                                        <version>${e.version}</version>
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                        </profile>
+                    </profiles>
+                </project>
+                """, spec -> {
+                  ((MavenParser.Builder) spec.getParser()).activeProfiles(activeProfile);
+              }
+            )
+          ),
+          mavenProject("a",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <relativePath />
+                    </parent>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>a</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite.maven</groupId>
+                            <artifactId>d</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.openrewrite.maven</groupId>
+                            <artifactId>e</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """, spec -> {
+                  ((MavenParser.Builder) spec.getParser()).activeProfiles(activeProfile);
+                  spec.afterRecipe(pomXml -> {
+                      final Map<String, List<ResolvedDependency>> deps =
+                        pomXml.getMarkers()
+                          .findFirst(MavenResolutionResult.class)
+                          .orElseThrow()
+                          .getDependencies()
+                          .get(Scope.Compile)
+                          .stream()
+                          .collect(Collectors.groupingBy(ResolvedDependency::getArtifactId));
+
+                      assertThat(deps).hasEntrySatisfying("d", rds -> {
+                          assertThat(rds).hasSize(1);
+                          assertThat(rds.get(0).getVersion()).isEqualTo("0.1.0-SNAPSHOT");
+                      });
+
+                      assertThat(deps).hasEntrySatisfying("e", rds -> {
+                          assertThat(rds).hasSize(1);
+                          assertThat(rds.get(0).getVersion()).isEqualTo("0.2.0-SNAPSHOT");
+                      });
+                  });
+              }
+            )
+          ),
+          mavenProject("d",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>d</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                </project>
+                """
+            )
+          ),
+          mavenProject("e",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>e</artifactId>
+                    <version>0.2.0-SNAPSHOT</version>
+                </project>
                 """
             )
           )
