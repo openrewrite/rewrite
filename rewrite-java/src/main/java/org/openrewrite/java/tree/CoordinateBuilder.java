@@ -112,10 +112,13 @@ public abstract class CoordinateBuilder {
 
         public JavaCoordinates addMethodDeclaration(Comparator<J.MethodDeclaration> idealOrdering) {
             Comparator<UUID> natural = Comparator.naturalOrder();
-            return addStatement((org.openrewrite.java.tree.Statement s1, org.openrewrite.java.tree.Statement s2) -> s1 instanceof J.MethodDeclaration && s2 instanceof J.MethodDeclaration ?
-                    idealOrdering.compare((J.MethodDeclaration) s1, (J.MethodDeclaration) s2) :
-                    natural.compare(s1.getId(), s2.getId())
-            );
+            return addStatement((s1, s2) -> {
+                if (s1 instanceof J.MethodDeclaration && s2 instanceof J.MethodDeclaration) {
+                    return idealOrdering.compare((J.MethodDeclaration) s1, (J.MethodDeclaration) s2);
+                } else {
+                    return natural.compare(s1.getId(), s2.getId());
+                }
+            });
         }
 
         public JavaCoordinates lastStatement() {
@@ -303,7 +306,7 @@ public abstract class CoordinateBuilder {
         Yield(J.Yield tree) {
             super(tree);
         }
-
+        
         @Override
         public JavaCoordinates replace() {
             return replace(Space.Location.YIELD_PREFIX);
