@@ -1,18 +1,19 @@
 /*
  * Copyright 2021 the original author or authors.
- * <p>
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
@@ -42,9 +43,12 @@ class MethodParamPadTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
+        // Apply MethodParamPad recipe and disable type validation
+        spec.typeValidationOptions(TypeValidation.none());
         spec.recipe(new MethodParamPad());
     }
 
+    // Helper method to create named styles
     static Iterable<NamedStyles> namedStyles(Collection<Style> styles) {
         return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
     }
@@ -162,17 +166,17 @@ class MethodParamPadTest implements RewriteTest {
                   E1
                           ()
               }
-                            
+
               class B {
               }
-                            
+
               class A extends B {
                   A
                           () {
                       super
                               ();
                   }
-                            
+
                   static void method
                           (int x, int y) {
                       A a = new A
@@ -198,17 +202,17 @@ class MethodParamPadTest implements RewriteTest {
                   E1
                           ()
               }
-                            
+
               class B {
               }
-                            
+
               class A extends B {
                   A
                           () {
                       super
                               ();
                   }
-                            
+
                   static void method
                           (int x, int y) {
                       A a = new A
@@ -368,6 +372,7 @@ class MethodParamPadTest implements RewriteTest {
         );
     }
 
+    // Helper method to check if auto-formatting is idempotent
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
         return spec -> spec.afterRecipe(cu ->
           assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
