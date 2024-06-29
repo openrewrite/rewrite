@@ -312,15 +312,17 @@ public class ChangeType extends Recipe {
                 }
 
                 // Recreate any static imports as needed
-                JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
-                for (J.Import anImport : cu.getImports()) {
-                    if (anImport.isStatic() && anImport.getQualid().getTarget().getType() != null) {
-                        JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
-                        if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
-                            ident.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
-                            JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
-                            maybeAddImport((targetFqn).getFullyQualifiedName(), ident.getSimpleName());
-                            break;
+                JavaSourceFile cu = getCursor().firstEnclosing(JavaSourceFile.class);
+                if (cu != null) {
+                    for (J.Import anImport : cu.getImports()) {
+                        if (anImport.isStatic() && anImport.getQualid().getTarget().getType() != null) {
+                            JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
+                            if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
+                                ident.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
+                                JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
+                                maybeAddImport((targetFqn).getFullyQualifiedName(), ident.getSimpleName());
+                                break;
+                            }
                         }
                     }
                 }
