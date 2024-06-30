@@ -137,7 +137,15 @@ public class MergeYaml extends Recipe {
 
             @Nullable
             private String maybeKeyFromJsonPath(String jsonPath) {
-                if(!jsonPath.startsWith("$.")) {
+                if (!jsonPath.startsWith("$.")) {
+                    return null;
+                }
+                // if the key contains a jsonpath filter we cannot infer a valid key
+                if (jsonPath.matches(".*\\[\\s?\\?\\s?\\(\\s?@\\..*\\)\\s?].*")) {
+                    return null;
+                }
+                // remove keys that contain wilcard or deep search
+                if (jsonPath.matches(".*\\*.*") || jsonPath.matches(".*\\.\\..*")) {
                     return null;
                 }
                 return jsonPath.substring(2);
