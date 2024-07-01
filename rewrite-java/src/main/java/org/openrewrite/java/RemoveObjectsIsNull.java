@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import org.openrewrite.*;
 import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
-import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -58,16 +57,26 @@ public class RemoveObjectsIsNull extends Recipe {
                 maybeRemoveImport("java.util.Objects");
                 maybeRemoveImport("java.util.Objects." + m.getSimpleName());
 
+                // Upcasted primitives are never null; simplify logic for use in SimplifyConstantIfBranchExecution
                 JavaType type = m.getArguments().get(0).getType();
                 if (type instanceof JavaType.Primitive && JavaType.Primitive.String != type) {
                     boolean replacementValue = NON_NULL.matches(m);
                     return new J.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY, replacementValue, String.valueOf(replacementValue), null, JavaType.Primitive.Boolean);
                 }
 
-                Expression e = m.getArguments().get(0);
-                Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), e);
-                replaced = (Expression) new UnnecessaryParenthesesVisitor<>().visitNonNull(replaced, ctx, getCursor());
-                return (Expression) new SimplifyBooleanExpressionVisitor<>().visitNonNull(replaced, ctx, getCursor());
+                // Replace the method invocation with a simple null check
+                getCursor().getParentOrThrow().putMessage("REMOVE_PARENTHESES", true);
+                Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), m.getArguments().get(0));
+                return (Expression) new UnnecessaryParenthesesVisitor<>().visitNonNull(replaced, ctx, getCursor());
+            }
+
+            @Override
+            public J postVisit(J tree, ExecutionContext executionContext) {
+                J j = super.postVisit(tree, executionContext);
+                if (getCursor().getMessage("REMOVE_PARENTHESES", false)) {
+                    return new UnnecessaryParenthesesVisitor<>().visit(j, executionContext);
+                }
+                return j;
             }
         });
     }

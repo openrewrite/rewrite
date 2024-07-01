@@ -166,4 +166,35 @@ class RemoveObjectsIsNullTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4244")
+    void negatedRemoveObjectsIsNull() {
+        rewriteRun(
+          java(
+            """
+            package com.helloworld;
+            
+            import java.util.Objects;
+
+            class Hello {
+              public boolean hello(String abc) {
+                return !Objects.isNull(abc);
+              }
+            }
+            """,
+            // "!abc == null" is not a valid expression
+            """
+            package com.helloworld;
+
+            class Hello {
+              public boolean hello(String abc) {
+                return !(abc == null);
+              }
+            }
+            """
+          )
+        );
+    }
+
 }
