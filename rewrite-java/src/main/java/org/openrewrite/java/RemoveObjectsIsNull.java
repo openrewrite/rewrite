@@ -74,7 +74,7 @@ public class RemoveObjectsIsNull extends Recipe {
             @Override
             public J postVisit(J tree, ExecutionContext ctx) {
                 J j = super.postVisit(tree, ctx);
-                if (getCursor().getNearestMessage("SIMPLIFY_BOOLEAN_EXPRESSION", false)) {
+                if (Boolean.TRUE.equals(getCursor().pollMessage("SIMPLIFY_BOOLEAN_EXPRESSION"))) {
                     return new SimplifyBooleanExpressionVisitor().visit(j, ctx, getCursor().getParentOrThrow());
                 }
                 return j;
