@@ -65,7 +65,7 @@ public class RemoveObjectsIsNull extends Recipe {
                 }
 
                 // Replace the method invocation with a simple null check
-                getCursor().getParentOrThrow().putMessage("REMOVE_PARENTHESES", true);
+                getCursor().getParentTreeCursor().putMessage("REMOVE_PARENTHESES", true);
                 Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), m.getArguments().get(0));
                 return (Expression) new UnnecessaryParenthesesVisitor<>().visitNonNull(replaced, ctx, getCursor());
             }
