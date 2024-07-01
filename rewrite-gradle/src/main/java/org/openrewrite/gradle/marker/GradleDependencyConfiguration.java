@@ -61,20 +61,17 @@ public class GradleDependencyConfiguration implements Serializable {
      */
     List<ResolvedDependency> directResolved;
 
-    /**
-     * The name of this method is misleading.
-     * When we retrieve dependency information from Gradle we cannot actually tell which dependencies are direct and which are transitive.
-     * So this returns ALL dependencies resolved for this configuration, including transitive dependencies.
-     */
     public List<ResolvedDependency> getDirectResolved() {
         return directResolved == null ? emptyList() : directResolved;
     }
 
     /**
-     * An alias for "getDirectResolved()" until such time as we are able to differentiate between direct and transitive dependencies.
+     * The list of all dependencies resolved for this configuration, including transitive dependencies.
      */
     public List<ResolvedDependency> getResolved() {
-        return getDirectResolved();
+        List<ResolvedDependency> resolved = new ArrayList<>(getDirectResolved());
+        Set<ResolvedDependency> alreadyResolved = new LinkedHashSet<>();
+        return resolveTransitiveDependencies(resolved, alreadyResolved);
     }
 
     /**
@@ -136,5 +133,14 @@ public class GradleDependencyConfiguration implements Serializable {
 
     public void unsafeSetExtendsFrom(List<GradleDependencyConfiguration> extendsFrom) {
         this.extendsFrom = extendsFrom;
+    }
+
+    private static List<ResolvedDependency> resolveTransitiveDependencies(List<ResolvedDependency> resolved, Set<ResolvedDependency> alreadyResolved) {
+        for (ResolvedDependency dependency : resolved) {
+            if (alreadyResolved.add(dependency)) {
+                alreadyResolved.addAll(resolveTransitiveDependencies(dependency.getDependencies(), alreadyResolved));
+            }
+        }
+        return new ArrayList<>(alreadyResolved);
     }
 }
