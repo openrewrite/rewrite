@@ -73,8 +73,8 @@ public class RemoveObjectsIsNull extends Recipe {
             @Override
             public J postVisit(J tree, ExecutionContext ctx) {
                 J j = super.postVisit(tree, ctx);
-                    return new UnnecessaryParenthesesVisitor<>().visit(j, ctx);
-                    return new UnnecessaryParenthesesVisitor<>().visit(j, executionContext);
+                if (getCursor().getNearestMessage("REMOVE_PARENTHESES", false)) {
+                    return new UnnecessaryParenthesesVisitor<>().visit(j, ctx, getCursor().getParentOrThrow());
                 }
                 return j;
             }
