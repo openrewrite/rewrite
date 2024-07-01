@@ -189,7 +189,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
 
             class Hello {
               public boolean hello(String abc) {
-                return !(abc == null);
+                return abc != null;
               }
             }
             """

@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.*;
+import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
 import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
@@ -65,7 +66,7 @@ public class RemoveObjectsIsNull extends Recipe {
                 }
 
                 // Replace the method invocation with a simple null check
-                getCursor().getParentTreeCursor().putMessage("REMOVE_PARENTHESES", true);
+                getCursor().getParentTreeCursor().putMessage("SIMPLIFY_BOOLEAN_EXPRESSION", true);
                 Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), m.getArguments().get(0));
                 return (Expression) new UnnecessaryParenthesesVisitor<>().visitNonNull(replaced, ctx, getCursor());
             }
@@ -73,8 +74,8 @@ public class RemoveObjectsIsNull extends Recipe {
             @Override
             public J postVisit(J tree, ExecutionContext ctx) {
                 J j = super.postVisit(tree, ctx);
-                if (getCursor().getNearestMessage("REMOVE_PARENTHESES", false)) {
-                    return new UnnecessaryParenthesesVisitor<>().visit(j, ctx, getCursor().getParentOrThrow());
+                if (getCursor().getNearestMessage("SIMPLIFY_BOOLEAN_EXPRESSION", false)) {
+                    return new SimplifyBooleanExpressionVisitor().visit(j, ctx, getCursor().getParentOrThrow());
                 }
                 return j;
             }
