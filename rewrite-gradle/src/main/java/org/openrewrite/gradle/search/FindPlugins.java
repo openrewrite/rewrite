@@ -17,12 +17,15 @@ package org.openrewrite.gradle.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jetbrains.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.gradle.tree.GradlePlugin;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
@@ -88,12 +91,15 @@ public class FindPlugins extends Recipe {
         MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
         List<GradlePlugin> pluginsWithVersion = plugins.stream().flatMap(plugin -> {
             if (versionMatcher.matches(plugin) && idMatcher.matches(plugin.getSelect())) {
-                return Stream.of(new GradlePlugin(
-                        plugin,
-                        requireNonNull(((J.Literal) requireNonNull(((J.MethodInvocation) plugin.getSelect()))
-                                .getArguments().get(0)).getValue()).toString(),
-                        requireNonNull(((J.Literal) plugin.getArguments().get(0)).getValue()).toString()
-                ));
+                String pluginVersion = getPluginVersion(plugin.getArguments().get(0));
+                if (pluginVersion != null) {
+                    return Stream.of(new GradlePlugin(
+                            plugin,
+                            requireNonNull(((J.Literal) requireNonNull(((J.MethodInvocation) plugin.getSelect()))
+                                    .getArguments().get(0)).getValue()).toString(),
+                            pluginVersion
+                    ));
+                }
             }
             return Stream.empty();
         }).collect(toList());
@@ -114,5 +120,18 @@ public class FindPlugins extends Recipe {
         result.addAll(pluginsWithVersion);
         result.addAll(pluginsWithoutVersion);
         return result;
+    }
+
+    @Nullable
+    private static String getPluginVersion(Expression expression) {
+        if (expression instanceof J.Literal) {
+            return requireNonNull(((J.Literal) expression).getValue()).toString();
+        } else if (expression instanceof G.GString) {
+            List<J> strings = ((G.GString) expression).getStrings();
+            if (!strings.isEmpty() && strings.get(0) instanceof G.GString.Value) {
+                return ((G.GString.Value) strings.get(0)).getTree().toString();
+            }
+        }
+        return null;
     }
 }
