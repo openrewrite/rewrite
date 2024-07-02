@@ -38,6 +38,7 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
+import java.net.URI;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -94,13 +95,13 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     final Boolean addIfMissing;
 
     @Getter
-            @Option(example = "https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip", displayName = "Wrapper URI",
-                    description = "The URI of the Gradle wrapper distribution. " +
-                            "Lookup of available versions still requires access to https://services.gradle.org " +
-                            "When this is specified the exact literal values supplied for `version` and `distribution` " +
-                            "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively. " +
-                            "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
-                    required = false)
+    @Option(example = "https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip", displayName = "Wrapper URI",
+            description = "The URI of the Gradle wrapper distribution. " +
+                          "Lookup of available versions still requires access to https://services.gradle.org " +
+                          "When this is specified the exact literal values supplied for `version` and `distribution` " +
+                          "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively. " +
+                          "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
+            required = false)
     @Nullable
     final String wrapperUri;
 
@@ -118,7 +119,32 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     private GradleWrapper getGradleWrapper(ExecutionContext ctx) {
         if (gradleWrapper == null) {
-            gradleWrapper = GradleWrapper.create(distribution, version, null, ctx);
+            try {
+                gradleWrapper = GradleWrapper.create(distribution, version, null, ctx);
+            } catch (Exception e) {
+                // services.gradle.org is unreachable, possibly because of a firewall
+                // But if the user specified a wrapperUri to an internal repository things might still be workable
+                if (wrapperUri == null) {
+                    throw new IllegalArgumentException(
+                            "Could not reach services.gradle.org and no alternative wrapper URI is provided. " +
+                            "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri.", e);
+                }
+                if (wrapperUri.contains("${version})")) {
+                    if (version == null) {
+                        throw new IllegalArgumentException(
+                                "wrapperUri contains a ${version} interpolation specifier but no version parameter was specified.", e);
+                    }
+                    if(!version.matches("[0-9.]+")) {
+                        throw new IllegalArgumentException(
+                                "Version selectors like \"" + version + "\" are unavailable when services.gradle.org cannot be reached. " +
+                                "Specify an exact, literal version number.", e);
+                    }
+                }
+                String effectiveWrapperUri = wrapperUri
+                        .replace("${version}", version == null ? "" : version)
+                        .replace("${distribution}", distribution == null ? "bin" : distribution);
+                gradleWrapper = GradleWrapper.create(URI.create(effectiveWrapperUri), ctx);
+            }
         }
         return gradleWrapper;
     }
@@ -436,12 +462,12 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 String currentUrl = value.getText();
                 // Prefer wrapperUri specified directly in the recipe over other options
                 // If that isn't set, prefer the existing artifact repository URL over changing to services.gradle.org
-                if(wrapperUri != null) {
+                if (wrapperUri != null) {
                     String effectiveWrapperUri = formatUriForPropertiesFile(wrapperUri
                             .replace("${version}", gradleWrapper.getVersion())
                             .replace("${distribution}", distribution == null ? "bin" : distribution));
                     return entry.withValue(value.withText(effectiveWrapperUri));
-                } else if(currentUrl.startsWith("https\\://services.gradle.org/distributions/")) {
+                } else if (currentUrl.startsWith("https\\://services.gradle.org/distributions/")) {
                     return entry.withValue(value.withText(gradleWrapper.getPropertiesFormattedUrl()));
                 } else {
                     String gradleServicesDistributionUrl = gradleWrapper.getDistributionUrl();

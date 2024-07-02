@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -952,7 +953,7 @@ class ChangeTypeTest implements RewriteTest {
               
               public class OuterClass {
                   public static class InnerClass {
-                            
+              
                   }
               }
               """
@@ -1776,7 +1777,7 @@ class ChangeTypeTest implements RewriteTest {
               public class Test {
                   private class InnerA {
                   }
-                  
+              
                   private class InnerB {
                   }
               
@@ -1789,7 +1790,7 @@ class ChangeTypeTest implements RewriteTest {
               public class Test {
                   private class InnerA {
                   }
-                  
+              
                   private class InnerB {
                   }
               
@@ -1840,6 +1841,64 @@ class ChangeTypeTest implements RewriteTest {
               public class Sibling {
                   public Test test() {
                       return new Test();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-jackson/pull/6")
+    @Test
+    void changeTypeOfStaticImportOfNestedEnumValue() {
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipe(new ChangeType(
+            "org.codehaus.jackson.map.SerializationConfig$Feature",
+            "com.fasterxml.jackson.databind.SerializationFeature", true)),
+          java(
+            """
+              package org.codehaus.jackson.map;
+              public class SerializationConfig {
+                  public static enum Feature {
+                      WRAP_ROOT_VALUE
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.fasterxml.jackson.databind;
+              public enum SerializationFeature {
+                  WRAP_ROOT_VALUE
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.codehaus.jackson.map.SerializationConfig.Feature;
+
+              import static org.codehaus.jackson.map.SerializationConfig.Feature.WRAP_ROOT_VALUE;
+
+              class A {
+                  void test() {
+                      configure(WRAP_ROOT_VALUE, true);
+                  }
+                  void configure(Feature f, boolean b) {
+                  }
+              }
+              """,
+            """
+              import com.fasterxml.jackson.databind.SerializationFeature;
+
+              import static com.fasterxml.jackson.databind.SerializationFeature.WRAP_ROOT_VALUE;
+
+              class A {
+                  void test() {
+                      configure(WRAP_ROOT_VALUE, true);
+                  }
+                  void configure(SerializationFeature f, boolean b) {
                   }
               }
               """

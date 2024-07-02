@@ -421,6 +421,7 @@ public class MavenSettings {
         @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true) // wrapping is disabled by default on MavenXmlMapper
         @Nullable
         List<HttpHeader> httpHeaders;
+
         /**
          * Timeout in milliseconds for establishing a connection.
          */
