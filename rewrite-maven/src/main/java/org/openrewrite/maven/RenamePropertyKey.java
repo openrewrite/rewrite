@@ -78,8 +78,8 @@ public class RenamePropertyKey extends Recipe {
             }
 
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                Xml.Document d = super.visitDocument(document, executionContext);
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml.Document d = super.visitDocument(document, ctx);
                 if (d != document) {
                     maybeUpdateModel();
                 }
