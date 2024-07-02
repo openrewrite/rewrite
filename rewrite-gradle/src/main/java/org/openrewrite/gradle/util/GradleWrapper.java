@@ -94,7 +94,11 @@ public class GradleWrapper {
     // Supports org.openrewrite.gradle.toolingapi.Assertions.withToolingApi(URI)
     // This method is provided to support recipe development at organizations which require gradle to come from
     // internal repositories. This is not used in contexts where services.gradle.org is accessible
-    @SuppressWarnings("unused")
+
+    /**
+     * Construct a Gradle wrapper from a URI.
+     * Can be used in contexts where servcies.gradle.org, normally used for version lookups, is unavailable.
+     */
     public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
         String version = "";
         Matcher matcher = GRADLE_VERSION_PATTERN.matcher(fullDistributionUri.toString());
