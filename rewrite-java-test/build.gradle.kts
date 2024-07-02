@@ -36,6 +36,9 @@ tasks.named<JavaCompile>("compileTestJava") {
 }
 
 tasks.withType<Test> {
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(JavaVersion.VERSION_21.toString())
+    }
     systemProperty("junit.jupiter.extensions.autodetection.enabled", true)
 }
 
