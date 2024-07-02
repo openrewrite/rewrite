@@ -28,20 +28,20 @@ class MavenMetadataTest {
     @Test
     void deserializeMetadata() throws IOException {
         @Language("xml") String metadata = """
-            <metadata>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot</artifactId>
-                <versioning>
-                    <latest>2.4.2</latest>
-                    <release>2.4.2</release>
-                    <versions>
-                        <version>2.4.1</version>
-                        <version>2.4.2</version>
-                    </versions>
-                    <lastUpdated>20210115042754</lastUpdated>
-                </versioning>
-            </metadata>
-        """;
+          <metadata>
+              <groupId>org.springframework.boot</groupId>
+              <artifactId>spring-boot</artifactId>
+              <versioning>
+                  <latest>2.4.2</latest>
+                  <release>2.4.2</release>
+                  <versions>
+                      <version>2.4.1</version>
+                      <version>2.4.2</version>
+                  </versions>
+                  <lastUpdated>20210115042754</lastUpdated>
+              </versioning>
+          </metadata>
+          """;
 
         MavenMetadata parsed = MavenMetadata.parse(metadata.getBytes());
         assertThat(parsed.getVersioning().getVersions()).hasSize(2);
@@ -51,39 +51,40 @@ class MavenMetadataTest {
     @Test
     void deserializeSnapshotMetadata() throws IOException {
         @Language("xml") String metadata = """
-            <metadata modelVersion="1.1.0">
-                <groupId>org.openrewrite.recipe</groupId>
-                <artifactId>rewrite-recommendations</artifactId>
-                <version>0.1.0-SNAPSHOT</version>
-                <versioning>
-                    <snapshot>
-                        <timestamp>20220927.033510</timestamp>
-                        <buildNumber>223</buildNumber>
-                    </snapshot>
-                    <snapshotVersions>
-                        <snapshotVersion>
-                            <extension>pom.asc</extension>
-                            <value>0.1.0-20220927.033510-223</value>
-                            <updated>20220927033510</updated>
-                        </snapshotVersion>
-                        <snapshotVersion>
-                            <extension>pom</extension>
-                            <value>0.1.0-20220927.033510-223</value>
-                            <updated>20220927033510</updated>
-                        </snapshotVersion>
-                    </snapshotVersions>
-                </versioning>
-            </metadata>
-        """;
+          <metadata modelVersion="1.1.0">
+              <groupId>org.openrewrite.recipe</groupId>
+              <artifactId>rewrite-recommendations</artifactId>
+              <version>0.1.0-SNAPSHOT</version>
+              <versioning>
+                  <snapshot>
+                      <timestamp>20220927.033510</timestamp>
+                      <buildNumber>223</buildNumber>
+                  </snapshot>
+                  <snapshotVersions>
+                      <snapshotVersion>
+                          <extension>pom.asc</extension>
+                          <value>0.1.0-20220927.033510-223</value>
+                          <updated>20220927033510</updated>
+                      </snapshotVersion>
+                      <snapshotVersion>
+                          <extension>pom</extension>
+                          <value>0.1.0-20220927.033510-223</value>
+                          <updated>20220927033510</updated>
+                      </snapshotVersion>
+                  </snapshotVersions>
+              </versioning>
+          </metadata>
+          """;
 
         MavenMetadata parsed = MavenMetadata.parse(metadata.getBytes());
+        MavenMetadata.Versioning versioning = parsed.getVersioning();
 
-        assertThat(parsed.getVersioning().getSnapshot().getTimestamp()).isEqualTo("20220927.033510");
-        assertThat(parsed.getVersioning().getSnapshot().getBuildNumber()).isEqualTo("223");
-        assertThat(parsed.getVersioning().getVersions()).isNotNull();
-        assertThat(parsed.getVersioning().getSnapshotVersions()).hasSize(2);
-        assertThat(parsed.getVersioning().getSnapshotVersions().get(0).getExtension()).isNotNull();
-        assertThat(parsed.getVersioning().getSnapshotVersions().get(0).getValue()).isNotNull();
-        assertThat(parsed.getVersioning().getSnapshotVersions().get(0).getUpdated()).isNotNull();
+        assertThat(versioning.getSnapshot().getTimestamp()).isEqualTo("20220927.033510");
+        assertThat(versioning.getSnapshot().getBuildNumber()).isEqualTo("223");
+        assertThat(versioning.getVersions()).isNotNull();
+        assertThat(versioning.getSnapshotVersions()).hasSize(2);
+        assertThat(versioning.getSnapshotVersions().get(0).getExtension()).isNotNull();
+        assertThat(versioning.getSnapshotVersions().get(0).getValue()).isNotNull();
+        assertThat(versioning.getSnapshotVersions().get(0).getUpdated()).isNotNull();
     }
 }
