@@ -140,7 +140,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 gradleProject = cu.getMarkers().findFirst(GradleProject.class)
                         .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
 
-                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new HashMap<>();
+                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new LinkedHashMap<>();
 
                 DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
                 for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
@@ -163,7 +163,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                                         new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId()),
                                         singletonMap(constraintConfig, selected),
                                         (existing, update) -> {
-                                            Map<GradleDependencyConfiguration, String> all = new HashMap<>(existing);
+                                            Map<GradleDependencyConfiguration, String> all = new LinkedHashMap<>(existing);
                                             all.putAll(update);
                                             all.keySet().removeIf(c -> {
                                                 if (c == null) {

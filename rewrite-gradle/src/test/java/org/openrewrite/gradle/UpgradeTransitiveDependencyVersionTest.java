@@ -228,10 +228,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
               dependencies {
                   constraints {
-                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                      earlib('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
-                      earlib('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
                   }
