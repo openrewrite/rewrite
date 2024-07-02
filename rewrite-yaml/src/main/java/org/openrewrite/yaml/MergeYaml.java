@@ -96,10 +96,10 @@ public class MergeYaml extends Recipe {
                             ctx, getCursor()));
                 }
                 Yaml.Document d = super.visitDocument(document, ctx);
-                if(d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
+                if (d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
                     // No matching element already exists, attempt to construct one
                     String valueKey = maybeKeyFromJsonPath(key);
-                    if(valueKey == null) {
+                    if (valueKey == null) {
                         return d;
                     }
                     // If there is no space between the colon and the value it will not be interpreted as a mapping
@@ -137,7 +137,15 @@ public class MergeYaml extends Recipe {
 
             @Nullable
             private String maybeKeyFromJsonPath(String jsonPath) {
-                if(!jsonPath.startsWith("$.")) {
+                if (!jsonPath.startsWith("$.")) {
+                    return null;
+                }
+                // if the key contains a jsonpath filter we cannot infer a valid key
+                if (jsonPath.matches(".*\\[\\s?\\?\\s?\\(\\s?@\\..*\\)\\s?].*")) {
+                    return null;
+                }
+                // remove keys that contain wildcard or deep search
+                if (jsonPath.matches(".*\\*.*") || jsonPath.matches(".*\\.\\..*")) {
                     return null;
                 }
                 return jsonPath.substring(2);
