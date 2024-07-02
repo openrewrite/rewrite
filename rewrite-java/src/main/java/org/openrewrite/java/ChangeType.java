@@ -227,7 +227,7 @@ public class ChangeType extends Recipe {
                 }
 
                 if (sf != null) {
-                    sf = sf.withImports(ListUtils.map(sf.getImports(), originalImport -> visitAndCast(originalImport, ctx, super::visitImport)));
+                    sf = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
                 }
 
                 j = sf;
