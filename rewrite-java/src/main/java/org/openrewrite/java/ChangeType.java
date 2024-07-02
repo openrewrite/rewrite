@@ -227,10 +227,7 @@ public class ChangeType extends Recipe {
                 }
 
                 if (sf != null) {
-                    sf = sf.withImports(ListUtils.map(sf.getImports(), originalImport -> {
-                        J.Import modifiedImport = visitAndCast(originalImport, ctx, super::visitImport);
-                        return modifiedImport; // FIXME Mangles import
-                    }));
+                    sf = sf.withImports(ListUtils.map(sf.getImports(), originalImport -> visitAndCast(originalImport, ctx, super::visitImport)));
                 }
 
                 j = sf;
@@ -279,6 +276,10 @@ public class ChangeType extends Recipe {
                         e = i.withType(targetType);
                     }
                     return e;
+                } else if (maybeClass.toString().equals(oldType.getFullyQualifiedName().replace('$', '.'))) {
+                    maybeRemoveImport(oldType.getOwningClass());
+                    return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                            .withPrefix(fieldAccess.getPrefix()));
                 }
             }
             return super.visitFieldAccess(fieldAccess, ctx);
