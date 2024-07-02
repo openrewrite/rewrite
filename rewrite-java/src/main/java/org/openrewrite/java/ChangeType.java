@@ -276,6 +276,10 @@ public class ChangeType extends Recipe {
                         e = i.withType(targetType);
                     }
                     return e;
+                } else if (maybeClass.toString().equals(oldType.getFullyQualifiedName().replace('$', '.'))) {
+                    maybeRemoveImport(oldType.getOwningClass());
+                    return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                            .withPrefix(fieldAccess.getPrefix()));
                 }
             }
             return super.visitFieldAccess(fieldAccess, ctx);
