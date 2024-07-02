@@ -38,6 +38,7 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
+import java.net.URI;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -118,7 +119,25 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     private GradleWrapper getGradleWrapper(ExecutionContext ctx) {
         if (gradleWrapper == null) {
-            gradleWrapper = GradleWrapper.create(distribution, version, null, ctx);
+            try {
+                gradleWrapper = GradleWrapper.create(distribution, version, null, ctx);
+            } catch (Exception e) {
+                // services.gradle.org is unreachable, possibly because of a firewall
+                // But if the user specified a wrapperUri to an internal repository things might still be workable
+                if(wrapperUri == null) {
+                    throw new IllegalStateException(
+                            "Could not reach services.gradle.org and no alternative wrapper URI is provided. " +
+                            "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri.", e);
+                }
+                if(wrapperUri.contains("${version})") && version == null) {
+                    throw new IllegalStateException(
+                            "wrapperUri contains a ${version} interpolation specifier but no version parameter was specified.", e);
+                }
+                String effectiveWrapperUri = wrapperUri
+                        .replace("${version}", version == null ? "" : version)
+                        .replace("${distribution}", distribution == null ? "bin" : distribution);
+                gradleWrapper = GradleWrapper.create(URI.create(effectiveWrapperUri), ctx);
+            }
         }
         return gradleWrapper;
     }
