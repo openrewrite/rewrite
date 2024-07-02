@@ -87,70 +87,70 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 .contextSensitive()
                                 .build()
                                 .apply(getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
-                    } else {
-                        return JavaTemplate.builder("#{} = #{}")
-                                .contextSensitive()
-                                .build()
-                                .apply(getCursor(), a.getCoordinates().replaceArguments(), attributeName, newAttributeValue);
                     }
-                } else {
-                    // First assume the value exists amongst the arguments and attempt to update it
-                    AtomicBoolean foundAttributeWithDesiredValue = new AtomicBoolean(false);
-                    final J.Annotation finalA = a;
-                    List<Expression> newArgs = ListUtils.map(currentArgs, it -> {
-                        if (it instanceof J.Assignment) {
-                            J.Assignment as = (J.Assignment) it;
-                            J.Identifier var = (J.Identifier) as.getVariable();
-                            if (attributeName == null || !attributeName.equals(var.getSimpleName())) {
-                                return it;
-                            }
-                            J.Literal value = (J.Literal) as.getAssignment();
+                    return JavaTemplate.builder("#{} = #{}")
+                            .contextSensitive()
+                            .build()
+                            .apply(getCursor(), a.getCoordinates().replaceArguments(), attributeName, newAttributeValue);
+                }
+
+                // First assume the value exists amongst the arguments and attempt to update it
+                AtomicBoolean foundAttributeWithDesiredValue = new AtomicBoolean(false);
+                final J.Annotation finalA = a;
+                List<Expression> newArgs = ListUtils.map(currentArgs, it -> {
+                    if (it instanceof J.Assignment) {
+                        J.Assignment as = (J.Assignment) it;
+                        J.Identifier var = (J.Identifier) as.getVariable();
+                        if (attributeName == null || !attributeName.equals(var.getSimpleName())) {
+                            return it;
+                        }
+                        if (newAttributeValue == null) {
+                            return null;
+                        }
+                        J.Literal value = (J.Literal) as.getAssignment();
+                        if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
+                            foundAttributeWithDesiredValue.set(true);
+                            return it;
+                        }
+                        return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
+                    }
+
+                    if (it instanceof J.Literal) {
+                        // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
+                        if (attributeName == null || "value".equals(attributeName)) {
                             if (newAttributeValue == null) {
                                 return null;
                             }
+                            J.Literal value = (J.Literal) it;
                             if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
                                 foundAttributeWithDesiredValue.set(true);
                                 return it;
                             }
-                            return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
-                        } else if (it instanceof J.Literal) {
-                            // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
-                            if (attributeName == null || "value".equals(attributeName)) {
-                                if (newAttributeValue == null) {
-                                    return null;
-                                }
-                                J.Literal value = (J.Literal) it;
-                                if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
-                                    foundAttributeWithDesiredValue.set(true);
-                                    return it;
-                                }
-                                return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
-                            } else {
-                                //noinspection ConstantConditions
-                                return ((J.Annotation) JavaTemplate.builder("value = #{}")
-                                        .contextSensitive()
-                                        .build()
-                                        .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it)
-                                ).getArguments().get(0);
-                            }
+                            return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
                         }
-                        return it;
-                    });
-                    if (foundAttributeWithDesiredValue.get() || newArgs != currentArgs) {
-                        return a.withArguments(newArgs);
+                        //noinspection ConstantConditions
+                        return ((J.Annotation) JavaTemplate.builder("value = #{}")
+                                .contextSensitive()
+                                .build()
+                                .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it))
+                                .getArguments().get(0);
                     }
-                    // There was no existing value to update, so add a new value into the argument list
-                    String effectiveName = (attributeName == null) ? "value" : attributeName;
-                    //noinspection ConstantConditions
-                    J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")
-                            .contextSensitive()
-                            .build()
-                            .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue)
-                    ).getArguments().get(0);
-                    List<Expression> newArguments = ListUtils.concat(as, a.getArguments());
-                    a = a.withArguments(newArguments);
-                    a = autoFormat(a, ctx);
+                    return it;
+                });
+                if (foundAttributeWithDesiredValue.get() || newArgs != currentArgs) {
+                    return a.withArguments(newArgs);
                 }
+                // There was no existing value to update, so add a new value into the argument list
+                String effectiveName = (attributeName == null) ? "value" : attributeName;
+                //noinspection ConstantConditions
+                J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue)
+                ).getArguments().get(0);
+                List<Expression> newArguments = ListUtils.concat(as, a.getArguments());
+                a = a.withArguments(newArguments);
+                a = autoFormat(a, ctx);
 
                 return a;
             }
