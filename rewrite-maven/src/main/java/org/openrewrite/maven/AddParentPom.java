@@ -29,7 +29,9 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Value
@@ -119,27 +121,24 @@ public class AddParentPom extends Recipe {
                     Optional<String> targetVersion = findAcceptableVersion(groupId, artifactId, ctx);
                     if (targetVersion.isPresent()) {
 
-                        Xml.Tag parentTag = Xml.Tag.build("<parent>\n" +
+                        Xml.Tag parentTag = Xml.Tag.build(
+                                "<parent>\n" +
                                 "<groupId>" + groupId + "</groupId>\n" +
                                 "<artifactId>" + artifactId + "</artifactId>\n" +
                                 "<version>" + targetVersion.get() + "</version>\n" +
-                                (relativePath != null ?
-                                        StringUtils.isBlank(relativePath) ?
-                                                "<relativePath/>"
-                                                : "<relativePath>" + relativePath + "</relativePath>"
-                                        : ""
-                                ) +
+                                (relativePath == null ? "" : StringUtils.isBlank(relativePath) ?
+                                        "<relativePath/>" : "<relativePath>" + relativePath + "</relativePath>") +
                                 "</parent>");
-
 
                         document = (Xml.Document) new AddToTagVisitor<>(root, parentTag, new MavenTagInsertionComparator(root.getChildren()))
                                 .visitNonNull(document, ctx, getCursor().getParentOrThrow());
 
+                        maybeUpdateModel();
                         doAfterVisit(new RemoveRedundantDependencyVersions(null, null,
                                 RemoveRedundantDependencyVersions.Comparator.GTE, null).getVisitor());
 
                     }
-                } catch(MavenDownloadingException e) {
+                } catch (MavenDownloadingException e) {
                     for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
                         MavenRepository repository = repositoryResponse.getKey();
                         metadataFailures.insertRow(ctx, new MavenMetadataFailures.Row(groupId, artifactId, version,
@@ -156,7 +155,6 @@ public class AddParentPom extends Recipe {
 
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    //noinspection EqualsWithItself
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                             .filter(v -> versionComparator.isValid(null, v))
                             .collect(Collectors.toList());
