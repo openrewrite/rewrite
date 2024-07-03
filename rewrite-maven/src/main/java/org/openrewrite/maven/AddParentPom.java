@@ -31,6 +31,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -70,7 +71,7 @@ public class AddParentPom extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change Maven parent";
+        return "Add Maven parent";
     }
 
     @Override
@@ -80,7 +81,7 @@ public class AddParentPom extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add a parent pom to a Maven pom.xml. Doesn't add in case of a parent already present.";
+        return "Add a parent pom to a Maven pom.xml. Does nothing if a parent pom is already present.";
     }
 
     @Override
@@ -95,9 +96,6 @@ public class AddParentPom extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        VersionComparator versionComparator = Semver.validate(version, versionPattern).getValue();
-        assert versionComparator != null;
-
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
@@ -120,7 +118,6 @@ public class AddParentPom extends Recipe {
                 try {
                     Optional<String> targetVersion = findAcceptableVersion(groupId, artifactId, ctx);
                     if (targetVersion.isPresent()) {
-
                         Xml.Tag parentTag = Xml.Tag.build(
                                 "<parent>\n" +
                                 "<groupId>" + groupId + "</groupId>\n" +
@@ -136,7 +133,6 @@ public class AddParentPom extends Recipe {
                         maybeUpdateModel();
                         doAfterVisit(new RemoveRedundantDependencyVersions(null, null,
                                 RemoveRedundantDependencyVersions.Comparator.GTE, null).getVisitor());
-
                     }
                 } catch (MavenDownloadingException e) {
                     for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
@@ -150,9 +146,10 @@ public class AddParentPom extends Recipe {
                 return super.visitDocument(document, ctx);
             }
 
+            private final VersionComparator versionComparator = Objects.requireNonNull(Semver.validate(version, versionPattern).getValue());
+
             private Optional<String> findAcceptableVersion(String groupId, String artifactId, ExecutionContext ctx)
                     throws MavenDownloadingException {
-
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
