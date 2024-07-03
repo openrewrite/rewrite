@@ -15,7 +15,6 @@
  */
 package org.openrewrite.yaml;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -326,7 +325,100 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
+    void insertInSequenceEntriesWithWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.*.containers",
+            "imagePullPolicy: Always",
+            true,
+            null
+          )),
+          yaml(
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>
+              """,
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>
+                    imagePullPolicy: Always
+              """
+          )
+        );
+    }
+
+    @Test
+    void noInsertInSequenceEntriesWithWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.*.unknown",
+            "imagePullPolicy: Always",
+            true,
+            null
+          )),
+          yaml(
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertInSequenceEntriesWithDeepSearch() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$..containers",
+            "imagePullPolicy: Always",
+            true,
+            null
+          )),
+          yaml(
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>
+              """,
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>
+                    imagePullPolicy: Always
+              """
+          )
+        );
+    }
+
+    @Test
+    void noInsertInSequenceEntriesWithDeepSearch() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$..unknown",
+            "imagePullPolicy: Always",
+            true,
+            null
+          )),
+          yaml(
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>
+              """
+          )
+        );
+    }
+
+    @Test
     void insertInSequenceEntriesMatchingPredicate() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
@@ -350,6 +442,28 @@ class MergeYamlTest implements RewriteTest {
                 containers:
                   - name: pod-0
                     imagePullPolicy: Always
+                  - name: pod-1
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeInSequenceEntriesNotMatchingPredicate() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.spec.containers[?(@.name == 'pod-x')]",
+            //language=yaml
+            "imagePullPolicy: Always",
+            true,
+            null
+          )),
+          yaml(
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: pod-0
                   - name: pod-1
               """
           )

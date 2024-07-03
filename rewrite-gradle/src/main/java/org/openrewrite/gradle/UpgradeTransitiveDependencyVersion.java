@@ -46,6 +46,7 @@ import org.openrewrite.semver.Semver;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
@@ -139,7 +140,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 gradleProject = cu.getMarkers().findFirst(GradleProject.class)
                         .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
 
-                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new HashMap<>();
+                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new LinkedHashMap<>();
 
                 DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
                 for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
@@ -162,7 +163,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                                         new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId()),
                                         singletonMap(constraintConfig, selected),
                                         (existing, update) -> {
-                                            Map<GradleDependencyConfiguration, String> all = new HashMap<>(existing);
+                                            Map<GradleDependencyConfiguration, String> all = new LinkedHashMap<>(existing);
                                             all.putAll(update);
                                             all.keySet().removeIf(c -> {
                                                 if (c == null) {
@@ -210,9 +211,41 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                                     update.getKey().getArtifactId(), config.getValue()), because).visitNonNull(cu, ctx);
                         }
                     }
+
+                    // Update dependency model so chained recipes will have correct information on what dependencies are present
+                    cu = cu.withMarkers(cu.getMarkers()
+                            .removeByType(GradleProject.class)
+                            .add(updatedModel(gradleProject, toUpdate, ctx)));
+
+                    // Spring dependency management plugin stomps on constraints. Use an alternative mechanism it does not override
+                    if (gradleProject.getPlugins().stream()
+                            .anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
+                        cu = (G.CompilationUnit) new DependencyConstraintToRule().getVisitor().visitNonNull(cu, ctx);
+                    }
                 }
 
                 return cu;
+            }
+
+            private GradleProject updatedModel(GradleProject gradleProject, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate, ExecutionContext ctx) {
+                GradleProject gp = gradleProject;
+                Set<String> configNames = gp.getConfigurations().stream()
+                        .map(GradleDependencyConfiguration::getName)
+                        .collect(Collectors.toSet());
+                Set<GroupArtifactVersion> gavs = new LinkedHashSet<>();
+                for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
+                    Map<GradleDependencyConfiguration, String> configs = update.getValue();
+                    String groupId = update.getKey().getGroupId();
+                    String artifactId = update.getKey().getArtifactId();
+                    for (Map.Entry<GradleDependencyConfiguration, String> configToVersion : configs.entrySet()) {
+                        String newVersion = configToVersion.getValue();
+                        gavs.add(new GroupArtifactVersion(groupId, artifactId, newVersion));
+                    }
+                }
+                for (GroupArtifactVersion gav : gavs) {
+                    gp = UpgradeDependencyVersion.replaceVersion(gp, ctx, gav, configNames);
+                }
+                return gp;
             }
 
             /*
