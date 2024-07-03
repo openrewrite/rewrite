@@ -66,16 +66,6 @@ public class AddParentPom extends Recipe {
     @Nullable
     String versionPattern;
 
-    @Option(displayName = "File pattern",
-            description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
-                          "Multiple patterns may be specified, separated by a semicolon `;`. " +
-                          "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
-                          "When not set, all source files are searched. ",
-            required = false,
-            example = "**/*-parent/grpc-*/pom.xml")
-    @Nullable
-    String filePattern;
-
     @Override
     public String getDisplayName() {
         return "Change Maven parent";
@@ -110,8 +100,7 @@ public class AddParentPom extends Recipe {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Tag root = document.getRoot();
-                if (!root.getChild("parent").isPresent() &&
-                    (filePattern == null || PathUtils.matchesGlob(document.getSourcePath(), filePattern))) {
+                if (!root.getChild("parent").isPresent()) {
                     return SearchResult.found(document);
                 }
                 return document;

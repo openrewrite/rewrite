@@ -34,7 +34,6 @@ class AddParentPomTest implements RewriteTest {
             "spring-boot-starter-parent",
             "1.5.12.RELEASE",
             null,
-            null,
             null
           )),
           pomXml(
@@ -74,7 +73,6 @@ class AddParentPomTest implements RewriteTest {
             "spring-boot-starter-parent",
             "1.5.99.RELEASE",
             null,
-            null,
             null
           )),
           pomXml(
@@ -100,7 +98,6 @@ class AddParentPomTest implements RewriteTest {
             "spring-boot-starter-parent",
             "~1.9",
             null,
-            null,
             null
           )),
           pomXml(
@@ -125,7 +122,6 @@ class AddParentPomTest implements RewriteTest {
             "spring-boot-starter-parent",
             "1.5.12.RELEASE",
             "../../pom.xml",
-            null,
             null
           )),
           pomXml(
@@ -165,7 +161,6 @@ class AddParentPomTest implements RewriteTest {
             "spring-boot-starter-parent",
             "1.5.12.RELEASE",
             "",
-            null,
             null
           )),
           pomXml(
@@ -199,7 +194,7 @@ class AddParentPomTest implements RewriteTest {
 
     @Test
     void multiModuleRelativePath() {
-        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "1.5.12.RELEASE", "", null, null);
+        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "1.5.12.RELEASE", "", null);
         rewriteRun(
           spec -> spec.recipe(recipe),
           mavenProject("parent",
@@ -276,7 +271,7 @@ class AddParentPomTest implements RewriteTest {
 
     @Test
     void multiModuleRelativePathChangeChildrens() {
-        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "1.5.12.RELEASE", null, null, null);
+        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "1.5.12.RELEASE", null, null);
         rewriteRun(
           spec -> spec.recipe(recipe),
           mavenProject("parent",
@@ -358,7 +353,6 @@ class AddParentPomTest implements RewriteTest {
             "spring-boot-starter-parent",
             "~1.5",
             null,
-            null,
             null
           )),
           pomXml(
@@ -397,7 +391,6 @@ class AddParentPomTest implements RewriteTest {
             "junit-bom",
             "5.9.1",
             "",
-            null,
             null
           )),
           pomXml(
@@ -452,7 +445,6 @@ class AddParentPomTest implements RewriteTest {
             "junit-bom",
             "5.9.1",
             "",
-            null,
             null
           )),
           pomXml(
@@ -502,7 +494,7 @@ class AddParentPomTest implements RewriteTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1753")
     void multiModule() {
-        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.6.7", null, null, null);
+        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.6.7", null, null);
         rewriteRun(
           spec -> spec.recipe(recipe),
           mavenProject("parent",
@@ -579,7 +571,7 @@ class AddParentPomTest implements RewriteTest {
     @Test
     void shouldNotAddToDependencyManagement() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom("org.jenkins-ci.plugins", "plugin", "4.81", "", null, null)),
+          spec -> spec.recipe(new AddParentPom("org.jenkins-ci.plugins", "plugin", "4.81", "", null)),
           // language=xml
           pomXml(
             """
@@ -669,54 +661,5 @@ class AddParentPomTest implements RewriteTest {
               </project>
               """
           ));
-    }
-
-    @Test
-    void addParentPomWithMatchingFilePattern() {
-        rewriteRun(
-          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, "dir/pom.xml")),
-          pomXml(
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """,
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.7.18</version>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """,
-            spec -> spec.path("dir/pom.xml")
-          )
-        );
-    }
-
-    @Test
-    void addParentPomWithNonMatchingFilePattern() {
-        rewriteRun(
-          spec -> spec.recipe(new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.7.18", null, null, "dir/pom.xml")),
-          pomXml(
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """,
-            spec -> spec.path("pom.xml")
-          )
-        );
     }
 }
