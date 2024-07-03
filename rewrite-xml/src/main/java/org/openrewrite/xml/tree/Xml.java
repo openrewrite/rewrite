@@ -311,7 +311,7 @@ public interface Xml extends Tree {
     @SuppressWarnings("unused")
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    class Tag implements Xml, Content {
+    class Tag implements Xml, Content, Namespaced {
         @EqualsAndHashCode.Include
         @With
         UUID id;
@@ -345,6 +345,7 @@ public interface Xml extends Tree {
          * @param cursor     the cursor to search from
          * @return a map containing all namespaces defined in the current scope, including all parent scopes.
          */
+        @Override
         public Map<String, String> getAllNamespaces(Cursor cursor) {
             Map<String, String> namespaces = getNamespaces();
             while (cursor != null) {
@@ -615,6 +616,7 @@ public interface Xml extends Tree {
         /**
          * @return The local name for this tag, without any namespace prefix.
          */
+        @Override
         public String getLocalName() {
             return extractLocalName(name);
         }
@@ -622,6 +624,7 @@ public interface Xml extends Tree {
         /**
          * @return The namespace prefix for this tag, if any.
          */
+        @Override
         public Optional<String> getNamespacePrefix() {
             String extractedNamespacePrefix = extractNamespacePrefix(name);
             return Optional.ofNullable(StringUtils.isNotEmpty(extractedNamespacePrefix) ? extractedNamespacePrefix : null);
@@ -630,6 +633,7 @@ public interface Xml extends Tree {
         /**
          * @return The namespace URI for this tag, if any.
          */
+        @Override
         public Optional<String> getNamespaceUri(Cursor cursor) {
             Optional<String> maybeNamespacePrefix = getNamespacePrefix();
             return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(getAllNamespaces(cursor).get(s)));
@@ -688,7 +692,7 @@ public interface Xml extends Tree {
     @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class Attribute implements Xml {
+    class Attribute implements Xml, Namespaced {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -753,6 +757,62 @@ public interface Xml extends Tree {
 
         public String getValueAsString() {
             return value.getValue();
+        }
+
+        @Override
+        public String getName() {
+            return key.getName();
+        }
+
+        /**
+         * @return The local name for this attribute, without any namespace prefix.
+         */
+        @Override
+        public String getLocalName() {
+            return extractLocalName(getKeyAsString());
+        }
+
+        /**
+         * @return The namespace prefix for this attribute, if any.
+         */
+        @Override
+        public Optional<String> getNamespacePrefix() {
+            String extractedNamespacePrefix = extractNamespacePrefix(getKeyAsString());
+            return Optional.ofNullable(StringUtils.isNotEmpty(extractedNamespacePrefix) ? extractedNamespacePrefix : null);
+        }
+
+        /**
+         * @return The namespace URI for this attribute, if any.
+         */
+        @Override
+        public Optional<String> getNamespaceUri(Cursor cursor) {
+            Optional<String> maybeNamespacePrefix = getNamespacePrefix();
+            return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(getAllNamespaces(cursor).get(s)));
+        }
+
+        /**
+         * Gets a map containing all namespaces defined in the current scope, including all parent scopes.
+         *
+         * @param cursor     the cursor to search from
+         * @return a map containing all namespaces defined in the current scope, including all parent scopes.
+         */
+        @Override
+        public Map<String, String> getAllNamespaces(Cursor cursor) {
+            Map<String, String> namespaces = new HashMap<>();
+            while (cursor != null) {
+                Xml.Tag enclosing = cursor.firstEnclosing(Xml.Tag.class);
+                if (enclosing != null) {
+                    for (Map.Entry<String, String> ns : enclosing.getNamespaces().entrySet()) {
+                        if (namespaces.containsValue(ns.getKey())) {
+                            throw new IllegalStateException(java.lang.String.format("Cannot have two namespaces with the same prefix (%s): '%s' and '%s'", ns.getKey(), namespaces.get(ns.getKey()), ns.getValue()));
+                        }
+                        namespaces.put(ns.getKey(), ns.getValue());
+                    }
+                }
+                cursor = cursor.getParent();
+            }
+
+            return namespaces;
         }
 
         @Override

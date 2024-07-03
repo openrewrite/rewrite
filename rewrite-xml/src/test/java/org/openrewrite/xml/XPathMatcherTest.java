@@ -105,6 +105,9 @@ class XPathMatcherTest {
                                   http://www.example.com/namespace3 http://www.example.com/namespace3.xsd">
           <element1 ns3:attribute1="content3">content1</element1>
           <ns2:element2>content2</ns2:element2>
+          <parent>
+              <element3 ns3:attr='test'>content3</element3>
+          </parent>
         </root>
         """
     ).toList().get(0);
@@ -132,6 +135,8 @@ class XPathMatcherTest {
         assertThat(match("//dependency", xmlDoc)).isTrue();
         assertThat(match("dependency/*", xmlDoc)).isTrue();
         assertThat(match("dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dependency", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency/groupId", xmlDoc)).isTrue();
     }
 
     @Test
@@ -157,6 +162,8 @@ class XPathMatcherTest {
           pomXml1)).isTrue();
         assertThat(match("/project/build//plugins/plugin/configuration/source",
           pomXml2)).isTrue();
+//        assertThat(match("/project/build//plugin/configuration/source", pomXml2)).isTrue(); // TODO: seems parser only handles // up to 1 level
+//        assertThat(match("/project//configuration/source", pomXml2)).isTrue(); // TODO: was already failing previously
     }
 
     private final SourceFile attributeXml = new XmlParser().parse(
@@ -250,7 +257,7 @@ class XPathMatcherTest {
     }
 
     @Test
-    void testMatchLocalName() {
+    void matchLocalNameFunctionCondition() {
         assertThat(match("/*[local-name()='root']", namespacedXml)).isTrue();
         assertThat(match("/*[local-name()='element1']", namespacedXml)).isFalse();
         assertThat(match("/*[local-name()='element2']", namespacedXml)).isFalse();
@@ -263,6 +270,62 @@ class XPathMatcherTest {
         assertThat(match("//element2[local-name()='element2']", namespacedXml)).isFalse();
         assertThat(match("//ns2:element2[local-name()='element2']", namespacedXml)).isTrue();
         assertThat(match("//dne[local-name()='dne']", namespacedXml)).isFalse();
+
+        // TODO: fix mid-path // with condition
+//        assertThat(match("/root//element1[local-name()='element1']", namespacedXml)).isTrue();
+    }
+
+    @Test
+    void matchNamespaceUriFunctionCondition() {
+        assertThat(match("/root/*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
+        assertThat(match("/*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
+        assertThat(match("//*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
+        assertThat(match("//ns2:element2[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
+        assertThat(match("//element2[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
+    }
+
+    @Test
+    void matchAttributeCondition() {
+        assertThat(match("//*[@*='content3']", namespacedXml)).isTrue();
+        assertThat(match("//*[@*='content2']", namespacedXml)).isFalse();
+        assertThat(match("//*[@ns3:attribute1='content3']", namespacedXml)).isTrue();
+        assertThat(match("//*[@attribute1='content3']", namespacedXml)).isFalse();
+        assertThat(match("//element1[@ns3:attribute1='content3']", namespacedXml)).isTrue();
+        assertThat(match("//element1[@attribute1='content3']", namespacedXml)).isFalse();
+        assertThat(match("//element1[@*='content3']", namespacedXml)).isTrue();
+        assertThat(match("//element1[@*='dne']", namespacedXml)).isFalse();
+        assertThat(match("/root/element1[@*='content3']", namespacedXml)).isTrue();
+        assertThat(match("/root/element1[@*='dne']", namespacedXml)).isFalse();
+        // TODO: fix mid-path // match with condition
+//        assertThat(match("/root//element1[@*='content3']", namespacedXml)).isTrue();
+//        assertThat(match("/root//element1[@*='dne']", namespacedXml)).isFalse();
+    }
+
+    @Test
+    void matchAttributeElement() {
+        assertThat(match("//@ns3:attribute1", namespacedXml)).isTrue();
+        assertThat(match("//@attribute1", namespacedXml)).isFalse();
+        assertThat(match("//@*", namespacedXml)).isTrue();
+        assertThat(match("//@*[local-name()='attribute1']", namespacedXml)).isTrue();
+        assertThat(match("//@*[local-name()='attribute2']", namespacedXml)).isFalse();
+        assertThat(match("//@*[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
+        assertThat(match("//@*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
+
+        assertThat(match("//element1/@*", namespacedXml)).isTrue();
+        assertThat(match("/root/element1/@*", namespacedXml)).isTrue();
+        assertThat(match("//element1/@*[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
+        assertThat(match("//element1/@*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
+        assertThat(match("//ns2:element2/@*", namespacedXml)).isFalse();
+        assertThat(match("/root/ns2:element2/@*", namespacedXml)).isFalse();
+
+        assertThat(match("/root/parent/element3/@attr", namespacedXml)).isFalse();
+        assertThat(match("/root/parent/element3/@ns3:attr", namespacedXml)).isTrue();
+        assertThat(match("/root/parent/element3/@ns3:attr[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
+        assertThat(match("//element3/@ns3:attr[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
+
+        // TODO: fix mid-path // match with attribute element
+//        assertThat(match("/root//element1/@*", namespacedXml)).isTrue();
+//        assertThat(match("/root//element1/@*[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
     }
 
     private boolean match(String xpath, SourceFile x) {

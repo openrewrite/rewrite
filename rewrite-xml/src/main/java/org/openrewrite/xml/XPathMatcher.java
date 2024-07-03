@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.search.FindTags;
+import org.openrewrite.xml.tree.Namespaced;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -36,8 +37,9 @@ import java.util.regex.Pattern;
  */
 public class XPathMatcher {
 
+    private static final Pattern XPATH_ELEMENT_SPLITTER = Pattern.compile("((?<=/)(?=/)|[^/\\[]|\\[[^]]*\\])+");
     // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']` or foo[@bar='baz']
-    private static final Pattern PATTERN = Pattern.compile("([-\\w]+|\\*)\\[((local-name|namespace-uri)\\(\\)|(@)?([-\\w]+|\\*))='([-\\w.]+)']");
+    private static final Pattern PATTERN = Pattern.compile("(@)?([-:\\w]+|\\*)\\[((local-name|namespace-uri)\\(\\)|(@)?([-\\w]+|\\*))='(.*)']");
 
     private final String expression;
     private final boolean startsWithSlash;
@@ -48,7 +50,16 @@ public class XPathMatcher {
         this.expression = expression;
         startsWithSlash = expression.startsWith("/");
         startsWithDoubleSlash = expression.startsWith("//");
-        parts = expression.substring(startsWithDoubleSlash ? 2 : startsWithSlash ? 1 : 0).split("/");
+        parts = splitOnXPathSeparator(expression.substring(startsWithDoubleSlash ? 2 : startsWithSlash ? 1 : 0));
+    }
+
+    private String[] splitOnXPathSeparator(String input) {
+        List<String> matches = new ArrayList<>();
+        Matcher m = XPATH_ELEMENT_SPLITTER.matcher(input);
+        while (m.find()) {
+            matches.add(m.group());
+        }
+        return matches.toArray(new String[0]);
     }
 
     /**
@@ -78,13 +89,17 @@ public class XPathMatcher {
                     if (index < 0) {
                         return false;
                     }
-                    //if is Attribute
-                    if (part.charAt(index + 1) == '@') {
+                    if (part.startsWith("@")) { // is attribute selector
                         partWithCondition = part;
-                        tagForCondition = path.get(i);
-                    } else if (part.contains("(") && part.contains(")")) { //if is function
-                        partWithCondition = part;
-                        tagForCondition = path.get(i);
+                        tagForCondition = i > 0 ? path.get(i - 1) : path.get(i);
+                    } else { // is element selector
+                        if (part.charAt(index + 1) == '@') { // is Attribute condition
+                            partWithCondition = part;
+                            tagForCondition = path.get(i);
+                        } else if (part.contains("(") && part.contains(")")) { // is function condition
+                            partWithCondition = part;
+                            tagForCondition = path.get(i);
+                        }
                     }
                 } else if (i < path.size() && i > 0 && parts[i - 1].endsWith("]")) {
                     String partBefore = parts[i - 1];
@@ -102,24 +117,30 @@ public class XPathMatcher {
                 }
 
                 String partName;
+                boolean matchedCondition = false;
 
                 Matcher matcher;
                 if (tagForCondition != null && partWithCondition.endsWith("]") && (matcher = PATTERN.matcher(
                         partWithCondition)).matches()) {
-                    String optionalPartName = matchesCondition(matcher, tagForCondition, cursor);
+                    String optionalPartName = matchesElementWithConditionFunction(matcher, tagForCondition, cursor);
                     if (optionalPartName == null) {
                         return false;
                     }
                     partName = optionalPartName;
+                    matchedCondition = true;
                 } else {
                     partName = null;
                 }
 
                 if (part.startsWith("@")) {
-                    if (!(cursor.getValue() instanceof Xml.Attribute &&
-                            (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
-                            "*".equals(part.substring(1)))) {
-                        return false;
+                    if (!matchedCondition) {
+                        if (!(cursor.getValue() instanceof Xml.Attribute)) {
+                            return false;
+                        }
+                        Xml.Attribute attribute = cursor.getValue();
+                        if (!attribute.getKeyAsString().equals(part.substring(1)) && !"*".equals(part.substring(1))) {
+                            return false;
+                        }
                     }
 
                     pathIndex--;
@@ -145,7 +166,7 @@ public class XPathMatcher {
             Collections.reverse(path);
 
             // Deal with the two forward slashes in the expression; works, but I'm not proud of it.
-            if (expression.contains("//") && Arrays.stream(parts).anyMatch(StringUtils::isBlank)) {
+            if (expression.contains("//") && !expression.contains("://") && Arrays.stream(parts).anyMatch(StringUtils::isBlank)) {
                 int blankPartIndex = Arrays.asList(parts).indexOf("");
                 int doubleSlashIndex = expression.indexOf("//");
 
@@ -176,24 +197,30 @@ public class XPathMatcher {
             for (int i = 0; i < parts.length; i++) {
                 String part = parts[i];
 
-                Xml.Tag tag = i < path.size() ? path.get(i) : null;
+                int isAttr = part.startsWith("@") ? 1 : 0;
+                Xml.Tag tag = i - isAttr < path.size() ? path.get(i - isAttr) : null;
                 String partName;
+                boolean matchedCondition = false;
 
                 Matcher matcher;
                 if (tag != null && part.endsWith("]") && (matcher = PATTERN.matcher(part)).matches()) {
-                    String optionalPartName = matchesCondition(matcher, tag, cursor);
+                    String optionalPartName = matchesElementWithConditionFunction(matcher, tag, cursor);
                     if (optionalPartName == null) {
                         return false;
                     }
                     partName = optionalPartName;
+                    matchedCondition = true;
                 } else {
                     partName = part;
                 }
 
                 if (part.startsWith("@")) {
+                    if (matchedCondition) {
+                        return true;
+                    }
                     return cursor.getValue() instanceof Xml.Attribute &&
-                            (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
-                                    "*".equals(part.substring(1)));
+                           (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
+                            "*".equals(part.substring(1)));
                 }
 
                 if (path.size() < i + 1 || (tag != null && !tag.getName().equals(partName) && !partName.equals("*") && !"*".equals(part))) {
@@ -206,32 +233,32 @@ public class XPathMatcher {
     }
 
     @Nullable
-    private String matchesCondition(Matcher matcher, Xml.Tag tag, Cursor cursor) {
-        String name = matcher.group(1);
-        boolean isAttribute = matcher.group(4) != null; // either group4 != null, or group 2 startsWith @
-        String selector = isAttribute ? matcher.group(5) : matcher.group(2);
-        boolean isFunction = selector.endsWith("()");
-        String value = matcher.group(6);
+    private String matchesElementWithConditionFunction(Matcher matcher, Xml.Tag tag, Cursor cursor) {
+        boolean isAttributeElement = matcher.group(1) != null;
+        String element = matcher.group(2);
+        boolean isAttributeCondition = matcher.group(5) != null; // either group4 != null, or group 2 startsWith @
+        String selector = isAttributeCondition ? matcher.group(6) : matcher.group(3);
+        boolean isFunctionCondition = selector.endsWith("()");
+        String value = matcher.group(7);
 
         boolean matchCondition = false;
-        if (isAttribute) {
+        if (isAttributeCondition) {
             for (Xml.Attribute a : tag.getAttributes()) {
                 if ((a.getKeyAsString().equals(selector) || "*".equals(selector)) && a.getValueAsString().equals(value)) {
                     matchCondition = true;
                     break;
                 }
             }
-        } else if (isFunction) {
-            if (!name.equals("*") && !tag.getLocalName().equals(name)) {
-                matchCondition = false;
-            } else if (selector.equals("local-name()")) {
-                if (tag.getLocalName().equals(value)) {
-                    matchCondition = true;
+        } else if (isFunctionCondition) {
+            if (isAttributeElement) {
+                for (Xml.Attribute a : tag.getAttributes()) {
+                    if (matchesElementAndFunction(a, cursor, element, selector, value)) {
+                        matchCondition = true;
+                        break;
+                    }
                 }
-            } else if (selector.equals("namespace-uri()")) {
-                if (tag.getNamespaceUri(cursor).get().equals(value)) {
-                    matchCondition = true;
-                }
+            } else {
+                matchCondition = matchesElementAndFunction(tag, cursor, element, selector, value);
             }
         } else { // other [] conditions
             for (Xml.Tag t : FindTags.find(tag, selector)) {
@@ -242,6 +269,18 @@ public class XPathMatcher {
             }
         }
 
-        return matchCondition ? name : null;
+        return matchCondition ? element : null;
+    }
+
+    private static boolean matchesElementAndFunction(Namespaced tagOrAttribute, Cursor cursor, String element, String selector, String value) {
+        if (!element.equals("*") && !tagOrAttribute.getName().equals(element)) {
+            return false;
+        } else if (selector.equals("local-name()")) {
+            return tagOrAttribute.getLocalName().equals(value);
+        } else if (selector.equals("namespace-uri()")) {
+            Optional<String> nsUri = tagOrAttribute.getNamespaceUri(cursor);
+            return nsUri.isPresent() && nsUri.get().equals(value);
+        }
+        return false;
     }
 }
