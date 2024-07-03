@@ -65,6 +65,58 @@ class AddParentPomTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
+    @Test
+    void addParentWithNonExistingVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new AddParentPom(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "1.5.99.RELEASE",
+            null,
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @DocumentExample
+    @Test
+    void addParentWithNonExistingVersionWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new AddParentPom(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "~1.9",
+            null,
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void addParentWithRelativePath() {
         rewriteRun(
