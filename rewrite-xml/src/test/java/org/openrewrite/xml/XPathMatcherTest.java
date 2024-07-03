@@ -107,6 +107,7 @@ class XPathMatcherTest {
           <ns2:element2>content2</ns2:element2>
           <parent>
               <element3 ns3:attr='test'>content3</element3>
+              <ns2:element4 ns3:attr='test2'>content4</ns2:element4>
           </parent>
         </root>
         """
@@ -326,6 +327,27 @@ class XPathMatcherTest {
         // TODO: fix mid-path // match with attribute element
 //        assertThat(match("/root//element1/@*", namespacedXml)).isTrue();
 //        assertThat(match("/root//element1/@*[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
+    }
+
+    @Test
+    void matchMultipleConditions() {
+        assertThat(match("//*[namespace-uri()='http://www.example.com/namespace2'][local-name()='element2']", namespacedXml)).isTrue();
+        assertThat(match("//*[local-name()='element2'][namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
+
+        assertThat(match("//*[namespace-uri()='http://www.example.com/namespace2'][local-name()='dne']", namespacedXml)).isFalse();
+        assertThat(match("//*[local-name()='dne'][namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
+
+        assertThat(match("//*[local-name()='element1'][@ns3:attribute1='content3']", namespacedXml)).isTrue();
+        assertThat(match("//@*[namespace-uri()='http://www.example.com/namespace3'][local-name()='attribute1']", namespacedXml)).isTrue();
+        assertThat(match("//@*[namespace-uri()='http://www.example.com/namespace3'][local-name()='dne']", namespacedXml)).isFalse();
+
+        assertThat(match("//*[@ns3:attr='test'][local-name()='element3']", namespacedXml)).isTrue();
+        assertThat(match("//*[@ns3:attr='test'][local-name()='elementX']", namespacedXml)).isFalse();
+
+        assertThat(match("//*[@ns3:attr='test2'][local-name()='element4'][namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
+        assertThat(match("//*[@ns3:attr='testX'][local-name()='element4'][namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
+        assertThat(match("//*[@ns3:attr='test2'][local-name()='elementX'][namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
+        assertThat(match("//*[@ns3:attr='test2'][local-name()='element4'][namespace-uri()='http://www.example.com/namespaceX']", namespacedXml)).isFalse();
     }
 
     private boolean match(String xpath, SourceFile x) {
