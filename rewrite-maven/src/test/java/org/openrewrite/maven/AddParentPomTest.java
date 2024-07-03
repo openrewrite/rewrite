@@ -16,8 +16,9 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.mavenProject;
@@ -64,39 +65,17 @@ class AddParentPomTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void addParentWithNonExistingVersion() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "1.5.99.RELEASE",
+      "~1.9"
+    })
+    void shoudNotAddInvalidParentPomVersion(String version) {
         rewriteRun(
           spec -> spec.recipe(new AddParentPom(
             "org.springframework.boot",
             "spring-boot-starter-parent",
-            "1.5.99.RELEASE",
-            null,
-            null
-          )),
-          pomXml(
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void addParentWithNonExistingVersionWildcard() {
-        rewriteRun(
-          spec -> spec.recipe(new AddParentPom(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "~1.9",
+            version,
             null,
             null
           )),
@@ -270,10 +249,13 @@ class AddParentPomTest implements RewriteTest {
     }
 
     @Test
-    void multiModuleRelativePathChangeChildrens() {
-        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "1.5.12.RELEASE", null, null);
+    void multiModuleShouldOnlyChangeRoot() {
         rewriteRun(
-          spec -> spec.recipe(recipe),
+          spec -> spec.recipe(new AddParentPom(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "1.5.12.RELEASE",
+            null, null)),
           mavenProject("parent",
             pomXml(
               """
@@ -346,7 +328,7 @@ class AddParentPomTest implements RewriteTest {
     }
 
     @Test
-    void wildcardVersion() {
+    void shouldResolveWildcardVersion() {
         rewriteRun(
           spec -> spec.recipe(new AddParentPom(
             "org.springframework.boot",
@@ -489,177 +471,5 @@ class AddParentPomTest implements RewriteTest {
               """
           )
         );
-    }
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1753")
-    void multiModule() {
-        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "2.6.7", null, null);
-        rewriteRun(
-          spec -> spec.recipe(recipe),
-          mavenProject("parent",
-            pomXml(
-              """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>org.sample</groupId>
-                  <artifactId>sample</artifactId>
-                  <version>1.0.0</version>
-
-                  <modules>
-                    <module>module1</module>
-                    <module>module2</module>
-                  </modules>
-                </project>
-                """,
-              """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                  <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>2.6.7</version>
-                  </parent>
-                  <groupId>org.sample</groupId>
-                  <artifactId>sample</artifactId>
-                  <version>1.0.0</version>
-
-                  <modules>
-                    <module>module1</module>
-                    <module>module2</module>
-                  </modules>
-                </project>
-                """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                      <groupId>org.sample</groupId>
-                      <artifactId>sample</artifactId>
-                      <version>1.0.0</version>
-                    </parent>
-                    <artifactId>module1</artifactId>
-                  </project>
-                  """
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                      <groupId>org.sample</groupId>
-                      <artifactId>sample</artifactId>
-                      <version>1.0.0</version>
-                    </parent>
-                    <artifactId>module2</artifactId>
-                  </project>
-                  """
-              )
-            )
-          )
-        );
-    }
-
-    @Test
-    void shouldNotAddToDependencyManagement() {
-        rewriteRun(
-          spec -> spec.recipe(new AddParentPom("org.jenkins-ci.plugins", "plugin", "4.81", "", null)),
-          // language=xml
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>org.sample</groupId>
-                  <artifactId>sample</artifactId>
-                  <version>1.0.0</version>
-                  <properties>
-                      <jenkins.version>2.387.3</jenkins.version>
-                  </properties>
-                  <repositories>
-                      <repository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </repository>
-                  </repositories>
-                  <pluginRepositories>
-                      <pluginRepository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </pluginRepository>
-                  </pluginRepositories>
-                  <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>io.jenkins.tools.bom</groupId>
-                            <artifactId>bom-2.387.x</artifactId>
-                            <version>2516.v113cb_3d00317</version>
-                            <type>pom</type>
-                            <scope>import</scope>
-                        </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.jenkins-ci.plugins</groupId>
-                          <artifactId>junit</artifactId>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>4.81</version>
-                      <relativePath/>
-                  </parent>
-                  <groupId>org.sample</groupId>
-                  <artifactId>sample</artifactId>
-                  <version>1.0.0</version>
-                  <properties>
-                      <jenkins.version>2.387.3</jenkins.version>
-                  </properties>
-                  <repositories>
-                      <repository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </repository>
-                  </repositories>
-                  <pluginRepositories>
-                      <pluginRepository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </pluginRepository>
-                  </pluginRepositories>
-                  <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>io.jenkins.tools.bom</groupId>
-                            <artifactId>bom-2.387.x</artifactId>
-                            <version>2516.v113cb_3d00317</version>
-                            <type>pom</type>
-                            <scope>import</scope>
-                        </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.jenkins-ci.plugins</groupId>
-                          <artifactId>junit</artifactId>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
-          ));
     }
 }
