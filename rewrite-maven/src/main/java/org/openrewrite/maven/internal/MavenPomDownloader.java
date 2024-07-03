@@ -267,11 +267,17 @@ public class MavenPomDownloader {
                         // A maven repository can be expressed as a URI with a file scheme
                         Path path = Paths.get(URI.create(uri));
                         if (Files.exists(path)) {
-                            result = Optional.of(MavenMetadata.parse(Files.readAllBytes(path)));
+                            MavenMetadata parsed = MavenMetadata.parse(Files.readAllBytes(path));
+                            if (parsed != null) {
+                                result = Optional.of(parsed);
+                            }
                         }
                     } else {
                         byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri);
-                        result = Optional.of(MavenMetadata.parse(responseBody));
+                        MavenMetadata parsed = MavenMetadata.parse(responseBody);
+                        if (parsed != null) {
+                            result = Optional.of(parsed);
+                        }
                     }
                 } catch (HttpSenderResponseException e) {
                     repositoryResponses.put(repo, e.getMessage());
