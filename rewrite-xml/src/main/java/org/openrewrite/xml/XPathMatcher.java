@@ -37,6 +37,7 @@ import java.util.regex.Pattern;
  */
 public class XPathMatcher {
 
+    private static final Pattern XPATH_ELEMENT_SPLITTER = Pattern.compile("((?<=/)(?=/)|[^/\\[]|\\[[^]]*\\])+");
     // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']` or foo[@bar='baz']
     private static final Pattern PATTERN = Pattern.compile("(@)?([-:\\w]+|\\*)\\[((local-name|namespace-uri)\\(\\)|(@)?([-\\w]+|\\*))='(.*)']");
 
@@ -54,8 +55,7 @@ public class XPathMatcher {
 
     private String[] splitOnXPathSeparator(String input) {
         List<String> matches = new ArrayList<>();
-        Pattern p = Pattern.compile("((?<=/)(?=/)|[^/\\[]|\\[[^]]*\\])+");
-        Matcher m = p.matcher(input);
+        Matcher m = XPATH_ELEMENT_SPLITTER.matcher(input);
         while (m.find()) {
             matches.add(m.group());
         }
