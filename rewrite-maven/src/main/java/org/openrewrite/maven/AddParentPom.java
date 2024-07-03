@@ -78,7 +78,7 @@ public class AddParentPom extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change the parent pom of a Maven pom.xml. Identifies the parent pom to be changed by its groupId and artifactId.";
+        return "Add a parent pom to a Maven pom.xml. Doesn't add in case of a parent already present.";
     }
 
     @Override
