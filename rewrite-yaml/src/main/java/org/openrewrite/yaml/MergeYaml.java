@@ -51,6 +51,13 @@ public class MergeYaml extends Recipe {
     @Nullable
     String objectIdentifyingProperty;
 
+    @Option(displayName = "File pattern",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
+            example = ".github/workflows/*.yml")
+    @Nullable
+    String filePattern;
+
     @Override
     public Validated<Object> validate() {
         return super.validate()
@@ -87,7 +94,8 @@ public class MergeYaml extends Recipe {
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"))
                 .getDocuments().get(0).getBlock();
 
-        return new YamlIsoVisitor<ExecutionContext>() {
+
+        return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
                 if ("$".equals(key)) {
@@ -103,13 +111,14 @@ public class MergeYaml extends Recipe {
                         return d;
                     }
                     // If there is no space between the colon and the value it will not be interpreted as a mapping
-                    @Language("yml") String snippet;
+                    String snippet;
                     if (incoming instanceof Yaml.Mapping) {
                         snippet = valueKey + ":\n" + indent(yaml);
                     } else {
                         snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
                     }
                     // No matching element already exists, so it must be constructed
+                    //noinspection LanguageMismatch
                     return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), snippet,
                             Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(d.getBlock(),
                             ctx, getCursor()));
@@ -188,6 +197,6 @@ public class MergeYaml extends Recipe {
                 }
                 return super.visitSequence(sequence, ctx);
             }
-        };
+        });
     }
 }
