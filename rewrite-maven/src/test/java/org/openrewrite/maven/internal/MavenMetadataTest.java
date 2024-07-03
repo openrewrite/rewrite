@@ -17,6 +17,7 @@ package org.openrewrite.maven.internal;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.maven.tree.MavenMetadata;
 
 import java.io.IOException;
@@ -86,5 +87,12 @@ class MavenMetadataTest {
         assertThat(versioning.getSnapshotVersions().get(0).getExtension()).isNotNull();
         assertThat(versioning.getSnapshotVersions().get(0).getValue()).isNotNull();
         assertThat(versioning.getSnapshotVersions().get(0).getUpdated()).isNotNull();
+    }
+
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4285")
+    void deserializeMetadataWithEmptyVersions() throws IOException {
+        assertThat(MavenMetadata.parse("<?xml version=\"1.0\" encoding=\"UTF-8\"?><metadata/>\n".getBytes())).isNull();
     }
 }
