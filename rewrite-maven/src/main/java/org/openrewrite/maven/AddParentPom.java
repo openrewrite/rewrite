@@ -126,55 +126,40 @@ public class AddParentPom extends Recipe {
                 Xml.Tag root = document.getRoot();
                 assert !root.getChild("parent").isPresent();
 
-                document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<parent/>"), new MavenTagInsertionComparator(root.getChildren()))
-                        .visitNonNull(document, ctx, getCursor().getParentOrThrow());
+                try {
+                    Optional<String> targetVersion = findAcceptableVersion(groupId, artifactId, ctx);
+                    if (targetVersion.isPresent()) {
+
+                        Xml.Tag parentTag = Xml.Tag.build("<parent>\n" +
+                                "<groupId>" + groupId + "</groupId>\n" +
+                                "<artifactId>" + artifactId + "</artifactId>\n" +
+                                "<version>" + targetVersion.get() + "</version>\n" +
+                                (relativePath != null ?
+                                        StringUtils.isBlank(relativePath) ?
+                                                "<relativePath/>"
+                                                : "<relativePath>" + relativePath + "</relativePath>"
+                                        : ""
+                                ) +
+                                "</parent>");
+
+
+                        document = (Xml.Document) new AddToTagVisitor<>(root, parentTag, new MavenTagInsertionComparator(root.getChildren()))
+                                .visitNonNull(document, ctx, getCursor().getParentOrThrow());
+
+                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null,
+                                RemoveRedundantDependencyVersions.Comparator.GTE, null).getVisitor());
+
+                    }
+                } catch(MavenDownloadingException e) {
+                    for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
+                        MavenRepository repository = repositoryResponse.getKey();
+                        metadataFailures.insertRow(ctx, new MavenMetadataFailures.Row(groupId, artifactId, version,
+                                repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
+                    }
+                    return e.warn(document);
+                }
 
                 return super.visitDocument(document, ctx);
-            }
-
-            @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = super.visitTag(tag, ctx);
-
-                if (isParentTag()) {
-                    List<TreeVisitor<?, ExecutionContext>> addToTagVisitors = new ArrayList<>();
-
-                    addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<groupId>" + groupId + "</groupId>")));
-                    addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<artifactId>" + artifactId + "</artifactId>")));
-
-                    try {
-                        Optional<String> targetVersion = findAcceptableVersion(groupId, artifactId, ctx);
-                        // TODO What to do if not present?
-                        targetVersion.ifPresent((v) ->
-                                addToTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<version>" + v + "</version>")))
-                        );
-                    } catch (MavenDownloadingException e) {
-                        for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
-                            MavenRepository repository = repositoryResponse.getKey();
-                            metadataFailures.insertRow(ctx, new MavenMetadataFailures.Row(groupId, artifactId, version,
-                                    repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
-                        }
-                        return e.warn(tag);
-                    }
-
-                    if (relativePath != null) {
-                        final Xml.Tag relativePathTag;
-                        if (StringUtils.isBlank(relativePath)) {
-                            relativePathTag = Xml.Tag.build("<relativePath/>");
-                        } else {
-                            relativePathTag = Xml.Tag.build("<relativePath>" + relativePath + "</relativePath>");
-                        }
-                        addToTagVisitors.add(new AddToTagVisitor<>(t, relativePathTag));
-                    }
-
-                    for (TreeVisitor<?, ExecutionContext> visitor : addToTagVisitors) {
-                        doAfterVisit(visitor);
-                    }
-                    maybeUpdateModel();
-                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null,
-                            RemoveRedundantDependencyVersions.Comparator.GTE, null).getVisitor());
-                }
-                return t;
             }
 
             private Optional<String> findAcceptableVersion(String groupId, String artifactId, ExecutionContext ctx)
