@@ -687,7 +687,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
                 GradleDependencyConfiguration newGdc = gdc
                         .withRequested(ListUtils.map(gdc.getRequested(), requested -> maybeUpdateDependency(requested, newRequested)))
-                        .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeUpdateResolvedDependency(resolved, newDep)));
+                        .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeUpdateResolvedDependency(resolved, newDep, new HashSet<>())));
                 anyChanged |= newGdc != gdc;
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
             }
@@ -711,10 +711,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     private static ResolvedDependency maybeUpdateResolvedDependency(
             ResolvedDependency dep,
-            ResolvedDependency newDep) {
+            ResolvedDependency newDep,
+            Set<ResolvedDependency> history) {
         if(Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
             return newDep;
         }
-        return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep)));
+        if (history.add(dep)) {
+            return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep, history)));
+        }
+        return dep;
+
     }
 }
