@@ -720,6 +720,5 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep, history)));
         }
         return dep;
-
     }
 }
