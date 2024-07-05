@@ -42,6 +42,9 @@ public class XmlParser implements Parser {
             try (EncodingDetectingInputStream is = input.getSource(ctx)) {
                 String sourceStr = is.readFully();
 
+                // Preprocess JSP-specific syntax
+                sourceStr = preprocessJspSyntax(sourceStr);
+
                 XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
                         CharStreams.fromString(sourceStr))));
 
@@ -62,6 +65,11 @@ public class XmlParser implements Parser {
                 return ParseError.build(this, input, relativeTo, ctx, t);
             }
         });
+    }
+
+    private String preprocessJspSyntax(String source) {
+        // Replace JSP comments with XML comments to avoid parser errors
+        return source.replaceAll("<%--(.*?)--%>", "<!--$1-->");
     }
 
     @Override
