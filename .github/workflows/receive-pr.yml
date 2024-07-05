@@ -75,15 +75,10 @@ jobs:
           - org.openrewrite.java.ChangeType:
               oldFullyQualifiedTypeName: org.jetbrains.annotations.Nullable
               newFullyQualifiedTypeName: org.openrewrite.internal.lang.Nullable
+          - org.openrewrite.java.ChangeType:
+              oldFullyQualifiedTypeName: jakarta.annotation.Nullable
+              newFullyQualifiedTypeName: org.openrewrite.internal.lang.Nullable
           - org.openrewrite.java.RemoveAnnotation:
               annotationPattern: '@org.jetbrains.annotations.NotNull'
-              - org.openrewrite.java.ChangeType:
-                  oldFullyQualifiedTypeName: org.jetbrains.annotations.Nullable
-                  newFullyQualifiedTypeName: org.openrewrite.internal.lang.Nullable
-              - org.openrewrite.java.ChangeType:
-                  oldFullyQualifiedTypeName: jakarta.annotation.Nullable
-                  newFullyQualifiedTypeName: org.openrewrite.internal.lang.Nullable
-              - org.openrewrite.java.RemoveAnnotation:
-                  annotationPattern: '@org.jetbrains.annotations.NotNull'
-              - org.openrewrite.java.RemoveAnnotation:
-                  annotationPattern: '@jakarta.annotation.Nonnull'
+          - org.openrewrite.java.RemoveAnnotation:
+              annotationPattern: '@jakarta.annotation.Nonnull'
