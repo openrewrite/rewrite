@@ -787,7 +787,7 @@ class MavenSettingsTest {
                 <server>
                   <id>maven-snapshots</id>
                   <configuration>
-                    <connectTimeout>10000</connectTimeout>
+                    <timeout>10000</timeout>
                     <httpHeaders>
                       <property>
                         <name>X-JFrog-Art-Api</name>
