@@ -350,6 +350,34 @@ class XPathMatcherTest {
         assertThat(match("//*[@ns3:attr='test2'][local-name()='element4'][namespace-uri()='http://www.example.com/namespaceX']", namespacedXml)).isFalse();
     }
 
+    @Test
+    void matchConditionsWithConjunctions() {
+        // T&T, T&F, F&T, F&F
+        assertThat(match("//*[local-name()='element3' and @ns3:attr='test']", namespacedXml)).isTrue();
+        assertThat(match("//*[local-name()='element3' and @ns3:attr='dne']", namespacedXml)).isFalse();
+        assertThat(match("//*[local-name()='dne' and @ns3:attr='test']", namespacedXml)).isFalse();
+        assertThat(match("//*[local-name()='dne' and @ns3:attr='dne']", namespacedXml)).isFalse();
+
+        // T|T, T|F, F|T, F|F
+        assertThat(match("//*[local-name()='element2' or namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
+        assertThat(match("//*[local-name()='element2' or namespace-uri()='dne']", namespacedXml)).isTrue();
+        assertThat(match("//*[local-name()='dne' or local-name()='element2']", namespacedXml)).isTrue();
+        assertThat(match("//*[local-name()='dne' or local-name()='dne2']", namespacedXml)).isFalse();
+
+        assertThat(match("//@*[namespace-uri()='dne' or namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
+        // [T&T][T] = T
+        assertThat(match("//*[local-name()='element4' and namespace-uri()='http://www.example.com/namespace2'][@ns3:attr='test2']", namespacedXml)).isTrue();
+        // [T&T][F] = F
+        assertThat(match("//*[local-name()='element4' and namespace-uri()='http://www.example.com/namespace2'][@ns3:attr='dne']", namespacedXml)).isFalse();
+        // [F&T][T] = F
+        assertThat(match("//*[local-name()='dne' and namespace-uri()='http://www.example.com/namespace2'][@ns3:attr='test2']", namespacedXml)).isFalse();
+        // [F|T][T] = T
+        assertThat(match("//*[local-name()='dne' or local-name()='element4'][namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
+        // [F|T][F] = F
+        assertThat(match("//*[local-name()='dne' or local-name()='element4'][namespace-uri()='http://www.example.com/namespaceX']", namespacedXml)).isFalse();
+
+    }
+
     private boolean match(String xpath, SourceFile x) {
         XPathMatcher matcher = new XPathMatcher(xpath);
         return !TreeVisitor.collect(new XmlVisitor<>() {
