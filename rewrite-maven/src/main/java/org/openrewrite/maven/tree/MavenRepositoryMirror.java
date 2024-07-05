@@ -55,10 +55,7 @@ public class MavenRepositoryMirror {
     Boolean snapshots;
 
     @Nullable
-    Long connectTimeout;
-
-    @Nullable
-    Long readTimeout;
+    Long timeout;
 
     private final boolean externalOnly;
     private final List<String> mirrorsOf;
@@ -98,25 +95,20 @@ public class MavenRepositoryMirror {
                 Optional<MavenSettings.Server> maybeServer = servers.getServers().stream()
                         .filter(s -> id.equals(s.getId()) && s.getConfiguration() != null)
                         .findFirst();
-                if (maybeServer.isPresent()) {
-                    MavenSettings.ServerConfiguration serverConfig = maybeServer.get().getConfiguration();
-                    connectTimeout = serverConfig.getConnectTimeout();
-                    readTimeout = serverConfig.getReadTimeout();
+                if (maybeServer.isPresent() && maybeServer.get().getConfiguration() != null){
+                    timeout = maybeServer.get().getConfiguration().getTimeout();
                 } else {
-                    connectTimeout = null;
-                    readTimeout = null;
+                    timeout = null;
                 }
             } else {
-                connectTimeout = null;
-                readTimeout = null;
+                timeout = null;
             }
         } else {
             externalOnly = false;
             mirrorsOf = null;
             includedRepos = null;
             excludedRepos = null;
-            connectTimeout = null;
-            readTimeout = null;
+            timeout = null;
         }
     }
 

@@ -868,11 +868,11 @@ public class MavenPomDownloader {
                             request.withHeader(header.getName(), header.getValue());
                         }
                     }
-                    if (configuration.getConnectTimeout() != null) {
-                        request.withConnectTimeout(Duration.ofMillis(configuration.getConnectTimeout()));
+                    if (configuration.getTimeout() != null) {
+                        request.withConnectTimeout(Duration.ofMillis(configuration.getTimeout()));
                     }
-                    if (configuration.getReadTimeout() != null) {
-                        request.withReadTimeout(Duration.ofMillis(configuration.getReadTimeout()));
+                    if (configuration.getTimeout() != null) {
+                        request.withReadTimeout(Duration.ofMillis(configuration.getTimeout()));
                     }
                 }
             }

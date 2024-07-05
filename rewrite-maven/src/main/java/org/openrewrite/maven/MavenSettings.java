@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.*;
 import java.util.function.UnaryOperator;
 
@@ -245,8 +246,7 @@ public class MavenSettings {
             }
             return new ServerConfiguration(
                     ListUtils.map(configuration.httpHeaders, this::interpolate),
-                    configuration.connectTimeout,
-                    configuration.readTimeout
+                    configuration.timeout
             );
         }
 
@@ -422,17 +422,8 @@ public class MavenSettings {
         @Nullable
         List<HttpHeader> httpHeaders;
 
-        /**
-         * Timeout in milliseconds for establishing a connection.
-         */
         @Nullable
-        Long connectTimeout;
-
-        /**
-         * Timeout in milliseconds for reading from the connection.
-         */
-        @Nullable
-        Long readTimeout;
+        Long timeout;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
