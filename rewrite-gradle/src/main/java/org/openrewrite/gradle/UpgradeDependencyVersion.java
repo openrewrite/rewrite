@@ -712,13 +712,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private static ResolvedDependency maybeUpdateResolvedDependency(
             ResolvedDependency dep,
             ResolvedDependency newDep,
-            Set<ResolvedDependency> history) {
+            Set<ResolvedDependency> traversalHistory) {
+        if(traversalHistory.contains(dep)) {
+            return dep;
+        }
         if(Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
             return newDep;
         }
-        if (history.add(dep)) {
-            return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep, history)));
-        }
-        return dep;
+        traversalHistory.add(dep);
+        return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep, new HashSet<>(traversalHistory))));
     }
 }
