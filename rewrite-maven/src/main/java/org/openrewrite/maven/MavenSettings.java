@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.*;
 import java.util.function.UnaryOperator;
 
@@ -422,6 +421,9 @@ public class MavenSettings {
         @Nullable
         List<HttpHeader> httpHeaders;
 
+        /**
+         * Timeout in milliseconds for reading connecting to and reading from the connection.
+         */
         @Nullable
         Long timeout;
     }
