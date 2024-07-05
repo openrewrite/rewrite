@@ -163,7 +163,7 @@ class MavenSettingsTest {
 
         assertThat(ctx.getRepositories())
           .as("When multiple repositories have the same id in a maven settings file the last one wins. In a pom.xml an error would be thrown.")
-          .containsExactly(new MavenRepository("repo", "https://lastwins.com", null, null, null, null, null, null));
+          .containsExactly(new MavenRepository("repo", "https://lastwins.com", null, null, null, null, null));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
