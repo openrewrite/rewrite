@@ -47,9 +47,9 @@ public class RemoveObjectsIsNull extends Recipe {
             public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (IS_NULL.matches(m)) {
-                    return replace(ctx, m, "((#{any(boolean)}) == null)");
+                    return replace(ctx, m, "(#{any(boolean)}) == null");
                 } else if (NON_NULL.matches(m)) {
-                    return replace(ctx, m, "((#{any(boolean)}) != null)");
+                    return replace(ctx, m, "(#{any(boolean)}) != null");
                 }
                 return m;
             }
@@ -66,9 +66,14 @@ public class RemoveObjectsIsNull extends Recipe {
                 }
 
                 // Replace the method invocation with a simple null check
-                getCursor().getParentTreeCursor().putMessage("SIMPLIFY_BOOLEAN_EXPRESSION", true);
+                Cursor parentTreeCursor = getCursor().getParentTreeCursor();
+                if (!(parentTreeCursor.getValue() instanceof J.ControlParentheses) &&
+                    !(parentTreeCursor.getValue() instanceof J.Parentheses)) {
+                    pattern = '(' + pattern + ')';
+                }
+                parentTreeCursor.putMessage("SIMPLIFY_BOOLEAN_EXPRESSION", true);
                 Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), m.getArguments().get(0));
-                return (Expression) new UnnecessaryParenthesesVisitor<>().visitNonNull(replaced, ctx, getCursor());
+                return (Expression) new UnnecessaryParenthesesVisitor<>().visitNonNull(replaced, ctx);
             }
 
             @Override
