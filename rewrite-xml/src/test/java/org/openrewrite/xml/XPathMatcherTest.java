@@ -375,7 +375,6 @@ class XPathMatcherTest {
         assertThat(match("//*[local-name()='dne' or local-name()='element4'][namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
         // [F|T][F] = F
         assertThat(match("//*[local-name()='dne' or local-name()='element4'][namespace-uri()='http://www.example.com/namespaceX']", namespacedXml)).isFalse();
-
     }
 
     private boolean match(String xpath, SourceFile x) {

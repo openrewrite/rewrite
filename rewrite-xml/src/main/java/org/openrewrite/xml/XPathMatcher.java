@@ -123,7 +123,7 @@ public class XPathMatcher {
 
                 Matcher matcher;
                 if (tagForCondition != null && partWithCondition.endsWith("]")
-                        && (matcher = ELEMENT_WITH_CONDITION_PATTERN.matcher(partWithCondition)).matches()) {
+                    && (matcher = ELEMENT_WITH_CONDITION_PATTERN.matcher(partWithCondition)).matches()) {
                     String optionalPartName = matchesElementWithConditionFunction(matcher, tagForCondition, cursor);
                     if (optionalPartName == null) {
                         return false;
@@ -150,15 +150,15 @@ public class XPathMatcher {
                 }
 
                 boolean conditionNotFulfilled = tagForCondition == null
-                        || (!part.equals(partName) && !tagForCondition.getName().equals(partName));
+                                                || (!part.equals(partName) && !tagForCondition.getName().equals(partName));
 
                 int idx = part.indexOf("[");
                 if (idx > 0) {
                     part = part.substring(0, idx);
                 }
-                if (path.size() < i + 1 || (
-                        !(path.get(pathIndex).getName().equals(part)) && !"*".equals(part)) ||
-                        conditionIsBefore && conditionNotFulfilled) {
+                if (path.size() < i + 1
+                    || (!(path.get(pathIndex).getName().equals(part)) && !"*".equals(part))
+                    || conditionIsBefore && conditionNotFulfilled) {
                     return false;
                 }
             }
