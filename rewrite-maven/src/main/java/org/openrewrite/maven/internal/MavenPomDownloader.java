@@ -781,8 +781,7 @@ public class MavenPomDownloader {
                                         repository.getSnapshots(),
                                         repository.getUsername(),
                                         repository.getPassword(),
-                                        repository.getConnectTimeout(),
-                                        repository.getReadTimeout());
+                                        repository.getTimeout());
                             } catch (HttpSenderResponseException e) {
                                 //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
                                 if (e.isServerReached()) {
@@ -793,8 +792,7 @@ public class MavenPomDownloader {
                                             repository.getSnapshots(),
                                             repository.getUsername(),
                                             repository.getPassword(),
-                                            repository.getConnectTimeout(),
-                                            repository.getReadTimeout());
+                                            repository.getTimeout());
                                 }
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
