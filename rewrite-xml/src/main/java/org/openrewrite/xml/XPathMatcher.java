@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 /**
  * Supports a limited set of XPath expressions, specifically those documented on <a
  * href="https://www.w3schools.com/xml/xpath_syntax.asp">this page</a>.
+ * Additionally, supports `local-name()` and `namespace-uri()` conditions, `and`/`or` operators, and chained conditions.
  * <p>
  * Used for checking whether a visitor's cursor meets a certain XPath expression.
  * <p>
