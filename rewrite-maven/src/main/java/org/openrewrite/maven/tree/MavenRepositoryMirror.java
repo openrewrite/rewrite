@@ -130,8 +130,7 @@ public class MavenRepositoryMirror {
                     .withSnapshots(!Boolean.FALSE.equals(snapshots) ? "true" : "false")
                     // Since the URL has likely changed we cannot assume that the new repository is known to exist
                     .withKnownToExist(false)
-                    .withConnectTimeout(repo.getConnectTimeout())
-                    .withReadTimeout(repo.getReadTimeout());
+                    .withTimeout(repo.getTimeout());
         }
         return repo;
     }

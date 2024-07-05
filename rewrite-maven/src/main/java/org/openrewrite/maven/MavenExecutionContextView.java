@@ -278,8 +278,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                                     knownRepo.isKnownToExist() && knownRepo.getUri().equals(repo.getUrl()),
                                     knownRepo.getUsername(),
                                     knownRepo.getPassword(),
-                                    knownRepo.getConnectTimeout(),
-                                    knownRepo.getReadTimeout(),
+                                    knownRepo.getTimeout(),
                                     knownRepo.getDeriveMetadataIfMissing()
                             );
                         } else {
@@ -288,7 +287,6 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                                     repo.getUrl(),
                                     repo.getReleases() == null ? null : repo.getReleases().getEnabled(),
                                     repo.getSnapshots() == null ? null : repo.getSnapshots().getEnabled(),
-                                    null,
                                     null,
                                     null,
                                     null

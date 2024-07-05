@@ -39,9 +39,9 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class MavenRepository implements Serializable {
 
-    public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), "true", "true", true, null, null, null, null, false);
-    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", Paths.get(System.getProperty("user.home"), ".m2", "repository").toUri().toString(), "true", "true", true, null, null, null, null, false);
-    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", "true", "false", true, null, null, null, null, true);
+    public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), "true", "true", true, null, null, null, false);
+    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", Paths.get(System.getProperty("user.home"), ".m2", "repository").toUri().toString(), "true", "true", true, null, null, null, false);
+    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", "true", "false", true, null, null, null, true);
 
     @EqualsAndHashCode.Include
     @With
@@ -83,11 +83,7 @@ public class MavenRepository implements Serializable {
 
     @With
     @Nullable
-    Duration connectTimeout;
-
-    @With
-    @Nullable
-    Duration readTimeout;
+    Duration timeout;
 
     @Nullable
     @NonFinal
@@ -96,7 +92,7 @@ public class MavenRepository implements Serializable {
     /**
      * Constructor required by {@link org.openrewrite.maven.tree.OpenRewriteModelSerializableTest}.
      *
-     * @deprecated Use {@link #MavenRepository(String, String, String, String, boolean, String, String, Duration, Duration, Boolean)}
+     * @deprecated Use {@link #MavenRepository(String, String, String, String, boolean, String, String, Duration, Boolean)}
      */
     @Deprecated
     @JsonIgnore
@@ -104,13 +100,13 @@ public class MavenRepository implements Serializable {
             @Nullable String id, String uri, @Nullable String releases, @Nullable String snapshots,
             @Nullable String username, @Nullable String password
     ) {
-        this(id, uri, releases, snapshots, false, username, password, null, null, null);
+        this(id, uri, releases, snapshots, false, username, password, null, null);
     }
 
     /**
      * Constructor required by {@link org.openrewrite.gradle.marker.GradleProject}.
      *
-     * @deprecated Use {@link #MavenRepository(String, String, String, String, boolean, String, String, Duration, Duration, Boolean)}
+     * @deprecated Use {@link #MavenRepository(String, String, String, String, boolean, String, String, Duration, Boolean)}
      */
     @Deprecated
     @JsonIgnore
@@ -118,14 +114,13 @@ public class MavenRepository implements Serializable {
             @Nullable String id, String uri, @Nullable String releases, @Nullable String snapshots, boolean knownToExist,
             @Nullable String username, @Nullable String password, @Nullable Boolean deriveMetadataIfMissing
     ) {
-        this(id, uri, releases, snapshots, knownToExist, username, password, null, null, deriveMetadataIfMissing);
+        this(id, uri, releases, snapshots, knownToExist, username, password, null, deriveMetadataIfMissing);
     }
 
     @JsonIgnore
     public MavenRepository(
             @Nullable String id, String uri, @Nullable String releases, @Nullable String snapshots, boolean knownToExist,
-            @Nullable String username, @Nullable String password, @Nullable Duration connectTimeout,
-            @Nullable Duration readTimeout, @Nullable Boolean deriveMetadataIfMissing
+            @Nullable String username, @Nullable String password, @Nullable Duration timeout, @Nullable Boolean deriveMetadataIfMissing
     ) {
         this.id = id;
         this.uri = uri;
@@ -134,8 +129,7 @@ public class MavenRepository implements Serializable {
         this.knownToExist = knownToExist;
         this.username = username;
         this.password = password;
-        this.connectTimeout = connectTimeout;
-        this.readTimeout = readTimeout;
+        this.timeout = timeout;
         this.deriveMetadataIfMissing = deriveMetadataIfMissing;
     }
 
@@ -157,14 +151,13 @@ public class MavenRepository implements Serializable {
         String username;
         String password;
         Boolean deriveMetadataIfMissing;
-        Duration connectTimeout;
-        Duration readTimeout;
+        Duration timeout;
 
         private Builder() {
         }
 
         public MavenRepository build() {
-            return new MavenRepository(id, uri, releases, snapshots, knownToExist, username, password, connectTimeout, readTimeout, deriveMetadataIfMissing);
+            return new MavenRepository(id, uri, releases, snapshots, knownToExist, username, password, timeout, deriveMetadataIfMissing);
         }
 
         public Builder releases(boolean releases) {
@@ -207,13 +200,8 @@ public class MavenRepository implements Serializable {
             return this;
         }
 
-        public Builder connectTimeout(Duration connectTimeout) {
-            this.connectTimeout = connectTimeout;
-            return this;
-        }
-
-        public Builder readTimeout(Duration readTimeout) {
-            this.readTimeout = readTimeout;
+        public Builder timeout(Duration timeout) {
+            this.timeout = timeout;
             return this;
         }
 

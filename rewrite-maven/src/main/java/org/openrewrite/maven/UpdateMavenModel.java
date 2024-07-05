@@ -121,7 +121,6 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     t.getChild("snapshots").flatMap(s -> s.getChildValue("enabled")).orElse(null),
                     null,
                     null,
-                    null,
                     null
             )).collect(Collectors.toList()));
         } else {

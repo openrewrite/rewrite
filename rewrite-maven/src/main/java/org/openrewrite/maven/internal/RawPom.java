@@ -439,7 +439,7 @@ public class RawPom {
                     pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
                             r.getReleases() == null ? null : r.getReleases().getEnabled(),
                             r.getSnapshots() == null ? null : r.getSnapshots().getEnabled(),
-                            false, null, null, null, null, null));
+                            false, null, null, null, null));
                 }
 
             }

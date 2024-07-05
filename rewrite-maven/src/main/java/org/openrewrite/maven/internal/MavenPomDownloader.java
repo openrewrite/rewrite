@@ -824,8 +824,8 @@ public class MavenPomDownloader {
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         try {
             HttpSender.Request.Builder request = httpSender.get(uriString)
-                    .withConnectTimeout(repo.getConnectTimeout())
-                    .withReadTimeout(repo.getReadTimeout());
+                    .withConnectTimeout(repo.getTimeout())
+                    .withReadTimeout(repo.getTimeout());
             return sendRequest(applyAuthenticationToRequest(repo, request).build());
         } catch (HttpSenderResponseException e) {
             if (hasCredentials(repo) && e.isClientSideException()) {
