@@ -51,6 +51,13 @@ public class MergeYaml extends Recipe {
     @Nullable
     String objectIdentifyingProperty;
 
+    @Option(displayName = "File pattern",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
+            example = ".github/workflows/*.yml")
+    @Nullable
+    String filePattern;
+
     @Override
     public Validated<Object> validate() {
         return super.validate()
@@ -87,7 +94,8 @@ public class MergeYaml extends Recipe {
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"))
                 .getDocuments().get(0).getBlock();
 
-        return new YamlIsoVisitor<ExecutionContext>() {
+
+        return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
                 if ("$".equals(key)) {
@@ -96,20 +104,21 @@ public class MergeYaml extends Recipe {
                             ctx, getCursor()));
                 }
                 Yaml.Document d = super.visitDocument(document, ctx);
-                if(d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
+                if (d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
                     // No matching element already exists, attempt to construct one
                     String valueKey = maybeKeyFromJsonPath(key);
-                    if(valueKey == null) {
+                    if (valueKey == null) {
                         return d;
                     }
                     // If there is no space between the colon and the value it will not be interpreted as a mapping
-                    @Language("yml") String snippet;
+                    String snippet;
                     if (incoming instanceof Yaml.Mapping) {
                         snippet = valueKey + ":\n" + indent(yaml);
                     } else {
                         snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
                     }
                     // No matching element already exists, so it must be constructed
+                    //noinspection LanguageMismatch
                     return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), snippet,
                             Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(d.getBlock(),
                             ctx, getCursor()));
@@ -137,7 +146,15 @@ public class MergeYaml extends Recipe {
 
             @Nullable
             private String maybeKeyFromJsonPath(String jsonPath) {
-                if(!jsonPath.startsWith("$.")) {
+                if (!jsonPath.startsWith("$.")) {
+                    return null;
+                }
+                // if the key contains a jsonpath filter we cannot infer a valid key
+                if (jsonPath.matches(".*\\[\\s?\\?\\s?\\(\\s?@\\..*\\)\\s?].*")) {
+                    return null;
+                }
+                // remove keys that contain wildcard or deep search
+                if (jsonPath.matches(".*\\*.*") || jsonPath.matches(".*\\.\\..*")) {
                     return null;
                 }
                 return jsonPath.substring(2);
@@ -180,6 +197,6 @@ public class MergeYaml extends Recipe {
                 }
                 return super.visitSequence(sequence, ctx);
             }
-        };
+        });
     }
 }

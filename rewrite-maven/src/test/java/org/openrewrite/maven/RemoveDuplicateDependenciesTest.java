@@ -345,6 +345,39 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
         );
     }
 
+	@Test
+	void keepDependencyManagementWithType() {
+		rewriteRun(
+		  pomXml(
+			"""
+ 			  <project>
+				<modelVersion>4.0.0</modelVersion>
+				
+				<groupId>com.mycompany.app</groupId>
+				<artifactId>my-app</artifactId>
+				<version>1</version>
+				
+				<dependencyManagement>
+				  <dependencies>
+					<dependency>
+					  <groupId>com.acme</groupId>
+					  <artifactId>example-dependency</artifactId>
+				      <version>1.0.0</version>
+					</dependency>
+					<dependency>
+				      <groupId>com.acme</groupId>
+				      <artifactId>example-dependency</artifactId>
+				      <version>1.0.0</version>
+				      <type>test-jar</type>
+					</dependency>
+				  </dependencies>
+				</dependencyManagement>
+			  </project>
+			  """
+		  )
+		);
+	}
+
     @Test
     void keepDependencyWithDifferentScope() {
         rewriteRun(

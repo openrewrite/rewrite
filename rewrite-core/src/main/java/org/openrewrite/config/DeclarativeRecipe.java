@@ -77,6 +77,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @JsonIgnore
     private Validated<Object> validation = Validated.none();
+
     @JsonIgnore
     private Validated<Object> initValidation = null;
 
@@ -149,6 +150,7 @@ public class DeclarativeRecipe extends Recipe {
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
                 TreeVisitor<?, ExecutionContext> p = precondition.get();
+
                 @Override
                 public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                     return p.isAcceptable(sourceFile, ctx);
@@ -166,7 +168,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @EqualsAndHashCode(callSuper = false)
     @Value
-    static class BellwetherDecoratedRecipe extends Recipe {
+    static class BellwetherDecoratedRecipe extends Recipe implements DelegatingRecipe {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         Recipe delegate;
@@ -195,11 +197,16 @@ public class DeclarativeRecipe extends Recipe {
         public List<Recipe> getRecipeList() {
             return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
         }
+
+        @Override
+        public boolean causesAnotherCycle() {
+            return delegate.causesAnotherCycle();
+        }
     }
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> {
+    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> implements DelegatingRecipe {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         ScanningRecipe<T> delegate;
@@ -242,6 +249,11 @@ public class DeclarativeRecipe extends Recipe {
         @Override
         public List<Recipe> getRecipeList() {
             return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
+        }
+
+        @Override
+        public boolean causesAnotherCycle() {
+            return delegate.causesAnotherCycle();
         }
     }
 
@@ -313,11 +325,17 @@ public class DeclarativeRecipe extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        return Validated.<Object>test("initialization",
-                        "initialize(..) must be called on DeclarativeRecipe prior to use.",
-                        this, r -> initValidation != null)
-                .and(validation)
-                .and(initValidation);
+        Validated<Object> validated = Validated.none();
+
+        if (!uninitializedRecipes.isEmpty() && uninitializedRecipes.size() != recipeList.size()) {
+            validated = validated.and(Validated.invalid("initialization", recipeList, "DeclarativeRecipe must not contain uninitialized recipes. Be sure to call .initialize() on DeclarativeRecipe."));
+        }
+        if (!uninitializedPreconditions.isEmpty() && uninitializedPreconditions.size() != preconditions.size()) {
+            validated = validated.and(Validated.invalid("initialization", preconditions, "DeclarativeRecipe must not contain uninitialized preconditions. Be sure to call .initialize() on DeclarativeRecipe."));
+        }
+
+        return validated.and(validation)
+                .and(initValidation == null ? Validated.none() : initValidation);
     }
 
     @Value

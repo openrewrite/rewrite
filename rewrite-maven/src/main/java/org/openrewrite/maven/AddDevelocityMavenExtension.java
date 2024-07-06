@@ -238,6 +238,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     @Value
     private static class GradleEnterpriseConfiguration {
         ServerConfiguration server;
+
         @Nullable
         BuildScanConfiguration buildScan;
     }
@@ -245,6 +246,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     @Value
     private static class ServerConfiguration {
         String url;
+
         @Nullable
         Boolean allowUntrusted;
     }
@@ -253,8 +255,10 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     private static class BuildScanConfiguration {
         @Nullable
         Boolean backgroundBuildScanUpload;
+
         @Nullable
         String publish;
+
         @Nullable
         Capture capture;
     }

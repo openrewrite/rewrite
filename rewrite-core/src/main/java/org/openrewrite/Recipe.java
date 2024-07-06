@@ -103,7 +103,7 @@ public abstract class Recipe implements Cloneable {
      * @return The display name.
      */
     @Language("markdown")
-    public abstract String getDisplayName();
+    public abstract @NlsRewrite.DisplayName String getDisplayName();
 
     /**
      * A human-readable display name for this recipe instance, including some descriptive
@@ -130,7 +130,7 @@ public abstract class Recipe implements Cloneable {
             return getDisplayName() + " " + suffix;
         }
 
-        List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors(getClass()));
+        List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors());
         options.removeIf(opt -> !opt.isRequired());
         if (options.isEmpty()) {
             return getDisplayName();
@@ -179,7 +179,7 @@ public abstract class Recipe implements Cloneable {
      * @return The display name.
      */
     @Language("markdown")
-    public abstract String getDescription();
+    public abstract @NlsRewrite.Description String getDescription();
 
     /**
      * A set of strings used for categorizing related recipes. For example
@@ -208,7 +208,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     protected RecipeDescriptor createRecipeDescriptor() {
-        List<OptionDescriptor> options = getOptionDescriptors(this.getClass());
+        List<OptionDescriptor> options = getOptionDescriptors();
         List<RecipeDescriptor> recipeList1 = new ArrayList<>();
         for (Recipe next : getRecipeList()) {
             recipeList1.add(next.getDescriptor());
@@ -225,14 +225,19 @@ public abstract class Recipe implements Cloneable {
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
-    private List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
+    private List<OptionDescriptor> getOptionDescriptors() {
+        Recipe recipe = this;
+        if (this instanceof DelegatingRecipe) {
+            recipe = ((DelegatingRecipe) this).getDelegate();
+        }
+
         List<OptionDescriptor> options = new ArrayList<>();
 
-        for (Field field : recipeClass.getDeclaredFields()) {
+        for (Field field : recipe.getClass().getDeclaredFields()) {
             Object value;
             try {
                 field.setAccessible(true);
-                value = field.get(this);
+                value = field.get(recipe);
             } catch (IllegalAccessException e) {
                 value = null;
             }
@@ -414,5 +419,9 @@ public abstract class Recipe implements Cloneable {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public interface DelegatingRecipe {
+        Recipe getDelegate();
     }
 }

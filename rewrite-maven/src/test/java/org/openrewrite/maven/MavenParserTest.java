@@ -2936,4 +2936,175 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void transitiveDependencyManagement() {
+        rewriteRun(
+          mavenProject("depends-on-guava",
+            pomXml("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>depends-on-guava</artifactId>
+                    <version>0.0.1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>30.0-jre</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  //noinspection OptionalGetWithoutIsPresent
+                  List<ResolvedDependency> guava = pom.getMarkers().findFirst(MavenResolutionResult.class)
+                    .map(mrr -> mrr.findDependencies("com.google.guava", "guava", Scope.Compile))
+                    .get();
+
+                  assertThat(guava)
+                    .singleElement()
+                    .as("Dependency management cannot override the version of a direct dependency")
+                    .matches(it -> "29.0-jre".equals(it.getVersion()));
+              })
+            )),
+          mavenProject("transitively-depends-on-guava",
+            pomXml("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>transitively-depends-on-guava</artifactId>
+                    <version>0.0.1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>depends-on-guava</artifactId>
+                            <version>0.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  //noinspection OptionalGetWithoutIsPresent
+                  List<ResolvedDependency> guava = pom.getMarkers().findFirst(MavenResolutionResult.class)
+                    .map(mrr -> mrr.findDependencies("com.google.guava", "guava", Scope.Compile))
+                    .get();
+
+                  assertThat(guava)
+                    .singleElement()
+                    .as("The dependency management of dependency does not override the versions of its own direct dependencies")
+                    .matches(it -> "29.0-jre".equals(it.getVersion()));
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void runtimeClasspathOnly() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>cache-2</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.glassfish.jaxb</groupId>
+                    <artifactId>jaxb-runtime</artifactId>
+                    <version>4.0.5</version>
+                    <scope>runtime</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Compile)).isEmpty();
+                assertThat(resolution.findDependencies("jakarta.xml.bind", "jakarta.xml.bind-api", Scope.Compile)).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4093")
+    void circularImportDependency() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>circular-example-parent</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <modules>
+                    <module>circular-example-child</module>
+                  </modules>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.example</groupId>
+                        <artifactId>circular-example-child</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pomXml -> {
+                  MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().get(0).getGav();
+                  assertThat(gav.getGroupId()).isEqualTo("junit");
+                  assertThat(gav.getArtifactId()).isEqualTo("junit");
+                  assertThat(gav.getVersion()).isEqualTo("4.13.2");
+              })
+            ),
+            mavenProject("circular-example-child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>circular-example-parent</artifactId>
+                      <version>0.0.1-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>circular-example-child</artifactId>
+                    <version>0.0.1-SNAPSHOT</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>4.13.2</version>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                    MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().get(0).getGav();
+                    assertThat(gav.getGroupId()).isEqualTo("junit");
+                    assertThat(gav.getArtifactId()).isEqualTo("junit");
+                    assertThat(gav.getVersion()).isEqualTo("4.13.2");
+                })
+              )
+            )
+          )
+        );
+    }
 }

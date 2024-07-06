@@ -18,10 +18,7 @@ package org.openrewrite.yaml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
@@ -58,6 +55,14 @@ public class DeleteProperty extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
+            example = ".github/workflows/*.yml")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Delete property";
@@ -71,7 +76,7 @@ public class DeleteProperty extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new YamlIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
 
             @Override
             public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
@@ -104,7 +109,7 @@ public class DeleteProperty extends Recipe {
 
                 return e;
             }
-        };
+        });
     }
 
     private static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
@@ -185,7 +190,7 @@ public class DeleteProperty extends Recipe {
         }
     }
 
-    private static boolean containsOnlyWhitespace(String str) {
+    private static boolean containsOnlyWhitespace(@Nullable String str) {
         if (str == null || str.isEmpty()) {
             return false;
         }

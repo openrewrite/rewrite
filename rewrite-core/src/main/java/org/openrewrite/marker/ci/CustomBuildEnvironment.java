@@ -32,6 +32,7 @@ import static org.openrewrite.Tree.randomId;
 public class CustomBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
+
     String cloneURL;
     String ref;
     String sha;

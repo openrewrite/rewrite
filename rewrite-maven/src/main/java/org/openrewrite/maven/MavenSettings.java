@@ -16,8 +16,11 @@
 package org.openrewrite.maven;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -46,12 +49,14 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
 @AllArgsConstructor
+@JacksonXmlRootElement(localName = "settings")
 public class MavenSettings {
     @Nullable
     String localRepository;
 
     @Nullable
     @NonFinal
+    @JsonIgnore
     MavenRepository mavenLocal;
 
     @Nullable
@@ -238,8 +243,10 @@ public class MavenSettings {
             if (configuration == null) {
                 return null;
             }
-            return new ServerConfiguration(configuration.httpHeaders == null ? null :
-                    ListUtils.map(configuration.httpHeaders, this::interpolate));
+            return new ServerConfiguration(
+                    ListUtils.map(configuration.httpHeaders, this::interpolate),
+                    configuration.timeout
+            );
         }
 
         private HttpHeader interpolate(HttpHeader httpHeader) {
@@ -403,12 +410,22 @@ public class MavenSettings {
         ServerConfiguration configuration;
     }
 
+    @SuppressWarnings("DefaultAnnotationParam")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     @With
+    @JsonIgnoreProperties(value = "httpHeaders")
     public static class ServerConfiguration {
+        @JacksonXmlProperty(localName = "property")
+        @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true) // wrapping is disabled by default on MavenXmlMapper
         @Nullable
         List<HttpHeader> httpHeaders;
+
+        /**
+         * Timeout in milliseconds for reading connecting to and reading from the connection.
+         */
+        @Nullable
+        Long timeout;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

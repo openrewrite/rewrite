@@ -435,6 +435,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
                 } else if (arg instanceof J.Literal) {
                     J.Literal literal = (J.Literal) arg;
+                    if (literal.getType() != JavaType.Primitive.String) {
+                        return arg;
+                    }
                     String gav = (String) literal.getValue();
                     if (gav == null) {
                         getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, new IllegalStateException("Unable to update version"));
@@ -652,7 +655,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
     }
 
-    static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav, Set<String> configurations) {
+    public static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav, Set<String> configurations) {
         try {
             if (gav.getGroupId() == null || gav.getArtifactId() == null) {
                 return gp;
@@ -668,26 +671,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             MavenPomDownloader mpd = new MavenPomDownloader(ctx);
             Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
             ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
-            ResolvedGroupArtifactVersion resolvedGav = resolvedPom.getGav();
             List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
+            org.openrewrite.maven.tree.Dependency newRequested = org.openrewrite.maven.tree.Dependency.builder()
+                    .gav(gav)
+                    .build();
+            ResolvedDependency newDep = ResolvedDependency.builder()
+                    .gav(resolvedPom.getGav())
+                    .requested(newRequested)
+                    .dependencies(transitiveDependencies)
+                    .build();
+
             Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
             Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
             boolean anyChanged = false;
             for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                GradleDependencyConfiguration newGdc = gdc;
-                newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                    if (!Objects.equals(requested.getGroupId(), gav.getGroupId()) || !Objects.equals(requested.getArtifactId(), gav.getArtifactId())) {
-                        return requested;
-                    }
-                    return requested.withGav(gav);
-                }));
-                newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
-                    if (!Objects.equals(resolved.getGroupId(), resolvedGav.getGroupId()) || !Objects.equals(resolved.getArtifactId(), resolvedGav.getArtifactId())) {
-                        return resolved;
-                    }
-                    return resolved.withGav(resolvedGav)
-                            .withDependencies(transitiveDependencies);
-                }));
+                GradleDependencyConfiguration newGdc = gdc
+                        .withRequested(ListUtils.map(gdc.getRequested(), requested -> maybeUpdateDependency(requested, newRequested)))
+                        .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeUpdateResolvedDependency(resolved, newDep)));
                 anyChanged |= newGdc != gdc;
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
             }
@@ -698,5 +698,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             return gp;
         }
         return gp;
+    }
+
+    private static org.openrewrite.maven.tree.Dependency maybeUpdateDependency(
+            org.openrewrite.maven.tree.Dependency dep,
+            org.openrewrite.maven.tree.Dependency newDep) {
+        if(Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
+            return newDep;
+        }
+        return dep;
+    }
+
+    private static ResolvedDependency maybeUpdateResolvedDependency(
+            ResolvedDependency dep,
+            ResolvedDependency newDep) {
+        if(Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
+            return newDep;
+        }
+        return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep)));
     }
 }

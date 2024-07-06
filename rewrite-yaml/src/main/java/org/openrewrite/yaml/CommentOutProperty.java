@@ -18,7 +18,6 @@ package org.openrewrite.yaml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayDeque;
@@ -37,7 +36,7 @@ public class CommentOutProperty extends Recipe {
             example = "applicability.singleSource")
     String propertyKey;
 
-    @Option(displayName = "comment text",
+    @Option(displayName = "Comment text",
             description = "The comment text to be added before the specified key.",
             example = "The `foo` property is deprecated, please migrate")
     String commentText;
@@ -106,7 +105,7 @@ public class CommentOutProperty extends Recipe {
                         comment = lastIndentation + "#" + entry.print(getCursor());
                     }
 
-                    doAfterVisit(new DeleteProperty(propertyKey, null, null).getVisitor());
+                    doAfterVisit(new DeleteProperty(propertyKey, null, null, null).getVisitor());
                     return entry;
                 }
 

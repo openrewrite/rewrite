@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy;
 
+import groovy.lang.GroovySystem;
 import groovyjarjarasm.asm.Opcodes;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -65,8 +66,10 @@ import static org.openrewrite.java.tree.Space.format;
  */
 public class GroovyParserVisitor {
     private final Path sourcePath;
+
     @Nullable
     private final FileAttributes fileAttributes;
+
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
@@ -75,6 +78,7 @@ public class GroovyParserVisitor {
     private int cursor = 0;
 
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
+
     @SuppressWarnings("RegExpSimplifiable")
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
@@ -84,6 +88,9 @@ public class GroovyParserVisitor {
      */
     private int columnOffset;
 
+    @Nullable
+    private static Boolean olderThanGroovy3;
+
     @SuppressWarnings("unused")
     public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
@@ -92,6 +99,15 @@ public class GroovyParserVisitor {
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
         this.typeMapping = new GroovyTypeMapping(typeCache);
+    }
+
+    private static boolean isOlderThanGroovy3() {
+        if (olderThanGroovy3 == null) {
+            String groovyVersionText = GroovySystem.getVersion();
+            int majorVersion = Integer.parseInt(groovyVersionText.substring(0, groovyVersionText.indexOf('.')));
+            olderThanGroovy3 = majorVersion < 3;
+        }
+        return olderThanGroovy3;
     }
 
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
@@ -681,7 +697,7 @@ public class GroovyParserVisitor {
                                 .collect(Collectors.toList());
             } else if (!unparsedArgs.isEmpty() && unparsedArgs.get(0) instanceof MapExpression) {
                 // The map literal may or may not be wrapped in "[]"
-                // If it is wrapped in "[]" then this isn't a named arguments situation and we should not lift the parameters out of the enclosing MapExpression
+                // If it is wrapped in "[]" then this isn't a named arguments situation, and we should not lift the parameters out of the enclosing MapExpression
                 saveCursor = cursor;
                 whitespace();
                 boolean isOpeningBracketPresent = '[' == source.charAt(cursor);
@@ -1175,7 +1191,7 @@ public class GroovyParserVisitor {
                 } else if (type == ClassHelper.STRING_TYPE) {
                     jType = JavaType.Primitive.String;
                     // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
-                    int length = sourceLengthOfNext(expression);
+                    int length = sourceLengthOfString(expression);
                     // this is an attribute selector
                     if (source.startsWith("@"+value, cursor)) {
                         length += 1;
@@ -1441,7 +1457,7 @@ public class GroovyParserVisitor {
                     // The sub-strings within a GString have no delimiters of their own, confusing visitConstantExpression()
                     // ConstantExpression.getValue() cannot be trusted for strings as its values don't match source code because sequences like "\\" have already been replaced with a single "\"
                     // Use the AST element's line/column positions to figure out its extent, but those numbers need tweaks to be correct
-                    int length = sourceLengthOfNext(cs);
+                    int length = sourceLengthOfString(cs);
                     if (i == 0 || i == rawExprs.size() - 1) {
                         // The first and last constants within a GString have line/column position which incorrectly include the GString's delimiters
                         length -= delimiter.length();
@@ -2279,10 +2295,45 @@ public class GroovyParserVisitor {
     }
 
     /**
-     * Gets the length in characters of the AST node.
+     * Gets the length in characters of a String literal.
+     * Attempts to account for a number of different strange compiler behaviors, old bugs, and edge cases.
      * cursor is presumed to point at the beginning of the node.
      */
-    private int sourceLengthOfNext(ASTNode node) {
+    private int sourceLengthOfString(ConstantExpression expr) {
+        // ConstantExpression.getValue() already has resolved escaped characters. So "\t" and a literal tab will look the same.
+        // Since we cannot differentiate between the two, use this alternate method only when an old version of groovy indicates risk
+        // and the literal doesn't contain any characters which might be from an escape sequence. e.g.: tabs, newlines, carriage returns
+        String value = (String) expr.getValue();
+        if (isOlderThanGroovy3() && value.matches("[^\\t\\r\\n\\\\]*")) {
+            int delimiterLength = getDelimiterLength();
+            return delimiterLength + value.length() + delimiterLength;
+        }
+        return lengthAccordingToAst(expr);
+    }
+
+    private int getDelimiterLength() {
+        String maybeDelimiter = source.substring(cursor, Math.min(cursor + 3, source.length()));
+        int delimiterLength = 0;
+        if (maybeDelimiter.startsWith("$/")) {
+            delimiterLength = 2;
+        } else if (maybeDelimiter.startsWith("\"\"\"") || maybeDelimiter.startsWith("'''")) {
+            delimiterLength = 3;
+        } else if (maybeDelimiter.startsWith("/") || maybeDelimiter.startsWith("\"") || maybeDelimiter.startsWith("'")) {
+            delimiterLength = 1;
+        }
+        return delimiterLength;
+    }
+
+    /**
+     * Gets the length according to the Groovy compiler's attestation of starting/ending line and column numbers.
+     * On older versions of the JDK/Groovy compiler string literals with following whitespace sometimes erroneously include
+     * the length of the whitespace in the length of the AST node.
+     * So in this method invocation:
+     *    foo( 'a' )
+     * the correct source length for the AST node representing 'a' is 3, but in affected groovy versions the length
+     * on the node is '4' because it is also counting the trailing whitespace.
+     */
+    private int lengthAccordingToAst(ConstantExpression node) {
         if (!appearsInSource(node)) {
             return 0;
         }

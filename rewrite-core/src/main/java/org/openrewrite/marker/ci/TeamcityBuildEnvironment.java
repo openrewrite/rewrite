@@ -30,6 +30,7 @@ import static org.openrewrite.Tree.randomId;
 public class TeamcityBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
+
     String projectName;
     String buildNumber;
     String buildUrl;

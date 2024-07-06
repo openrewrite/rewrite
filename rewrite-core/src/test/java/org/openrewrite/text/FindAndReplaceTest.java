@@ -32,7 +32,7 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void nonTxtExtension() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(".", "G", null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplace(".", "G", null, null, null, null, null, null)),
           text(
             """
               This is text.
@@ -48,7 +48,7 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void removeWhenNullOrEmpty() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("Bar", null, null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplace("Bar", null, null, null, null, null, null, null)),
           text(
             """
               Foo
@@ -67,7 +67,7 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void defaultNonRegex() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(".", "G", null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplace(".", "G", null, null, null, null, null, null)),
           text(
             """
               This is text.
@@ -82,7 +82,7 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void regexReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(".", "G", true, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplace(".", "G", true, null, null, null, null, null)),
           text(
             """
               This is text.
@@ -97,7 +97,7 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void captureGroups() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("This is ([^.]+).", "I like $1.", true, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplace("This is ([^.]+).", "I like $1.", true, null, null, null, null, null)),
           text(
             """
               This is text.
@@ -112,7 +112,7 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void noRecursive() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("test", "tested", false, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplace("test", "tested", false, null, null, null, null, null)),
           text("test", "tested")
         );
     }
@@ -122,7 +122,7 @@ class FindAndReplaceTest implements RewriteTest {
         String find = "This is text ${dynamic}.";
         String replace = "This is text ${dynamic}. Stuff";
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(find, replace, null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplace(find, replace, null, null, null, null, null, null)),
           text(find, replace)
         );
     }
@@ -144,9 +144,9 @@ class FindAndReplaceTest implements RewriteTest {
         @Override
         public List<Recipe> getRecipeList() {
             return Arrays.asList(
-              new FindAndReplace("one", "two", null, null, null, null, null),
-              new FindAndReplace("two", "three", null, null, null, null, null),
-              new FindAndReplace("three", "four", null, null, null, null, null));
+              new FindAndReplace("one", "two", null, null, null, null, null, null),
+              new FindAndReplace("two", "three", null, null, null, null, null, null),
+              new FindAndReplace("three", "four", null, null, null, null, null, null));
         }
     }
 

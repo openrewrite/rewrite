@@ -1,0 +1,84 @@
+name: receive-pr
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
+
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.ref }}'
+  cancel-in-progress: true
+
+# https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+# Since this pull request receives untrusted code, we should **NOT** have any secrets in the environment.
+jobs:
+  upload-patch:
+    uses: openrewrite/gh-automation/.github/workflows/receive-pr.yml@main
+    with:
+      recipe: 'org.openrewrite.recipes.OpenRewriteBestPracticesSubset'
+      rewrite_yml: |
+        ---
+        type: specs.openrewrite.org/v1beta/recipe
+        name: org.openrewrite.recipes.OpenRewriteBestPracticesSubset
+        displayName: OpenRewrite best practices
+        description: Best practices for OpenRewrite recipe development.
+        recipeList:
+          - org.openrewrite.recipes.JavaRecipeBestPracticesSubset
+          - org.openrewrite.recipes.RecipeTestingBestPracticesSubset
+          - org.openrewrite.recipes.RecipeNullabilityBestPracticesSubset
+          #- org.openrewrite.java.OrderImports
+          #- org.openrewrite.java.format.EmptyNewlineAtEndOfFile
+          - org.openrewrite.staticanalysis.InlineVariable
+          - org.openrewrite.staticanalysis.MissingOverrideAnnotation
+          - org.openrewrite.staticanalysis.UseDiamondOperator
+        ---
+        type: specs.openrewrite.org/v1beta/recipe
+        name: org.openrewrite.recipes.JavaRecipeBestPracticesSubset
+        displayName: Java Recipe best practices
+        description: Best practices for Java recipe development.
+        preconditions:
+          - org.openrewrite.java.search.FindTypes:
+              fullyQualifiedTypeName: org.openrewrite.Recipe
+              checkAssignability: true
+        recipeList:
+          - org.openrewrite.java.recipes.BlankLinesAroundFieldsWithAnnotations
+          - org.openrewrite.java.recipes.ExecutionContextParameterName
+          - org.openrewrite.java.recipes.MissingOptionExample
+          - org.openrewrite.java.recipes.RecipeEqualsAndHashCodeCallSuper
+          - org.openrewrite.java.recipes.UseTreeRandomId
+          - org.openrewrite.staticanalysis.NeedBraces
+          #- org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+        ---
+        type: specs.openrewrite.org/v1beta/recipe
+        name: org.openrewrite.recipes.RecipeTestingBestPracticesSubset
+        displayName: Recipe testing best practices
+        description: Best practices for testing recipes.
+        preconditions:
+          - org.openrewrite.java.search.FindTypes:
+              fullyQualifiedTypeName: org.openrewrite.test.RewriteTest
+              checkAssignability: true
+        recipeList:
+          - org.openrewrite.java.recipes.RewriteTestClassesShouldNotBePublic
+          #- org.openrewrite.java.recipes.SelectRecipeExamples
+          - org.openrewrite.java.recipes.SourceSpecTextBlockIndentation
+          - org.openrewrite.java.testing.cleanup.RemoveTestPrefix
+          - org.openrewrite.java.testing.cleanup.TestsShouldNotBePublic
+          - org.openrewrite.staticanalysis.NeedBraces
+          - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+        ---
+        type: specs.openrewrite.org/v1beta/recipe
+        name: org.openrewrite.recipes.RecipeNullabilityBestPracticesSubset
+        displayName: Recipe nullability best practices
+        description: Use OpenRewrite internal nullability annotations; drop JetBrains annotations; use `package-info.java` instead.
+        recipeList:
+          - org.openrewrite.java.ChangeType:
+              oldFullyQualifiedTypeName: org.jetbrains.annotations.Nullable
+              newFullyQualifiedTypeName: org.openrewrite.internal.lang.Nullable
+          - org.openrewrite.java.ChangeType:
+              oldFullyQualifiedTypeName: jakarta.annotation.Nullable
+              newFullyQualifiedTypeName: org.openrewrite.internal.lang.Nullable
+          - org.openrewrite.java.RemoveAnnotation:
+              annotationPattern: '@org.jetbrains.annotations.NotNull'
+          - org.openrewrite.java.RemoveAnnotation:
+              annotationPattern: '@jakarta.annotation.Nonnull'

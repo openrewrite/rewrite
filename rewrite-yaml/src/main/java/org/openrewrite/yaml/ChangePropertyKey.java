@@ -17,10 +17,7 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
@@ -69,6 +66,14 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     List<String> except;
 
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
+            example = ".github/workflows/*.yml")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Change property key";
@@ -86,7 +91,7 @@ public class ChangePropertyKey extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangePropertyKeyVisitor<>();
+        return Preconditions.check(new FindSourceFiles(filePattern), new ChangePropertyKeyVisitor<>());
     }
 
     private class ChangePropertyKeyVisitor<P> extends YamlIsoVisitor<P> {
