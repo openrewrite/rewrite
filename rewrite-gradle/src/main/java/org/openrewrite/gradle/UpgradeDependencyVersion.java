@@ -160,7 +160,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 m = cursor.getValue();
                 String methodName = m.getSimpleName();
                 if ("constraints".equals(methodName) || "project".equals(methodName) || "modules".equals(methodName)
-                    || "module".equals(methodName) ||"file".equals(methodName) || "files".equals(methodName)) {
+                    || "module".equals(methodName) || "file".equals(methodName) || "files".equals(methodName)) {
                     return false;
                 }
                 if (DEPENDENCY_DSL_MATCHER.matches(m)) {
@@ -703,7 +703,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private static org.openrewrite.maven.tree.Dependency maybeUpdateDependency(
             org.openrewrite.maven.tree.Dependency dep,
             org.openrewrite.maven.tree.Dependency newDep) {
-        if(Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
+        if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
             return newDep;
         }
         return dep;
@@ -713,10 +713,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             ResolvedDependency dep,
             ResolvedDependency newDep,
             Set<ResolvedDependency> traversalHistory) {
-        if(traversalHistory.contains(dep)) {
+        if (traversalHistory.contains(dep)) {
             return dep;
         }
-        if(Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
+        if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
             return newDep;
         }
         traversalHistory.add(dep);
