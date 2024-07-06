@@ -63,7 +63,7 @@ public class UseStaticImport extends Recipe {
                     Preconditions.not(new DeclaresMethod<>("*..* " + methodNameMatcher + "(..)")),
                     Preconditions.not(new JavaIsoVisitor<ExecutionContext>() {
                         @Override
-                        public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
+                        public J.Import visitImport(J.Import _import, ExecutionContext ctx) {
                             if (_import.isStatic() && _import.getQualid().getSimpleName().equals(methodNameMatcher.substring(1))) {
                                 return SearchResult.found(_import);
                             }
