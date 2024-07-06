@@ -27,8 +27,7 @@ class MaybeUsesImportTest implements RewriteTest {
     @Test
     void usesType() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new
-            MaybeUsesImport<>("java.util.Collections"))),
+          spec -> spec.recipe(toRecipe(() -> new MaybeUsesImport<>("java.util.Collections"))),
           java(
             """
               import java.io.File;
@@ -40,7 +39,7 @@ class MaybeUsesImportTest implements RewriteTest {
               import static java.util.Collections.singleton;
               import static java.util.Collections.*;
               import java.util.Map;
-                              
+
               class Test {
               }
               """,
@@ -54,7 +53,7 @@ class MaybeUsesImportTest implements RewriteTest {
               /*~~>*/import static java.util.Collections.singleton;
               /*~~>*/import static java.util.Collections.*;
               import java.util.Map;
-                              
+
               class Test {
               }
               """
@@ -80,7 +79,7 @@ class MaybeUsesImportTest implements RewriteTest {
               import static java.util.Collections.singleton;
               import static java.util.Collections.*;
               import java.util.concurrent.ConcurrentHashMap;
-                            
+
               class Test {
               }
               """,
@@ -94,7 +93,7 @@ class MaybeUsesImportTest implements RewriteTest {
               /*~~>*/import static java.util.Collections.singleton;
               /*~~>*/import static java.util.Collections.*;
               /*~~>*/import java.util.concurrent.ConcurrentHashMap;
-                            
+
               class Test {
               }
               """

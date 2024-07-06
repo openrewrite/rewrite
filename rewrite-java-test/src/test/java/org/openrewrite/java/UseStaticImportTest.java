@@ -152,6 +152,18 @@ class UseStaticImportTest implements RewriteTest {
                       int b = Integer.valueOf("1");
                   }
               }
+              """,
+            """
+              package com.helloworld;
+
+              import static java.lang.String.valueOf;
+
+              public class SameMethodNames {
+                  public void avoidCollision() {
+                      String a = valueOf("1");
+                      int b = Integer.valueOf("1");
+                  }
+              }
               """
           )
         );
