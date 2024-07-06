@@ -59,7 +59,7 @@ public class UseStaticImport extends Recipe {
             int indexBrace = methodPattern.indexOf('(', indexSpace);
             String methodNameMatcher = methodPattern.substring(indexSpace, indexBrace);
             preconditions = Preconditions.and(preconditions,
-                    Preconditions.not(new DeclaresMethod<>("* " + methodNameMatcher + "(..)")));
+                    Preconditions.not(new DeclaresMethod<>("*..* " + methodNameMatcher + "(..)")));
         }
         return Preconditions.check(preconditions, new UseStaticImportVisitor());
     }

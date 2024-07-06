@@ -18,7 +18,10 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -95,6 +98,8 @@ class UseStaticImportTest implements RewriteTest {
           spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
           java(
             """
+            package com.helloworld;
+
             import java.util.Collections;
             import java.util.List;
 
@@ -102,11 +107,51 @@ class UseStaticImportTest implements RewriteTest {
                 public void avoidCollision() {
                     List<Object> list = Collections.emptyList();
                 }
-                
+
                 private int emptyList(String canHaveDifferentArguments) {
                 }
             }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sameMethodImportedNoStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.lang.String valueOf(..)")),
+          java(
             """
+            package com.helloworld;
+
+            import static java.lang.Integer.valueOf;
+
+            public class SameMethodNameImported {
+                public void avoidCollision() {
+                    String a = String.valueOf("1");
+                    int b = valueOf("1");
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void sameMethodsNoStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(new CompositeRecipe(List.of(new UseStaticImport("java.lang.String valueOf(..)"), new UseStaticImport("java.lang.Integer valueOf(..)")))),
+          java(
+            """
+            package com.helloworld;
+
+            public class SameMethodNames {
+                public void avoidCollision() {
+                    String a = String.valueOf("1");
+                    int b = Integer.valueOf("1");
+                }
+            }
+          """
           )
         );
     }
