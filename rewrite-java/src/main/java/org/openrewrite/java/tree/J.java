@@ -1340,7 +1340,8 @@ public interface J extends Tree {
                 Enum,
                 Interface,
                 Annotation,
-                Record
+                Record,
+                Value
             }
         }
 

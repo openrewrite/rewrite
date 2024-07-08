@@ -139,7 +139,7 @@ class MavenPomDownloaderTest {
             repository.setKnownToExist(true);
         }
 
-        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, true, null, null, null, null, null);
+        MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, true, null, null, null, null);
         List<String> attemptedUris = new ArrayList<>();
         List<MavenRepository> discoveredRepositories = new ArrayList<>();
         ctx.setResolutionListener(new ResolutionEventListener() {
@@ -171,7 +171,7 @@ class MavenPomDownloaderTest {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
         // Avoid actually trying to reach a made-up URL
         String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
-        MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null, null);
+        MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
         Map<String, Throwable> attemptedUris = new HashMap<>();
         List<MavenRepository> discoveredRepositories = new ArrayList<>();
         ctx.setResolutionListener(new ResolutionEventListener() {

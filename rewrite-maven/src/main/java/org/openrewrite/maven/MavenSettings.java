@@ -245,8 +245,7 @@ public class MavenSettings {
             }
             return new ServerConfiguration(
                     ListUtils.map(configuration.httpHeaders, this::interpolate),
-                    configuration.connectTimeout,
-                    configuration.readTimeout
+                    configuration.timeout
             );
         }
 
@@ -423,16 +422,10 @@ public class MavenSettings {
         List<HttpHeader> httpHeaders;
 
         /**
-         * Timeout in milliseconds for establishing a connection.
+         * Timeout in milliseconds for reading connecting to and reading from the connection.
          */
         @Nullable
-        Long connectTimeout;
-
-        /**
-         * Timeout in milliseconds for reading from the connection.
-         */
-        @Nullable
-        Long readTimeout;
+        Long timeout;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

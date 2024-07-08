@@ -41,9 +41,9 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package test;
-                            
+
               import asserts.Assert;
-                            
+
               class Test {
                   void test() {
                       Assert.assertTrue(true);
@@ -54,9 +54,9 @@ class UseStaticImportTest implements RewriteTest {
               """,
             """
               package test;
-                            
+
               import static asserts.Assert.*;
-                            
+
               class Test {
                   void test() {
                       assertTrue(true);
@@ -76,15 +76,15 @@ class UseStaticImportTest implements RewriteTest {
           spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
           java(
             """
-            import java.util.Collections;
-            import java.util.List;
+              import java.util.Collections;
+              import java.util.List;
 
-            public class Reproducer {
-                public void methodWithTypeParameter() {
-                    List<Object> list = Collections.<Object>emptyList();
-                }
-            }
-            """
+              public class Reproducer {
+                  public void methodWithTypeParameter() {
+                      List<Object> list = Collections.<Object>emptyList();
+                  }
+              }
+              """
           )
         );
     }
@@ -95,18 +95,76 @@ class UseStaticImportTest implements RewriteTest {
           spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
           java(
             """
-            import java.util.Collections;
-            import java.util.List;
+              package com.helloworld;
 
-            public class SameMethodNameLocally {
-                public void avoidCollision() {
-                    List<Object> list = Collections.emptyList();
-                }
-                
-                private int emptyList(String canHaveDifferentArguments) {
-                }
-            }
+              import java.util.Collections;
+              import java.util.List;
+
+              public class SameMethodNameLocally {
+                  public void avoidCollision() {
+                      List<Object> list = Collections.emptyList();
+                  }
+
+                  private int emptyList(String canHaveDifferentArguments) {
+                  }
+              }
+                """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4304")
+    void sameMethodImportedNoStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.lang.String valueOf(..)")),
+          java(
             """
+              package com.helloworld;
+
+              import static java.lang.Integer.valueOf;
+
+              public class SameMethodNameImported {
+                  public void avoidCollision() {
+                      String a = String.valueOf("1");
+                      int b = valueOf("1");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4304")
+    void sameMethodsNoStaticImport() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UseStaticImport("java.lang.String valueOf(..)"),
+            new UseStaticImport("java.lang.Integer valueOf(..)")),
+          java(
+            """
+              package com.helloworld;
+
+              public class SameMethodNames {
+                  public void avoidCollision() {
+                      String a = String.valueOf("1");
+                      int b = Integer.valueOf("1");
+                  }
+              }
+              """,
+            """
+              package com.helloworld;
+
+              import static java.lang.String.valueOf;
+
+              public class SameMethodNames {
+                  public void avoidCollision() {
+                      String a = valueOf("1");
+                      int b = Integer.valueOf("1");
+                  }
+              }
+              """
           )
         );
     }
@@ -117,26 +175,26 @@ class UseStaticImportTest implements RewriteTest {
           spec -> spec.recipe(new UseStaticImport("java.util.Collections *()")),
           java(
             """
-            import java.util.Collections;
-            import java.util.List;
+              import java.util.Collections;
+              import java.util.List;
 
-            class SameMethodNameLocally {
-                void avoidCollision() {
-                    List<Object> list = Collections.emptyList();
-                }
-            }
-            """,
+              class SameMethodNameLocally {
+                  void avoidCollision() {
+                      List<Object> list = Collections.emptyList();
+                  }
+              }
+              """,
             """
-            import java.util.List;
-            
-            import static java.util.Collections.emptyList;
+              import java.util.List;
 
-            class SameMethodNameLocally {
-                void avoidCollision() {
-                    List<Object> list = emptyList();
-                }
-            }
-            """
+              import static java.util.Collections.emptyList;
+
+              class SameMethodNameLocally {
+                  void avoidCollision() {
+                      List<Object> list = emptyList();
+                  }
+              }
+              """
           )
         );
     }
@@ -186,33 +244,33 @@ class UseStaticImportTest implements RewriteTest {
           spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
           java(
             """
-            import java.util.Collections;
-            import java.util.List;
+              import java.util.Collections;
+              import java.util.List;
 
-            public class WithJavadoc {
-                /**
-                 * This method uses {@link Collections#emptyList()}.
-                 */
-                public void mustNotChangeTheJavadocAbove() {
-                    List<Object> list = Collections.emptyList();
-                }
-            }
-            """,
+              public class WithJavadoc {
+                  /**
+                   * This method uses {@link Collections#emptyList()}.
+                   */
+                  public void mustNotChangeTheJavadocAbove() {
+                      List<Object> list = Collections.emptyList();
+                  }
+              }
+              """,
             """
-            import java.util.Collections;
-            import java.util.List;
+              import java.util.Collections;
+              import java.util.List;
 
-            import static java.util.Collections.emptyList;
+              import static java.util.Collections.emptyList;
 
-            public class WithJavadoc {
-                /**
-                 * This method uses {@link Collections#emptyList()}.
-                 */
-                public void mustNotChangeTheJavadocAbove() {
-                    List<Object> list = emptyList();
-                }
-            }
-            """
+              public class WithJavadoc {
+                  /**
+                   * This method uses {@link Collections#emptyList()}.
+                   */
+                  public void mustNotChangeTheJavadocAbove() {
+                      List<Object> list = emptyList();
+                  }
+              }
+              """
           )
         );
     }

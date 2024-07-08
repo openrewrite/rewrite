@@ -355,7 +355,8 @@ public interface JavaType {
             Enum,
             Interface,
             Annotation,
-            Record
+            Record,
+            Value
         }
     }
 
