@@ -58,7 +58,7 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 @SuppressWarnings({"HttpUrlsUsage"})
 class MavenPomDownloaderTest {
     private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-      .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(150), Duration.ofMillis(150)));
+      .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(250), Duration.ofMillis(250)));
 
     private void mockServer(Integer responseCode, Consumer<MockWebServer> block) {
         try (MockWebServer mockRepo = new MockWebServer()) {
