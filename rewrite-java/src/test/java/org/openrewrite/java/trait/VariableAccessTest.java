@@ -26,7 +26,7 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ALL")
-public class VariableAccessTest implements RewriteTest {
+class VariableAccessTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
