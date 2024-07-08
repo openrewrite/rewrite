@@ -33,6 +33,7 @@ public abstract class SimpleTraitMatcher<U extends Trait<?>> implements TraitMat
         return Optional.ofNullable(test(cursor));
     }
 
+    @Override
     public Stream<U> higher(Cursor cursor) {
         Stream.Builder<U> stream = Stream.builder();
         Iterator<Cursor> cursors = cursor.getPathAsCursors();
