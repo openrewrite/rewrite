@@ -38,10 +38,10 @@ import java.util.regex.Pattern;
  */
 public class XPathMatcher {
 
-    private static final Pattern XPATH_ELEMENT_SPLITTER = Pattern.compile("((?<=/)(?=/)|[^/\\[]|\\[[^]]*\\])+");
+    private static final Pattern XPATH_ELEMENT_SPLITTER = Pattern.compile("((?<=/)(?=/)|[^/\\[]|\\[[^]]*])+");
     // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']` or foo[@bar='baz']
-    private static final Pattern ELEMENT_WITH_CONDITION_PATTERN = Pattern.compile("(@)?([-:\\w]+|\\*)(\\[.+\\])");
-    private static final Pattern CONDITION_PATTERN = Pattern.compile("(\\[.*?\\])+?");
+    private static final Pattern ELEMENT_WITH_CONDITION_PATTERN = Pattern.compile("(@)?([-:\\w]+|\\*)(\\[.+])");
+    private static final Pattern CONDITION_PATTERN = Pattern.compile("(\\[.*?])+?");
     private static final Pattern CONDITION_CONJUNCTION_PATTERN = Pattern.compile("(((local-name|namespace-uri)\\(\\)|(@)?([-\\w:]+|\\*))='(.*?)'(\\h?(or|and)\\h?)?)+?");
 
     private final String expression;

@@ -229,9 +229,8 @@ class XPathMatcherTest {
     }
 
     @Test
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/3919")
-    void matchFunctions() {
+    void namespaceMatchFunctions() {
         assertThat(match("/root/element1", namespacedXml)).isTrue();
         assertThat(match("/root/ns2:element2", namespacedXml)).isTrue();
         assertThat(match("/root/dne", namespacedXml)).isFalse();
@@ -244,17 +243,21 @@ class XPathMatcherTest {
         assertThat(match("/*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isFalse();
         assertThat(match("//*[namespace-uri()='http://www.example.com/namespace2']", namespacedXml)).isTrue();
         assertThat(match("//@*[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
+    }
 
+    @Test
+    @Disabled
+    void otherUncoveredXpathFunctions() {
         // Other common XPath functions
-        assertThat(match("contains(/root/element1, 'content1')", namespacedXml)).isTrue();
-        assertThat(match("not(contains(/root/element1, 'content1'))", namespacedXml)).isFalse();
-        assertThat(match("string-length(/root/element1) > 2", namespacedXml)).isTrue();
-        assertThat(match("starts-with(/root/element1, 'content1')", namespacedXml)).isTrue();
-        assertThat(match("ends-with(/root/element1, 'content1')", namespacedXml)).isTrue();
-        assertThat(match("substring-before(/root/element1, '1') = 'content'", namespacedXml)).isTrue();
-        assertThat(match("substring-after(/root/element1, 'content') = '1'", namespacedXml)).isTrue();
-        assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
-        assertThat(match("count(/root/*)", namespacedXml)).isTrue();
+       assertThat(match("contains(/root/element1, 'content1')", namespacedXml)).isTrue();
+       assertThat(match("not(contains(/root/element1, 'content1'))", namespacedXml)).isFalse();
+       assertThat(match("string-length(/root/element1) > 2", namespacedXml)).isTrue();
+       assertThat(match("starts-with(/root/element1, 'content1')", namespacedXml)).isTrue();
+       assertThat(match("ends-with(/root/element1, 'content1')", namespacedXml)).isTrue();
+       assertThat(match("substring-before(/root/element1, '1') = 'content'", namespacedXml)).isTrue();
+       assertThat(match("substring-after(/root/element1, 'content') = '1'", namespacedXml)).isTrue();
+       assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
+       assertThat(match("count(/root/*)", namespacedXml)).isTrue();
     }
 
     @Test
