@@ -52,8 +52,8 @@ public abstract class SimpleTraitMatcher<U extends Trait<?>> implements TraitMat
     @Override
     public Stream<U> lower(Cursor cursor) {
         Stream.Builder<U> stream = Stream.builder();
-        this.<Stream.Builder<U>>asVisitor((va, c, sb) -> {
-            sb.add(test(c));
+        this.<Stream.Builder<U>>asVisitor((va, sb) -> {
+            sb.add(test(va.getCursor()));
             return va.getTree();
         }).visit(cursor.getValue(), stream, cursor.getParentOrThrow());
         return stream.build();
@@ -70,13 +70,13 @@ public abstract class SimpleTraitMatcher<U extends Trait<?>> implements TraitMat
      * @return A visitor that can be used to locate trees matching the trait.
      */
     @Override
-    public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction3<U, P> visitor) {
+    public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<U, P> visitor) {
         return new TreeVisitor<Tree, P>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, P p) {
                 U u = test(getCursor());
                 return u != null ?
-                        visitor.visit(u, getCursor(), p) :
+                        visitor.visit(u, p) :
                         super.visit(tree, p);
             }
         };

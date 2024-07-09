@@ -76,7 +76,7 @@ public interface TraitMatcher<U extends Trait<?>> {
      * @return A visitor that can be used to inspect or modify trees matching the trait.
      */
     default <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction<U> visitor) {
-        return asVisitor((u, cursor, p) -> visitor.visit(u));
+        return asVisitor((u, p) -> visitor.visit(u));
     }
 
     /**
@@ -85,15 +85,5 @@ public interface TraitMatcher<U extends Trait<?>> {
      * @param <P>     The type of context object passed to the visitor.
      * @return A visitor that can be used to inspect or modify trees matching the trait.
      */
-    default <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<U, P> visitor) {
-        return asVisitor((u, cursor, p) -> visitor.visit(u, p));
-    }
-
-    /**
-     * @param visitor Called for each match of the trait. The function is passed the trait, the cursor at which the
-     *                trait was found, and a context object.
-     * @param <P>     The type of context object passed to the visitor.
-     * @return A visitor that can be used to inspect or modify trees matching the trait.
-     */
-    <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction3<U, P> visitor);
+    <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<U, P> visitor);
 }

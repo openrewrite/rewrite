@@ -26,7 +26,7 @@ import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
-import org.openrewrite.trait.VisitFunction3;
+import org.openrewrite.trait.VisitFunction2;
 
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -84,13 +84,13 @@ public class VariableAccess implements Trait<J.Identifier> {
         }
 
         @Override
-        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction3<VariableAccess, P> visitor) {
+        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<VariableAccess, P> visitor) {
             return new JavaVisitor<P>() {
                 @Override
                 public J visitIdentifier(J.Identifier ident, P p) {
                     VariableAccess varAccess = test(getCursor());
                     return varAccess != null ?
-                            (J) visitor.visit(varAccess, getCursor(), p) :
+                            (J) visitor.visit(varAccess, p) :
                             super.visitIdentifier(ident, p);
                 }
             };

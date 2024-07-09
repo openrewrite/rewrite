@@ -30,7 +30,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.MethodCall;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
-import org.openrewrite.trait.VisitFunction3;
+import org.openrewrite.trait.VisitFunction2;
 
 import java.util.function.Predicate;
 
@@ -54,13 +54,13 @@ public class MethodAccess implements Trait<MethodCall> {
         }
 
         @Override
-        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction3<MethodAccess, P> visitor) {
+        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<MethodAccess, P> visitor) {
             return new JavaVisitor<P>() {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, P p) {
                     MethodAccess methodAccess = test(getCursor());
                     return methodAccess != null ?
-                            (J) visitor.visit(methodAccess, getCursor(), p) :
+                            (J) visitor.visit(methodAccess, p) :
                             super.visitMethodInvocation(method, p);
                 }
 
@@ -68,7 +68,7 @@ public class MethodAccess implements Trait<MethodCall> {
                 public J visitNewClass(J.NewClass newClass, P p) {
                     MethodAccess methodAccess = test(getCursor());
                     return methodAccess != null ?
-                            (J) visitor.visit(methodAccess, getCursor(), p) :
+                            (J) visitor.visit(methodAccess, p) :
                             super.visitNewClass(newClass, p);
                 }
 
@@ -76,7 +76,7 @@ public class MethodAccess implements Trait<MethodCall> {
                 public J visitMemberReference(J.MemberReference memberRef, P p) {
                     MethodAccess methodAccess = test(getCursor());
                     return methodAccess != null ?
-                            (J) visitor.visit(methodAccess, getCursor(), p) :
+                            (J) visitor.visit(methodAccess, p) :
                             super.visitMemberReference(memberRef, p);
                 }
             };
