@@ -35,8 +35,11 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class MavenVisitor<P> extends XmlVisitor<P> {
 
     static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
+    static final XPathMatcher PROFILE_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencies/dependency");
     static final XPathMatcher PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("//plugins/plugin/dependencies/dependency");
+    static final XPathMatcher PROFILE_PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/build/plugins/plugin/dependencies/dependency");
     static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
+    static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
@@ -61,9 +64,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     protected MavenResolutionResult getResolutionResult() {
         Iterator<Object> itr = getCursor()
                 .getPath(Xml.Document.class::isInstance);
-        if(itr.hasNext()) {
+        if (itr.hasNext()) {
             Xml.Document newDocument = (Xml.Document) itr.next();
-            if(document != null && document != newDocument) {
+            if (document != null && document != newDocument) {
                 throw new IllegalStateException(
                         "The same MavenVisitor instance has been used on two different XML documents. " +
                         "This violates the Recipe contract that they will return a unique visitor instance every time getVisitor() is called.");
@@ -96,6 +99,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
      */
     public boolean isDependencyTag(String groupId, String artifactId) {
         if (!isDependencyTag()) {
+            if (isTag("dependency") && PROFILE_DEPENDENCY_MATCHER.matches(getCursor())) {
+                Xml.Tag tag = getCursor().getValue();
+                return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+            }
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
@@ -132,7 +140,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isPluginDependencyTag(String groupId, String artifactId) {
-        if (!PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
+        if (!isTag("dependency") ||
+            !PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()) &&
+            !PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
@@ -153,6 +163,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
      */
     public boolean isManagedDependencyTag(String groupId, String artifactId) {
         if (!isManagedDependencyTag()) {
+            if (isTag("dependency") && PROFILE_MANAGED_DEPENDENCY_MATCHER.matches(getCursor())) {
+                Xml.Tag tag = getCursor().getValue();
+                return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+            }
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
