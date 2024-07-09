@@ -88,15 +88,10 @@ public class MethodAccess implements Trait<MethodCall> {
             JavaType.Method methodType = ((MethodCall) value).getMethodType();
             JavaType returnType = methodType == null ? null : methodType.getReturnType();
 
-            if (value instanceof J.MethodInvocation ||
-                value instanceof J.NewClass ||
-                value instanceof J.MemberReference) {
-                return methodMatcher.matches(((Expression) value)) &&
-                       returnsTest.test(returnType) ?
-                        new MethodAccess(cursor) :
-                        null;
-            }
-            return null;
+            return methodMatcher.matches(((Expression) value)) &&
+                   returnsTest.test(returnType) ?
+                    new MethodAccess(cursor) :
+                    null;
         }
     }
 }
