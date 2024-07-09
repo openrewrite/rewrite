@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
+import org.openrewrite.marker.SearchResult;
 
 @ToString
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -59,7 +60,17 @@ public class UseStaticImport extends Recipe {
             int indexBrace = methodPattern.indexOf('(', indexSpace);
             String methodNameMatcher = methodPattern.substring(indexSpace, indexBrace);
             preconditions = Preconditions.and(preconditions,
-                    Preconditions.not(new DeclaresMethod<>("* " + methodNameMatcher + "(..)")));
+                    Preconditions.not(new DeclaresMethod<>("*..* " + methodNameMatcher + "(..)")),
+                    Preconditions.not(new JavaIsoVisitor<ExecutionContext>() {
+                        @Override
+                        public J.Import visitImport(J.Import _import, ExecutionContext ctx) {
+                            if (_import.isStatic() && _import.getQualid().getSimpleName().equals(methodNameMatcher.substring(1))) {
+                                return SearchResult.found(_import);
+                            }
+                            return _import;
+                        }
+                    })
+            );
         }
         return Preconditions.check(preconditions, new UseStaticImportVisitor());
     }

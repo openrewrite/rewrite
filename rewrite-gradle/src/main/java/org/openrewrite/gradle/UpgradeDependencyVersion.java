@@ -160,7 +160,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 m = cursor.getValue();
                 String methodName = m.getSimpleName();
                 if ("constraints".equals(methodName) || "project".equals(methodName) || "modules".equals(methodName)
-                    || "module".equals(methodName) ||"file".equals(methodName) || "files".equals(methodName)) {
+                    || "module".equals(methodName) || "file".equals(methodName) || "files".equals(methodName)) {
                     return false;
                 }
                 if (DEPENDENCY_DSL_MATCHER.matches(m)) {
@@ -687,7 +687,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
                 GradleDependencyConfiguration newGdc = gdc
                         .withRequested(ListUtils.map(gdc.getRequested(), requested -> maybeUpdateDependency(requested, newRequested)))
-                        .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeUpdateResolvedDependency(resolved, newDep)));
+                        .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeUpdateResolvedDependency(resolved, newDep, new HashSet<>())));
                 anyChanged |= newGdc != gdc;
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
             }
@@ -703,7 +703,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private static org.openrewrite.maven.tree.Dependency maybeUpdateDependency(
             org.openrewrite.maven.tree.Dependency dep,
             org.openrewrite.maven.tree.Dependency newDep) {
-        if(Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
+        if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
             return newDep;
         }
         return dep;
@@ -711,10 +711,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     private static ResolvedDependency maybeUpdateResolvedDependency(
             ResolvedDependency dep,
-            ResolvedDependency newDep) {
-        if(Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
+            ResolvedDependency newDep,
+            Set<ResolvedDependency> traversalHistory) {
+        if (traversalHistory.contains(dep)) {
+            return dep;
+        }
+        if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
             return newDep;
         }
-        return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep)));
+        traversalHistory.add(dep);
+        return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep, new HashSet<>(traversalHistory))));
     }
 }
