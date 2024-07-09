@@ -20,15 +20,52 @@ import org.openrewrite.*;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+/**
+ * A trait matcher builds {@link Trait} instances when they match the criteria for that trait.
+ * Required constructor arguments in implementing classes represent the minimum information
+ * needed to meaningfully search for this trait. Optional further filtering criteria should
+ * be expressed as setter methods in the builder style (lacking a 'set' prefix and returning
+ * the matcher instance).
+ *
+ * @param <U> The type of {@link Trait} that this matcher builds.
+ */
 @Incubating(since = "8.30.0")
 public interface TraitMatcher<U extends Trait<?>> {
 
+    /**
+     * Tests whether a tree at the cursor matches the trait, and if so, returns
+     * a trait instance containing the semantic information represented by the tree.
+     *
+     * @param cursor The starting point of the search.
+     * @return Optionally a trait instance if the tree pointed at by the cursor
+     * matches the trait criteria.
+     */
     Optional<U> get(Cursor cursor);
 
+    /**
+     * Looks up the cursor stack (ancestors) for trees that match the trait.
+     *
+     * @param cursor The starting point of the search.
+     * @return A stream of trees that are ancestors of the cursor that match the trait.
+     */
     Stream<U> higher(Cursor cursor);
 
+    /**
+     * Looks down the syntax tree starting at the cursor stack (descendents)
+     * for trees that match the trait.
+     *
+     * @param cursor The starting point of the search.
+     * @return A stream of trees that are descendents of the cursor that match the trait.
+     */
     Stream<U> lower(Cursor cursor);
 
+    /**
+     * Looks down the syntax tree starting at the source file (root LST)
+     * for trees that match the trait.
+     *
+     * @param sourceFile A whole source file.
+     * @return A stream of all trees in a source file that match the trait.
+     */
     default Stream<U> lower(SourceFile sourceFile) {
         return lower(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), sourceFile));
     }

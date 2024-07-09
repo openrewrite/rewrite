@@ -26,21 +26,31 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.MethodCall;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction3;
 
+import java.util.function.Predicate;
+
 @Incubating(since = "8.30.0")
 @Value
-public class MethodAccess implements Trait<Expression> {
+public class MethodAccess implements Trait<MethodCall> {
     Cursor cursor;
 
     @RequiredArgsConstructor
     public static class Matcher extends SimpleTraitMatcher<MethodAccess> {
         private final MethodMatcher methodMatcher;
+        private Predicate<@Nullable JavaType> returnsTest = m -> true;
 
         public Matcher(String methodPattern) {
             this(new MethodMatcher(methodPattern));
+        }
+
+        public Matcher returns(Predicate<@Nullable JavaType> returnsTest) {
+            this.returnsTest = returnsTest;
+            return this;
         }
 
         @Override
@@ -52,14 +62,6 @@ public class MethodAccess implements Trait<Expression> {
                     return methodAccess != null ?
                             (J) visitor.visit(methodAccess, getCursor(), p) :
                             super.visitMethodInvocation(method, p);
-                }
-
-                @Override
-                public J visitMethodDeclaration(J.MethodDeclaration method, P p) {
-                    MethodAccess methodAccess = test(getCursor());
-                    return methodAccess != null ?
-                            (J) visitor.visit(methodAccess, getCursor(), p) :
-                            super.visitMethodDeclaration(method, p);
                 }
 
                 @Override
@@ -83,29 +85,16 @@ public class MethodAccess implements Trait<Expression> {
         @Override
         protected @Nullable MethodAccess test(Cursor cursor) {
             Object value = cursor.getValue();
+            JavaType.Method methodType = ((MethodCall) value).getMethodType();
+            JavaType returnType = methodType == null ? null : methodType.getReturnType();
+
             if (value instanceof J.MethodInvocation ||
                 value instanceof J.NewClass ||
                 value instanceof J.MemberReference) {
-                return methodMatcher.matches(((Expression) value)) ?
+                return methodMatcher.matches(((Expression) value)) &&
+                       returnsTest.test(returnType) ?
                         new MethodAccess(cursor) :
                         null;
-            }
-            if (value instanceof J.MethodDeclaration) {
-                J newClassOrClassDecl = cursor
-                        .dropParentUntil(t -> t instanceof J.ClassDeclaration ||
-                                              t instanceof J.NewClass)
-                        .getValue();
-                if (newClassOrClassDecl instanceof J.ClassDeclaration) {
-                    return methodMatcher.matches((J.MethodDeclaration) value,
-                            (J.ClassDeclaration) newClassOrClassDecl) ?
-                            new MethodAccess(cursor) :
-                            null;
-                } else if (newClassOrClassDecl instanceof J.NewClass) {
-                    return methodMatcher.matches((J.MethodDeclaration) value,
-                            (J.NewClass) newClassOrClassDecl) ?
-                            new MethodAccess(cursor) :
-                            null;
-                }
             }
             return null;
         }

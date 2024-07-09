@@ -16,7 +16,9 @@
 package org.openrewrite.java.trait;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
@@ -62,3 +64,4 @@ public class MethodAccessTest implements RewriteTest {
         return toRecipe(() -> matcher.asVisitor(va -> SearchResult.found(va.getTree())));
     }
 }
+
