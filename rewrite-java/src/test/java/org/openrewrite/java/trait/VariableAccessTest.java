@@ -38,7 +38,7 @@ class VariableAccessTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              class Test<T> {
+              class Test {
                  int test(int p) {
                    int a = p;
                    p++;
