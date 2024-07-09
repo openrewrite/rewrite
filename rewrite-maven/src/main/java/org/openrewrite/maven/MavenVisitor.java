@@ -64,9 +64,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     protected MavenResolutionResult getResolutionResult() {
         Iterator<Object> itr = getCursor()
                 .getPath(Xml.Document.class::isInstance);
-        if(itr.hasNext()) {
+        if (itr.hasNext()) {
             Xml.Document newDocument = (Xml.Document) itr.next();
-            if(document != null && document != newDocument) {
+            if (document != null && document != newDocument) {
                 throw new IllegalStateException(
                         "The same MavenVisitor instance has been used on two different XML documents. " +
                         "This violates the Recipe contract that they will return a unique visitor instance every time getVisitor() is called.");
@@ -102,7 +102,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (isTag("dependency") && PROFILE_DEPENDENCY_MATCHER.matches(getCursor())) {
                 Xml.Tag tag = getCursor().getValue();
                 return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
-                        matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
             }
             return false;
         }
@@ -140,7 +140,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isPluginDependencyTag(String groupId, String artifactId) {
-        if (!(PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()) || PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()))) {
+        if (!isTag("dependency") ||
+            !PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()) &&
+            !PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
@@ -164,7 +166,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (isTag("dependency") && PROFILE_MANAGED_DEPENDENCY_MATCHER.matches(getCursor())) {
                 Xml.Tag tag = getCursor().getValue();
                 return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
-                        matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
             }
             return false;
         }
