@@ -128,7 +128,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void latestPatch() {
+    void latestPatchMangedDependency() {
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -171,6 +171,63 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeProfileManagedDependencyGroupIdAndArtifactId() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                    <profile>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>javax.activation</groupId>
+                                  <artifactId>javax.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                    </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                    <profile>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>2.1.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                    </profile>
+                  </profiles>
               </project>
               """
           )
