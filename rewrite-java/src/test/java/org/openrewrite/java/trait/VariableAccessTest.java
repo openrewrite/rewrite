@@ -48,7 +48,7 @@ class VariableAccessTest implements RewriteTest {
               }
               """,
             """
-              class Test<T> {
+              class Test {
                  int test(int p) {
                    int a = /*~~(read p)~~>*/p;
                    /*~~(write p)~~>*/p++;
