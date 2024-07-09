@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -141,6 +142,163 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeProfileManagedDependencyGroupIdAndArtifactId() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                    <profile>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>javax.activation</groupId>
+                                  <artifactId>javax.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                    </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                    <profile>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>2.1.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                    </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeProfileManagedDependencyWithDynamicVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                    <profile>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>javax.activation</groupId>
+                                  <artifactId>javax.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                    </profile>
+                  </profiles>
+              </project>
+              """,
+            spec -> spec.after(pom -> {
+                assertThat(pom).containsPattern("<version>2.1.(\\d+)</version>");
+                return pom;
+            })
+          )
+        );
+    }
+
+    @Test
+    void latestPatchProfileManagedDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "latest.patch",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                    <profile>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>javax.activation</groupId>
+                                  <artifactId>javax.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                    </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                    <profile>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>1.2.2</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                    </profile>
+                  </profiles>
               </project>
               """
           )
@@ -1130,6 +1288,153 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <version>2.11.0</version>
                       </dependency>
                   </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeProfileDependencyGroupIdAndArtifactId() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                      <profile>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>javax.activation</groupId>
+                                  <artifactId>javax.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                      <profile>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>2.1.0</version>
+                              </dependency>
+                          </dependencies>
+                      </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeProfileDependencyWithDynamicVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                      <profile>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>javax.activation</groupId>
+                                  <artifactId>javax.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </profile>
+                  </profiles>
+              </project>
+              """,
+            spec -> spec.after(pom -> {
+                assertThat(pom).containsPattern("<version>2.1.(\\d+)</version>");
+                return pom;
+            })
+          )
+        );
+    }
+
+    @Test
+    void latestPatchProfileDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "latest.patch",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                      <profile>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>javax.activation</groupId>
+                                  <artifactId>javax.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                      <profile>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>1.2.2</version>
+                              </dependency>
+                          </dependencies>
+                      </profile>
+                  </profiles>
               </project>
               """
           )
