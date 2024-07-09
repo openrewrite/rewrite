@@ -43,6 +43,7 @@ class VariableAccessTest implements RewriteTest {
                    int a = p;
                    p++;
                    p = p+1;
+                   int negP = -p;
                    return a+1;
                  }
               }
@@ -53,12 +54,13 @@ class VariableAccessTest implements RewriteTest {
                    int a = /*~~(read p)~~>*/p;
                    /*~~(write p)~~>*/p++;
                    /*~~(write p)~~>*/p = /*~~(read p)~~>*/p+1;
+                   int negP = -/*~~(read p)~~>*/p;
                    return /*~~(read a)~~>*/a+1;
                  }
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(5);
+                assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(6);
             })
           )
         );

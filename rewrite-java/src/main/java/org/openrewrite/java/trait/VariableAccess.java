@@ -48,7 +48,8 @@ public class VariableAccess implements Trait<J.Identifier> {
         }
         if (pair.getParent() instanceof J.Unary) {
             J.Unary unary = (J.Unary) pair.getParent();
-            return unary.getExpression() == pair.getTree();
+            return unary.getExpression() == pair.getTree() &&
+                   unary.getOperator().isModifying();
         }
         return false;
     }
@@ -66,6 +67,11 @@ public class VariableAccess implements Trait<J.Identifier> {
         if (pair.getParent() instanceof J.Assignment) {
             J.Assignment assignment = (J.Assignment) pair.getParent();
             return assignment.getVariable() != pair.getTree();
+        }
+        if (pair.getParent() instanceof J.Unary) {
+            J.Unary unary = (J.Unary) pair.getParent();
+            return unary.getExpression() == pair.getTree() &&
+                   !unary.getOperator().isModifying();
         }
         return true;
     }
