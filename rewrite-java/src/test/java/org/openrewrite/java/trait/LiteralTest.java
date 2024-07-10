@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.trait.Traits.literal;
 
-public class LiteralTest implements RewriteTest {
+class LiteralTest implements RewriteTest {
 
     @Test
     void numericLiteral() {
