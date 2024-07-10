@@ -54,6 +54,10 @@ public class Literal implements Trait<Expression> {
         return !isNull();
     }
 
+    public String getString() {
+        return getValue(String.class);
+    }
+
     public <@Nullable T> T getValue(Class<T> type) {
         return getValue(mapper.constructType(type));
     }
