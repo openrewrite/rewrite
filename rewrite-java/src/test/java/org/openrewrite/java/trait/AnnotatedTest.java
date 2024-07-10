@@ -16,50 +16,50 @@
 package org.openrewrite.java.trait;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Recipe;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.trait.Traits.methodAccess;
-import static org.openrewrite.test.RewriteTest.toRecipe;
+import static org.openrewrite.java.trait.Traits.annotated;
 
-@SuppressWarnings("ALL")
-class MethodAccessTest implements RewriteTest {
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(markMethodAccesses(methodAccess(
-          new MethodMatcher("java.util.List add(..)", true))));
-    }
+public class AnnotatedTest implements RewriteTest {
 
     @Test
-    void methodAccesses() {
+    void attributes() {
         rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            annotated("@Example").asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getDefaultAttribute("name")
+                .map(lit -> lit.getValue(String.class))
+                .orElse("unknown"))
+            )
+          )),
           java(
             """
-              import java.util.List;
+              import java.lang.annotation.Repeatable;
+              @Repeatable
+              @interface Example {
+                  String value() default "";
+                  String name() default "";
+              }
+              """
+          ),
+          java(
+            """
+              @Example("test")
+              @Example(value = "test")
+              @Example(name = "test")
               class Test {
-                 void test(List<String> names) {
-                   names.add("Alice");
-                 }
               }
               """,
             """
-              import java.util.List;
+              /*~~(test)~~>*/@Example("test")
+              /*~~(test)~~>*/@Example(value = "test")
+              /*~~(test)~~>*/@Example(name = "test")
               class Test {
-                 void test(List<String> names) {
-                   /*~~>*/names.add("Alice");
-                 }
               }
               """
           )
         );
-    }
-
-    Recipe markMethodAccesses(MethodAccess.Matcher matcher) {
-        return toRecipe(() -> matcher.asVisitor(ma -> SearchResult.found(ma.getTree())));
     }
 }
