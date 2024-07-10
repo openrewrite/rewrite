@@ -162,7 +162,7 @@ class ClassDeclarationTest implements RewriteTest {
               """, spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements().stream()
                   .anyMatch(it -> it instanceof J.ClassDeclaration &&
-                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Interface)).isEqualTo(true);
+                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Interface)).isTrue();
             })
           )
         );
@@ -182,7 +182,7 @@ class ClassDeclarationTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements().stream()
                   .anyMatch(it -> it instanceof J.ClassDeclaration &&
-                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Annotation)).isEqualTo(true);
+                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Annotation)).isTrue();
             }))
           );
     }
@@ -194,7 +194,7 @@ class ClassDeclarationTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
               assertThat(cu.getStatements().stream()
                 .anyMatch(it -> it instanceof J.ClassDeclaration &&
-                  ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Enum)).isEqualTo(true);
+                  ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Enum)).isTrue();
           }))
         );
     }

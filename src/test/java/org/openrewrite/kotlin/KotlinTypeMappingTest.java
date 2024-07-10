@@ -343,7 +343,7 @@ public class KotlinTypeMappingTest {
         JavaType.Class c = (JavaType.Class) firstMethodParameter("javaType");
         assertThat(c.getFullyQualifiedName()).isEqualTo("java.lang.Object");
         assertThat(c.getSupertype()).isNull();
-        assertThat(c.getMethods().size()).isEqualTo(12);
+        assertThat(c.getMethods()).hasSize(12);
 
         // Assert generic type parameters have the correct type bounds.
         JavaType.Method method = c.getMethods().stream().filter(it -> "getClass".equals(it.getName())).findFirst().orElse(null);
@@ -615,7 +615,7 @@ public class KotlinTypeMappingTest {
                             return super.visitBinary(binary, b);
                         }
                     }.visit(cu, found);
-                    assertThat(found.get()).isEqualTo(true);
+                    assertThat(found.get()).isTrue();
                 })
               )
             );
@@ -1592,7 +1592,7 @@ public class KotlinTypeMappingTest {
                             return super.visitMemberReference(memberRef, integer);
                         }
                     }.visit(cu, 0);
-                    assertThat(found.get()).isEqualTo(true);
+                    assertThat(found.get()).isTrue();
                 })
               )
             );
@@ -1709,7 +1709,7 @@ public class KotlinTypeMappingTest {
                                       count.getAndIncrement();
                                       break;
                                   case "foo.bar":
-                                      assertThat(fieldAccessSignature).isEqualTo("");
+                                      assertThat(fieldAccessSignature).isEmpty();
                                       count.getAndIncrement();
                                       break;
                               }

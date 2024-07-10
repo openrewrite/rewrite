@@ -249,4 +249,29 @@ class FieldAccessTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dataClassFieldAccessRetainsNullableMarker() {
+        // language=kotlin
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                  if ("completed".equals(fieldAccess.getSimpleName())) {
+                      // TODO Type is not nullable, but field is nullable
+                  }
+                  return super.visitFieldAccess(fieldAccess, ctx);
+              }
+          })),
+          kotlin(
+            """
+              data class Todo(val completed: Boolean?)
+              fun main() {
+                val todo = Todo(null)
+                val isCompleted = todo.completed
+              }
+              """
+          )
+        );
+    }
 }

@@ -487,7 +487,7 @@ class AutodetectTest implements RewriteTest {
         var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
-        assertThat(importLayout.getLayout().size()).isEqualTo(5);
+        assertThat(importLayout.getLayout()).hasSize(5);
 
         assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
 
@@ -545,7 +545,7 @@ class AutodetectTest implements RewriteTest {
         var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
-        assertThat(importLayout.getLayout().size()).isEqualTo(5);
+        assertThat(importLayout.getLayout()).hasSize(5);
 
         assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllAliases.class);
 

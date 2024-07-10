@@ -67,7 +67,7 @@ class AssertionsTest implements RewriteTest {
                     //language=none
                     "a++")
                 .findFirst();
-        assertThat(sf.isPresent()).isEqualTo(true);
+        assertThat(sf.isPresent()).isTrue();
         //noinspection OptionalGetWithoutIsPresent
         assertThat(sf.get()).isInstanceOf(ParseError.class);
     }
