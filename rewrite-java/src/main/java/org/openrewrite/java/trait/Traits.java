@@ -43,4 +43,8 @@ public class Traits {
     public static Annotated.Matcher annotated(String signature) {
         return new Annotated.Matcher(signature);
     }
+
+    public static Annotated.Matcher annotated(Class<?> annotationType) {
+        return new Annotated.Matcher(annotationType);
+    }
 }

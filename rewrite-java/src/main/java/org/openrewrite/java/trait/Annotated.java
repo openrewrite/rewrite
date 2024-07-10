@@ -83,6 +83,10 @@ public class Annotated implements Trait<J.Annotation> {
             this.matcher = new AnnotationMatcher(signature);
         }
 
+        public Matcher(Class<?> annotationType) {
+            this.matcher = new AnnotationMatcher(annotationType);
+        }
+
         @Override
         protected @Nullable Annotated test(Cursor cursor) {
             Object value = cursor.getValue();
