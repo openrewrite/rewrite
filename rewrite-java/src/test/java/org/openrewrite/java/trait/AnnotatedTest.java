@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.trait.Traits.annotated;
 
-public class AnnotatedTest implements RewriteTest {
+class AnnotatedTest implements RewriteTest {
 
     @Test
     void attributes() {
