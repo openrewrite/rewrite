@@ -172,6 +172,17 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
                 }
             }
 
+            if (m.getSimpleName().equals("remote") && withinMethodInvocations(Arrays.asList("gradleEnterprise", "buildCache"))) {
+                return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                    if (arg instanceof J.FieldAccess) {
+                        J.FieldAccess field = (J.FieldAccess) arg;
+                        if (field.getSimpleName().equals("buildCache") && field.getTarget() instanceof J.Identifier && ((J.Identifier) field.getTarget()).getSimpleName().equals("gradleEnterprise")) {
+                            return field.withTarget(((J.Identifier) field.getTarget()).withSimpleName("develocity"));
+                        }
+                    }
+                    return arg;
+                }));
+            }
             return m;
         }
 

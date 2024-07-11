@@ -47,6 +47,12 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                           taskInputFiles = true
                       }
                   }
+                  buildCache {
+                      remote(gradleEnterprise.buildCache) {
+                          enabled = true
+                          push = System.getenv("CI") != null
+                      }
+                  }
               }
               """,
             """
@@ -60,6 +66,12 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                       uploadInBackground = true
                       capture {
                           fileFingerprints = true
+                      }
+                  }
+                  buildCache {
+                      remote(develocity.buildCache) {
+                          enabled = true
+                          push = System.getenv("CI") != null
                       }
                   }
               }
