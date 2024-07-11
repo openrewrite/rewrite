@@ -16,6 +16,8 @@
 package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -30,6 +32,8 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
+    @Issue("https://github.com/openrewrite/rewrite/issues/4135")
     void migrate() {
         rewriteRun(
           settingsGradle(
