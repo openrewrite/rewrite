@@ -94,12 +94,22 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     @Nullable
     Boolean changeManagedDependency;
 
+    @Option(displayName = "Update dependency management",
+            description = "Also update the dependency management section. The default for this flag is `true`.",
+            required = false)
+    @Nullable
+    Boolean changePropertyVersionNames;
+
     public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
-        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, false, true);
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, false, true, true);
+    }
+
+    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency) {
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, overrideManagedVersion, changeManagedDependency, true);
     }
 
     @JsonCreator
-    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency) {
+    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency, @Nullable Boolean changePropertyVersionNames) {
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
@@ -108,6 +118,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
         this.versionPattern = versionPattern;
         this.overrideManagedVersion = overrideManagedVersion;
         this.changeManagedDependency = changeManagedDependency;
+        this.changePropertyVersionNames = changePropertyVersionNames;
     }
 
     @Override
@@ -156,13 +167,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                // Any managed dependency change is unlikely to use the same version, so only update selectively.
-                if ((changeManagedDependency == null || changeManagedDependency) && newVersion != null || versionPattern != null) {
+                // Any managed dependency change is unlikely to use the same version, so only update selectively. If the new dependency is already managed, don't change the old dependency. It will be removed at the end.
+                if ((changeManagedDependency == null || changeManagedDependency) && newVersion != null && !isDependencyManaged(newGroupId, newArtifactId, newVersion)) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
                             oldGroupId, oldArtifactId,
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),
                             Optional.ofNullable(newArtifactId).orElse(oldArtifactId),
-                            newVersion, versionPattern).getVisitor());
+                            newVersion, versionPattern, changePropertyVersionNames).getVisitor());
                 }
                 return super.visitDocument(document, ctx);
             }
@@ -203,13 +214,35 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false).visit(t, ctx);
                                 } else {
                                     // Otherwise, change the version to the new value.
-                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                    if (Objects.requireNonNull(currentVersion).contains("$")) {
+                                        // If the version is a property value, change version in property section and rename the property if changePropertyNames is true.
+                                        String propertyVariable = currentVersion.substring(2, currentVersion.length() - 1);
+                                        String newPropertyVariable = propertyVariable;
+                                        if (Boolean.TRUE.equals(changePropertyVersionNames)){
+                                            newPropertyVariable = newArtifactId + ".version";
+                                            doAfterVisit(new RenamePropertyKey(propertyVariable, newPropertyVariable).getVisitor());
+                                            t = changeChildTagValue(t, "version", "${"+newPropertyVariable+"}", ctx);
+                                        }
+                                        doAfterVisit(new ChangePropertyValue(newPropertyVariable, resolvedNewVersion, false, false).getVisitor());
+                                    } else {
+                                        //If the version is no property value, change it right here.
+                                        t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                    }
+
                                 }
-                            } else if (configuredToOverrideManageVersion || !newDependencyManaged) {
-                                //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
-                                Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
-                                //noinspection ConstantConditions
-                                t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
+                            } else if (!(newDependencyManaged && configuredToChangeManagedDependency)) {
+                                //If the Version not present and the new version is not managed and/or the changeManagedDependency Option is false.
+                                List<ResolvedManagedDependency> md = getResolutionResult().getPom().getDependencyManagement();
+                                if (configuredToOverrideManageVersion || ((!md.isEmpty() && md.get(0).getRequestedBom() != null) && !newDependencyManaged) || !configuredToChangeManagedDependency) {
+                                    //If the version is not present, add the version if we are explicitly overriding a managed version, if no managed version exists with no collection of dependencies or changeManageDependency is false.
+                                    Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
+                                    //noinspection ConstantConditions
+                                    t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
+                                }
+
+                            } else if (oldDependencyManaged){
+                                //If the version is not present and the new and old version are managed, remove the old dependency
+                                doAfterVisit(new RemoveManagedDependency(oldGroupId,oldArtifactId, null).getVisitor());
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
@@ -238,6 +271,17 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
                         return scope.isInClasspathOf(managedDependency.getScope());
+                    }
+                }
+                return false;
+            }
+
+            private boolean isDependencyManaged(String groupId, String artifactId, String version) {
+
+                MavenResolutionResult result = getResolutionResult();
+                for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
+                    if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId()) && version.equals(managedDependency.getVersion())) {
+                        return true;
                     }
                 }
                 return false;

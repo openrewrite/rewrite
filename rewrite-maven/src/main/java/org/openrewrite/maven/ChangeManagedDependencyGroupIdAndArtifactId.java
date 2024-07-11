@@ -72,29 +72,36 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
     String versionPattern;
 
+    @Option(displayName = "Change property version names",
+            description = "Allows property version names to be changed to best practice naming convention",
+            example = "-jre",
+            required = false)
+    @Nullable
+    Boolean changePropertyVersionNames;
+
     public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion) {
-        this.oldGroupId = oldGroupId;
-        this.oldArtifactId = oldArtifactId;
-        this.newGroupId = newGroupId;
-        this.newArtifactId = newArtifactId;
-        this.newVersion = newVersion;
-        this.versionPattern = null;
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, null, true);
+    }
+
+    public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, true);
     }
 
     @JsonCreator
-    public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
+    public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean changePropertyVersionNames) {
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
         this.newArtifactId = newArtifactId;
         this.newVersion = newVersion;
         this.versionPattern = versionPattern;
+        this.changePropertyVersionNames = changePropertyVersionNames;
     }
 
     @Override
@@ -156,8 +163,21 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
                             if (versionTag.isPresent()) {
-                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, newArtifactId, versionTag.get().getValue().orElse(null));
-                                t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
+                                String version = versionTag.get().getValue().orElse(null);
+                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, newArtifactId, version);
+                                if (Objects.requireNonNull(version).contains("$")) {
+                                    String propertyVariable = version.substring(2, version.length() - 1);
+                                    String newPropertyVariable = propertyVariable;
+                                    if (Boolean.TRUE.equals(changePropertyVersionNames)){
+                                        newPropertyVariable = newArtifactId + ".version";
+                                        doAfterVisit(new RenamePropertyKey(propertyVariable, newPropertyVariable).getVisitor());
+                                        t = changeChildTagValue(t, "version", "${"+newPropertyVariable+"}", ctx);
+                                    }
+                                    doAfterVisit(new ChangePropertyValue(newPropertyVariable, resolvedNewVersion, false, false).getVisitor());
+                                } else {
+                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                }
+
                             }
                             changed = true;
                         } catch(MavenDownloadingException e) {
@@ -172,8 +192,21 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 return t;
             }
 
+            private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
+                Optional<Xml.Tag> childTag = tag.getChild(childTagName);
+                if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
+                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
+                }
+                return tag;
+            }
+
             @SuppressWarnings("ConstantConditions")
             private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
+                if (currentVersion.contains("$")){
+                    String propertyVariable = currentVersion.substring(2, currentVersion.length() - 1);
+                    currentVersion = getResolutionResult().getPom().getProperties().get(propertyVariable);
+                }
+
                 if (versionComparator == null) {
                     return newVersion;
                 }
