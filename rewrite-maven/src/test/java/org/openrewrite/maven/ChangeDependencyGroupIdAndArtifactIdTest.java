@@ -1359,7 +1359,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
-                          <jakarta.activation-api.version>2.1.0</jakarta.activation-api.version>
+                          <javax.activation.version>2.1.0</javax.activation.version>
                   </properties>
                   <profiles>
                     <profile>
@@ -1369,7 +1369,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <dependency>
                                   <groupId>jakarta.activation</groupId>
                                   <artifactId>jakarta.activation-api</artifactId>
-                                  <version>${jakarta.activation-api.version}</version>
+                                  <version>${javax.activation.version}</version>
                               </dependency>
                           </dependencies>
                       </dependencyManagement>
@@ -1431,14 +1431,14 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
-                          <jakarta.activation-api.version>2.1.0</jakarta.activation-api.version>
+                          <javax.activation.version>2.1.0</javax.activation.version>
                   </properties>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>${jakarta.activation-api.version}</version>
+                              <version>${javax.activation.version}</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -1501,7 +1501,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
-                          <jakarta.activation-api.version>2.1.0</jakarta.activation-api.version>
+                          <javax.activation.version>2.1.0</javax.activation.version>
                   </properties>
                   <profiles>
                     <profile>
@@ -1510,7 +1510,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                         <dependency>
                             <groupId>jakarta.activation</groupId>
                             <artifactId>jakarta.activation-api</artifactId>
-                            <version>${jakarta.activation-api.version}</version>
+                            <version>${javax.activation.version}</version>
                         </dependency>
                       </dependencies>
                     </profile>
