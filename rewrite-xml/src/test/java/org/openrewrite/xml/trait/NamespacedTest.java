@@ -13,45 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.internal;
+package org.openrewrite.xml.trait;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.xml.tree.Xml;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
-class XmlTest {
+class NamespacedTest {
 
     @Test
     void isNamespaceDefinitionAttributeTests() {
-        assertThat(Xml.isNamespaceDefinitionAttribute("xmlns:test")).isTrue();
-        assertThat(Xml.isNamespaceDefinitionAttribute("test")).isFalse();
+        assertThat(Namespaced.isNamespaceDefinitionAttribute("xmlns:test")).isTrue();
+        assertThat(Namespaced.isNamespaceDefinitionAttribute("test")).isFalse();
     }
 
     @Test
     void getAttributeNameForPrefix() {
-        assertThat(Xml.getAttributeNameForPrefix("test")).isEqualTo("xmlns:test");
-        assertThat(Xml.getAttributeNameForPrefix("")).isEqualTo("xmlns");
+        assertThat(Namespaced.getAttributeNameForPrefix("test")).isEqualTo("xmlns:test");
+        assertThat(Namespaced.getAttributeNameForPrefix("")).isEqualTo("xmlns");
     }
 
     @Test
     void extractNamespacePrefix() {
-        assertEquals("test", Xml.extractNamespacePrefix("test:tag"));
-        assertEquals("", Xml.extractNamespacePrefix("tag"));
+        assertEquals("test", Namespaced.extractNamespacePrefix("test:tag"));
+        assertEquals("", Namespaced.extractNamespacePrefix("tag"));
     }
 
     @Test
     void extractLocalName() {
-        assertEquals("tag", Xml.extractLocalName("test:tag"));
-        assertEquals("tag", Xml.extractLocalName("tag"));
+        assertEquals("tag", Namespaced.extractLocalName("test:tag"));
+        assertEquals("tag", Namespaced.extractLocalName("tag"));
     }
 
     @Test
     void extractPrefixFromNamespaceDefinition() {
-        assertEquals("test", Xml.extractPrefixFromNamespaceDefinition("xmlns:test"));
-        assertEquals("", Xml.extractPrefixFromNamespaceDefinition("xmlns"));
-        assertThat(Xml.extractPrefixFromNamespaceDefinition("test")).isEqualTo(null);
-        assertThat(Xml.extractPrefixFromNamespaceDefinition("a:test")).isEqualTo(null);
+        assertEquals("test", Namespaced.extractPrefixFromNamespaceDefinition("xmlns:test"));
+        assertEquals("", Namespaced.extractPrefixFromNamespaceDefinition("xmlns"));
+        assertThat(Namespaced.extractPrefixFromNamespaceDefinition("test")).isEqualTo(null);
+        assertThat(Namespaced.extractPrefixFromNamespaceDefinition("a:test")).isEqualTo(null);
     }
 }

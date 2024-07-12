@@ -19,7 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.search.FindTags;
-import org.openrewrite.xml.tree.Namespaced;
+import org.openrewrite.xml.trait.Namespaced;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -281,13 +281,13 @@ public class XPathMatcher {
                 } else if (isFunctionCondition) { // [local-name()='name'] pattern
                     if (isAttributeElement) {
                         for (Xml.Attribute a : tag.getAttributes()) {
-                            if (matchesElementAndFunction(a, cursor, element, selector, value)) {
+                            if (matchesElementAndFunction(new Cursor(cursor, a), element, selector, value)) {
                                 matchCurrentCondition = true;
                                 break;
                             }
                         }
                     } else {
-                        matchCurrentCondition = matchesElementAndFunction(tag, cursor, element, selector, value);
+                        matchCurrentCondition = matchesElementAndFunction(cursor, element, selector, value);
                     }
                 } else { // other [] conditions
                     for (Xml.Tag t : FindTags.find(tag, selector)) {
@@ -309,13 +309,14 @@ public class XPathMatcher {
         return stillMatchesConditions ? element : null;
     }
 
-    private static boolean matchesElementAndFunction(Namespaced tagOrAttribute, Cursor cursor, String element, String selector, String value) {
-        if (!element.equals("*") && !tagOrAttribute.getName().equals(element)) {
+    private static boolean matchesElementAndFunction(Cursor cursor, String element, String selector, String value) {
+        Namespaced namespaced = new Namespaced(cursor);
+        if (!element.equals("*") && !Objects.equals(namespaced.getName().orElse(null), element)) {
             return false;
         } else if (selector.equals("local-name()")) {
-            return tagOrAttribute.getLocalName().equals(value);
+            return Objects.equals(namespaced.getLocalName().orElse(null), value);
         } else if (selector.equals("namespace-uri()")) {
-            Optional<String> nsUri = tagOrAttribute.getNamespaceUri(cursor);
+            Optional<String> nsUri = namespaced.getNamespaceUri();
             return nsUri.isPresent() && nsUri.get().equals(value);
         }
         return false;

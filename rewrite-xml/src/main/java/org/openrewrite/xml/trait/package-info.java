@@ -13,21 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.tree;
+@NonNullApi
+package org.openrewrite.xml.trait;
 
-import org.openrewrite.Cursor;
-
-import java.util.Map;
-import java.util.Optional;
-
-public interface Namespaced extends Xml {
-    String getName();
-
-    String getLocalName();
-
-    Optional<String> getNamespacePrefix();
-
-    Optional<String> getNamespaceUri(Cursor cursor);
-
-    Map<String, String> getAllNamespaces(Cursor cursor);
-}
+import org.openrewrite.internal.lang.NonNullApi;
