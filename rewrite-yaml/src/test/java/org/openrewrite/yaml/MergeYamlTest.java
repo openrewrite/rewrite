@@ -1135,4 +1135,32 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void insertElementIntoExistingSequence() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$.build",
+              """
+                steps:
+                  - run: publish
+                """,
+              false, null, null)
+          ),
+          yaml(
+            """
+              build:
+                steps:
+                  - run: build
+              """,
+            """
+              build:
+                steps:
+                  - run: build
+                  - run: publish
+              """
+          )
+        );
+    }
 }
