@@ -1785,15 +1785,15 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitShortTernaryExpression(ElvisOperatorExpression ternary) {
-            Space fmt = whitespace();
-            Expression trueExpr = visit(ternary.getBooleanExpression());
-            J.Ternary elvis = new J.Ternary(randomId(), fmt, Markers.EMPTY,
-                    trueExpr,
-                    padLeft(sourceBefore("?"), trueExpr),
-                    padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
-                    typeMapping.type(staticType(ternary)));
-            elvis = elvis.withMarkers(elvis.getMarkers().add(new Elvis(randomId())));
-            queue.add(elvis);
+            queue.add(insideParentheses(ternary, fmt -> {
+                Expression trueExpr = visit(ternary.getBooleanExpression());
+                J.Ternary elvis = new J.Ternary(randomId(), fmt, Markers.EMPTY,
+                        trueExpr,
+                        padLeft(sourceBefore("?"), trueExpr),
+                        padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
+                        typeMapping.type(staticType(ternary)));
+                return elvis.withMarkers(elvis.getMarkers().add(new Elvis(randomId())));
+            }));
         }
 
         @Override

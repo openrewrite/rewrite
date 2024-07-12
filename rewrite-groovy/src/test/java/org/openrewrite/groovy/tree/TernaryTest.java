@@ -36,6 +36,13 @@ class TernaryTest implements RewriteTest {
     }
 
     @Test
+    void elvisInParens() {
+        rewriteRun(
+          groovy(" ( System.getProperty(\"foo\") ?: false ) ")
+        );
+    }
+
+    @Test
     void ternary() {
         rewriteRun(
           groovy("1 == 2 ? /no it isn't/ : /yes it is/")
