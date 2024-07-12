@@ -19,6 +19,8 @@ import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.MethodMatcher;
 
 public class Traits {
+    private Traits() {
+    }
 
     public static Literal.Matcher literal() {
         return new Literal.Matcher();
