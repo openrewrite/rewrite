@@ -301,6 +301,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
+            public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
+                if (sf instanceof Properties) {
+                    return new UpdateProperties(acc).isAcceptable(sf, ctx);
+                } else if (sf instanceof G.CompilationUnit) {
+                    return new UpdateGroovy(acc).isAcceptable(sf, ctx);
+                }
+                return false;
+            }
+
+            @Override
             public @Nullable Tree visit(@Nullable Tree t, ExecutionContext ctx) {
                 if (t instanceof Properties) {
                     t = new UpdateProperties(acc).visitNonNull(t, ctx);
