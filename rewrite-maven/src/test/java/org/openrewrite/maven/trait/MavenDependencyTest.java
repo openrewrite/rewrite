@@ -16,6 +16,7 @@
 package org.openrewrite.maven.trait;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -23,7 +24,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.maven.trait.Traits.mavenDependency;
 
-public class MavenDependencyTest implements RewriteTest {
+class MavenDependencyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -32,6 +33,7 @@ public class MavenDependencyTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
     void dependency() {
         rewriteRun(
           pomXml(
