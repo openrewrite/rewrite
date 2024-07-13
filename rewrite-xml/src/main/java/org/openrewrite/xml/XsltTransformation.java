@@ -18,13 +18,7 @@ package org.openrewrite.xml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.FindSourceFiles;
-import org.openrewrite.Option;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -41,12 +35,14 @@ public class XsltTransformation extends Recipe {
     @Language("xml")
     @Option(displayName = "XSLT Configuration transformation",
             description = "The transformation to be applied.",
+            example = "<xsl:stylesheet ...>...</xsl:stylesheet>",
             required = false)
     String xslt;
 
     @Nullable
     @Option(displayName = "XSLT Configuration transformation classpath resource",
             description = "Recipe transformation provided as a classpath resource.",
+            example = "/changePlugin.xslt",
             required = false)
     String xsltResource;
 

@@ -49,7 +49,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -71,7 +71,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -102,7 +102,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -119,7 +119,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -155,7 +155,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -173,7 +173,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -209,7 +209,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -231,7 +231,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -267,7 +267,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -289,7 +289,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -325,7 +325,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>

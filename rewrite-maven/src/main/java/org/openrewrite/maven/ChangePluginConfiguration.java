@@ -63,12 +63,16 @@ public class ChangePluginConfiguration extends Recipe {
     @Nullable
     @Language("xml")
     @Option(displayName = "XSLT Configuration transformation",
-            description = "The transformation to be applied on the <configuration> element.")
+            description = "The transformation to be applied on the <configuration> element.",
+            example = "<xsl:stylesheet ...>...</xsl:stylesheet>",
+            required = false)
     String xslt;
 
     @Nullable
     @Option(displayName = "XSLT Configuration transformation classpath resource",
-            description = "The transformation to be applied on the <configuration> element provided as a classpath resource.")
+            description = "The transformation to be applied on the <configuration> element provided as a classpath resource.",
+            example = "/changePlugin.xslt",
+            required = false)
     String xsltResource;
 
     @Override
