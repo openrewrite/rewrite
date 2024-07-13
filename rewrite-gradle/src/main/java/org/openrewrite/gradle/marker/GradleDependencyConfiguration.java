@@ -70,7 +70,7 @@ public class GradleDependencyConfiguration implements Serializable {
      */
     public List<ResolvedDependency> getResolved() {
         List<ResolvedDependency> resolved = new ArrayList<>(getDirectResolved());
-        Set<ResolvedDependency> alreadyResolved = new HashSet<>();
+        Set<ResolvedDependency> alreadyResolved = new LinkedHashSet<>();
         return resolveTransitiveDependencies(resolved, alreadyResolved);
     }
 

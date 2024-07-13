@@ -20,8 +20,6 @@ import lombok.experimental.FieldDefaults;
 import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -73,49 +71,6 @@ public interface Xml extends Tree {
      * referential equality check.
      */
     Xml withPrefixUnsafe(String prefix);
-
-    static boolean isNamespaceDefinitionAttribute(String name) {
-        return name.startsWith("xmlns");
-    }
-
-    static String getAttributeNameForPrefix(String namespacePrefix) {
-        return namespacePrefix.isEmpty() ? "xmlns" : "xmlns:" + namespacePrefix;
-    }
-
-    /**
-     * Extract the namespace prefix from a namespace definition attribute name (xmlns* attributes).
-     *
-     * @param name the attribute name or null if not a namespace definition attribute
-     * @return the namespace prefix
-     */
-    static @Nullable String extractPrefixFromNamespaceDefinition(String name) {
-        if (!isNamespaceDefinitionAttribute(name)) {
-            return null;
-        }
-        return "xmlns".equals(name) ? "" : extractLocalName(name);
-    }
-
-    /**
-     * Extract the namespace prefix from a tag or attribute name.
-     *
-     * @param name the tag or attribute name
-     * @return the namespace prefix (empty string for the default namespace)
-     */
-    static String extractNamespacePrefix(String name) {
-        int colon = name.indexOf(':');
-        return colon == -1 ? "" : name.substring(0, colon);
-    }
-
-    /**
-     * Extract the local name from a tag or attribute name.
-     *
-     * @param name the tag or attribute name
-     * @return the local name
-     */
-    static String extractLocalName(String name) {
-        int colon = name.indexOf(':');
-        return colon == -1 ? name : name.substring(colon + 1);
-    }
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -174,14 +129,8 @@ public interface Xml extends Tree {
         @With
         Prolog prolog;
 
+        @With
         Tag root;
-
-        public Document withRoot(Tag root) {
-            if (this.root == root) {
-                return this;
-            }
-            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
-        }
 
         String eof;
 
@@ -324,123 +273,6 @@ public interface Xml extends Tree {
 
         @With
         String prefixUnsafe;
-
-        /**
-         * The map returned by this method is a view of the Tag's attributes.
-         * Modifying the map will NOT modify the tag's attributes.
-         *
-         * @return a map of namespace prefixes (without the <code>xmlns</code> prefix) to URIs for this tag.
-         */
-        public Map<String, String> getNamespaces() {
-            final Map<String, String> namespaces = new LinkedHashMap<>(attributes.size());
-            if (!attributes.isEmpty()) {
-                for (Attribute attribute : attributes) {
-                    if(isNamespaceDefinitionAttribute(attribute.getKeyAsString())) {
-                        namespaces.put(
-                                extractPrefixFromNamespaceDefinition(attribute.getKeyAsString()),
-                                attribute.getValueAsString());
-                    }
-                }
-            }
-            return namespaces;
-        }
-
-        /**
-         * Gets a map containing all namespaces defined in the current scope, including all parent scopes.
-         *
-         * @param cursor     the cursor to search from
-         * @return a map containing all namespaces defined in the current scope, including all parent scopes.
-         */
-        public Map<String, String> getAllNamespaces(Cursor cursor) {
-            Map<String, String> namespaces = getNamespaces();
-            while (cursor != null) {
-                Xml.Tag enclosing = cursor.firstEnclosing(Xml.Tag.class);
-                if (enclosing != null) {
-                    for (Map.Entry<String, String> ns : enclosing.getNamespaces().entrySet()) {
-                        if (namespaces.containsValue(ns.getKey())) {
-                            throw new IllegalStateException(java.lang.String.format("Cannot have two namespaces with the same prefix (%s): '%s' and '%s'", ns.getKey(), namespaces.get(ns.getKey()), ns.getValue()));
-                        }
-                        namespaces.put(ns.getKey(), ns.getValue());
-                    }
-                }
-                cursor = cursor.getParent();
-            }
-
-            return namespaces;
-        }
-
-        public Tag withNamespaces(Map<String, String> namespaces) {
-            Map<String, String> currentNamespaces = getNamespaces();
-            if (currentNamespaces.equals(namespaces)) {
-                return this;
-            }
-
-            List<Xml.Attribute> attributes = this.attributes;
-            if (attributes.isEmpty()) {
-                for (Map.Entry<String, String> ns : namespaces.entrySet()) {
-                    String key = getAttributeNameForPrefix(ns.getKey());
-                    attributes = ListUtils.concat(attributes, new Xml.Attribute(
-                            randomId(),
-                            "",
-                            Markers.EMPTY,
-                            new Xml.Ident(
-                                    randomId(),
-                                    "",
-                                    Markers.EMPTY,
-                                    key
-                            ),
-                            "",
-                            new Xml.Attribute.Value(
-                                    randomId(),
-                                    "",
-                                    Markers.EMPTY,
-                                    Xml.Attribute.Value.Quote.Double, ns.getValue()
-                            )
-                    ));
-                }
-            } else {
-                Map<String, Xml.Attribute> attributeByKey = attributes.stream()
-                        .collect(Collectors.toMap(
-                                Attribute::getKeyAsString,
-                                a -> a
-                        ));
-
-                for (Map.Entry<String, String> ns : namespaces.entrySet()) {
-                    String key = getAttributeNameForPrefix(ns.getKey());
-                    if (attributeByKey.containsKey(key)) {
-                        Xml.Attribute attribute = attributeByKey.get(key);
-                        if (!ns.getValue().equals(attribute.getValueAsString())) {
-                            ListUtils.map(attributes, a -> a.getKeyAsString().equals(key)
-                                    ? attribute.withValue(new Xml.Attribute.Value(randomId(), "", Markers.EMPTY, Xml.Attribute.Value.Quote.Double, ns.getValue()))
-                                    : a
-                            );
-                        }
-                    } else {
-                        attributes = ListUtils.concat(attributes, new Xml.Attribute(
-                                randomId(),
-                                " ",
-                                Markers.EMPTY,
-                                new Xml.Ident(
-                                        randomId(),
-                                        "",
-                                        Markers.EMPTY,
-                                        key
-                                ),
-                                "",
-                                new Xml.Attribute.Value(
-                                        randomId(),
-                                        "",
-                                        Markers.EMPTY,
-                                        Xml.Attribute.Value.Quote.Double, ns.getValue()
-                                )
-                        ));
-                    }
-                }
-            }
-
-            return new Tag(id, prefixUnsafe, markers, name, attributes, content, closing,
-                    beforeTagDelimiterPrefix);
-        }
 
         @Override
         public Tag withPrefix(String prefix) {
@@ -617,29 +449,6 @@ public interface Xml extends Tree {
          */
         @With
         String beforeTagDelimiterPrefix;
-
-        /**
-         * @return The local name for this tag, without any namespace prefix.
-         */
-        public String getLocalName() {
-            return extractLocalName(name);
-        }
-
-        /**
-         * @return The namespace prefix for this tag, if any.
-         */
-        public Optional<String> getNamespacePrefix() {
-            String extractedNamespacePrefix = extractNamespacePrefix(name);
-            return Optional.ofNullable(StringUtils.isNotEmpty(extractedNamespacePrefix) ? extractedNamespacePrefix : null);
-        }
-
-        /**
-         * @return The namespace URI for this tag, if any.
-         */
-        public Optional<String> getNamespaceUri(Cursor cursor) {
-            Optional<String> maybeNamespacePrefix = getNamespacePrefix();
-            return maybeNamespacePrefix.flatMap(s -> Optional.ofNullable(getAllNamespaces(cursor).get(s)));
-        }
 
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {

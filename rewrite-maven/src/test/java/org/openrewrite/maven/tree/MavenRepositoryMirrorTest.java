@@ -25,7 +25,7 @@ class MavenRepositoryMirrorTest {
 
     MavenRepositoryMirror one = new MavenRepositoryMirror("one", "https://one.org/m2", "*", true, true, null);
     MavenRepositoryMirror two = new MavenRepositoryMirror("two", "https://two.org/m2", "*", true, true, null);
-    MavenRepository foo = new MavenRepository("foo", "https://foo.org/m2", "true", "true", null, null, null, null);
+    MavenRepository foo = new MavenRepository("foo", "https://foo.org/m2", "true", "true", null, null, null);
 
     @Test
     void useFirstMirror() {

@@ -163,7 +163,7 @@ class MavenSettingsTest {
 
         assertThat(ctx.getRepositories())
           .as("When multiple repositories have the same id in a maven settings file the last one wins. In a pom.xml an error would be thrown.")
-          .containsExactly(new MavenRepository("repo", "https://lastwins.com", null, null, null, null, null, null));
+          .containsExactly(new MavenRepository("repo", "https://lastwins.com", null, null, null, null, null));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
@@ -343,6 +343,8 @@ class MavenSettingsTest {
 
     @Test
     void serverTimeouts() {
+        // Deliberately supporting the simpler old configuration of a single timeout
+        // https://maven.apache.org/guides/mini/guide-http-settings.html#connection-timeouts
         var settings = MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
           //language=xml
           """
@@ -353,8 +355,7 @@ class MavenSettingsTest {
                         <server>
                           <id>server001</id>
                           <configuration>
-                            <connectTimeout>40000</connectTimeout>
-                            <readTimeout>50000</readTimeout>
+                            <timeout>40000</timeout>
                           </configuration>
                         </server>
                       </servers>
@@ -366,8 +367,7 @@ class MavenSettingsTest {
         assertThat(settings.getServers().getServers()).hasSize(1);
         assertThat(settings.getServers().getServers().get(0))
           .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getConfiguration().getConnectTimeout().equals(40000L))
-          .matches(repo -> repo.getConfiguration().getReadTimeout().equals(50000L));
+          .matches(repo -> repo.getConfiguration().getTimeout().equals(40000L));
     }
 
     @Nested
@@ -787,7 +787,7 @@ class MavenSettingsTest {
                 <server>
                   <id>maven-snapshots</id>
                   <configuration>
-                    <connectTimeout>10000</connectTimeout>
+                    <timeout>10000</timeout>
                     <httpHeaders>
                       <property>
                         <name>X-JFrog-Art-Api</name>
@@ -801,7 +801,7 @@ class MavenSettingsTest {
             """).findFirst().get();
 
         MavenSettings.HttpHeader httpHeader = new MavenSettings.HttpHeader("X-JFrog-Art-Api", "myApiToken");
-        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(java.util.Collections.singletonList(httpHeader), 10000L, null);
+        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(java.util.Collections.singletonList(httpHeader), 10000L);
         MavenSettings.Server server = new MavenSettings.Server("maven-snapshots", null, null, configuration);
         MavenSettings.Servers servers = new MavenSettings.Servers(java.util.Collections.singletonList(server));
         MavenSettings settings = new MavenSettings(null, null, null, null, servers);

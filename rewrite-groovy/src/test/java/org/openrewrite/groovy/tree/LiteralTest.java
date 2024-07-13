@@ -89,8 +89,8 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              "uid: ${ UUID.randomUUID() } "
-               """
+              " uid: ${ UUID.randomUUID() } "
+              """
           )
         );
     }
@@ -282,13 +282,23 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              "\\\\n\\t"
-              '\\\\n\\t'
-              ///\\\\n\\t///
-              
+            "\\\\n\\t"
+            '\\\\n\\t'
+            ///\\\\n\\t///
             """
           )
         );
+    }
 
+    @Test
+    void differentiateEscapeFromLiteral() {
+        rewriteRun(
+          groovy(
+            """
+            '\t'
+            '	'
+            """
+          )
+        );
     }
 }

@@ -267,11 +267,17 @@ public class MavenPomDownloader {
                         // A maven repository can be expressed as a URI with a file scheme
                         Path path = Paths.get(URI.create(uri));
                         if (Files.exists(path)) {
-                            result = Optional.of(MavenMetadata.parse(Files.readAllBytes(path)));
+                            MavenMetadata parsed = MavenMetadata.parse(Files.readAllBytes(path));
+                            if (parsed != null) {
+                                result = Optional.of(parsed);
+                            }
                         }
                     } else {
                         byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri);
-                        result = Optional.of(MavenMetadata.parse(responseBody));
+                        MavenMetadata parsed = MavenMetadata.parse(responseBody);
+                        if (parsed != null) {
+                            result = Optional.of(parsed);
+                        }
                     }
                 } catch (HttpSenderResponseException e) {
                     repositoryResponses.put(repo, e.getMessage());
@@ -775,8 +781,7 @@ public class MavenPomDownloader {
                                         repository.getSnapshots(),
                                         repository.getUsername(),
                                         repository.getPassword(),
-                                        repository.getConnectTimeout(),
-                                        repository.getReadTimeout());
+                                        repository.getTimeout());
                             } catch (HttpSenderResponseException e) {
                                 //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
                                 if (e.isServerReached()) {
@@ -787,8 +792,7 @@ public class MavenPomDownloader {
                                             repository.getSnapshots(),
                                             repository.getUsername(),
                                             repository.getPassword(),
-                                            repository.getConnectTimeout(),
-                                            repository.getReadTimeout());
+                                            repository.getTimeout());
                                 }
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
@@ -818,8 +822,8 @@ public class MavenPomDownloader {
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         try {
             HttpSender.Request.Builder request = httpSender.get(uriString)
-                    .withConnectTimeout(repo.getConnectTimeout())
-                    .withReadTimeout(repo.getReadTimeout());
+                    .withConnectTimeout(repo.getTimeout())
+                    .withReadTimeout(repo.getTimeout());
             return sendRequest(applyAuthenticationToRequest(repo, request).build());
         } catch (HttpSenderResponseException e) {
             if (hasCredentials(repo) && e.isClientSideException()) {
@@ -862,11 +866,11 @@ public class MavenPomDownloader {
                             request.withHeader(header.getName(), header.getValue());
                         }
                     }
-                    if (configuration.getConnectTimeout() != null) {
-                        request.withConnectTimeout(Duration.ofMillis(configuration.getConnectTimeout()));
+                    if (configuration.getTimeout() != null) {
+                        request.withConnectTimeout(Duration.ofMillis(configuration.getTimeout()));
                     }
-                    if (configuration.getReadTimeout() != null) {
-                        request.withReadTimeout(Duration.ofMillis(configuration.getReadTimeout()));
+                    if (configuration.getTimeout() != null) {
+                        request.withReadTimeout(Duration.ofMillis(configuration.getTimeout()));
                     }
                 }
             }

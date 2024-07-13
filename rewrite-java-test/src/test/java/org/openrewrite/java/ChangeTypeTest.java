@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -171,6 +172,7 @@ class ChangeTypeTest implements RewriteTest {
               class Test {
                   Entry p;
                   Map.Entry p2;
+                  java.util.Map.Entry p3;
               }
               """,
             """
@@ -179,6 +181,7 @@ class ChangeTypeTest implements RewriteTest {
               class Test {
                   List p;
                   List p2;
+                  java.util.List p3;
               }
               """
           )
@@ -952,7 +955,7 @@ class ChangeTypeTest implements RewriteTest {
               
               public class OuterClass {
                   public static class InnerClass {
-                            
+              
                   }
               }
               """
@@ -1776,7 +1779,7 @@ class ChangeTypeTest implements RewriteTest {
               public class Test {
                   private class InnerA {
                   }
-                  
+              
                   private class InnerB {
                   }
               
@@ -1789,7 +1792,7 @@ class ChangeTypeTest implements RewriteTest {
               public class Test {
                   private class InnerA {
                   }
-                  
+              
                   private class InnerB {
                   }
               
@@ -1840,6 +1843,69 @@ class ChangeTypeTest implements RewriteTest {
               public class Sibling {
                   public Test test() {
                       return new Test();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-jackson/pull/6")
+    @Test
+    void changeTypeOfStaticImportOfNestedEnumValueUsed() {
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipes(
+            new ChangeType(
+              "org.codehaus.jackson.map.ObjectMapper",
+              "com.fasterxml.jackson.databind.ObjectMapper", true),
+            new ChangeType(
+              "org.codehaus.jackson.map.SerializationConfig$Feature",
+              "com.fasterxml.jackson.databind.SerializationFeature", true)
+          ),
+          java(
+            """
+              package org.codehaus.jackson.map;
+              public class SerializationConfig {
+                  public static enum Feature {
+                      WRAP_ROOT_VALUE
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package org.codehaus.jackson.map;
+              public class ObjectMapper {
+                  public ObjectMapper configure(SerializationConfig.Feature f, boolean state) {
+                      return this;
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.codehaus.jackson.map.ObjectMapper;
+
+              import static org.codehaus.jackson.map.SerializationConfig.Feature.WRAP_ROOT_VALUE;
+
+              class A {
+                  void test() {
+                      ObjectMapper mapper = new ObjectMapper();
+                      mapper.configure(WRAP_ROOT_VALUE, true);
+                  }
+              }
+              """,
+            """
+              import com.fasterxml.jackson.databind.ObjectMapper;
+
+              import static com.fasterxml.jackson.databind.SerializationFeature.WRAP_ROOT_VALUE;
+
+              class A {
+                  void test() {
+                      ObjectMapper mapper = new ObjectMapper();
+                      mapper.configure(WRAP_ROOT_VALUE, true);
                   }
               }
               """

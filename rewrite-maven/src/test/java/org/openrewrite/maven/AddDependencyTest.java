@@ -950,6 +950,9 @@ class AddDependencyTest implements RewriteTest {
             )
           ),
           mavenProject("project1",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
             pomXml(
               """
                 <project>

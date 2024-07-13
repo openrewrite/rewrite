@@ -22,7 +22,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import lombok.*;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Value;
+import lombok.With;
 import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
@@ -156,7 +159,7 @@ public class ResolvedPom {
     @SuppressWarnings("DuplicatedCode")
     public ResolvedPom resolve(ExecutionContext ctx, MavenPomDownloader downloader) throws MavenDownloadingException {
         // If this resolved pom represents an obsolete pom format, refuse to resolve in same as Maven itself would
-        if(requested.getObsoletePomVersion() != null) {
+        if (requested.getObsoletePomVersion() != null) {
             return this;
         }
 
@@ -421,12 +424,12 @@ public class ResolvedPom {
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
-                    mergeDependencyManagement(profile.getDependencyManagement(), pom);
+                    mergeDependencyManagement(profile.getDependencyManagement(), pomAncestry);
                     mergeRequestedDependencies(profile.getDependencies());
                 }
             }
 
-            mergeDependencyManagement(pom.getDependencyManagement(), pom);
+            mergeDependencyManagement(pom.getDependencyManagement(), pomAncestry);
             mergeRequestedDependencies(pom.getDependencies());
 
             if (pom.getParent() != null) {
@@ -733,8 +736,7 @@ public class ResolvedPom {
                             incomingRepository.isKnownToExist(),
                             incomingRepository.getUsername(),
                             incomingRepository.getPassword(),
-                            incomingRepository.getConnectTimeout(),
-                            incomingRepository.getReadTimeout(),
+                            incomingRepository.getTimeout(),
                             incomingRepository.getDeriveMetadataIfMissing()
                     );
 
@@ -768,14 +770,19 @@ public class ResolvedPom {
             }
         }
 
-        private void mergeDependencyManagement(List<ManagedDependency> incomingDependencyManagement, Pom pom) throws MavenDownloadingException {
+        private void mergeDependencyManagement(List<ManagedDependency> incomingDependencyManagement, List<Pom> pomAncestry) throws MavenDownloadingException {
+            Pom pom = pomAncestry.get(0);
             if (!incomingDependencyManagement.isEmpty()) {
                 if (dependencyManagement == null || dependencyManagement.isEmpty()) {
                     dependencyManagement = new ArrayList<>();
                 }
                 for (ManagedDependency d : incomingDependencyManagement) {
                     if (d instanceof Imported) {
-                        ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, ResolvedPom.this, repositories)
+                        GroupArtifactVersion groupArtifactVersion = getValues(((Imported) d).getGav());
+                        if (isAlreadyResolved(groupArtifactVersion, pomAncestry)) {
+                            continue;
+                        }
+                        ResolvedPom bom = downloader.download(groupArtifactVersion, null, ResolvedPom.this, repositories)
                                 .resolve(activeProfiles, downloader, initialRepositories, ctx);
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
@@ -801,6 +808,19 @@ public class ResolvedPom {
                     }
                 }
             }
+        }
+
+        private boolean isAlreadyResolved(GroupArtifactVersion groupArtifactVersion, List<Pom> pomAncestry) {
+            for (int i = 1; i < pomAncestry.size(); i++) { // skip current pom
+                Pom pom = pomAncestry.get(i);
+                ResolvedGroupArtifactVersion alreadyResolvedGav = pom.getGav();
+                if (alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId())
+                    && alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId())
+                    && alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 

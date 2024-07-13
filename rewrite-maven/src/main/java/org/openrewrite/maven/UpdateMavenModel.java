@@ -40,6 +40,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         Pom requested = resolutionResult.getPom().getRequested();
 
         Optional<Xml.Tag> properties = document.getRoot().getChild("properties");
+        requested.getProperties().clear();
         if (properties.isPresent()) {
             for (final Xml.Tag propertyTag : properties.get().getChildren()) {
                 requested.getProperties().put(propertyTag.getName(),
@@ -118,7 +119,6 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     t.getChildValue("url").get(),
                     t.getChild("releases").flatMap(s -> s.getChildValue("enabled")).orElse(null),
                     t.getChild("snapshots").flatMap(s -> s.getChildValue("enabled")).orElse(null),
-                    null,
                     null,
                     null,
                     null

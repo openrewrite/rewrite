@@ -1340,7 +1340,8 @@ public interface J extends Tree {
                 Enum,
                 Interface,
                 Annotation,
-                Record
+                Record,
+                Value
             }
         }
 
@@ -4025,7 +4026,12 @@ public interface J extends Tree {
     @Data
     final class Modifier implements J {
         public static boolean hasModifier(Collection<Modifier> modifiers, Modifier.Type modifier) {
-            return modifiers.stream().anyMatch(m -> m.getType() == modifier);
+            for (Modifier m : modifiers) {
+                if (m.getType() == modifier) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @With
