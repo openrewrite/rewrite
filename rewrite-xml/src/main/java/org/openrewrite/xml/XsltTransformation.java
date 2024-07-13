@@ -78,22 +78,13 @@ public class XsltTransformation extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        Validated<Object> validated = super.validate();
-
-        if (StringUtils.isBlank(xslt) && StringUtils.isBlank(xsltResource)) {
-            validated = validated.and(Validated.missing("xslt", xslt, "XSLT")
-                    .or(Validated.missing("xsltResource", xsltResource, "XSLT Classpath resource")));
-        }
-
-        if (!StringUtils.isBlank(xslt) && !StringUtils.isBlank(xsltResource)) {
-            validated = validated.and(Validated.missing("xslt", xslt, "XSLT")
-                    .and(Validated.missing("xsltResource", xsltResource, "XSLT Classpath resource")));
-        }
-
-        return validated;
+        return super.validate()
+                .and(Validated.test("xslt", "set either xslt or xsltResource, but not both",
+                        xslt, s -> StringUtils.isBlank(s) != StringUtils.isBlank(xsltResource) &&
+                                   !StringUtils.isBlank(loadResource(xslt, xsltResource))));
     }
 
-    private static String loadResource(String xslt, String xsltResource) {
+    private static @Nullable String loadResource(@Nullable String xslt, @Nullable String xsltResource) {
         if (StringUtils.isBlank(xsltResource)) {
             return xslt;
         }
