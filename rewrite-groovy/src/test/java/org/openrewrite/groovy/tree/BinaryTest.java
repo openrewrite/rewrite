@@ -159,8 +159,8 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            def isString = "" instanceof java.lang.String
-            """)
+              def isString = "" instanceof java.lang.String
+              """)
         );
     }
 
@@ -168,12 +168,13 @@ class BinaryTest implements RewriteTest {
     void spreadOperator() {
         rewriteRun(
           groovy("[ ] *. toString()"),
-          groovy("""
-            class A {
-                def value = 1
-            }
-            [ new A() ].findAll { it -> it.value == 1 } *. value = 2
-            """)
+          groovy(
+            """
+              class A {
+                  def value = 1
+              }
+              [ new A() ].findAll { it -> it.value == 1 } *. value = 2
+              """)
         );
     }
 }
