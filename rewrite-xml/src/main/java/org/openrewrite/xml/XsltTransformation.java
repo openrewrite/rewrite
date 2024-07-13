@@ -60,7 +60,7 @@ public class XsltTransformation extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Apply the specified XSLT transformation on.";
+        return "Apply the specified XSLT transformation on matching files.";
     }
 
     @Override
