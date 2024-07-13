@@ -28,7 +28,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class XsltTransformation extends Recipe {
 
     @Nullable
