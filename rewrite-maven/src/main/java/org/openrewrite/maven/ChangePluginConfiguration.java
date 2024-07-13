@@ -18,10 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XPathMatcher;
@@ -129,7 +126,7 @@ public class ChangePluginConfiguration extends Recipe {
         };
     }
 
-    private static String loadResource(String xslt, String xsltResource) {
+    private static @Nullable String loadResource(@Nullable String xslt, @Nullable String xsltResource) {
         if (StringUtils.isBlank(xsltResource)) {
             return xslt;
         }

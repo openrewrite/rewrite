@@ -26,21 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.openrewrite.xml.Assertions.xml;
 
 class XsltTransformationTest implements RewriteTest {
-
-    @Language("xml")
-    private static String xslt;
-
-    @BeforeAll
-    static void setup() {
-        xslt = StringUtils.readFully(XsltTransformationTest.class
-          .getResourceAsStream("/org/openrewrite/xml/XsltTransformationTest.xslt"));
-
-        assertFalse(StringUtils.isBlank(xslt));
-    }
-
     @DocumentExample
     @Test
     void transformFromParameter() {
+        @Language("xml")
+        String xslt = StringUtils.readFully(XsltTransformationTest.class
+          .getResourceAsStream("/org/openrewrite/xml/XsltTransformationTest.xslt"));
+
         rewriteRun(
           spec -> spec.recipe(new XsltTransformation(xslt, null, "**/*.xml")),
           xml(

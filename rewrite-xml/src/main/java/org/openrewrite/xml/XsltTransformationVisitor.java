@@ -73,9 +73,8 @@ public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
 
     public static Xml.Tag transformTag(String sourceConfiguration, String xslt) {
         try {
-            TransformerFactory factory = TransformerFactory.newInstance();
             Source xsltSource = new StreamSource(new ByteArrayInputStream(xslt.getBytes()));
-            Transformer transformer = factory.newTransformer(xsltSource);
+            Transformer transformer = TransformerFactory.newInstance().newTransformer(xsltSource);
 
             Source text = new StreamSource(new ByteArrayInputStream(sourceConfiguration.getBytes()));
             try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
