@@ -59,21 +59,6 @@ public class ChangePluginConfiguration extends Recipe {
     @Nullable
     String configuration;
 
-    @Nullable
-    @Language("xml")
-    @Option(displayName = "XSLT Configuration transformation",
-            description = "The transformation to be applied on the <configuration> element.",
-            example = "<xsl:stylesheet ...>...</xsl:stylesheet>",
-            required = false)
-    String xslt;
-
-    @Nullable
-    @Option(displayName = "XSLT Configuration transformation classpath resource",
-            description = "The transformation to be applied on the <configuration> element provided as a classpath resource.",
-            example = "/changePlugin.xslt",
-            required = false)
-    String xsltResource;
-
     @Override
     public String getDisplayName() {
         return "Change Maven plugin configuration";
@@ -87,12 +72,6 @@ public class ChangePluginConfiguration extends Recipe {
     @Override
     public String getDescription() {
         return "Apply the specified configuration to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
-    }
-
-    @Override
-    public Validated<Object> validate() {
-        return super.validate().and(Validated.test("configuration", "Configuration set at most once", configuration,
-                cfg -> Stream.of(configuration, xslt, xsltResource).filter(StringUtils::isBlank).count() >= 2));
     }
 
     @Override
@@ -111,39 +90,18 @@ public class ChangePluginConfiguration extends Recipe {
                             .findAny();
                     if (maybePlugin.isPresent()) {
                         Xml.Tag plugin = maybePlugin.get();
-                        if (configuration == null && xslt == null && xsltResource == null) {
+                        if (configuration == null) {
                             plugins = filterChildren(plugins, plugin,
                                     child -> !(child instanceof Xml.Tag && "configuration".equals(((Xml.Tag) child).getName())));
-                        } else if (configuration != null) {
+                        } else  {
                             plugins = addOrUpdateChild(plugins, plugin,
                                     Xml.Tag.build("<configuration>\n" + configuration + "\n</configuration>"),
                                     getCursor().getParentOrThrow());
-                        } else {
-                            // Implied that xslt or xsltResource is not null
-                            Optional<Xml.Tag> configurationTag = plugin.getChild("configuration");
-                            if (configurationTag.isPresent()) {
-                                String xsltTransformation = loadResource(xslt, xsltResource);
-                                plugins = addOrUpdateChild(plugins, plugin,
-                                        XsltTransformationVisitor.transformTag(configurationTag.get().printTrimmed(getCursor()), xsltTransformation),
-                                        getCursor().getParentOrThrow());
-                            }
                         }
                     }
                 }
                 return plugins;
             }
         };
-    }
-
-    private static String loadResource(@Nullable String xslt, @Nullable String xsltResource) {
-        if (StringUtils.isBlank(xsltResource)) {
-            return requireNonNull(xslt);
-        }
-        try (InputStream is = XsltTransformation.class.getResourceAsStream(xsltResource)) {
-            assert is != null;
-            return StringUtils.readFully(is, Charset.defaultCharset());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 }
