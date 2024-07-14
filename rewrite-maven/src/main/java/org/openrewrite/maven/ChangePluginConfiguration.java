@@ -30,7 +30,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Optional;
+import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterChildren;
 
@@ -88,6 +90,12 @@ public class ChangePluginConfiguration extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(Validated.test("configuration", "Configuration set at most once", configuration,
+                cfg -> Stream.of(configuration, xslt, xsltResource).filter(StringUtils::isBlank).count() >= 2));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
             @Override
@@ -110,7 +118,8 @@ public class ChangePluginConfiguration extends Recipe {
                             plugins = addOrUpdateChild(plugins, plugin,
                                     Xml.Tag.build("<configuration>\n" + configuration + "\n</configuration>"),
                                     getCursor().getParentOrThrow());
-                        } else if (xslt != null || xsltResource != null) {
+                        } else {
+                            // Implied that xslt or xsltResource is not null
                             Optional<Xml.Tag> configurationTag = plugin.getChild("configuration");
                             if (configurationTag.isPresent()) {
                                 String xsltTransformation = loadResource(xslt, xsltResource);
@@ -126,14 +135,13 @@ public class ChangePluginConfiguration extends Recipe {
         };
     }
 
-    private static @Nullable String loadResource(@Nullable String xslt, @Nullable String xsltResource) {
+    private static String loadResource(@Nullable String xslt, @Nullable String xsltResource) {
         if (StringUtils.isBlank(xsltResource)) {
-            return xslt;
+            return requireNonNull(xslt);
         }
-        try (InputStream is = XsltTransformation.class.getResourceAsStream(StringUtils.trimIndent(xsltResource))) {
+        try (InputStream is = XsltTransformation.class.getResourceAsStream(xsltResource)) {
             assert is != null;
-            return !StringUtils.isBlank(xsltResource) ? StringUtils.readFully(is, Charset.defaultCharset())
-                    : xslt;
+            return StringUtils.readFully(is, Charset.defaultCharset());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

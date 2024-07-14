@@ -27,6 +27,8 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class XsltTransformation extends Recipe {
@@ -84,14 +86,13 @@ public class XsltTransformation extends Recipe {
                                    !StringUtils.isBlank(loadResource(xslt, xsltResource))));
     }
 
-    private static @Nullable String loadResource(@Nullable String xslt, @Nullable String xsltResource) {
+    private static String loadResource(@Nullable String xslt, @Nullable String xsltResource) {
         if (StringUtils.isBlank(xsltResource)) {
-            return xslt;
+            return requireNonNull(xslt);
         }
-        try (InputStream is = XsltTransformation.class.getResourceAsStream(StringUtils.trimIndent(xsltResource))) {
+        try (InputStream is = XsltTransformation.class.getResourceAsStream(xsltResource)) {
             assert is != null;
-            return !StringUtils.isBlank(xsltResource) ? StringUtils.readFully(is, Charset.defaultCharset())
-                    : xslt;
+            return StringUtils.readFully(is, Charset.defaultCharset());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

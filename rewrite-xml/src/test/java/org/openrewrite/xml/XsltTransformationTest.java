@@ -16,13 +16,11 @@
 package org.openrewrite.xml;
 
 import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.test.RewriteTest;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.openrewrite.xml.Assertions.xml;
 
 class XsltTransformationTest implements RewriteTest {
