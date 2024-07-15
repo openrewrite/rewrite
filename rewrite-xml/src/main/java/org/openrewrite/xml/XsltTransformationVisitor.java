@@ -16,7 +16,9 @@
 package org.openrewrite.xml;
 
 import lombok.RequiredArgsConstructor;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Incubating;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.xml.tree.Xml;
@@ -35,6 +37,7 @@ import java.util.Objects;
 import static org.openrewrite.Tree.randomId;
 
 @RequiredArgsConstructor
+@Incubating(since = "8.30.0")
 public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
 
     private final String xslt;
@@ -71,12 +74,20 @@ public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
         }
     }
 
-    public static Xml.Tag transformTag(String sourceConfiguration, String xslt) {
+    /**
+     * Transform XML content using XSLT transformation. There are no formatting guarantees with this transformation.
+     *
+     * @param xmlContent XML content to transform
+     * @param xslt       XSLT transformation
+     * @return Transformed XML content
+     */
+    @SuppressWarnings("unused")
+    public static Xml.Tag transformTag(@Language("xml") String xmlContent, @Language("xslt") String xslt) {
         try {
             Source xsltSource = new StreamSource(new ByteArrayInputStream(xslt.getBytes()));
             Transformer transformer = TransformerFactory.newInstance().newTransformer(xsltSource);
 
-            Source text = new StreamSource(new ByteArrayInputStream(sourceConfiguration.getBytes()));
+            Source text = new StreamSource(new ByteArrayInputStream(xmlContent.getBytes()));
             try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
                 transformer.transform(text, new StreamResult(baos));
                 return Xml.Tag.build(baos.toString());

@@ -31,6 +31,7 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
+@Incubating(since = "8.30.0")
 public class XsltTransformation extends Recipe {
 
     @Nullable
@@ -62,7 +63,8 @@ public class XsltTransformation extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Apply the specified XSLT transformation on matching files.";
+        return "Apply the specified XSLT transformation on matching files. " +
+               "Note that there are no format matching guarantees when running this recipe.";
     }
 
     @Override
