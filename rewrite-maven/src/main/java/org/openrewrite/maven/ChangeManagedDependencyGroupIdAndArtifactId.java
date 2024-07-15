@@ -86,11 +86,11 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     Boolean changePropertyVersionNames;
 
     public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion) {
-        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, null, true);
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, null, false);
     }
 
     public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
-        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, true);
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, false);
     }
 
     @JsonCreator
