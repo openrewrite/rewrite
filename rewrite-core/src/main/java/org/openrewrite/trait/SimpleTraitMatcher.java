@@ -73,11 +73,11 @@ public abstract class SimpleTraitMatcher<U extends Trait<?>> implements TraitMat
     public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<U, P> visitor) {
         return new TreeVisitor<Tree, P>() {
             @Override
-            public @Nullable Tree preVisit(Tree tree, P p) {
+            public Tree preVisit(Tree tree, P p) {
                 U u = test(getCursor());
                 return u != null ?
-                        super.visit(visitor.visit(u, p), p) :
-                        super.visit(tree, p);
+                        visitor.visit(u, p) :
+                        tree;
             }
         };
     }

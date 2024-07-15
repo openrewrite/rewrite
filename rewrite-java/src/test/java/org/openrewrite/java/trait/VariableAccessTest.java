@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.trait.Traits.variableAccess;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ALL")
@@ -30,7 +31,7 @@ class VariableAccessTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(markVariableAccesses(new VariableAccess.Matcher()));
+        spec.recipe(markVariableAccesses(variableAccess()));
     }
 
     @Test

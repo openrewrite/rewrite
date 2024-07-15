@@ -21,14 +21,12 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.trait.Namespaced;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 @Value
@@ -59,32 +57,26 @@ public class HasNamespaceUri extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        XPathMatcher matcher = StringUtils.isBlank(xPath) ? null : new XPathMatcher(xPath);
-        return new XmlVisitor<ExecutionContext>() {
-
-            @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-                if (tag.getNamespaces().containsValue(namespaceUri) && (matcher == null || matcher.matches(getCursor()))) {
-                    t = SearchResult.found(t);
-                }
-                return t;
-            }
-        };
+        return Namespaced.matcher()
+                .xPath(xPath)
+                .uri(namespaceUri)
+                .asVisitor(n -> n.getTree() instanceof Xml.Tag ?
+                        SearchResult.found(n.getTree()) :
+                        n.getTree());
     }
 
     public static Set<Xml.Tag> find(Xml x, String namespaceUri, @Nullable String xPath) {
-        XPathMatcher matcher = StringUtils.isBlank(xPath) ? null : new XPathMatcher(xPath);
-        Set<Xml.Tag> ts = new HashSet<>();
-        new XmlVisitor<Set<Xml.Tag>>() {
-            @Override
-            public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> ts) {
-                if (tag.getNamespaces().containsValue(namespaceUri) && (matcher == null || matcher.matches(getCursor()))) {
-                    ts.add(tag);
-                }
-                return super.visitTag(tag, ts);
-            }
-        }.visit(x, ts);
+        Set<Xml.Tag> ts = new LinkedHashSet<>();
+        Namespaced.matcher()
+                .xPath(xPath)
+                .uri(namespaceUri)
+                .asVisitor(n ->
+                {
+                    if (n.getTree() instanceof Xml.Tag) {
+                        ts.add((Xml.Tag) n.getTree());
+                    }
+                    return n.getTree();
+                }).visit(x, 0);
         return ts;
     }
 }
