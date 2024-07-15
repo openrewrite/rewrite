@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -29,6 +30,7 @@ class DependencyConstraintToRuleTest implements RewriteTest {
         spec.recipe(new DependencyConstraintToRule());
     }
 
+    @DocumentExample
     @Test
     void newResolutionStrategyBlock() {
         rewriteRun(
