@@ -16,6 +16,7 @@
 package org.openrewrite.java.trait;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.marker.SearchResult;
@@ -35,6 +36,7 @@ class MethodAccessTest implements RewriteTest {
           new MethodMatcher("java.util.List add(..)", true))));
     }
 
+    @DocumentExample
     @Test
     void methodAccesses() {
         rewriteRun(
