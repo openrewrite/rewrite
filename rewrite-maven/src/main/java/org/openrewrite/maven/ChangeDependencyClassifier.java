@@ -54,6 +54,13 @@ public class ChangeDependencyClassifier extends Recipe {
     @Nullable
     String newClassifier;
 
+    @Option(displayName = "Change Maven managed dependency",
+            description = "This flag can be set to explicitly change the classifier in Maven management dependency section. Default `false`.",
+            example = "true",
+            required = false)
+    @Nullable
+    Boolean changeManagedDependency;
+
     @Override
     public String getDisplayName() {
         return "Change Maven dependency classifier";
@@ -74,22 +81,21 @@ public class ChangeDependencyClassifier extends Recipe {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependencyTag(groupId, artifactId)) {
-                    Optional<Xml.Tag> scope = tag.getChild("classifier");
-                    if (scope.isPresent()) {
+                if (isDependencyTag(groupId, artifactId) ||
+                        (Boolean.TRUE.equals(changeManagedDependency) && isManagedDependencyTag(groupId, artifactId))) {
+                    Optional<Xml.Tag> classifier = tag.getChild("classifier");
+                    if (classifier.isPresent()) {
                         if (newClassifier == null) {
-                            doAfterVisit(new RemoveContentVisitor<>(scope.get(), false));
-                        } else if (!newClassifier.equals(scope.get().getValue().orElse(null))) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(scope.get(), newClassifier));
+                            doAfterVisit(new RemoveContentVisitor<>(classifier.get(), false));
+                        } else if (!newClassifier.equals(classifier.get().getValue().orElse(null))) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(classifier.get(), newClassifier));
                         }
                     } else if (newClassifier != null) {
                         doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<classifier>" + newClassifier + "</classifier>")));
                     }
                 }
-
                 return super.visitTag(tag, ctx);
             }
         };
     }
-
 }

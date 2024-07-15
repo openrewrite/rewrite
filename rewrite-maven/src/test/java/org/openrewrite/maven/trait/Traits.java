@@ -13,21 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.tree;
+package org.openrewrite.maven.trait;
 
-import org.openrewrite.Cursor;
+public class Traits {
+    private Traits() {
+    }
 
-import java.util.Map;
-import java.util.Optional;
-
-public interface Namespaced extends Xml {
-    String getName();
-
-    String getLocalName();
-
-    Optional<String> getNamespacePrefix();
-
-    Optional<String> getNamespaceUri(Cursor cursor);
-
-    Map<String, String> getAllNamespaces(Cursor cursor);
+    public static MavenDependency.Matcher mavenDependency() {
+        return new MavenDependency.Matcher();
+    }
 }

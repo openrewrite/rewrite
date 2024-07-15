@@ -32,6 +32,19 @@ import java.util.stream.Stream;
 @Incubating(since = "8.30.0")
 public interface TraitMatcher<U extends Trait<?>> {
 
+    default U require(Tree tree, Cursor parent) {
+        return require(new Cursor(parent, tree));
+    }
+
+    default U require(Cursor cursor) {
+        return get(cursor).orElseThrow(() ->
+                new IllegalStateException("Expected this cursor to match the trait"));
+    }
+
+    default Optional<U> get(Tree tree, Cursor parent) {
+        return get(new Cursor(parent, tree));
+    }
+
     /**
      * Tests whether a tree at the cursor matches the trait, and if so, returns
      * a trait instance containing the semantic information represented by the tree.

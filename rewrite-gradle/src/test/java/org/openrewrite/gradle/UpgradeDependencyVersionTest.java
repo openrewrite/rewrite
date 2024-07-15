@@ -16,12 +16,13 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.Issue;
+import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainTextParser;
 
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -906,5 +907,19 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-java-dependencies/pull/106")
+    void isAcceptable(){
+        // Mimic org.openrewrite.java.dependencies.UpgradeTransitiveDependencyVersion#getVisitor
+        UpgradeDependencyVersion guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
+        TreeVisitor<?, ExecutionContext> visitor = guava.getVisitor();
+
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow();
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
+
+        sourceFile = PropertiesParser.builder().build().parse("guavaVersion=29.0-jre").findFirst().orElseThrow();
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isTrue();
     }
 }
