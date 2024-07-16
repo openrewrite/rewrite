@@ -18,7 +18,10 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
@@ -308,11 +311,40 @@ public abstract class Recipe implements Cloneable {
      * A list of recipes that run, source file by source file,
      * after this recipe. This method is guaranteed to be called only once
      * per cycle.
+     * <p>
+     * When creating a recipe with a fixed recipe list, either override
+     * this method or {@link #buildRecipeList(RecipeList)} but ideally not
+     * both, as their default implementations are interconnected.
      *
      * @return The list of recipes to run.
      */
     public List<Recipe> getRecipeList() {
-        return Collections.emptyList();
+        RecipeList list = new RecipeList(getName());
+        buildRecipeList(list);
+        return list.getRecipes();
+    }
+
+    /**
+     * Used to build up a recipe list programmatically. Using the
+     * methods on {@link RecipeList}, the appearance of a recipe
+     * that chains other recipes with options will be not strikingly
+     * different from defining it in a recipe.yml.
+     * <p>
+     * Building, or at least starting to build, recipes for complex
+     * migrations with this method is more amenable to AI coding assistants
+     * since these assistants are primarily optimized for providing completion
+     * assistance in a single file.
+     * <p>
+     * When creating a recipe with a fixed recipe list, either override
+     * this method or {@link #getRecipeList()} but ideally not
+     * both, as their default implementations are interconnected.
+     *
+     * @param list A recipe list used to build up a series of recipes
+     *             in code in a way that looks fairly declarative and
+     *             therefore is more amenable to AI code completion.
+     */
+    @SuppressWarnings("unused")
+    public void buildRecipeList(RecipeList list) {
     }
 
     /**
@@ -423,5 +455,58 @@ public abstract class Recipe implements Cloneable {
 
     public interface DelegatingRecipe {
         Recipe getDelegate();
+    }
+
+    /**
+     * @return A new recipe builder.
+     */
+    @Incubating(since = "8.31.0")
+    public static Builder builder(@NlsRewrite.DisplayName @Language("markdown") String displayName,
+                                  @NlsRewrite.Description @Language("markdown") String description) {
+        return new Builder(displayName, description);
+    }
+
+    @Incubating(since = "8.31.0")
+    @RequiredArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    public static class Builder {
+        @NlsRewrite.DisplayName
+        @Language("markdown")
+        final String displayName;
+
+        @NlsRewrite.Description
+        @Language("markdown")
+        final String description;
+
+        TreeVisitor<? extends Tree, ExecutionContext> visitor = TreeVisitor.noop();
+
+        public Builder visitor(TreeVisitor<? extends Tree, ExecutionContext> visitor) {
+            this.visitor = visitor;
+            return this;
+        }
+
+        public Recipe build(String name) {
+            return new Recipe() {
+                @Override
+                public String getName() {
+                    return name;
+                }
+
+                @Override
+                public String getDisplayName() {
+                    return displayName;
+                }
+
+                @Override
+                public String getDescription() {
+                    return description;
+                }
+
+                @Override
+                public TreeVisitor<?, ExecutionContext> getVisitor() {
+                    return visitor;
+                }
+            };
+        }
     }
 }
