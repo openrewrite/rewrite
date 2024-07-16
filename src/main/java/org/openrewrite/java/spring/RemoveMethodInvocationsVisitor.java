@@ -70,8 +70,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         return j;
     }
 
-    @Nullable
-    private J removeMethods(Expression expression, int depth, boolean isLambdaBody, Stack<Space> selectAfter) {
+    private @Nullable J removeMethods(Expression expression, int depth, boolean isLambdaBody, Stack<Space> selectAfter) {
         if (!(expression instanceof J.MethodInvocation)) {
             return expression;
         }
