@@ -51,8 +51,7 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
         return this;
     }
 
-    @Nullable
-    public Charset getCharset() {
+    public @Nullable Charset getCharset() {
         return getMessage(CHARSET);
     }
 }

@@ -202,8 +202,7 @@ public class MavenPomDownloader {
         }
     }
 
-    @Nullable
-    private Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
+    private @Nullable Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
         final Parent parent = projectPom.getParent();
         if (parent == null || projectPom.getSourcePath() == null) {
             return null;
@@ -347,8 +346,7 @@ public class MavenPomDownloader {
      * @param repo The repository that will be queried for directory results
      * @return Metadata or null if the metadata cannot be derived.
      */
-    @Nullable
-    private MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, IOException, MavenDownloadingException {
+    private @Nullable MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, IOException, MavenDownloadingException {
         if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null) {
             // Do not derive metadata if we cannot navigate/browse the artifacts.
             // Do not derive metadata if a specific version has been defined.
@@ -384,8 +382,7 @@ public class MavenPomDownloader {
         }
     }
 
-    @Nullable
-    private MavenMetadata.Versioning directoryToVersioning(String uri, GroupArtifactVersion gav) throws MavenDownloadingException {
+    private @Nullable MavenMetadata.Versioning directoryToVersioning(String uri, GroupArtifactVersion gav) throws MavenDownloadingException {
         Path dir = Paths.get(URI.create(uri));
         if (Files.exists(dir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
@@ -403,8 +400,7 @@ public class MavenPomDownloader {
         return null;
     }
 
-    @Nullable
-    private MavenMetadata.Versioning htmlIndexToVersioning(String responseBody, String uri) {
+    private @Nullable MavenMetadata.Versioning htmlIndexToVersioning(String responseBody, String uri) {
         // A very primitive approach, this just finds hrefs with trailing "/",
         List<String> versions = new ArrayList<>();
         int start = responseBody.indexOf("<a href=\"");
@@ -460,8 +456,7 @@ public class MavenPomDownloader {
         return new ArrayList<>(merged);
     }
 
-    @Nullable
-    private MavenMetadata.Snapshot maxSnapshot(@Nullable MavenMetadata.Snapshot s1, @Nullable MavenMetadata.Snapshot s2) {
+    private @Nullable MavenMetadata.Snapshot maxSnapshot(@Nullable MavenMetadata.Snapshot s1, @Nullable MavenMetadata.Snapshot s2) {
         // apparently the snapshot timestamp is not always present in the metadata
         if (s1 == null || s1.getTimestamp() == null) {
             return s2;
@@ -644,8 +639,7 @@ public class MavenPomDownloader {
         return gav;
     }
 
-    @Nullable
-    private String datedSnapshotVersion(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories, ExecutionContext ctx) {
+    private @Nullable String datedSnapshotVersion(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories, ExecutionContext ctx) {
         if (gav.getVersion() != null && gav.getVersion().endsWith("-SNAPSHOT")) {
             for (ResolvedGroupArtifactVersion pinnedSnapshotVersion : new MavenExecutionContextView(ctx).getPinnedSnapshotVersions()) {
                 if (pinnedSnapshotVersion.getDatedSnapshotVersion() != null &&
@@ -704,8 +698,7 @@ public class MavenPomDownloader {
         return normalizedRepositories.values();
     }
 
-    @Nullable
-    public MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
+    public @Nullable MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
         Optional<MavenRepository> result = null;
         MavenRepository repository = originalRepository;
         if (containingPom != null) {

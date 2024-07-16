@@ -259,8 +259,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
     }
 
-    @Nullable
-    public ResolvedDependency findDependency(Xml.Tag tag) {
+    public @Nullable ResolvedDependency findDependency(Xml.Tag tag) {
         Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
         Scope scope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
         if (dependencies.containsKey(scope)) {
@@ -279,8 +278,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return null;
     }
 
-    @Nullable
-    public ResolvedManagedDependency findManagedDependency(Xml.Tag tag) {
+    public @Nullable ResolvedManagedDependency findManagedDependency(Xml.Tag tag) {
         String groupId = getResolutionResult().getPom().getValue(tag.getChildValue("groupId")
                 .orElse(getResolutionResult().getPom().getGroupId()));
         String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
@@ -292,18 +290,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return null;
     }
 
-    @Nullable
-    public ResolvedManagedDependency findManagedDependency(String groupId, String artifactId) {
+    public @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId) {
         return findManagedDependency(groupId, artifactId, null);
     }
 
-    @Nullable
-    private ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier) {
+    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier) {
         return findManagedDependency(groupId, artifactId, classifier, null);
     }
 
-    @Nullable
-    private ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
+    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
         for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
             if (groupId.equals(d.getGroupId()) &&
                 artifactId.equals(d.getArtifactId()) &&
@@ -315,8 +310,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return null;
     }
 
-    @Nullable
-    public ResolvedManagedDependency findManagedDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
+    public @Nullable ResolvedManagedDependency findManagedDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
         Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse(null));
         if (inClasspathOf != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
             return null;
@@ -324,8 +318,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return findManagedDependency(tag);
     }
 
-    @Nullable
-    public ResolvedDependency findDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
+    public @Nullable ResolvedDependency findDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
         Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
         if (inClasspathOf != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
             return null;
@@ -394,8 +387,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return isManagedDependencyTag() || isDependencyTag() || isPluginTag();
     }
 
-    @Nullable
-    public Plugin findPlugin(Xml.Tag tag) {
+    public @Nullable Plugin findPlugin(Xml.Tag tag) {
         List<Plugin> plugins = getResolutionResult().getPom().getPlugins();
         if (plugins != null) {
             for (Plugin resolvedPlugin : plugins) {

@@ -407,33 +407,27 @@ public class TypeUtils {
         return false;
     }
 
-    @Nullable
-    public static JavaType.Class asClass(@Nullable JavaType type) {
+    public static @Nullable JavaType.Class asClass(@Nullable JavaType type) {
         return type instanceof JavaType.Class ? (JavaType.Class) type : null;
     }
 
-    @Nullable
-    public static JavaType.Parameterized asParameterized(@Nullable JavaType type) {
+    public static @Nullable JavaType.Parameterized asParameterized(@Nullable JavaType type) {
         return type instanceof JavaType.Parameterized ? (JavaType.Parameterized) type : null;
     }
 
-    @Nullable
-    public static JavaType.Array asArray(@Nullable JavaType type) {
+    public static @Nullable JavaType.Array asArray(@Nullable JavaType type) {
         return type instanceof JavaType.Array ? (JavaType.Array) type : null;
     }
 
-    @Nullable
-    public static JavaType.GenericTypeVariable asGeneric(@Nullable JavaType type) {
+    public static @Nullable JavaType.GenericTypeVariable asGeneric(@Nullable JavaType type) {
         return type instanceof JavaType.GenericTypeVariable ? (JavaType.GenericTypeVariable) type : null;
     }
 
-    @Nullable
-    public static JavaType.Primitive asPrimitive(@Nullable JavaType type) {
+    public static @Nullable JavaType.Primitive asPrimitive(@Nullable JavaType type) {
         return type instanceof JavaType.Primitive ? (JavaType.Primitive) type : null;
     }
 
-    @Nullable
-    public static JavaType.FullyQualified asFullyQualified(@Nullable JavaType type) {
+    public static @Nullable JavaType.FullyQualified asFullyQualified(@Nullable JavaType type) {
         if (type instanceof JavaType.FullyQualified && !(type instanceof JavaType.Unknown)) {
             return (JavaType.FullyQualified) type;
         }

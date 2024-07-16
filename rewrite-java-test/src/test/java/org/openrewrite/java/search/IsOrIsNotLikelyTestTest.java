@@ -174,9 +174,9 @@ public class IsOrIsNotLikelyTestTest {
               spec -> spec.recipe(toRecipe(() -> Preconditions.check(
                 Preconditions.or(new IsLikelyTest().getVisitor()),
                 new TreeVisitor<>() {
-                    @Nullable
+
                     @Override
-                    public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                         return tree != null ? SearchResult.found(tree, "recipe") : null;
                     }
                 }))),

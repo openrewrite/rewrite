@@ -64,8 +64,7 @@ public class ResolvedManagedDependency {
      *
      * @return the version of the dependency
      */
-    @Nullable
-    public String getVersion() {
+    public @Nullable String getVersion() {
         return gav.getVersion();
     }
 

@@ -65,8 +65,7 @@ public interface Tree {
      * @param <P> visit context type
      * @return visitor result
      */
-    @Nullable
-    default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+    default <R extends Tree, P> @Nullable R accept(TreeVisitor<R, P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -123,8 +122,7 @@ public interface Tree {
         return (T2) this;
     }
 
-    @Nullable
-    default <T2 extends Tree> T2 safeCast() {
+    default <T2 extends Tree> @Nullable T2 safeCast() {
         try {
             return cast();
         } catch (ClassCastException ignored) {

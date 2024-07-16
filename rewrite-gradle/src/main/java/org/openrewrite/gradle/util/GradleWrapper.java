@@ -116,8 +116,7 @@ public class GradleWrapper {
         return formatUriForPropertiesFile(getDistributionUrl());
     }
 
-    @Nullable
-    public Checksum getDistributionChecksum() {
+    public @Nullable Checksum getDistributionChecksum() {
         return distributionInfos.getChecksum();
     }
 

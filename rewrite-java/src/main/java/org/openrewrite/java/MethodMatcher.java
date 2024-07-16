@@ -295,8 +295,7 @@ public class MethodMatcher {
         return matchesParameterTypes(parameterTypes);
     }
 
-    @Nullable
-    private static JavaType variableDeclarationsType(Statement v) {
+    private static @Nullable JavaType variableDeclarationsType(Statement v) {
         if (v instanceof J.VariableDeclarations) {
             J.VariableDeclarations vd = (J.VariableDeclarations) v;
             List<J.VariableDeclarations.NamedVariable> variables = vd.getVariables();
@@ -397,8 +396,7 @@ public class MethodMatcher {
         return false;
     }
 
-    @Nullable
-    private static String typePattern(JavaType type) {
+    private static @Nullable String typePattern(JavaType type) {
         if (type instanceof JavaType.Primitive) {
             if (type.equals(JavaType.Primitive.String)) {
                 return ((JavaType.Primitive) type).getClassName();

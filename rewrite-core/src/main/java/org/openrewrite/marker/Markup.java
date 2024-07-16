@@ -156,9 +156,8 @@ public interface Markup extends Marker {
             return message;
         }
 
-        @Nullable
         @Override
-        public String getDetail() {
+        public @Nullable String getDetail() {
             return detail;
         }
     }
@@ -181,9 +180,8 @@ public interface Markup extends Marker {
             return message;
         }
 
-        @Nullable
         @Override
-        public String getDetail() {
+        public @Nullable String getDetail() {
             return detail;
         }
     }

@@ -235,8 +235,7 @@ public class XPathMatcher {
         }
     }
 
-    @Nullable
-    private String matchesElementWithConditionFunction(Matcher matcher, Xml.Tag tag, Cursor cursor) {
+    private @Nullable String matchesElementWithConditionFunction(Matcher matcher, Xml.Tag tag, Cursor cursor) {
         boolean isAttributeElement = matcher.group(1) != null;
         String element = matcher.group(2);
         String allConditions = matcher.group(3);

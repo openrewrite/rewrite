@@ -80,9 +80,8 @@ public class FindTags extends Recipe {
      * Returns <code>null</code> if there is not exactly one tag matching this xPath
      */
     @SuppressWarnings("unused")
-    @Nullable
     @Incubating(since = "7.33.0")
-    public static Xml.Tag findSingle(Xml x, String xPath) {
+    public static @Nullable Xml.Tag findSingle(Xml x, String xPath) {
         final Set<Xml.Tag> tags = find(x, xPath);
         if (tags.size() != 1) {
             return null;

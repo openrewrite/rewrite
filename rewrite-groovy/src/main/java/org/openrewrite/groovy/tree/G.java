@@ -52,8 +52,7 @@ public interface G extends J {
         return v.isAdaptableTo(GroovyVisitor.class);
     }
 
-    @Nullable
-    default <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+    default <P> @Nullable J acceptGroovy(GroovyVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -133,9 +132,8 @@ public interface G extends J {
         @Nullable
         JRightPadded<Package> packageDeclaration;
 
-        @Nullable
         @Override
-        public Package getPackageDeclaration() {
+        public @Nullable Package getPackageDeclaration() {
             return packageDeclaration == null ? null : packageDeclaration.getElement();
         }
 
@@ -256,8 +254,7 @@ public interface G extends J {
         public static class Padding implements JavaSourceFile.Padding {
             private final G.CompilationUnit t;
 
-            @Nullable
-            public JRightPadded<Package> getPackageDeclaration() {
+            public @Nullable JRightPadded<Package> getPackageDeclaration() {
                 return t.packageDeclaration;
             }
 
@@ -510,8 +507,7 @@ public interface G extends J {
         public static class Padding {
             private final MapEntry t;
 
-            @Nullable
-            public JRightPadded<Expression> getKey() {
+            public @Nullable JRightPadded<Expression> getKey() {
                 return t.key;
             }
 

@@ -96,8 +96,8 @@ public class ChangePropertyValue extends Recipe {
             return e;
         }
 
-        @Nullable // returns null if value should not change
-        private Properties.Value updateValue(Properties.Value value) {
+        // returns null if value should not change
+        private @Nullable Properties.Value updateValue(Properties.Value value) {
             Properties.Value updatedValue = value.withText(Boolean.TRUE.equals(regex)
                     ? value.getText().replaceAll(oldValue, newValue)
                     : newValue);

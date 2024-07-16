@@ -144,8 +144,7 @@ public class MergeYaml extends Recipe {
                 return text.replaceAll("(?m)^", padding.toString());
             }
 
-            @Nullable
-            private String maybeKeyFromJsonPath(String jsonPath) {
+            private @Nullable String maybeKeyFromJsonPath(String jsonPath) {
                 if (!jsonPath.startsWith("$.")) {
                     return null;
                 }

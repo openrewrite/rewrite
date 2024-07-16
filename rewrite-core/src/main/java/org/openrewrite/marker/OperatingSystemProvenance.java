@@ -231,8 +231,7 @@ public abstract class OperatingSystemProvenance implements Marker {
     /**
      * Locates the given executable in the system path. Returns null if not found.
      */
-    @Nullable
-    public File findInPath(String name) {
+    public @Nullable File findInPath(String name) {
         String exeName = getExecutableName(name);
         if (exeName.contains(File.separator)) {
             File candidate = new File(exeName);

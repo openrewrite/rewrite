@@ -334,13 +334,11 @@ public class RawPom {
         RawRepositories repositories;
     }
 
-    @Nullable
-    public String getGroupId() {
+    public @Nullable String getGroupId() {
         return groupId == null && parent != null ? parent.getGroupId() : groupId;
     }
 
-    @Nullable
-    public String getVersion() {
+    public @Nullable String getVersion() {
         if(version == null) {
             if(currentVersion == null) {
                 if(parent == null) {

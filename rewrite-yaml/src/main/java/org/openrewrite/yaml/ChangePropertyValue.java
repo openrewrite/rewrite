@@ -107,8 +107,8 @@ public class ChangePropertyValue extends Recipe {
         });
     }
 
-    @Nullable // returns null if value should not change
-    private Yaml.Scalar updateValue(Yaml.Block value) {
+    // returns null if value should not change
+    private @Nullable Yaml.Scalar updateValue(Yaml.Block value) {
         if (!(value instanceof Yaml.Scalar)) {
             return null;
         }

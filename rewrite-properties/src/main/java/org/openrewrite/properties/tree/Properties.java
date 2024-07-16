@@ -45,8 +45,7 @@ public interface Properties extends Tree {
         return v.isAdaptableTo(PropertiesVisitor.class);
     }
 
-    @Nullable
-    default <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
+    default <P> @Nullable Properties acceptProperties(PropertiesVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 

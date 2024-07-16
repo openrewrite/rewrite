@@ -149,8 +149,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return this;
     }
 
-    @Nullable
-    public Boolean getAddLocalRepository() {
+    public @Nullable Boolean getAddLocalRepository() {
         return getMessage(MAVEN_ADD_LOCAL_REPOSITORY, null);
     }
 
@@ -159,8 +158,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return this;
     }
 
-    @Nullable
-    public Boolean getAddCentralRepository() {
+    public @Nullable Boolean getAddCentralRepository() {
         return getMessage(MAVEN_ADD_CENTRAL_REPOSITORY);
     }
 
@@ -228,8 +226,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return this;
     }
 
-    @Nullable
-    public MavenSettings getSettings() {
+    public @Nullable MavenSettings getSettings() {
         return getMessage(MAVEN_SETTINGS, null);
     }
 

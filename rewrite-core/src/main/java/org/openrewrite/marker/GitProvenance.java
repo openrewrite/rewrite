@@ -74,8 +74,7 @@ public class GitProvenance implements Marker {
      * @param baseUrl the portion of the URL which precedes the organization
      * @return the portion of the git origin URL which corresponds to the organization the git repository is organized under
      */
-    @Nullable
-    public String getOrganizationName(String baseUrl) {
+    public @Nullable String getOrganizationName(String baseUrl) {
         if (origin == null) {
             return null;
         }
@@ -102,8 +101,7 @@ public class GitProvenance implements Marker {
      * which accepts a "baseUrl" parameter should be used instead
      */
     @Deprecated
-    @Nullable
-    public String getOrganizationName() {
+    public @Nullable String getOrganizationName() {
         if (origin == null) {
             return null;
         }
@@ -118,8 +116,7 @@ public class GitProvenance implements Marker {
         }
     }
 
-    @Nullable
-    public String getRepositoryName() {
+    public @Nullable String getRepositoryName() {
         if (origin == null) {
             return null;
         }
@@ -137,9 +134,8 @@ public class GitProvenance implements Marker {
      * @return A marker containing git provenance information.
      * @deprecated Use {@link #fromProjectDirectory(Path, BuildEnvironment) instead}.
      */
-    @Nullable
     @Deprecated
-    public static GitProvenance fromProjectDirectory(Path projectDir) {
+    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir) {
         return fromProjectDirectory(projectDir, null);
     }
 
@@ -149,8 +145,7 @@ public class GitProvenance implements Marker {
      *                    determined from a {@link BuildEnvironment} marker if possible.
      * @return A marker containing git provenance information.
      */
-    @Nullable
-    public static GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment environment) {
+    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment environment) {
         if (environment != null) {
             if (environment instanceof JenkinsBuildEnvironment) {
                 JenkinsBuildEnvironment jenkinsBuildEnvironment = (JenkinsBuildEnvironment) environment;
@@ -191,8 +186,7 @@ public class GitProvenance implements Marker {
         }
     }
 
-    @Nullable
-    private static GitProvenance fromGitConfig(Path projectDir) {
+    private static @Nullable GitProvenance fromGitConfig(Path projectDir) {
         String branch = null;
         try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
             String changeset = getChangeset(repository);
@@ -217,8 +211,7 @@ public class GitProvenance implements Marker {
                 getCommitters(repository));
     }
 
-    @Nullable
-    static String resolveBranchFromGitConfig(Repository repository) {
+    static @Nullable String resolveBranchFromGitConfig(Repository repository) {
         String branch;
         try {
             try (Git git = Git.open(repository.getDirectory())) {
@@ -253,8 +246,7 @@ public class GitProvenance implements Marker {
 
     }
 
-    @Nullable
-    private static String localBranchName(Repository repository, @Nullable String remoteBranch) throws IOException, GitAPIException {
+    private static @Nullable String localBranchName(Repository repository, @Nullable String remoteBranch) throws IOException, GitAPIException {
         if (remoteBranch == null) {
             return null;
         } else if (remoteBranch.startsWith("remotes/")) {
@@ -276,8 +268,7 @@ public class GitProvenance implements Marker {
         return branch;
     }
 
-    @Nullable
-    private static String getOrigin(Repository repository) {
+    private static @Nullable String getOrigin(Repository repository) {
         Config storedConfig = repository.getConfig();
         String url = storedConfig.getString("remote", "origin", "url");
         if (url == null) {
@@ -289,8 +280,7 @@ public class GitProvenance implements Marker {
         return url;
     }
 
-    @Nullable
-    private static AutoCRLF getAutocrlf(Repository repository) {
+    private static @Nullable AutoCRLF getAutocrlf(Repository repository) {
         WorkingTreeOptions opt = repository.getConfig().get(WorkingTreeOptions.KEY);
         switch (opt.getAutoCRLF()) {
             case FALSE:
@@ -304,8 +294,7 @@ public class GitProvenance implements Marker {
         }
     }
 
-    @Nullable
-    private static EOL getEOF(Repository repository) {
+    private static @Nullable EOL getEOF(Repository repository) {
         WorkingTreeOptions opt = repository.getConfig().get(WorkingTreeOptions.KEY);
         switch (opt.getEOL()) {
             case CRLF:
@@ -345,8 +334,7 @@ public class GitProvenance implements Marker {
         }
     }
 
-    @Nullable
-    private static String getChangeset(Repository repository) throws IOException {
+    private static @Nullable String getChangeset(Repository repository) throws IOException {
         ObjectId head = repository.resolve(Constants.HEAD);
         if (head == null) {
             return null;
