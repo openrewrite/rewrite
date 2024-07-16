@@ -98,8 +98,7 @@ public class KotlinTypeIrSignatureBuilderTest {
                 .orElseThrow());
     }
 
-    @Nullable
-    public IrProperty getProperty(String field) {
+    public @Nullable IrProperty getProperty(String field) {
         return getCompiledSource().getDeclarations().stream()
                 .filter(IrClass.class::isInstance)
                 .map(IrClass.class::cast)

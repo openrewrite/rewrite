@@ -68,8 +68,7 @@ public final class Assertions {
     // The idea is to differentiate adjacent spaces by whitespace count so that if any adjacent spaces are swapped or unhandled well by the parser, it can be detected.
     // Just change from `before` to `adjustSpaces(before)` below in the `kotlin()` method to test locally
     @SuppressWarnings("IfStatementWithIdenticalBranches")
-    @Nullable
-    private static String adjustSpaces(@Nullable String input) {
+    private static @Nullable String adjustSpaces(@Nullable String input) {
         if (input == null) {
             return null;
         }

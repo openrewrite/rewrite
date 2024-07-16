@@ -65,8 +65,7 @@ public interface K extends J {
         return v.isAdaptableTo(KotlinVisitor.class);
     }
 
-    @Nullable
-    default <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+    default <P> @Nullable J acceptKotlin(KotlinVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -192,9 +191,8 @@ public interface K extends J {
         @Nullable
         JRightPadded<Package> packageDeclaration;
 
-        @Nullable
         @Override
-        public Package getPackageDeclaration() {
+        public @Nullable Package getPackageDeclaration() {
             return packageDeclaration == null ? null : packageDeclaration.getElement();
         }
 
@@ -296,8 +294,7 @@ public interface K extends J {
         public static class Padding implements JavaSourceFile.Padding {
             private final K.CompilationUnit t;
 
-            @Nullable
-            public JRightPadded<Package> getPackageDeclaration() {
+            public @Nullable JRightPadded<Package> getPackageDeclaration() {
                 return t.packageDeclaration;
             }
 
@@ -950,8 +947,7 @@ public interface K extends J {
         JContainer<Statement> destructAssignments;
 
         @Deprecated
-        @Nullable
-        public List<J.VariableDeclarations.NamedVariable> getAssignments() {
+        public @Nullable List<J.VariableDeclarations.NamedVariable> getAssignments() {
             return assignments != null ? assignments.getElements() : null;
         }
 
@@ -999,8 +995,7 @@ public interface K extends J {
             private final K.DestructuringDeclaration t;
 
             @Deprecated
-            @Nullable
-            public JContainer<J.VariableDeclarations.NamedVariable> getAssignments() {
+            public @Nullable JContainer<J.VariableDeclarations.NamedVariable> getAssignments() {
                 return t.assignments;
             }
 
@@ -1262,8 +1257,7 @@ public interface K extends J {
         public static class Padding {
             private final FunctionType t;
 
-            @Nullable
-            public JContainer<TypeTree> getParameters() {
+            public @Nullable JContainer<TypeTree> getParameters() {
                 return t.parameters;
             }
 
@@ -1533,8 +1527,7 @@ public interface K extends J {
         @Nullable
         JContainer<TypeParameter> typeParameters;
 
-        @Nullable
-        public List<TypeParameter> getTypeParameters() {
+        public @Nullable List<TypeParameter> getTypeParameters() {
             return typeParameters == null ? null : typeParameters.getElements();
         }
 
@@ -1607,8 +1600,7 @@ public interface K extends J {
             return paddedVariableDeclarations.getElement();
         }
 
-        @Nullable
-        public Expression getReceiver() {
+        public @Nullable Expression getReceiver() {
             return receiver == null ? null : receiver.getElement();
         }
 
@@ -1657,8 +1649,7 @@ public interface K extends J {
                         variableDeclarations, t.typeConstraints, t.accessors, t.receiver);
             }
 
-            @Nullable
-            public JContainer<TypeParameter> getTypeParameters() {
+            public @Nullable JContainer<TypeParameter> getTypeParameters() {
                 return t.typeParameters;
             }
 
@@ -1667,13 +1658,11 @@ public interface K extends J {
                         t.paddedVariableDeclarations, t.typeConstraints, t.accessors, t.receiver);
             }
 
-            @Nullable
-            public JRightPadded<Expression> getReceiver() {
+            public @Nullable JRightPadded<Expression> getReceiver() {
                 return t.receiver;
             }
 
-            @Nullable
-            public Property withReceiver(@Nullable JRightPadded<Expression> receiver) {
+            public @Nullable Property withReceiver(@Nullable JRightPadded<Expression> receiver) {
                 return t.receiver == receiver ? t : new Property(t.id, t.prefix, t.markers, t.typeParameters,
                         t.paddedVariableDeclarations, t.typeConstraints, t.accessors, receiver);
             }
@@ -1995,8 +1984,7 @@ public interface K extends J {
         @Nullable
         JContainer<TypeParameter> typeParameters;
 
-        @Nullable
-        public List<TypeParameter> getTypeParameters() {
+        public @Nullable List<TypeParameter> getTypeParameters() {
             return typeParameters == null ? null : typeParameters.getElements();
         }
 
@@ -2061,8 +2049,7 @@ public interface K extends J {
         public static class Padding {
             private final TypeAlias t;
 
-            @Nullable
-            public JContainer<TypeParameter> getTypeParameters() {
+            public @Nullable JContainer<TypeParameter> getTypeParameters() {
                 return t.typeParameters;
             }
 
@@ -2070,8 +2057,7 @@ public interface K extends J {
                 return t.typeParameters == typeParameters ? t : new TypeAlias(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.name, typeParameters, t.initializer, t.type);
             }
 
-            @Nullable
-            public JLeftPadded<Expression> getInitializer() {
+            public @Nullable JLeftPadded<Expression> getInitializer() {
                 return t.initializer;
             }
 
@@ -2359,9 +2345,8 @@ public interface K extends J {
             return v.visitWhen(this, p);
         }
 
-        @Nullable
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return type;
         }
 

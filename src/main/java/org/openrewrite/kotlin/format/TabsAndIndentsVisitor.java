@@ -53,8 +53,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
     @Override
-    @Nullable
-    public J visit(@Nullable Tree tree, P p, Cursor parent) {
+    public @Nullable J visit(@Nullable Tree tree, P p, Cursor parent) {
         setCursor(parent);
         for (Cursor c = parent; c != null; c = c.getParent()) {
             Object v = c.getValue();
@@ -85,11 +84,9 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         return visit(tree, p);
     }
 
-
     @SuppressWarnings("StatementWithEmptyBody")
     @Override
-    @Nullable
-    public J preVisit(@Nullable J tree, P p) {
+    public @Nullable J preVisit(@Nullable J tree, P p) {
         if (tree instanceof JavaSourceFile ||
                 tree instanceof J.Package ||
                 tree instanceof J.Import ||
@@ -698,18 +695,16 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         throw new IllegalStateException("For loops must have a control section");
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (tree instanceof J && tree.getMarkers().findFirst(Implicit.class).isPresent()) {
             return (J) tree;
         } else if (getCursor().getNearestMessage("stop") != null) {

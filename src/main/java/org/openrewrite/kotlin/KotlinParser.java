@@ -321,8 +321,7 @@ public class KotlinParser implements Parser {
             return this;
         }
 
-        @Nullable
-        private Collection<Path> resolvedClasspath() {
+        private @Nullable Collection<Path> resolvedClasspath() {
             if (artifactNames != null && !artifactNames.isEmpty()) {
                 classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
                 artifactNames = null;

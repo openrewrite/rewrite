@@ -1163,7 +1163,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         return e;
     }
 
-//    @Override
+    //    @Override
 //    public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, P p) {
 //        J.TypeParameter tp = super.visitTypeParameter(typeParam, p);
 //        if (tp.getPadding().getBounds() != null) {
@@ -1188,18 +1188,16 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 //        return tp;
 //    }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().getRoot().putMessage("stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }

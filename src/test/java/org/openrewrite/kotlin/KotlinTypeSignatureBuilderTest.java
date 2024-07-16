@@ -97,8 +97,7 @@ public class KotlinTypeSignatureBuilderTest {
                 .orElseThrow(), getCompiledSource());
     }
 
-    @Nullable
-    public FirProperty getProperty(String field) {
+    public @Nullable FirProperty getProperty(String field) {
         return getCompiledSource().getDeclarations().stream()
                 .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)

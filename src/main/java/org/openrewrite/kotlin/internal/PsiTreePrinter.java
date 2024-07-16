@@ -536,8 +536,7 @@ public class PsiTreePrinter {
         return sb.toString();
     }
 
-    @Nullable
-    public static String firElementToString(FirElement firElement) {
+    public static @Nullable String firElementToString(FirElement firElement) {
         if (firElement instanceof FirFile) {
             return ((FirFile) firElement).getName();
         } else if (firElement instanceof FirProperty) {

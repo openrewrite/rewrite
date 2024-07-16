@@ -1923,8 +1923,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return mapFunctionCall(expression, data);
     }
 
-    @Nullable
-    private J.AssignmentOperation.Type mapAssignmentOperationType(KtOperationReferenceExpression operationReference) {
+    private @Nullable J.AssignmentOperation.Type mapAssignmentOperationType(KtOperationReferenceExpression operationReference) {
         IElementType elementType = operationReference.getOperationSignTokenType();
 
         if (elementType == KtTokens.PLUSEQ) {
@@ -2602,8 +2601,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         );
     }
 
-    @Nullable
-    private FirResolvedImport getResolvedImport(KtImportDirective importDirective) {
+    private @Nullable FirResolvedImport getResolvedImport(KtImportDirective importDirective) {
         FirElement primary = psiElementAssociations.primary(importDirective);
         if (primary instanceof FirResolvedImport) {
             return (FirResolvedImport) primary;
@@ -2847,8 +2845,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     @Override
-    @Nullable
-    public J visitPackageDirective(KtPackageDirective directive, ExecutionContext data) {
+    public @Nullable J visitPackageDirective(KtPackageDirective directive, ExecutionContext data) {
         if (directive.getPackageNameExpression() == null) {
             return null;
         }
@@ -3304,8 +3301,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     /*====================================================================
      * Mapping methods
      * ====================================================================*/
-    @Nullable
-    private K.Binary.Type mapKBinaryType(KtOperationReferenceExpression operationReference) {
+    private @Nullable K.Binary.Type mapKBinaryType(KtOperationReferenceExpression operationReference) {
         IElementType elementType = operationReference.getOperationSignTokenType();
         if (elementType == null) {
             return null;
@@ -3332,8 +3328,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
     }
 
-    @Nullable
-    private J.Binary.Type mapJBinaryType(KtOperationReferenceExpression operationReference) {
+    private @Nullable J.Binary.Type mapJBinaryType(KtOperationReferenceExpression operationReference) {
         IElementType elementType = operationReference.getOperationSignTokenType();
 
         if (elementType == null) {
@@ -3383,8 +3378,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return null;
     }
 
-    @Nullable
-    private J.Unary.Type mapJUnaryType(KtSimpleNameExpression operationReference) {
+    private @Nullable J.Unary.Type mapJUnaryType(KtSimpleNameExpression operationReference) {
         IElementType elementType = operationReference.getReferencedNameElementType();
 
         if (elementType == KtTokens.EXCL) {
@@ -3450,8 +3444,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 Space.EMPTY);
     }
 
-    @Nullable
-    private J.If.Else buildIfElsePart(KtIfExpression expression) {
+    private @Nullable J.If.Else buildIfElsePart(KtIfExpression expression) {
         if (expression.getElse() == null) {
             return null;
         }
@@ -3633,8 +3626,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return type != null && !(type instanceof JavaType.FullyQualified);
     }
 
-    @Nullable
-    private JavaType type(@Nullable KtElement psi) {
+    private @Nullable JavaType type(@Nullable KtElement psi) {
         if (psi == null) {
             return JavaType.Unknown.getInstance();
         }
@@ -3645,18 +3637,15 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return psiElementAssociations.primitiveType(psi);
     }
 
-    @Nullable
-    private JavaType.Variable variableType(PsiElement psi, @Nullable FirElement parent) {
+    private @Nullable JavaType.Variable variableType(PsiElement psi, @Nullable FirElement parent) {
         return psiElementAssociations.variableType(psi, parent);
     }
 
-    @Nullable
-    private JavaType.Method methodDeclarationType(PsiElement psi) {
+    private @Nullable JavaType.Method methodDeclarationType(PsiElement psi) {
         return psiElementAssociations.methodDeclarationType(psi);
     }
 
-    @Nullable
-    private JavaType.Method methodInvocationType(PsiElement psi) {
+    private @Nullable JavaType.Method methodInvocationType(PsiElement psi) {
         return psiElementAssociations.methodInvocationType(psi);
     }
 
@@ -3707,8 +3696,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return id;
     }
 
-    @Nullable
-    private FirElement owner(PsiElement element) {
+    private @Nullable FirElement owner(PsiElement element) {
         KtElement owner = ownerStack.peek() == element ? ownerStack.get(ownerStack.size() - 2) : ownerStack.peek();
         if (owner instanceof KtDeclaration) {
             return psiElementAssociations.primary(owner);
@@ -3827,8 +3815,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return allChildren;
     }
 
-    @Nullable
-    private PsiElement findFirstPrefixSpace(@Nullable PsiElement element) {
+    private @Nullable PsiElement findFirstPrefixSpace(@Nullable PsiElement element) {
         if (element == null) {
             return null;
         }
@@ -3845,8 +3832,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return pre;
     }
 
-    @Nullable
-    private static PsiElement getFirstSpaceChildOrNull(@Nullable PsiElement element) {
+    private static @Nullable PsiElement getFirstSpaceChildOrNull(@Nullable PsiElement element) {
         if (element == null) {
             return null;
         }
@@ -4080,8 +4066,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return statements;
     }
 
-    @Nullable
-    private JContainer<TypeTree> mapSuperTypeList(@Nullable KtSuperTypeList ktSuperTypeList, ExecutionContext data) {
+    private @Nullable JContainer<TypeTree> mapSuperTypeList(@Nullable KtSuperTypeList ktSuperTypeList, ExecutionContext data) {
         if (ktSuperTypeList == null) {
             return null;
         }
@@ -4351,13 +4336,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         );
     }
 
-    @Nullable
-    private PsiElement findLastNotSpaceChild(@Nullable PsiElement parent) {
+    private @Nullable PsiElement findLastNotSpaceChild(@Nullable PsiElement parent) {
         return findLastChild(parent, psi -> !isSpace(psi.getNode()));
     }
 
-    @Nullable
-    private static PsiElement findFirstChild(@Nullable PsiElement parent, Predicate<PsiElement> condition) {
+    private static @Nullable PsiElement findFirstChild(@Nullable PsiElement parent, Predicate<PsiElement> condition) {
         if (parent == null) {
             return null;
         }
@@ -4371,13 +4354,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return null;
     }
 
-    @Nullable
-    private static PsiElement findFirstNonSpaceChild(@Nullable PsiElement parent) {
+    private static @Nullable PsiElement findFirstNonSpaceChild(@Nullable PsiElement parent) {
         return findFirstChild(parent, child -> !isSpace(child.getNode()));
     }
 
-    @Nullable
-    private static PsiElement findLastChild(@Nullable PsiElement parent, Predicate<PsiElement> condition) {
+    private static @Nullable PsiElement findLastChild(@Nullable PsiElement parent, Predicate<PsiElement> condition) {
         if (parent == null) {
             return null;
         }
@@ -4391,8 +4372,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return null;
     }
 
-    @Nullable
-    private PsiElement findLastSpaceChild(@Nullable PsiElement parent) {
+    private @Nullable PsiElement findLastSpaceChild(@Nullable PsiElement parent) {
         if (parent == null) {
             return null;
         }
@@ -4420,8 +4400,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return consumed;
     }
 
-    @Nullable
-    private PsiElement findTrailingComma(PsiElement element) {
+    private @Nullable PsiElement findTrailingComma(PsiElement element) {
         PsiElement nextSibling = element.getNextSibling();
         while (nextSibling != null) {
             if (nextSibling.getNode().getElementType() == KtTokens.COMMA) {

@@ -65,8 +65,7 @@ public class FindKotlinSources extends Recipe {
                 return tree;
             }
 
-            @Nullable
-            private KotlinSourceFile.SourceFileType getSourceFileType(SourceFile sourceFile) {
+            private @Nullable KotlinSourceFile.SourceFileType getSourceFileType(SourceFile sourceFile) {
                 KotlinSourceFile.SourceFileType sourceFileType = null;
                 if (sourceFile instanceof K.CompilationUnit) {
                     sourceFileType = KotlinSourceFile.SourceFileType.Kotlin;
