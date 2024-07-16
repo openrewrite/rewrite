@@ -22,4 +22,8 @@ public class Traits {
     public static MavenDependency.Matcher mavenDependency() {
         return new MavenDependency.Matcher();
     }
+
+    public static MavenPlugin.Matcher mavenPlugin() {
+        return new MavenPlugin.Matcher();
+    }
 }
