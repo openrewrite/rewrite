@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
@@ -27,12 +28,21 @@ import java.util.function.Function;
  * @author Rob Harrop
  */
 public class PropertyPlaceholderHelper {
+
     private static final Map<String, String> wellKnownSimplePrefixes = new HashMap<>(4);
+
+    private static final List<String> MAVEN_BUILT_IN_PROPERTY_PREFIXES = new ArrayList<>();
 
     static {
         wellKnownSimplePrefixes.put("}", "{");
         wellKnownSimplePrefixes.put("]", "[");
         wellKnownSimplePrefixes.put(")", "(");
+
+        MAVEN_BUILT_IN_PROPERTY_PREFIXES.add("project.");
+        MAVEN_BUILT_IN_PROPERTY_PREFIXES.add("pom.");
+        MAVEN_BUILT_IN_PROPERTY_PREFIXES.add("maven.");
+        MAVEN_BUILT_IN_PROPERTY_PREFIXES.add("env.");
+        MAVEN_BUILT_IN_PROPERTY_PREFIXES.add("settings.");
     }
 
     private final String placeholderPrefix;
@@ -88,7 +98,7 @@ public class PropertyPlaceholderHelper {
                 if (visitedPlaceholders == null) {
                     visitedPlaceholders = new HashSet<>(4);
                 }
-                if (!visitedPlaceholders.add(originalPlaceholder)) {
+                if (!visitedPlaceholders.add(originalPlaceholder) && !isMavenBuiltInProperty(originalPlaceholder)) {
                     throw new IllegalArgumentException(
                             "Circular placeholder reference '" + originalPlaceholder + "' in property definitions");
                 }
@@ -159,5 +169,14 @@ public class PropertyPlaceholderHelper {
             }
         }
         return true;
+    }
+
+    private static boolean isMavenBuiltInProperty(@NonNull final String originalPlaceholder) {
+        for (final String prefix : MAVEN_BUILT_IN_PROPERTY_PREFIXES) {
+            if (originalPlaceholder.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
