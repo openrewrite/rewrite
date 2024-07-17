@@ -278,6 +278,10 @@ public class ResolvedPom {
         if (property == null) {
             return null;
         }
+        final String propVal = properties.get(property);
+        if (propVal != null) {
+            return propVal;
+        }
         switch (property) {
             case "groupId":
             case "project.groupId":
@@ -302,7 +306,7 @@ public class ResolvedPom {
                 return requested.getParent() != null ? requested.getParent().getVersion() : null;
         }
 
-        return System.getProperty(property, properties.get(property));
+        return System.getProperty(property);
     }
 
     @Nullable

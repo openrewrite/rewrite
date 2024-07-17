@@ -3107,4 +3107,54 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void circularMavenProperty() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                            <groupId>example</groupId>
+                            <artifactId>example-root</artifactId>
+                            <packaging>pom</packaging>
+                            <version>1.0.0</version>
+                          
+                            <properties>
+                              <project.version>1.0.1</project.version>
+                            </properties>
+                          
+                            <modules>
+                              <module>example-child</module>
+                            </modules>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pomXml -> assertThat(
+                pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+                  .getPom().getProperties().get("project.version"))
+                .isEqualTo("1.0.1"))
+            ),
+            mavenProject("circular-example-child",
+              pomXml(
+                """
+                  <project>
+                              <parent>
+                                <groupId>example</groupId>
+                                <artifactId>example-root</artifactId>
+                                <version>1.0.0</version>
+                              </parent>
+                            
+                              <artifactId>example-child</artifactId>
+                              <version>${project.version}</version>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                    MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    assertThat(resolution.getPom().getVersion()).isEqualTo("1.0.1");
+                })
+              )
+            )
+          )
+        );
+    }
 }
