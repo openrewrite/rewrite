@@ -32,8 +32,9 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RecipeListTest implements RewriteTest {
+class RecipeListTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void declarativeRecipeInCode() {
         rewriteRun(
@@ -63,12 +64,12 @@ public class RecipeListTest implements RewriteTest {
 @Value
 @EqualsAndHashCode(callSuper = false)
 class FormalHello extends Recipe {
-    @Option(displayName = "Before name",
-      description = "The name of a person being greeted")
+    @Option(example = "TODO Provide a usage example for the docs", displayName = "Before name",
+            description = "The name of a person being greeted")
     String beforeName;
 
-    @Option(displayName = "After name",
-      description = "The more formal name of the person.")
+    @Option(example = "TODO Provide a usage example for the docs", displayName = "After name",
+            description = "The more formal name of the person.")
     String afterName;
 
     @Override
