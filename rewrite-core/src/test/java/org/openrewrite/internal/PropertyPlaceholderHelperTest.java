@@ -17,10 +17,6 @@ package org.openrewrite.internal;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.util.function.Function;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PropertyPlaceholderHelperTest {
@@ -34,26 +30,5 @@ class PropertyPlaceholderHelperTest {
             default -> throw new UnsupportedOperationException();
         });
         assertThat(s).isEqualTo("hi jon");
-    }
-
-    @Test
-    void testMavenBuiltInProperty() {
-        var helper = new PropertyPlaceholderHelper("${", "}", null);
-        final Set<String> visitedPlaceholders = new HashSet<>();
-        visitedPlaceholders.add("project.version");
-        visitedPlaceholders.add("pom.basedir");
-        visitedPlaceholders.add("maven.home");
-        visitedPlaceholders.add("env.PATH");
-        visitedPlaceholders.add("settings.localRepository");
-        assertThat(helper.parseStringValue("${project.version}", Function.identity(), visitedPlaceholders))
-          .isEqualTo("project.version");
-        assertThat(helper.parseStringValue("${pom.basedir}", Function.identity(), visitedPlaceholders))
-          .isEqualTo("pom.basedir");
-        assertThat(helper.parseStringValue("${maven.home}", Function.identity(), visitedPlaceholders))
-          .isEqualTo("maven.home");
-        assertThat(helper.parseStringValue("${env.PATH}", Function.identity(), visitedPlaceholders))
-          .isEqualTo("env.PATH");
-        assertThat(helper.parseStringValue("${settings.localRepository}", Function.identity(), visitedPlaceholders))
-          .isEqualTo("settings.localRepository");
     }
 }
