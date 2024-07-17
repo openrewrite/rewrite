@@ -3157,4 +3157,48 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multiModulePropertyVersionShouldAddModules() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>example</groupId>
+                    <artifactId>example-root</artifactId>
+                    <packaging>pom</packaging>
+                    <version>${revision}</version>
+
+                    <properties>
+                        <revision>1.0.1</revision>
+                    </properties>
+
+                    <modules>
+                        <module>example-child</module>
+                    </modules>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pomXml -> assertThat(
+                pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+                  .getModules()).isNotEmpty())
+            ),
+            mavenProject("multiModule-example-child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>example</groupId>
+                          <artifactId>example-root</artifactId>
+                          <version>${revision}</version>
+                      </parent>
+
+                      <artifactId>example-child</artifactId>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
 }
