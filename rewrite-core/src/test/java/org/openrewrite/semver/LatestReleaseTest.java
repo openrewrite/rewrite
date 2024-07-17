@@ -105,6 +105,25 @@ class LatestReleaseTest {
     }
 
     @Test
+    void releaseOrLatestKeyword_beatsEverything() {
+        assertThat(latestRelease.compare(null, "RELEASE", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "RELEASE", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "RELEASE", "RELEASE")).isZero();
+
+        assertThat(latestRelease.compare(null, "LATEST", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "LATEST", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "LATEST", "LATEST")).isZero();
+
+        assertThat(latestRelease.compare(null, "reLeaSE", "1.2.3")).isPositive();
+    }
+
+    @Test
+    void latestKeywordIsNewerThanReleaseKeyword() {
+        assertThat(latestRelease.compare(null, "RELEASE", "LATEST")).isNegative();
+        assertThat(latestRelease.compare(null, "LATEST", "RELEASE")).isPositive();
+    }
+
+    @Test
     void guavaVariants() {
         assertThat(latestRelease.compare("1.0", "25.0-jre", "29.0-jre")).isLessThan(0);
     }
