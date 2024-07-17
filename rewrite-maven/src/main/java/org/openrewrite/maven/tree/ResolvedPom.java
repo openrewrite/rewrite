@@ -275,6 +275,10 @@ public class ResolvedPom {
         if (property == null) {
             return null;
         }
+        String propVal = properties.get(property);
+        if (propVal != null) {
+            return propVal;
+        }
         switch (property) {
             case "groupId":
             case "project.groupId":
@@ -299,7 +303,7 @@ public class ResolvedPom {
                 return requested.getParent() != null ? requested.getParent().getVersion() : null;
         }
 
-        return System.getProperty(property, properties.get(property));
+        return System.getProperty(property);
     }
 
     public @Nullable String getManagedVersion(@Nullable String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
