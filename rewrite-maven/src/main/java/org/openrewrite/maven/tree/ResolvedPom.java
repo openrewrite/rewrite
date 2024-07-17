@@ -278,7 +278,7 @@ public class ResolvedPom {
         if (property == null) {
             return null;
         }
-        final String propVal = properties.get(property);
+        String propVal = properties.get(property);
         if (propVal != null) {
             return propVal;
         }
