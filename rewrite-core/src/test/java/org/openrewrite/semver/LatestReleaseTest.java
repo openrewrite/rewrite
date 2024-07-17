@@ -50,6 +50,12 @@ class LatestReleaseTest {
     }
 
     @Test
+    void datetimeVersion() {
+        assertThat(latestRelease.compare(null, "20230504141934.0.0", "20241212141934.0.0")).isNegative();
+        assertThat(latestRelease.compare(null, "20230504141934", "20241212141934")).isNegative();
+    }
+
+    @Test
     void others() {
         assertThat(latestRelease.compare(null, "2.5.6.SEC03", "6.0.4")).isLessThan(0);
     }
