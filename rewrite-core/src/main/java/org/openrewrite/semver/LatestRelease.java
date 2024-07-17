@@ -21,8 +21,6 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.regex.Matcher;
 
-import static java.lang.Integer.parseInt;
-
 public class LatestRelease implements VersionComparator {
     @Nullable
     private final String metadataPattern;
@@ -147,9 +145,10 @@ public class LatestRelease implements VersionComparator {
                     return 1;
                 }
 
-                int diff = parseInt(v1Part) - parseInt(v2Part);
+                long diff = Long.parseLong(v1Part) - Long.parseLong(v2Part);
                 if (diff != 0) {
-                    return diff;
+                    // squish the long to fit into an int; all that matters is whether the return value is pos/neg/zero
+                    return (int) (diff / Math.abs(diff));
                 }
             }
         } catch (IllegalStateException exception) {
