@@ -73,6 +73,7 @@ public class XmlParser implements Parser {
     public boolean accept(Path path) {
         String p = path.toString();
         return p.endsWith(".xml") ||
+               p.endsWith(".xmi") ||
                p.endsWith(".wsdl") ||
                p.endsWith(".xhtml") ||
                p.endsWith(".xsd") ||
