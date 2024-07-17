@@ -3159,6 +3159,7 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4319")
     void multiModulePropertyVersionShouldAddModules() {
         rewriteRun(
           mavenProject("root",
@@ -3183,7 +3184,7 @@ class MavenParserTest implements RewriteTest {
                 pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                   .getModules()).isNotEmpty())
             ),
-            mavenProject("multiModule-example-child",
+            mavenProject("example-child",
               pomXml(
                 """
                   <project>
