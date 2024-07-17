@@ -98,8 +98,14 @@ public class LatestRelease implements VersionComparator {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        if (v1.equals(v2)) {
+        if (v1.equalsIgnoreCase(v2)) {
             return 0;
+        }
+        if (v1.equalsIgnoreCase("RELEASE")) {
+            return v2.equalsIgnoreCase("LATEST") ? -1 : 1;
+        }
+        if (v1.equalsIgnoreCase("LATEST")) {
+            return 1;
         }
 
         String nv1 = normalizeVersion(v1);
