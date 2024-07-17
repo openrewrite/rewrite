@@ -33,7 +33,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {
-        return sourceFile instanceof JavaSourceFile;
+        return sourceFile instanceof J;
     }
 
     @Override
