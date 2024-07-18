@@ -78,9 +78,8 @@ public class InMemoryMavenPomCache implements MavenPomCache {
         this("default", pomCache, mavenMetadataCache, repositoryCache, dependencyCache);
     }
 
-    @Nullable
     @Override
-    public ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
+    public @Nullable ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
         return dependencyCache.getIfPresent(dependency);
     }
 
@@ -89,9 +88,8 @@ public class InMemoryMavenPomCache implements MavenPomCache {
         dependencyCache.put(dependency, resolved.deduplicate());
     }
 
-    @Nullable
     @Override
-    public Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+    public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
         return mavenMetadataCache.getIfPresent(new MetadataKey(repo, gav));
     }
 
@@ -100,9 +98,8 @@ public class InMemoryMavenPomCache implements MavenPomCache {
         mavenMetadataCache.put(new MetadataKey(repo, gav), Optional.ofNullable(metadata));
     }
 
-    @Nullable
     @Override
-    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) {
+    public @Nullable Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) {
         return pomCache.getIfPresent(gav);
     }
 
@@ -112,8 +109,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    @Nullable
-    public Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+    public @Nullable Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
         return repositoryCache.getIfPresent(repository);
     }
 

@@ -203,8 +203,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return gtv;
     }
 
-    @Nullable
-    public JavaType.Method methodType(@Nullable MethodNode node) {
+    public @Nullable JavaType.Method methodType(@Nullable MethodNode node) {
         if (node == null) {
             return null;
         }
@@ -265,8 +264,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return method;
     }
 
-    @Nullable
-    public JavaType.Variable variableType(@Nullable FieldNode node) {
+    public @Nullable JavaType.Variable variableType(@Nullable FieldNode node) {
         if (node == null) {
             return null;
         }
@@ -295,13 +293,11 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     /**
      * With an undefined owner
      */
-    @Nullable
-    public JavaType.Variable variableType(String name, @Nullable ASTNode type) {
+    public @Nullable JavaType.Variable variableType(String name, @Nullable ASTNode type) {
         return variableType(name, type(type));
     }
 
-    @Nullable
-    public JavaType.Variable variableType(String name, @Nullable JavaType type) {
+    public @Nullable JavaType.Variable variableType(String name, @Nullable JavaType type) {
         if (type == null) {
             return null;
         }
@@ -325,8 +321,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return variable;
     }
 
-    @Nullable
-    private List<JavaType.FullyQualified> getAnnotations(AnnotatedNode node) {
+    private @Nullable List<JavaType.FullyQualified> getAnnotations(AnnotatedNode node) {
         List<JavaType.FullyQualified> annotations = null;
         for (AnnotationNode a : node.getAnnotations()) {
             annotations = new ArrayList<>(node.getAnnotations().size());

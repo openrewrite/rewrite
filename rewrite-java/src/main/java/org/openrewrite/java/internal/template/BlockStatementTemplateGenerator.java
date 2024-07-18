@@ -131,9 +131,8 @@ public class BlockStatementTemplateGenerator {
                 return left;
             }
 
-            @Nullable
             @Override
-            public J visit(@Nullable Tree tree, Integer p) {
+            public @Nullable J visit(@Nullable Tree tree, Integer p) {
                 if (done) {
                     return (J) tree;
                 }
@@ -744,8 +743,7 @@ public class BlockStatementTemplateGenerator {
      * Accepts a @FunctionalInterface and returns the single abstract method from it, or null if the single abstract
      * method cannot be found
      */
-    @Nullable
-    private static JavaType.Method findSingleAbstractMethod(@Nullable JavaType javaType) {
+    private static @Nullable JavaType.Method findSingleAbstractMethod(@Nullable JavaType javaType) {
         if (javaType == null) {
             return null;
         }
@@ -759,8 +757,7 @@ public class BlockStatementTemplateGenerator {
     // Visitor for removing any trees having or following the `STOP_COMMENT`
     private static class TemplatedTreeTrimmer {
 
-        @Nullable
-        static J trimTree(J j) {
+        static @Nullable J trimTree(J j) {
             J trimmed = new TemplatedTreeTrimmerVisitor().visit(j, 0);
             if (trimmed == null || trimmed.getMarkers().findFirst(RemoveTreeMarker.class).isPresent()) {
                 return null;

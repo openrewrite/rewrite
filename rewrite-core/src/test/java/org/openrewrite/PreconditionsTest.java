@@ -100,9 +100,9 @@ class PreconditionsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.or(
               new PlainTextVisitor<>() {
-                  @Nullable
+
                   @Override
-                  public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                       return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
                   }
               }),
@@ -122,9 +122,9 @@ class PreconditionsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.and(
               new PlainTextVisitor<>() {
-                  @Nullable
+
                   @Override
-                  public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                       return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
                   }
               }),
@@ -144,9 +144,9 @@ class PreconditionsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.not(
               new PlainTextVisitor<>() {
-                  @Nullable
+
                   @Override
-                  public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                       return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
                   }
               }),

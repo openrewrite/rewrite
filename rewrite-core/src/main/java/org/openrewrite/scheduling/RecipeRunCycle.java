@@ -237,8 +237,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
     }
 
-    @Nullable
-    private SourceFile handleError(Recipe recipe, SourceFile sourceFile, @Nullable SourceFile after,
+    private @Nullable SourceFile handleError(Recipe recipe, SourceFile sourceFile, @Nullable SourceFile after,
                                    Throwable t) {
         ctx.getOnError().accept(t);
 

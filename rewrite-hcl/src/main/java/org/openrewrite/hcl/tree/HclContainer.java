@@ -144,8 +144,7 @@ public class HclContainer<T> {
         }
     }
 
-    @Nullable
-    public static <H extends Hcl> HclContainer<H> withElementsNullable(@Nullable HclContainer<H> before, @Nullable List<H> elements) {
+    public static <H extends Hcl> @Nullable HclContainer<H> withElementsNullable(@Nullable HclContainer<H> before, @Nullable List<H> elements) {
         if (before == null) {
             if (elements == null || elements.isEmpty()) {
                 return null;

@@ -86,8 +86,7 @@ public class MavenArtifactDownloader {
      * @param dependency The dependency to download.
      * @return The path on disk of the downloaded artifact or <code>null</code> if unable to download.
      */
-    @Nullable
-    public Path downloadArtifact(ResolvedDependency dependency) {
+    public @Nullable Path downloadArtifact(ResolvedDependency dependency) {
         if (dependency.getRequested().getType() != null && !"jar".equals(dependency.getRequested().getType())) {
             return null;
         }

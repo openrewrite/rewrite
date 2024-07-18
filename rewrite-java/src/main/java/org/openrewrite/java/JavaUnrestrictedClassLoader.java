@@ -95,8 +95,7 @@ public class JavaUnrestrictedClassLoader extends ClassLoader {
     }
 
     @Override
-    @Nullable
-    public URL getResource(String name) {
+    public @Nullable URL getResource(String name) {
         try {
             for (Path path : modules) {
                 Path classFile = path.resolve(name);
@@ -110,8 +109,7 @@ public class JavaUnrestrictedClassLoader extends ClassLoader {
         return super.getResource(name);
     }
 
-    @Nullable
-    private Class<?> loadIsolatedClass(String className) {
+    private @Nullable Class<?> loadIsolatedClass(String className) {
         if (!className.startsWith("org.openrewrite.java.isolated")) {
             return null;
         }

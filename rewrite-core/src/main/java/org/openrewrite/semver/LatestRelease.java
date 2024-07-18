@@ -21,8 +21,6 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.regex.Matcher;
 
-import static java.lang.Integer.parseInt;
-
 public class LatestRelease implements VersionComparator {
     @Nullable
     private final String metadataPattern;
@@ -100,8 +98,14 @@ public class LatestRelease implements VersionComparator {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        if (v1.equals(v2)) {
+        if (v1.equalsIgnoreCase(v2)) {
             return 0;
+        }
+        if (v1.equalsIgnoreCase("RELEASE")) {
+            return v2.equalsIgnoreCase("LATEST") ? -1 : 1;
+        }
+        if (v1.equalsIgnoreCase("LATEST")) {
+            return 1;
         }
 
         String nv1 = normalizeVersion(v1);
@@ -147,9 +151,10 @@ public class LatestRelease implements VersionComparator {
                     return 1;
                 }
 
-                int diff = parseInt(v1Part) - parseInt(v2Part);
+                long diff = Long.parseLong(v1Part) - Long.parseLong(v2Part);
                 if (diff != 0) {
-                    return diff;
+                    // squish the long to fit into an int; all that matters is whether the return value is pos/neg/zero
+                    return (int) (diff / Math.abs(diff));
                 }
             }
         } catch (IllegalStateException exception) {

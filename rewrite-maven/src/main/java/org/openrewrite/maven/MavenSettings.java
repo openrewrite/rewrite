@@ -83,8 +83,7 @@ public class MavenSettings {
         this.servers = servers;
     }
 
-    @Nullable
-    public static MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
+    public static @Nullable MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
             return new Interpolator().interpolate(
                     MavenXmlMapper.readMapper().readValue(source.getSource(ctx), MavenSettings.class));
@@ -94,8 +93,7 @@ public class MavenSettings {
         }
     }
 
-    @Nullable
-    public static MavenSettings parse(Path settingsPath, ExecutionContext ctx) {
+    public static @Nullable MavenSettings parse(Path settingsPath, ExecutionContext ctx) {
         return parse(new Parser.Input(settingsPath, () -> {
             try {
                 return Files.newInputStream(settingsPath);
@@ -106,8 +104,7 @@ public class MavenSettings {
         }), ctx);
     }
 
-    @Nullable
-    public static MavenSettings readMavenSettingsFromDisk(ExecutionContext ctx) {
+    public static @Nullable MavenSettings readMavenSettingsFromDisk(ExecutionContext ctx) {
         final Optional<MavenSettings> userSettings = Optional.of(userSettingsPath())
                 .filter(MavenSettings::exists)
                 .map(path -> parse(path, ctx));
@@ -216,14 +213,12 @@ public class MavenSettings {
                     interpolate(mavenSettings.servers));
         }
 
-        @Nullable
-        private ActiveProfiles interpolate(@Nullable ActiveProfiles activeProfiles) {
+        private @Nullable ActiveProfiles interpolate(@Nullable ActiveProfiles activeProfiles) {
             if (activeProfiles == null) return null;
             return new ActiveProfiles(ListUtils.map(activeProfiles.getActiveProfiles(), this::interpolate));
         }
 
-        @Nullable
-        private Mirrors interpolate(@Nullable Mirrors mirrors) {
+        private @Nullable Mirrors interpolate(@Nullable Mirrors mirrors) {
             if (mirrors == null) return null;
             return new Mirrors(ListUtils.map(mirrors.getMirrors(), this::interpolate));
         }
@@ -232,14 +227,12 @@ public class MavenSettings {
             return new Mirror(interpolate(mirror.id), interpolate(mirror.url), interpolate(mirror.getMirrorOf()), mirror.releases, mirror.snapshots);
         }
 
-        @Nullable
-        private Servers interpolate(@Nullable Servers servers) {
+        private @Nullable Servers interpolate(@Nullable Servers servers) {
             if (servers == null) return null;
             return new Servers(ListUtils.map(servers.getServers(), this::interpolate));
         }
 
-        @Nullable
-        private ServerConfiguration interpolate(@Nullable ServerConfiguration configuration) {
+        private @Nullable ServerConfiguration interpolate(@Nullable ServerConfiguration configuration) {
             if (configuration == null) {
                 return null;
             }
@@ -258,8 +251,7 @@ public class MavenSettings {
                     interpolate(server.configuration));
         }
 
-        @Nullable
-        private String interpolate(@Nullable String s) {
+        private @Nullable String interpolate(@Nullable String s) {
             return s == null ? null : propertyPlaceholders.replacePlaceholders(s, propertyResolver);
         }
     }

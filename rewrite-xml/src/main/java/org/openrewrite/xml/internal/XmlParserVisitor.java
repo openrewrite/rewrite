@@ -384,8 +384,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return prefix;
     }
 
-    @Nullable
-    private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, String, T> conversion) {
+    private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, String, T> conversion) {
         if (ctx == null) {
             return null;
         }

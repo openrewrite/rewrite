@@ -230,8 +230,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         @Override
-        @Nullable
-        public T getValue() {
+        public @Nullable T getValue() {
             return value;
         }
 
@@ -285,13 +284,11 @@ public interface Validated<T> extends Iterable<Validated<T>> {
             return property;
         }
 
-        @Nullable
-        public Object getInvalidValue() {
+        public @Nullable Object getInvalidValue() {
             return value;
         }
 
-        @Nullable
-        public Throwable getException() {
+        public @Nullable Throwable getException() {
             return exception;
         }
 

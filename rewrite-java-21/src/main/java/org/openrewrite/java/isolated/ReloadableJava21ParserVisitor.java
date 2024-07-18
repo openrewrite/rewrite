@@ -1703,13 +1703,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return source.substring(0, ((JCTree) tree).getStartPosition()).chars().filter(c -> c == '\n').count() + 1;
     }
 
-    @Nullable
-    private <T extends J> T convertOrNull(@Nullable Tree t) {
+    private <T extends J> @Nullable T convertOrNull(@Nullable Tree t) {
         return t == null ? null : convert(t);
     }
 
-    @Nullable
-    private <J2 extends J> JRightPadded<J2> convertOrNull(@Nullable Tree t, Function<Tree, Space> suffix) {
+    private <J2 extends J> @Nullable JRightPadded<J2> convertOrNull(@Nullable Tree t, Function<Tree, Space> suffix) {
         return t == null ? null : convert(t, suffix);
     }
 
@@ -1735,8 +1733,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    @Nullable
-    private JContainer<Expression> convertTypeParameters(@Nullable List<? extends Tree> typeArguments) {
+    private @Nullable JContainer<Expression> convertTypeParameters(@Nullable List<? extends Tree> typeArguments) {
         if (typeArguments == null) {
             return null;
         }

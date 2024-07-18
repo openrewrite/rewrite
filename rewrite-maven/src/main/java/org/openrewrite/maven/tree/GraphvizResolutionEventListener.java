@@ -191,8 +191,7 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
         });
     }
 
-    @Nullable
-    private String gavUrl(GroupArtifactVersion gav) {
+    private @Nullable String gavUrl(GroupArtifactVersion gav) {
         if (gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
             return null;
         }

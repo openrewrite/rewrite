@@ -227,8 +227,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                 return maven;
             }
 
-            @Nullable
-            private String existingManagedDependencyVersion() {
+            private @Nullable String existingManagedDependencyVersion() {
                 return getResolutionResult().getPom().getDependencyManagement().stream()
                         .map(resolvedManagedDep -> {
                             if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
@@ -244,8 +243,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                         .findFirst().orElse(null);
             }
 
-            @Nullable
-            private String findVersionToUse(VersionComparator versionComparator, ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
+            private @Nullable String findVersionToUse(VersionComparator versionComparator, ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
                 MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, containingPom, ctx));
                 LatestRelease latest = new LatestRelease(versionPattern);
                 return mavenMetadata.getVersioning().getVersions().stream()

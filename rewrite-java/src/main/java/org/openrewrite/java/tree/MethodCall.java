@@ -25,8 +25,9 @@ import java.util.List;
  * a {@link org.openrewrite.java.tree.J.NewClass}.
  */
 public interface MethodCall extends Expression {
-    @Nullable
+
     @Override
+    @Nullable
     JavaType getType();
 
     @Override

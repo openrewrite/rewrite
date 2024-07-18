@@ -111,8 +111,7 @@ public class JRightPadded<T> {
         return list;
     }
 
-    @Nullable
-    public static <T> JRightPadded<T> withElement(@Nullable JRightPadded<T> before, @Nullable T element) {
+    public static <T> @Nullable JRightPadded<T> withElement(@Nullable JRightPadded<T> before, @Nullable T element) {
         if (element == null) {
             return null;
         }

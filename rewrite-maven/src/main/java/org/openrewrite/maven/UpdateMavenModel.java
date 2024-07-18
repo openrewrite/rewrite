@@ -137,8 +137,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         }
     }
 
-    @Nullable
-    private List<GroupArtifact> mapExclusions(Xml.Tag tag) {
+    private @Nullable List<GroupArtifact> mapExclusions(Xml.Tag tag) {
         return tag.getChild("exclusions")
                 .map(exclusions -> {
                     List<Xml.Tag> eachExclusion = exclusions.getChildren("exclusion");

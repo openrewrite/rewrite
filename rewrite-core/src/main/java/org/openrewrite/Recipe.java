@@ -198,8 +198,7 @@ public abstract class Recipe implements Cloneable {
     /**
      * @return An estimated effort were a developer to fix manually instead of using this recipe.
      */
-    @Nullable
-    public Duration getEstimatedEffortPerOccurrence() {
+    public @Nullable Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(5);
     }
 

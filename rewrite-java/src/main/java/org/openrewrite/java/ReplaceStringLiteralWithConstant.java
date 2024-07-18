@@ -69,8 +69,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         return "Replace String literal with constant, adding import on class if needed.";
     }
 
-    @Nullable
-    public String getLiteralValue() {
+    public @Nullable String getLiteralValue() {
         if (this.literalValue == null && this.fullyQualifiedConstantName != null) {
             try {
                 this.literalValue = (String) getConstantValueByFullyQualifiedName(this.fullyQualifiedConstantName);
@@ -151,8 +150,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         }
     }
 
-    @Nullable
-    private static Object getConstantValueByFullyQualifiedName(String fullyQualifiedConstantName) throws ClassNotFoundException, IllegalAccessException, NoSuchFieldException {
+    private static @Nullable Object getConstantValueByFullyQualifiedName(String fullyQualifiedConstantName) throws ClassNotFoundException, IllegalAccessException, NoSuchFieldException {
         String owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
         String constantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf('.') + 1);
         Field constantField = Class.forName(owningType).getField(constantName);

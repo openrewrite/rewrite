@@ -92,9 +92,8 @@ public class NormalizeTabsOrSpacesVisitor<P> extends XmlIsoVisitor<P> {
         return text;
     }
 
-    @Nullable
     @Override
-    public Xml visit(@Nullable Tree tree, P p) {
+    public @Nullable Xml visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Xml) tree;
         }
@@ -108,9 +107,8 @@ public class NormalizeTabsOrSpacesVisitor<P> extends XmlIsoVisitor<P> {
         return super.visit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Xml postVisit(Xml tree, P p) {
+    public @Nullable Xml postVisit(Xml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "stop", true);
         }

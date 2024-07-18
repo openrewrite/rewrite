@@ -357,8 +357,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         return type(((JCTree) tree).type, symbol);
     }
 
-    @Nullable
-    private JavaType type(Type type, Symbol symbol) {
+    private @Nullable JavaType type(Type type, Symbol symbol) {
         if (type instanceof Type.MethodType) {
             return methodInvocationType(type, symbol);
         }
@@ -396,13 +395,11 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
-    @Nullable
-    public JavaType.Variable variableType(@Nullable Symbol symbol) {
+    public @Nullable JavaType.Variable variableType(@Nullable Symbol symbol) {
         return variableType(symbol, null);
     }
 
-    @Nullable
-    private JavaType.Variable variableType(@Nullable Symbol symbol,
+    private @Nullable JavaType.Variable variableType(@Nullable Symbol symbol,
                                            @Nullable JavaType.FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
@@ -449,8 +446,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    @Nullable
-    public JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
+    public @Nullable JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
@@ -552,8 +548,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
      * @param declaringType The method's declaring type.
      * @return Method type attribution.
      */
-    @Nullable
-    public JavaType.Method methodDeclarationType(@Nullable Symbol symbol, @Nullable JavaType.FullyQualified declaringType) {
+    public @Nullable JavaType.Method methodDeclarationType(@Nullable Symbol symbol, @Nullable JavaType.FullyQualified declaringType) {
         // if the symbol is not a method symbol, there is a parser error in play
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
@@ -681,8 +676,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
-    @Nullable
-    private List<JavaType.FullyQualified> listAnnotations(Symbol symb) {
+    private @Nullable List<JavaType.FullyQualified> listAnnotations(Symbol symb) {
         List<JavaType.FullyQualified> annotations = null;
         if (!symb.getDeclarationAttributes().isEmpty()) {
             annotations = new ArrayList<>(symb.getDeclarationAttributes().size());

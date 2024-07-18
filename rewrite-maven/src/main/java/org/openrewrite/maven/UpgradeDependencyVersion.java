@@ -322,8 +322,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return t;
             }
 
-            @Nullable
-            private TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency(Xml.Tag tag, ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
+            private @Nullable TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency(Xml.Tag tag, ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
                 ResolvedManagedDependency managedDependency = findManagedDependency(t);
                 if (managedDependency != null) {
                     String groupId = managedDependency.getGroupId();
@@ -381,8 +380,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return version;
             }
 
-            @Nullable
-            public TreeVisitor<Xml, ExecutionContext> upgradeVersion(ExecutionContext ctx, Xml.Tag tag, @Nullable String requestedVersion, String groupId, String artifactId, String version2) throws MavenDownloadingException {
+            public @Nullable TreeVisitor<Xml, ExecutionContext> upgradeVersion(ExecutionContext ctx, Xml.Tag tag, @Nullable String requestedVersion, String groupId, String artifactId, String version2) throws MavenDownloadingException {
                 String newerVersion = findNewerVersion(groupId, artifactId, version2, ctx);
                 if (newerVersion == null) {
                     return null;
@@ -399,8 +397,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return null;
             }
 
-            @Nullable
-            private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx)
+            private @Nullable String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx)
                     throws MavenDownloadingException {
                 return UpgradeDependencyVersion.this.findNewerVersion(
                         version, () -> downloadMetadata(groupId, artifactId, ctx), versionComparator, ctx);
@@ -408,8 +405,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         };
     }
 
-    @Nullable
-    private String findNewerVersion(
+    private @Nullable String findNewerVersion(
             String version, MavenMetadataFailures.MavenMetadataDownloader download, VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
         String finalVersion = !Semver.isVersion(version) ? "0.0.0" : version;
 

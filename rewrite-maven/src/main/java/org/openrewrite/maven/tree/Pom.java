@@ -124,8 +124,7 @@ public class Pom {
         return gav.getVersion();
     }
 
-    @Nullable
-    public String getDatedSnapshotVersion() {
+    public @Nullable String getDatedSnapshotVersion() {
         return gav.getDatedSnapshotVersion();
     }
 
@@ -186,8 +185,7 @@ public class Pom {
                 .resolve(ctx, downloader);
     }
 
-    @Nullable
-    public String getValue(@Nullable String value) {
+    public @Nullable String getValue(@Nullable String value) {
         if (value == null) {
             return null;
         }

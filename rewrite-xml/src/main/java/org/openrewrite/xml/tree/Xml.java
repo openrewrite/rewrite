@@ -50,8 +50,7 @@ public interface Xml extends Tree {
         return (R) acceptXml(v.adapt(XmlVisitor.class), p);
     }
 
-    @Nullable
-    default <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+    default <P> @Nullable Xml acceptXml(XmlVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 

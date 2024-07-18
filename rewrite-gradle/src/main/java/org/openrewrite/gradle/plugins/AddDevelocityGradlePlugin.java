@@ -245,8 +245,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
         return found.get();
     }
 
-    @Nullable
-    private J.MethodInvocation gradleEnterpriseDsl(String newVersion, VersionComparator versionComparator, String indent, ExecutionContext ctx) {
+    private @Nullable J.MethodInvocation gradleEnterpriseDsl(String newVersion, VersionComparator versionComparator, String indent, ExecutionContext ctx) {
         if (server == null && allowUntrustedServer == null && captureTaskInputFiles == null && uploadInBackground == null && publishCriteria == null) {
             return null;
         }

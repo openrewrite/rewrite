@@ -39,8 +39,7 @@ public interface Json extends Tree {
         return (R) acceptJson(v.adapt(JsonVisitor.class), p);
     }
 
-    @Nullable
-    default <P> Json acceptJson(JsonVisitor<P> v, P p) {
+    default <P> @Nullable Json acceptJson(JsonVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 

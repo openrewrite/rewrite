@@ -93,8 +93,7 @@ public class CaretRange extends LatestRelease {
         return Validated.valid("caretRange", new CaretRange(lower, upper, metadataPattern));
     }
 
-    @Nullable
-    private static String normalizeWildcard(@Nullable String part) {
+    private static @Nullable String normalizeWildcard(@Nullable String part) {
         return "*".equals(part) || "x".equals(part) || "X".equals(part) ? null : part;
     }
 }

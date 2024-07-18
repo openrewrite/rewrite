@@ -111,9 +111,8 @@ public class VariableAccess implements Trait<J.Identifier> {
             return Stream.empty();
         }
 
-        @Nullable
         @Override
-        protected VariableAccess test(Cursor cursor) {
+        protected @Nullable VariableAccess test(Cursor cursor) {
             if (!(cursor.getValue() instanceof J.Identifier)) {
                 return null;
             }
@@ -177,8 +176,7 @@ public class VariableAccess implements Trait<J.Identifier> {
             return null;
         }
 
-        @Nullable
-        private VariableAccess checkFilters(Cursor cursor) {
+        private @Nullable VariableAccess checkFilters(Cursor cursor) {
             return typeTest.test(cursor.<J.Identifier>getValue().getType()) ?
                     new VariableAccess(cursor) :
                     null;

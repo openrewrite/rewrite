@@ -308,8 +308,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         };
     }
 
-    @Nullable
-    private static String getManagedPluginVersion(ResolvedPom resolvedPom, @Nullable String groupId, String artifactId) {
+    private static @Nullable String getManagedPluginVersion(ResolvedPom resolvedPom, @Nullable String groupId, String artifactId) {
         for (Plugin p : resolvedPom.getPluginManagement()) {
             if (Objects.equals(
                     Optional.ofNullable(p.getGroupId()).orElse("org.apache.maven.plugins"),

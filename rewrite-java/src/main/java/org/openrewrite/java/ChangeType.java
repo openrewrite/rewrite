@@ -420,8 +420,7 @@ public class ChangeType extends Recipe {
             return typeTree;
         }
 
-        @Nullable
-        private JavaType updateType(@Nullable JavaType oldType) {
+        private @Nullable JavaType updateType(@Nullable JavaType oldType) {
             if (oldType == null || oldType instanceof JavaType.Unknown) {
                 return oldType;
             }
@@ -485,8 +484,7 @@ public class ChangeType extends Recipe {
             return oldType;
         }
 
-        @Nullable
-        private JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
+        private @Nullable JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
             if (oldMethodType != null) {
                 JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
                 if (method != null) {
@@ -634,8 +632,7 @@ public class ChangeType extends Recipe {
             return oldType;
         }
 
-        @Nullable
-        private JavaType.Method updateType(@Nullable JavaType.Method mt) {
+        private @Nullable JavaType.Method updateType(@Nullable JavaType.Method mt) {
             if (mt != null) {
                 return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
                         .withReturnType(updateType(mt.getReturnType()))
@@ -652,9 +649,9 @@ public class ChangeType extends Recipe {
     public static boolean containsClassDefinition(JavaSourceFile sourceFile, String fullyQualifiedTypeName) {
         AtomicBoolean found = new AtomicBoolean(false);
         JavaIsoVisitor<AtomicBoolean> visitor = new JavaIsoVisitor<AtomicBoolean>() {
-            @Nullable
+
             @Override
-            public J visit(@Nullable Tree tree, AtomicBoolean found) {
+            public @Nullable J visit(@Nullable Tree tree, AtomicBoolean found) {
                 if (found.get()) {
                     return (J) tree;
                 }

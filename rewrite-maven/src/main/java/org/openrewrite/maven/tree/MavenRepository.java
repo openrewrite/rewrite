@@ -205,8 +205,7 @@ public class MavenRepository implements Serializable {
             return this;
         }
 
-        @Nullable
-        private static String resolveEnvironmentProperty(@Nullable String rawProperty) {
+        private static @Nullable String resolveEnvironmentProperty(@Nullable String rawProperty) {
             if (rawProperty == null) {
                 return null;
             }

@@ -175,8 +175,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             return false;
         }
 
-        @Nullable
-        private Expression getTarget(J.FieldAccess fieldAccess) {
+        private @Nullable Expression getTarget(J.FieldAccess fieldAccess) {
             Expression target = fieldAccess.getTarget();
             if (target instanceof J.Identifier) {
                 return target;
@@ -194,8 +193,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             return null;
         }
 
-        @Nullable
-        private JavaType resolveType(@Nullable JavaType type) {
+        private @Nullable JavaType resolveType(@Nullable JavaType type) {
             return type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type;
         }
 
@@ -232,9 +230,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             return super.visitCatch(_catch, p);
         }
 
-        @Nullable
         @Override
-        public J postVisit(J tree, P p) {
+        public @Nullable J postVisit(J tree, P p) {
             maybeChangeNameScope(tree);
             return super.postVisit(tree, p);
         }
