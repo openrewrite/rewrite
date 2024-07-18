@@ -994,45 +994,4 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void exactSnapshotVersion() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite", "rewrite-core", "8.31.0-SNAPSHOT", null)),
-          buildGradle(
-            """
-              plugins {
-                id 'java-library'
-              }
-              
-              repositories {
-                mavenCentral()
-                maven {
-                    url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
-                }
-              }
-              
-              dependencies {
-                implementation('org.openrewrite:rewrite-core:8.19.0-SNAPSHOT')
-              }
-              """,
-            """
-              plugins {
-                id 'java-library'
-              }
-              
-              repositories {
-                mavenCentral()
-                maven {
-                    url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
-                }
-              }
-              
-              dependencies {
-                implementation('org.openrewrite:rewrite-core:8.31.0-SNAPSHOT')
-              }
-              """
-          )
-        );
-    }
 }

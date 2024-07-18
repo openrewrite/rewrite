@@ -20,7 +20,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 public class ExactVersionWithPattern extends LatestRelease {
-    String version;
+    private final String version;
 
     public ExactVersionWithPattern(String version, String metadataPattern) {
         super(metadataPattern);
