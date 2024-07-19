@@ -133,6 +133,34 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                         .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it)
                                 ).getArguments().get(0);
                             }
+                        } else if (it instanceof J.FieldAccess) {
+                            // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
+                            if (attributeName == null || "value".equals(attributeName)) {
+                                if (newAttributeValue == null) {
+                                    return null;
+                                }
+                                J.FieldAccess value = (J.FieldAccess) it;
+                                if (newAttributeValue.equals(value.toString()) || Boolean.TRUE.equals(addOnly)) {
+                                    foundAttributeWithDesiredValue.set(true);
+                                    return it;
+                                }
+
+                                JavaType.ShallowClass newClass = JavaType.ShallowClass.build(newAttributeValue);
+                                Expression currentTarget = value.getTarget();
+                                Expression newTarget = ((J.Identifier) currentTarget)
+                                        .withType(newClass)
+                                        .withSimpleName(newClass.getOwningClass().getClassName());
+                                return value
+                                        .withType(newClass)
+                                        .withTarget(newTarget);
+                            } else {
+                                //noinspection ConstantConditions
+                                return ((J.Annotation) JavaTemplate.builder("value = #{any(java.lang.Class)}")
+                                        .contextSensitive()
+                                        .build()
+                                        .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it)
+                                ).getArguments().get(0);
+                            }
                         }
                         return it;
                     });
