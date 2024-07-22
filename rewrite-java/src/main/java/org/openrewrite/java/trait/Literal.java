@@ -35,9 +35,9 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * A literal in Java is either a {@link J.Literal} or a {@link J.NewArray}
- * with a non-null initializer that itself literals or new arrays that recursively
- * contain these constraints. In other languages this trait is inclusive
- * of constructs like list or map literals.
+ * that has a non-null initializer that, itself, contains literals or new 
+ * arrays that recursively contain these constraints. In other languages 
+ * this trait is inclusive of constructs like list or map literals.
  */
 @RequiredArgsConstructor
 public class Literal implements Trait<Expression> {
