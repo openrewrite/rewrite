@@ -291,6 +291,7 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/4346")
     @Test
     @Disabled("Known issue; still need to explore a fix")
     void classExtendsGroovyLangScript() {
