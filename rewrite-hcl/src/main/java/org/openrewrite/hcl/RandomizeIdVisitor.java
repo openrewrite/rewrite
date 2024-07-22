@@ -21,9 +21,9 @@ import org.openrewrite.internal.lang.Nullable;
 import static org.openrewrite.Tree.randomId;
 
 public class RandomizeIdVisitor<P> extends HclVisitor<P> {
-    @Nullable
+
     @Override
-    public Hcl postVisit(Hcl tree, P p) {
+    public @Nullable Hcl postVisit(Hcl tree, P p) {
         return tree.withId(randomId());
     }
 }

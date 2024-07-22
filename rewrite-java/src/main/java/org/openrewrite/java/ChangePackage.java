@@ -242,8 +242,7 @@ public class ChangePackage extends Recipe {
             return j;
         }
 
-        @Nullable
-        private JavaType updateType(@Nullable JavaType oldType) {
+        private @Nullable JavaType updateType(@Nullable JavaType oldType) {
             if (oldType == null || oldType instanceof JavaType.Unknown) {
                 return oldType;
             }
@@ -308,8 +307,7 @@ public class ChangePackage extends Recipe {
             return oldType;
         }
 
-        @Nullable
-        private JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
+        private @Nullable JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
             if (oldMethodType != null) {
                 JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
                 if (method != null) {

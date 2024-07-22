@@ -630,8 +630,7 @@ public class JsonPathMatcher {
             return null;
         }
 
-        @Nullable
-        private Object getBinaryExpressionResult(Object ctx) {
+        private @Nullable Object getBinaryExpressionResult(Object ctx) {
             if (ctx instanceof JsonPathParser.BinaryExpressionContext) {
                 ctx = visitBinaryExpression((JsonPathParser.BinaryExpressionContext) ctx);
 
@@ -651,8 +650,7 @@ public class JsonPathMatcher {
         }
 
         // Interpret the LHS to check the appropriate value.
-        @Nullable
-        private Json getOperatorResult(Object lhs, String operator, Object rhs) {
+        private @Nullable Json getOperatorResult(Object lhs, String operator, Object rhs) {
             if (lhs instanceof Json.Member) {
                 Json.Member member = (Json.Member) lhs;
                 if (member.getValue() instanceof Json.Literal) {
@@ -697,8 +695,7 @@ public class JsonPathMatcher {
         }
 
         // Extract the result from JSON objects that can match by key.
-        @Nullable
-        public Object getResultByKey(Object result, String key) {
+        public @Nullable Object getResultByKey(Object result, String key) {
             if (result instanceof Json.JsonObject) {
                 Json.JsonObject jsonObject = (Json.JsonObject) result;
                 for (Json json : jsonObject.getMembers()) {
@@ -742,8 +739,7 @@ public class JsonPathMatcher {
         }
 
         // Extract the value from a Json object.
-        @Nullable
-        private Object getValue(Object result) {
+        private @Nullable Object getValue(Object result) {
             if (result instanceof Json.Member) {
                 return getValue(((Json.Member) result).getValue());
             } else if (result instanceof Json.JsonObject) {

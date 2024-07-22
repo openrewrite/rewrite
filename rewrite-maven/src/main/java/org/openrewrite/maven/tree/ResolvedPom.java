@@ -256,8 +256,7 @@ public class ResolvedPom {
     }
 
     @SuppressWarnings("unused")
-    @Nullable
-    public String getDatedSnapshotVersion() {
+    public @Nullable String getDatedSnapshotVersion() {
         return requested.getDatedSnapshotVersion();
     }
 
@@ -265,18 +264,20 @@ public class ResolvedPom {
         return requested.getPackaging() == null ? "jar" : requested.getPackaging();
     }
 
-    @Nullable
-    public String getValue(@Nullable String value) {
+    public @Nullable String getValue(@Nullable String value) {
         if (value == null) {
             return null;
         }
         return placeholderHelper.replacePlaceholders(value, this::getProperty);
     }
 
-    @Nullable
-    private String getProperty(@Nullable String property) {
+    private @Nullable String getProperty(@Nullable String property) {
         if (property == null) {
             return null;
+        }
+        String propVal = properties.get(property);
+        if (propVal != null) {
+            return propVal;
         }
         switch (property) {
             case "groupId":
@@ -302,11 +303,10 @@ public class ResolvedPom {
                 return requested.getParent() != null ? requested.getParent().getVersion() : null;
         }
 
-        return System.getProperty(property, properties.get(property));
+        return System.getProperty(property);
     }
 
-    @Nullable
-    public String getManagedVersion(@Nullable String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
+    public @Nullable String getManagedVersion(@Nullable String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
         for (ResolvedManagedDependency dm : dependencyManagement) {
             if (dm.matches(groupId, artifactId, type, classifier)) {
                 return getValue(dm.getVersion());
@@ -325,8 +325,7 @@ public class ResolvedPom {
         return emptyList();
     }
 
-    @Nullable
-    public Scope getManagedScope(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
+    public @Nullable Scope getManagedScope(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
         for (ResolvedManagedDependency dm : dependencyManagement) {
             if (dm.matches(groupId, artifactId, type, classifier)) {
                 return dm.getScope();

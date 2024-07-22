@@ -55,9 +55,8 @@ public interface Remote extends SourceFile {
 
     <R extends Remote> R withDescription(String description);
 
-    @Nullable
     @Override
-    default Checksum getChecksum() {
+    default @Nullable Checksum getChecksum() {
         return null;
     }
 

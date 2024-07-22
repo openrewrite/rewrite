@@ -152,7 +152,7 @@ public class MavenParser implements Parser {
                 if (parent != null &&
                     resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
                     resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
-                    resolutionResult.getPom().getVersion().equals(resolutionResult.getPom().getValue(parent.getVersion()))) {
+                    Objects.equals(resolutionResult.getPom().getValue(resolutionResult.getPom().getVersion()), resolutionResult.getPom().getValue(parent.getVersion()))) {
                     moduleResolutionResult.unsafeSetParent(resolutionResult);
                     modules.add(moduleResolutionResult);
                 }

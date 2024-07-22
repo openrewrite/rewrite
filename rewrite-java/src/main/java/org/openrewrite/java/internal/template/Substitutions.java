@@ -289,8 +289,7 @@ public class Substitutions {
                 return super.visitLiteral(literal, integer);
             }
 
-            @Nullable
-            private J maybeParameter(J j) {
+            private @Nullable J maybeParameter(J j) {
                 Integer param = parameterIndex(j.getPrefix());
                 if (param != null) {
                     J j2 = (J) parameters[param];
@@ -299,8 +298,7 @@ public class Substitutions {
                 return null;
             }
 
-            @Nullable
-            private Integer parameterIndex(Space space) {
+            private @Nullable Integer parameterIndex(Space space) {
                 for (Comment comment : space.getComments()) {
                     if (comment instanceof TextComment) {
                         Matcher matcher = PATTERN_COMMENT.matcher(((TextComment) comment).getText());

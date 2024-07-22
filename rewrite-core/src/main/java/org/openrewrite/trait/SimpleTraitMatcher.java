@@ -82,6 +82,5 @@ public abstract class SimpleTraitMatcher<U extends Trait<?>> implements TraitMat
         };
     }
 
-    @Nullable
-    protected abstract U test(Cursor cursor);
+    protected abstract @Nullable U test(Cursor cursor);
 }

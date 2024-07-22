@@ -198,8 +198,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }));
     }
 
-    @Nullable
-    public JavaType visitType(@Nullable JavaType javaType, P p) {
+    public @Nullable JavaType visitType(@Nullable JavaType javaType, P p) {
         return javaType;
     }
 
@@ -207,18 +206,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return nameTree;
     }
 
-    @Nullable
-    private <N extends NameTree> JLeftPadded<N> visitTypeName(@Nullable JLeftPadded<N> nameTree, P p) {
+    private <N extends NameTree> @Nullable JLeftPadded<N> visitTypeName(@Nullable JLeftPadded<N> nameTree, P p) {
         return nameTree == null ? null : nameTree.withElement(visitTypeName(nameTree.getElement(), p));
     }
 
-    @Nullable
-    private <N extends NameTree> JRightPadded<N> visitTypeName(@Nullable JRightPadded<N> nameTree, P p) {
+    private <N extends NameTree> @Nullable JRightPadded<N> visitTypeName(@Nullable JRightPadded<N> nameTree, P p) {
         return nameTree == null ? null : nameTree.withElement(visitTypeName(nameTree.getElement(), p));
     }
 
-    @Nullable
-    private <J2 extends J> JContainer<J2> visitTypeNames(@Nullable JContainer<J2> nameTrees, P p) {
+    private <J2 extends J> @Nullable JContainer<J2> visitTypeNames(@Nullable JContainer<J2> nameTrees, P p) {
         if (nameTrees == null) {
             return null;
         }

@@ -230,8 +230,7 @@ public class Result {
         }
     }
 
-    @Nullable
-    public static String diff(String before, String after, Path path) {
+    public static @Nullable String diff(String before, String after, Path path) {
         String diff = null;
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
                 path,

@@ -576,8 +576,7 @@ public class JsonPathMatcher {
             return null;
         }
 
-        @Nullable
-        private Object getBinaryExpressionResult(Object ctx) {
+        private @Nullable Object getBinaryExpressionResult(Object ctx) {
             if (ctx instanceof JsonPathParser.BinaryExpressionContext) {
                 ctx = visitBinaryExpression((JsonPathParser.BinaryExpressionContext) ctx);
 
@@ -597,8 +596,7 @@ public class JsonPathMatcher {
         }
 
         // Interpret the LHS to check the appropriate value.
-        @Nullable
-        private Hcl getOperatorResult(Object lhs, String operator, Object rhs) {
+        private @Nullable Hcl getOperatorResult(Object lhs, String operator, Object rhs) {
             if (lhs instanceof Hcl.Attribute) {
                 Hcl.Attribute attr = (Hcl.Attribute) lhs;
                 if (attr.getValue() instanceof Hcl.Literal) {
@@ -648,8 +646,7 @@ public class JsonPathMatcher {
         }
 
         // Extract the result from JSON objects that can match by key.
-        @Nullable
-        public Object getResultByKey(Object result, String key) {
+        public @Nullable Object getResultByKey(Object result, String key) {
             if (result instanceof Hcl.Block) {
                 Hcl.Block block = (Hcl.Block) result;
                 for (Hcl body : block.getBody()) {
@@ -690,8 +687,7 @@ public class JsonPathMatcher {
         }
 
         // Extract the value from a Json object.
-        @Nullable
-        private Object getValue(Object result) {
+        private @Nullable Object getValue(Object result) {
             if (result instanceof Hcl.Attribute) {
                 return getValue(((Hcl.Attribute) result).getValue());
             } else if (result instanceof Hcl.Block) {

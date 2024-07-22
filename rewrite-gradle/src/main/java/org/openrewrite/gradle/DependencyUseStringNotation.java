@@ -118,8 +118,7 @@ public class DependencyUseStringNotation extends Recipe {
                 return m;
             }
 
-            @Nullable
-            private J.Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
+            private @Nullable J.Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
                 if (mapNotation.containsKey("group") && mapNotation.containsKey("name")) {
                     String stringNotation = "";
 
@@ -148,8 +147,7 @@ public class DependencyUseStringNotation extends Recipe {
                 return null;
             }
 
-            @Nullable
-            private String coerceToStringNotation(Expression expression) {
+            private @Nullable String coerceToStringNotation(Expression expression) {
                 if (expression instanceof J.Literal) {
                     return (String) ((J.Literal) expression).getValue();
                 } else if (expression instanceof J.Identifier) {

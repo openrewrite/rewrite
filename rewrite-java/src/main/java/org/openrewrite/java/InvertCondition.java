@@ -35,9 +35,8 @@ public class InvertCondition extends JavaVisitor<ExecutionContext> {
                 .visit(controlParentheses, new InMemoryExecutionContext(), cursor.getParentOrThrow());
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
         J t;
         if (tree instanceof Expression && !(tree instanceof J.ControlParentheses) && !(tree instanceof J.Binary)) {
             Expression expression = (Expression) tree;

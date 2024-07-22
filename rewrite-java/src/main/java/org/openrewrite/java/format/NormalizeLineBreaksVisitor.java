@@ -90,9 +90,8 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
         return tree;
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }

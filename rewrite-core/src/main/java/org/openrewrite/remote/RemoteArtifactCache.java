@@ -31,8 +31,7 @@ public interface RemoteArtifactCache {
     @Nullable
     Path put(URI uri, InputStream is, Consumer<Throwable> onError);
 
-    @Nullable
-    default Path compute(URI uri, Callable<@Nullable InputStream> artifactStream, Consumer<Throwable> onError) {
+    default @Nullable Path compute(URI uri, Callable<@Nullable InputStream> artifactStream, Consumer<Throwable> onError) {
         Path artifact = get(uri);
         if (artifact == null) {
             try {

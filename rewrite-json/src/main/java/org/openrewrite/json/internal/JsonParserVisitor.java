@@ -281,8 +281,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
         return cursor;
     }
 
-    @Nullable
-    private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, Space, T> conversion) {
+    private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, Space, T> conversion) {
         if (ctx == null) {
             return null;
         }

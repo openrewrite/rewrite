@@ -17,6 +17,7 @@ package org.openrewrite.java.trait;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,6 +29,7 @@ import static org.openrewrite.java.trait.Traits.literal;
 
 class LiteralTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void numericLiteral() {
         rewriteRun(

@@ -23,8 +23,7 @@ public class DependencyStringNotationConverter {
      * @param notation a String in the format group:artifact:version
      * @return A corresponding Dependency or null if the notation could not be parsed
      */
-    @Nullable
-    public static Dependency parse(String notation) {
+    public static @Nullable Dependency parse(String notation) {
         int idx = notation.lastIndexOf('@');
         if (idx == -1) {
             return parse(notation, null);
@@ -38,8 +37,7 @@ public class DependencyStringNotationConverter {
         return parse(notation, null);
     }
 
-    @Nullable
-    private static Dependency parse(String notation, @Nullable String ext) {
+    private static @Nullable Dependency parse(String notation, @Nullable String ext) {
         Dependency dependency = new Dependency(null, null, null, null, ext);
 
         int count = 0;

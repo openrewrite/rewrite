@@ -45,8 +45,7 @@ public class Dependency implements Serializable {
     @Nullable
     String optional;
 
-    @Nullable
-    public String getGroupId() {
+    public @Nullable String getGroupId() {
         return gav.getGroupId();
     }
 
@@ -54,8 +53,7 @@ public class Dependency implements Serializable {
         return gav.getArtifactId();
     }
 
-    @Nullable
-    public String getVersion() {
+    public @Nullable String getVersion() {
         return gav.getVersion();
     }
 

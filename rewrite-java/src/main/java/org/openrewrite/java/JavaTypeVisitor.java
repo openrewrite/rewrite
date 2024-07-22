@@ -38,13 +38,11 @@ public class JavaTypeVisitor<P> {
         return ListUtils.map(javaTypes, jt -> (JT) visit(jt, p));
     }
 
-    @Nullable
-    public JavaType preVisit(JavaType javaType, P p) {
+    public @Nullable JavaType preVisit(JavaType javaType, P p) {
         return javaType;
     }
 
-    @Nullable
-    public JavaType postVisit(JavaType javaType, P p) {
+    public @Nullable JavaType postVisit(JavaType javaType, P p) {
         return javaType;
     }
 

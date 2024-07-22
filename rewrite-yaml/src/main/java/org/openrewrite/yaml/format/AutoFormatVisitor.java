@@ -74,18 +74,16 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
         return y;
     }
 
-    @Nullable
     @Override
-    public Yaml postVisit(Yaml tree, P p) {
+    public @Nullable Yaml postVisit(Yaml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Yaml.Documents.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Yaml visit(@Nullable Tree tree, P p) {
+    public @Nullable Yaml visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Yaml) tree;
         }

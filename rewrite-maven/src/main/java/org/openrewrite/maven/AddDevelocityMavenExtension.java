@@ -320,8 +320,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
         }
     }
 
-    @Nullable
-    private BuildScanConfiguration buildScanConfiguration(boolean develocity) {
+    private @Nullable BuildScanConfiguration buildScanConfiguration(boolean develocity) {
         if (uploadInBackground != null || publishCriteria != null || fileFingerprints != null) {
             if (develocity) {
                 PublishingConfiguration publishing = null;

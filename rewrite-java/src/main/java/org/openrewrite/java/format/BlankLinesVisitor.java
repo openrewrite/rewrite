@@ -324,9 +324,8 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
         return newLineCount;
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }

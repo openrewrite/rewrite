@@ -236,8 +236,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
             return null;
         }
 
-        @Nullable
-        private J.MethodInvocation develocityPublishAlwaysIfDsl(String indent, ExecutionContext ctx) {
+        private @Nullable J.MethodInvocation develocityPublishAlwaysIfDsl(String indent, ExecutionContext ctx) {
             StringBuilder ge = new StringBuilder("\ndevelocity {\n");
             ge.append(indent).append("buildScan {\n");
             ge.append(indent).append(indent).append("publishing.onlyIf { true }\n");
@@ -256,8 +255,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
             return (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) buildScan.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
         }
 
-        @Nullable
-        private J.MethodInvocation develocityPublishOnFailureIfDsl(String indent, ExecutionContext ctx) {
+        private @Nullable J.MethodInvocation develocityPublishOnFailureIfDsl(String indent, ExecutionContext ctx) {
             StringBuilder ge = new StringBuilder("\ndevelocity {\n");
             ge.append(indent).append("buildScan {\n");
             ge.append(indent).append(indent).append("publishing.onlyIf { !it.buildResult.failures.empty }\n");

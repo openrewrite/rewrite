@@ -270,8 +270,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
              *     implementation("g:a:v") { }
              * }
              */
-            @Nullable
-            private GradleDependencyConfiguration constraintConfiguration(GradleDependencyConfiguration config) {
+            private @Nullable GradleDependencyConfiguration constraintConfiguration(GradleDependencyConfiguration config) {
                 String constraintConfigName = config.getName();
                 switch (constraintConfigName) {
                     case "compileClasspath":

@@ -681,8 +681,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return qualifier;
     }
 
-    @Nullable
-    private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private @Nullable JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         if (type instanceof JavaType.Class) {
             JavaType.Class classType = (JavaType.Class) type;
 
@@ -738,8 +737,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return false;
     }
 
-    @Nullable
-    private JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private @Nullable JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;

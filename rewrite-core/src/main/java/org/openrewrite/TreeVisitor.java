@@ -85,8 +85,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     /**
      * @return Describes the language type that this visitor applies to, e.g. java, xml, properties.
      */
-    @Nullable
-    public String getLanguage() {
+    public @Nullable String getLanguage() {
         return null;
     }
 
@@ -135,18 +134,15 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return cursor;
     }
 
-    @Nullable
-    public T preVisit(T tree, P p) {
+    public @Nullable T preVisit(T tree, P p) {
         return defaultValue(tree, p);
     }
 
-    @Nullable
-    public T postVisit(T tree, P p) {
+    public @Nullable T postVisit(T tree, P p) {
         return defaultValue(tree, p);
     }
 
-    @Nullable
-    public T visit(@Nullable Tree tree, P p, Cursor parent) {
+    public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
         this.cursor = parent;
         return visit(tree, p);
     }
@@ -221,8 +217,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return p;
     }
 
-    @Nullable
-    public T visit(@Nullable Tree tree, P p) {
+    public @Nullable T visit(@Nullable Tree tree, P p) {
         if (tree == null) {
             return defaultValue(null, p);
         }
@@ -305,8 +300,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @SuppressWarnings("unused")
-    @Nullable
-    public T defaultValue(@Nullable Tree tree, P p) {
+    public @Nullable T defaultValue(@Nullable Tree tree, P p) {
         //noinspection unchecked
         return (T) tree;
     }
@@ -318,8 +312,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @Incubating(since = "7.0.0")
-    @Nullable
-    protected final <T2 extends T> T2 visitAndCast(@Nullable Tree tree, P p) {
+    protected final <T2 extends T> @Nullable T2 visitAndCast(@Nullable Tree tree, P p) {
         //noinspection unchecked
         return (T2) visit(tree, p);
     }

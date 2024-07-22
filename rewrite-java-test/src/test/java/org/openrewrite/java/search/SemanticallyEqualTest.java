@@ -16,8 +16,8 @@
 package org.openrewrite.java.search;
 
 import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.openrewrite.java.JavaIsoVisitor;

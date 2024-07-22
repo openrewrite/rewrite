@@ -638,8 +638,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         return qualifier;
     }
 
-    @Nullable
-    private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private @Nullable JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;
@@ -689,8 +688,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         return false;
     }
 
-    @Nullable
-    private JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private @Nullable JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;

@@ -248,8 +248,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         return gtv;
     }
 
-    @Nullable
-    private List<JavaType> genericBounds(Type[] bounds) {
+    private @Nullable List<JavaType> genericBounds(Type[] bounds) {
         List<JavaType> mappedBounds = null;
 
         for (Type bound : bounds) {

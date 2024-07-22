@@ -16,6 +16,7 @@
 package org.openrewrite.java.trait;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Recipe;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
@@ -34,6 +35,7 @@ class VariableAccessTest implements RewriteTest {
         spec.recipe(markVariableAccesses(variableAccess()));
     }
 
+    @DocumentExample
     @Test
     void variableAccesses() {
         rewriteRun(

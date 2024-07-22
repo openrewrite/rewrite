@@ -70,18 +70,16 @@ public class TabsAndIndentsVisitor<P> extends XmlIsoVisitor<P> {
         return x;
     }
 
-    @Nullable
     @Override
-    public Xml postVisit(Xml tree, P p) {
+    public @Nullable Xml postVisit(Xml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Xml visit(@Nullable Tree tree, P p) {
+    public @Nullable Xml visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Xml) tree;
         }
