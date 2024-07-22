@@ -31,7 +31,7 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package asserts;
-              
+                            
               public class Assert {
                   public static void assertTrue(boolean b) {}
                   public static void assertFalse(boolean b) {}
@@ -42,9 +42,9 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package test;
-             
+                           
               import asserts.Assert;
-              
+                            
               class Test {
                   void test() {
                       Assert.assertTrue(true);
@@ -55,9 +55,9 @@ class UseStaticImportTest implements RewriteTest {
               """,
             """
               package test;
-              
+                            
               import static asserts.Assert.*;
-              
+                            
               class Test {
                   void test() {
                       assertTrue(true);
@@ -79,7 +79,7 @@ class UseStaticImportTest implements RewriteTest {
             """
               import java.util.Collections;
               import java.util.List;
-              
+                            
               public class Reproducer {
                   public void methodWithTypeParameter() {
                       List<Object> list = Collections.<Object>emptyList();
@@ -97,15 +97,15 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package com.helloworld;
-              
+                            
               import java.util.Collections;
               import java.util.List;
-              
+                            
               public class SameMethodNameLocally {
                   public void avoidCollision() {
                       List<Object> list = Collections.emptyList();
                   }
-              
+                            
                   private int emptyList(String canHaveDifferentArguments) {
                   }
               }
@@ -122,9 +122,9 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package com.helloworld;
-              
+                            
               import static java.lang.Integer.valueOf;
-              
+                            
               public class SameMethodNameImported {
                   public void avoidCollision() {
                       String a = String.valueOf("1");
@@ -146,7 +146,7 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package com.helloworld;
-              
+                            
               public class SameMethodNames {
                   public void avoidCollision() {
                       String a = String.valueOf("1");
@@ -156,9 +156,9 @@ class UseStaticImportTest implements RewriteTest {
               """,
             """
               package com.helloworld;
-              
+                            
               import static java.lang.String.valueOf;
-              
+                            
               public class SameMethodNames {
                   public void avoidCollision() {
                       String a = valueOf("1");
@@ -178,7 +178,7 @@ class UseStaticImportTest implements RewriteTest {
             """
               import java.util.Collections;
               import java.util.List;
-              
+                            
               class SameMethodNameLocally {
                   void avoidCollision() {
                       List<Object> list = Collections.emptyList();
@@ -187,9 +187,9 @@ class UseStaticImportTest implements RewriteTest {
               """,
             """
               import java.util.List;
-              
+                            
               import static java.util.Collections.emptyList;
-              
+                            
               class SameMethodNameLocally {
                   void avoidCollision() {
                       List<Object> list = emptyList();
@@ -209,10 +209,10 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-              
+                            
               import org.junit.jupiter.api.Test;
               import org.junit.jupiter.api.Assertions;
-              
+                            
               class SampleTest {
                   @Test
                   void sample() {
@@ -222,11 +222,11 @@ class UseStaticImportTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-              
+                            
               import org.junit.jupiter.api.Test;
 
               import static org.junit.jupiter.api.Assertions.assertEquals;
-              
+                            
               class SampleTest {
                   @Test
                   void sample() {
@@ -247,7 +247,7 @@ class UseStaticImportTest implements RewriteTest {
             """
               import java.util.Collections;
               import java.util.List;
-              
+                            
               public class WithJavadoc {
                   /**
                    * This method uses {@link Collections#emptyList()}.
@@ -260,9 +260,9 @@ class UseStaticImportTest implements RewriteTest {
             """
               import java.util.Collections;
               import java.util.List;
-              
+                            
               import static java.util.Collections.emptyList;
-              
+                            
               public class WithJavadoc {
                   /**
                    * This method uses {@link Collections#emptyList()}.
@@ -294,9 +294,9 @@ class UseStaticImportTest implements RewriteTest {
               """,
             """
               import java.util.function.Predicate;
-              
+                            
               import static java.util.function.Predicate.not;
-              
+                            
               public class Reproducer {
                   void reproduce() {
                       Predicate<Object> predicate = x -> false;
@@ -333,15 +333,17 @@ class UseStaticImportTest implements RewriteTest {
         // Cannot do a static import of Arrays.toString() because it is ambiguous with Object.toString()
         rewriteRun(
           spec -> spec.recipe(new UseStaticImport("java..* *(..)")),
-          java("""
-            import java.util.Arrays;
-            
-            class A {
-                String s(String[] strings) {
-                    return Arrays.toString(strings);
-                }
-            }
+          java(
             """
-          ));
+              import java.util.Arrays;
+
+              class A {
+                  String s(String[] strings) {
+                      return Arrays.toString(strings);
+                  }
+              }
+              """
+          )
+        );
     }
 }
