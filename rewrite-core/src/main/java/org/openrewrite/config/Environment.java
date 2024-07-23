@@ -161,6 +161,9 @@ public class Environment {
                     String.join(", ", suggestions));
             throw new RecipeException(message);
         }
+        if (activatedRecipes.isEmpty()) {
+            return Recipe.noop();
+        }
         if (activatedRecipes.size() == 1) {
             return activatedRecipes.get(0);
         }
