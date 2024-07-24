@@ -60,15 +60,13 @@ public class InMemoryExecutionContext implements ExecutionContext {
     }
 
     @Override
-    @Nullable
-    public <T> T getMessage(String key) {
+    public <T> @Nullable T getMessage(String key) {
         //noinspection unchecked
         return (T) messages.get(key);
     }
 
     @Override
-    @Nullable
-    public <T> T pollMessage(String key) {
+    public <T> @Nullable T pollMessage(String key) {
         //noinspection unchecked
         return (T) messages.remove(key);
     }

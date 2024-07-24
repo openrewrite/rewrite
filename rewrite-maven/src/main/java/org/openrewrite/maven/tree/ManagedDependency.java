@@ -59,9 +59,8 @@ public interface ManagedDependency {
             return gav.getArtifactId();
         }
 
-        @Nullable
         @Override
-        public String getVersion() {
+        public @Nullable String getVersion() {
             return gav.getVersion();
         }
 
@@ -87,9 +86,8 @@ public interface ManagedDependency {
             return gav.getArtifactId();
         }
 
-        @Nullable
         @Override
-        public String getVersion() {
+        public @Nullable String getVersion() {
             return gav.getVersion();
         }
 

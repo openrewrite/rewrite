@@ -36,8 +36,7 @@ public class GradleSettings implements Marker, Serializable {
     List<GradlePluginDescriptor> plugins;
     Map<String, FeaturePreview> featurePreviews;
 
-    @Nullable
-    public Boolean isFeatureEnabled(String name) {
+    public @Nullable Boolean isFeatureEnabled(String name) {
         // Unclear how enabled status can be determined in latest gradle APIs
         return null;
     }

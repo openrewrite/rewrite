@@ -115,8 +115,7 @@ public interface RewriteTest extends SourceSpecs {
      * @return always null, a method that better documents in code that a source file does not exist either
      * before or after a recipe run.
      */
-    @Nullable
-    default String doesNotExist() {
+    default @Nullable String doesNotExist() {
         return null;
     }
 

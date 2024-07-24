@@ -133,8 +133,7 @@ public class JavaSourceSet implements SourceSet {
      * This method takes all of these considerations into account and returns a fully qualified name which replaces
      * inner-class signifying "$" with ".", while preserving
      */
-    @Nullable
-    private static String declarableFullyQualifiedName(ClassInfo classInfo) {
+    private static @Nullable String declarableFullyQualifiedName(ClassInfo classInfo) {
         String name;
         if (classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
             // Because we put java-supplied types into another package, we cannot access package-private types

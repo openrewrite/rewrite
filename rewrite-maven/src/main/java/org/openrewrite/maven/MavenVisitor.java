@@ -35,8 +35,11 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class MavenVisitor<P> extends XmlVisitor<P> {
 
     static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
+    static final XPathMatcher PROFILE_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencies/dependency");
     static final XPathMatcher PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("//plugins/plugin/dependencies/dependency");
+    static final XPathMatcher PROFILE_PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/build/plugins/plugin/dependencies/dependency");
     static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
+    static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
@@ -61,9 +64,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     protected MavenResolutionResult getResolutionResult() {
         Iterator<Object> itr = getCursor()
                 .getPath(Xml.Document.class::isInstance);
-        if(itr.hasNext()) {
+        if (itr.hasNext()) {
             Xml.Document newDocument = (Xml.Document) itr.next();
-            if(document != null && document != newDocument) {
+            if (document != null && document != newDocument) {
                 throw new IllegalStateException(
                         "The same MavenVisitor instance has been used on two different XML documents. " +
                         "This violates the Recipe contract that they will return a unique visitor instance every time getVisitor() is called.");
@@ -96,6 +99,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
      */
     public boolean isDependencyTag(String groupId, String artifactId) {
         if (!isDependencyTag()) {
+            if (isTag("dependency") && PROFILE_DEPENDENCY_MATCHER.matches(getCursor())) {
+                Xml.Tag tag = getCursor().getValue();
+                return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+            }
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
@@ -132,7 +140,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isPluginDependencyTag(String groupId, String artifactId) {
-        if (!PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
+        if (!isTag("dependency") ||
+            !PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()) &&
+            !PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
@@ -153,6 +163,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
      */
     public boolean isManagedDependencyTag(String groupId, String artifactId) {
         if (!isManagedDependencyTag()) {
+            if (isTag("dependency") && PROFILE_MANAGED_DEPENDENCY_MATCHER.matches(getCursor())) {
+                Xml.Tag tag = getCursor().getValue();
+                return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+            }
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
@@ -244,8 +259,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
     }
 
-    @Nullable
-    public ResolvedDependency findDependency(Xml.Tag tag) {
+    public @Nullable ResolvedDependency findDependency(Xml.Tag tag) {
         Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
         Scope scope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
         if (dependencies.containsKey(scope)) {
@@ -264,36 +278,39 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return null;
     }
 
-    @Nullable
-    public ResolvedManagedDependency findManagedDependency(Xml.Tag tag) {
-        String groupId = getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()));
+    public @Nullable ResolvedManagedDependency findManagedDependency(Xml.Tag tag) {
+        String groupId = getResolutionResult().getPom().getValue(tag.getChildValue("groupId")
+                .orElse(getResolutionResult().getPom().getGroupId()));
         String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
         String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
+        String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse(null));
         if (groupId != null && artifactId != null) {
-            return findManagedDependency(groupId, artifactId, classifier);
+            return findManagedDependency(groupId, artifactId, classifier, type);
         }
         return null;
     }
 
-    @Nullable
-    public ResolvedManagedDependency findManagedDependency(String groupId, String artifactId) {
+    public @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId) {
         return findManagedDependency(groupId, artifactId, null);
     }
 
-    @Nullable
-    private ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier) {
+    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier) {
+        return findManagedDependency(groupId, artifactId, classifier, null);
+    }
+
+    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
         for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
             if (groupId.equals(d.getGroupId()) &&
                 artifactId.equals(d.getArtifactId()) &&
-                (classifier == null || classifier.equals(d.getClassifier()))) {
+                (classifier == null || classifier.equals(d.getClassifier())) &&
+                (type == null || type.equals(d.getType()))) {
                 return d;
             }
         }
         return null;
     }
 
-    @Nullable
-    public ResolvedManagedDependency findManagedDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
+    public @Nullable ResolvedManagedDependency findManagedDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
         Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse(null));
         if (inClasspathOf != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
             return null;
@@ -301,8 +318,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return findManagedDependency(tag);
     }
 
-    @Nullable
-    public ResolvedDependency findDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
+    public @Nullable ResolvedDependency findDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
         Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
         if (inClasspathOf != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
             return null;
@@ -371,8 +387,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return isManagedDependencyTag() || isDependencyTag() || isPluginTag();
     }
 
-    @Nullable
-    public Plugin findPlugin(Xml.Tag tag) {
+    public @Nullable Plugin findPlugin(Xml.Tag tag) {
         List<Plugin> plugins = getResolutionResult().getPom().getPlugins();
         if (plugins != null) {
             for (Plugin resolvedPlugin : plugins) {

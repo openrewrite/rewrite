@@ -19,6 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
+import org.openrewrite.NlsRewrite;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
@@ -42,17 +43,18 @@ public class NamedStyles implements Marker {
     @EqualsAndHashCode.Include
     String name;
 
+    @NlsRewrite.DisplayName
     String displayName;
 
     @Nullable
+    @NlsRewrite.Description
     String description;
 
     Set<String> tags;
     Collection<Style> styles;
 
     @SuppressWarnings("unchecked")
-    @Nullable
-    public static <S extends Style> S merge(Class<S> styleClass,
+    public static <S extends Style> @Nullable S merge(Class<S> styleClass,
                                             Iterable<? extends NamedStyles> namedStyles) {
         S merged = null;
         for (NamedStyles namedStyle : namedStyles) {
@@ -79,8 +81,7 @@ public class NamedStyles implements Marker {
      * @param styles The styles to be merged. Styles earlier in the list take precedence over styles later in the list.
      * @return A single merged style with the aggregate configuration of all inputs. null if the list is empty.
      */
-    @Nullable
-    public static NamedStyles merge(List<NamedStyles> styles) {
+    public static @Nullable NamedStyles merge(List<NamedStyles> styles) {
         if (styles.isEmpty()) {
             return null;
         } else if (styles.size() == 1) {

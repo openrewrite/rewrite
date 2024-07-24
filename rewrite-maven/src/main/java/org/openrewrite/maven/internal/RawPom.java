@@ -334,13 +334,11 @@ public class RawPom {
         RawRepositories repositories;
     }
 
-    @Nullable
-    public String getGroupId() {
+    public @Nullable String getGroupId() {
         return groupId == null && parent != null ? parent.getGroupId() : groupId;
     }
 
-    @Nullable
-    public String getVersion() {
+    public @Nullable String getVersion() {
         if(version == null) {
             if(currentVersion == null) {
                 if(parent == null) {
@@ -439,7 +437,7 @@ public class RawPom {
                     pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
                             r.getReleases() == null ? null : r.getReleases().getEnabled(),
                             r.getSnapshots() == null ? null : r.getSnapshots().getEnabled(),
-                            false, null, null, null));
+                            false, null, null, null, null));
                 }
 
             }

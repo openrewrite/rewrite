@@ -18,7 +18,10 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
@@ -103,7 +106,7 @@ public abstract class Recipe implements Cloneable {
      * @return The display name.
      */
     @Language("markdown")
-    public abstract String getDisplayName();
+    public abstract @NlsRewrite.DisplayName String getDisplayName();
 
     /**
      * A human-readable display name for this recipe instance, including some descriptive
@@ -130,7 +133,7 @@ public abstract class Recipe implements Cloneable {
             return getDisplayName() + " " + suffix;
         }
 
-        List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors(getClass()));
+        List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors());
         options.removeIf(opt -> !opt.isRequired());
         if (options.isEmpty()) {
             return getDisplayName();
@@ -179,7 +182,7 @@ public abstract class Recipe implements Cloneable {
      * @return The display name.
      */
     @Language("markdown")
-    public abstract String getDescription();
+    public abstract @NlsRewrite.Description String getDescription();
 
     /**
      * A set of strings used for categorizing related recipes. For example
@@ -195,8 +198,7 @@ public abstract class Recipe implements Cloneable {
     /**
      * @return An estimated effort were a developer to fix manually instead of using this recipe.
      */
-    @Nullable
-    public Duration getEstimatedEffortPerOccurrence() {
+    public @Nullable Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(5);
     }
 
@@ -208,7 +210,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     protected RecipeDescriptor createRecipeDescriptor() {
-        List<OptionDescriptor> options = getOptionDescriptors(this.getClass());
+        List<OptionDescriptor> options = getOptionDescriptors();
         List<RecipeDescriptor> recipeList1 = new ArrayList<>();
         for (Recipe next : getRecipeList()) {
             recipeList1.add(next.getDescriptor());
@@ -225,14 +227,19 @@ public abstract class Recipe implements Cloneable {
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
-    private List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
+    private List<OptionDescriptor> getOptionDescriptors() {
+        Recipe recipe = this;
+        if (this instanceof DelegatingRecipe) {
+            recipe = ((DelegatingRecipe) this).getDelegate();
+        }
+
         List<OptionDescriptor> options = new ArrayList<>();
 
-        for (Field field : recipeClass.getDeclaredFields()) {
+        for (Field field : recipe.getClass().getDeclaredFields()) {
             Object value;
             try {
                 field.setAccessible(true);
-                value = field.get(this);
+                value = field.get(recipe);
             } catch (IllegalAccessException e) {
                 value = null;
             }
@@ -303,11 +310,40 @@ public abstract class Recipe implements Cloneable {
      * A list of recipes that run, source file by source file,
      * after this recipe. This method is guaranteed to be called only once
      * per cycle.
+     * <p>
+     * When creating a recipe with a fixed recipe list, either override
+     * this method or {@link #buildRecipeList(RecipeList)} but ideally not
+     * both, as their default implementations are interconnected.
      *
      * @return The list of recipes to run.
      */
     public List<Recipe> getRecipeList() {
-        return Collections.emptyList();
+        RecipeList list = new RecipeList(getName());
+        buildRecipeList(list);
+        return list.getRecipes();
+    }
+
+    /**
+     * Used to build up a recipe list programmatically. Using the
+     * methods on {@link RecipeList}, the appearance of a recipe
+     * that chains other recipes with options will be not strikingly
+     * different from defining it in a recipe.yml.
+     * <p>
+     * Building, or at least starting to build, recipes for complex
+     * migrations with this method is more amenable to AI coding assistants
+     * since these assistants are primarily optimized for providing completion
+     * assistance in a single file.
+     * <p>
+     * When creating a recipe with a fixed recipe list, either override
+     * this method or {@link #getRecipeList()} but ideally not
+     * both, as their default implementations are interconnected.
+     *
+     * @param list A recipe list used to build up a series of recipes
+     *             in code in a way that looks fairly declarative and
+     *             therefore is more amenable to AI code completion.
+     */
+    @SuppressWarnings("unused")
+    public void buildRecipeList(RecipeList list) {
     }
 
     /**
@@ -413,6 +449,63 @@ public abstract class Recipe implements Cloneable {
             return super.clone();
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    public interface DelegatingRecipe {
+        Recipe getDelegate();
+    }
+
+    /**
+     * @return A new recipe builder.
+     */
+    @Incubating(since = "8.31.0")
+    public static Builder builder(@NlsRewrite.DisplayName @Language("markdown") String displayName,
+                                  @NlsRewrite.Description @Language("markdown") String description) {
+        return new Builder(displayName, description);
+    }
+
+    @Incubating(since = "8.31.0")
+    @RequiredArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    public static class Builder {
+        @NlsRewrite.DisplayName
+        @Language("markdown")
+        final String displayName;
+
+        @NlsRewrite.Description
+        @Language("markdown")
+        final String description;
+
+        TreeVisitor<? extends Tree, ExecutionContext> visitor = TreeVisitor.noop();
+
+        public Builder visitor(TreeVisitor<? extends Tree, ExecutionContext> visitor) {
+            this.visitor = visitor;
+            return this;
+        }
+
+        public Recipe build(String name) {
+            return new Recipe() {
+                @Override
+                public String getName() {
+                    return name;
+                }
+
+                @Override
+                public String getDisplayName() {
+                    return displayName;
+                }
+
+                @Override
+                public String getDescription() {
+                    return description;
+                }
+
+                @Override
+                public TreeVisitor<?, ExecutionContext> getVisitor() {
+                    return visitor;
+                }
+            };
         }
     }
 }

@@ -90,8 +90,7 @@ public class JLeftPadded<T> {
         }
     }
 
-    @Nullable
-    public static <T> JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T element) {
+    public static <T> @Nullable JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T element) {
         if (element == null) {
             return null;
         }

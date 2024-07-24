@@ -113,8 +113,7 @@ public class PropertiesParser implements Parser {
         );
     }
 
-    @Nullable
-    private Properties.Content extractContent(String line, StringBuilder prefix) {
+    private @Nullable Properties.Content extractContent(String line, StringBuilder prefix) {
         Properties.Content content = null;
         if (line.trim().startsWith("#") || line.trim().startsWith("!")) {
             Properties.Comment.Delimiter delimiter = line.trim().startsWith("#") ?

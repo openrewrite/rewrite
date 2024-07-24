@@ -41,8 +41,7 @@ public enum Scope {
      * @param scope The scope on the left column of the table.
      * @return The scope inside the table.
      */
-    @Nullable
-    public Scope transitiveOf(@Nullable Scope scope) {
+    public @Nullable Scope transitiveOf(@Nullable Scope scope) {
         if (scope == null) {
             return this;
         }
@@ -121,7 +120,7 @@ public enum Scope {
      *
      * @return Scope with the higher precedence.
      */
-    @Nullable public static Scope maxPrecedence(@Nullable Scope scope1, @Nullable Scope scope2) {
+    public static @Nullable Scope maxPrecedence(@Nullable Scope scope1, @Nullable Scope scope2) {
         if (scope1 == null) {
             return scope2;
         } else if (scope2 == null) {
@@ -140,8 +139,7 @@ public enum Scope {
      * be used deliberately and in contexts sufficiently general that the differences are not important.
      */
     @SuppressWarnings("unused")
-    @Nullable
-    public static String asGradleConfigurationName(@Nullable Scope scope) {
+    public static @Nullable String asGradleConfigurationName(@Nullable Scope scope) {
         if(scope == null) {
             return null;
         }

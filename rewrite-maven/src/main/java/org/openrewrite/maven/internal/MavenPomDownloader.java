@@ -98,7 +98,7 @@ public class MavenPomDownloader {
                               @Nullable MavenSettings mavenSettings,
                               @Nullable List<String> activeProfiles) {
         this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-        this.mavenSettings = mavenSettings;
+        this.mavenSettings = mavenSettings != null ? mavenSettings : MavenExecutionContextView.view(ctx).getSettings();
         this.mirrors = this.ctx.getMirrors(mavenSettings);
         this.activeProfiles = activeProfiles;
     }
@@ -137,6 +137,7 @@ public class MavenPomDownloader {
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
         this.ctx = MavenExecutionContextView.view(ctx);
+        this.mavenSettings = this.ctx.getSettings();
         this.mavenCache = this.ctx.getPomCache();
         this.addCentralRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
         this.addLocalRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
@@ -201,8 +202,7 @@ public class MavenPomDownloader {
         }
     }
 
-    @Nullable
-    private Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
+    private @Nullable Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
         final Parent parent = projectPom.getParent();
         if (parent == null || projectPom.getSourcePath() == null) {
             return null;
@@ -266,11 +266,17 @@ public class MavenPomDownloader {
                         // A maven repository can be expressed as a URI with a file scheme
                         Path path = Paths.get(URI.create(uri));
                         if (Files.exists(path)) {
-                            result = Optional.of(MavenMetadata.parse(Files.readAllBytes(path)));
+                            MavenMetadata parsed = MavenMetadata.parse(Files.readAllBytes(path));
+                            if (parsed != null) {
+                                result = Optional.of(parsed);
+                            }
                         }
                     } else {
                         byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri);
-                        result = Optional.of(MavenMetadata.parse(responseBody));
+                        MavenMetadata parsed = MavenMetadata.parse(responseBody);
+                        if (parsed != null) {
+                            result = Optional.of(parsed);
+                        }
                     }
                 } catch (HttpSenderResponseException e) {
                     repositoryResponses.put(repo, e.getMessage());
@@ -340,8 +346,7 @@ public class MavenPomDownloader {
      * @param repo The repository that will be queried for directory results
      * @return Metadata or null if the metadata cannot be derived.
      */
-    @Nullable
-    private MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, IOException, MavenDownloadingException {
+    private @Nullable MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, IOException, MavenDownloadingException {
         if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null) {
             // Do not derive metadata if we cannot navigate/browse the artifacts.
             // Do not derive metadata if a specific version has been defined.
@@ -377,8 +382,7 @@ public class MavenPomDownloader {
         }
     }
 
-    @Nullable
-    private MavenMetadata.Versioning directoryToVersioning(String uri, GroupArtifactVersion gav) throws MavenDownloadingException {
+    private @Nullable MavenMetadata.Versioning directoryToVersioning(String uri, GroupArtifactVersion gav) throws MavenDownloadingException {
         Path dir = Paths.get(URI.create(uri));
         if (Files.exists(dir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
@@ -396,8 +400,7 @@ public class MavenPomDownloader {
         return null;
     }
 
-    @Nullable
-    private MavenMetadata.Versioning htmlIndexToVersioning(String responseBody, String uri) {
+    private @Nullable MavenMetadata.Versioning htmlIndexToVersioning(String responseBody, String uri) {
         // A very primitive approach, this just finds hrefs with trailing "/",
         List<String> versions = new ArrayList<>();
         int start = responseBody.indexOf("<a href=\"");
@@ -453,8 +456,7 @@ public class MavenPomDownloader {
         return new ArrayList<>(merged);
     }
 
-    @Nullable
-    private MavenMetadata.Snapshot maxSnapshot(@Nullable MavenMetadata.Snapshot s1, @Nullable MavenMetadata.Snapshot s2) {
+    private @Nullable MavenMetadata.Snapshot maxSnapshot(@Nullable MavenMetadata.Snapshot s1, @Nullable MavenMetadata.Snapshot s2) {
         // apparently the snapshot timestamp is not always present in the metadata
         if (s1 == null || s1.getTimestamp() == null) {
             return s2;
@@ -637,8 +639,7 @@ public class MavenPomDownloader {
         return gav;
     }
 
-    @Nullable
-    private String datedSnapshotVersion(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories, ExecutionContext ctx) {
+    private @Nullable String datedSnapshotVersion(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories, ExecutionContext ctx) {
         if (gav.getVersion() != null && gav.getVersion().endsWith("-SNAPSHOT")) {
             for (ResolvedGroupArtifactVersion pinnedSnapshotVersion : new MavenExecutionContextView(ctx).getPinnedSnapshotVersions()) {
                 if (pinnedSnapshotVersion.getDatedSnapshotVersion() != null &&
@@ -697,8 +698,7 @@ public class MavenPomDownloader {
         return normalizedRepositories.values();
     }
 
-    @Nullable
-    public MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
+    public @Nullable MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
         Optional<MavenRepository> result = null;
         MavenRepository repository = originalRepository;
         if (containingPom != null) {
@@ -773,7 +773,8 @@ public class MavenPomDownloader {
                                         repository.getReleases(),
                                         repository.getSnapshots(),
                                         repository.getUsername(),
-                                        repository.getPassword());
+                                        repository.getPassword(),
+                                        repository.getTimeout());
                             } catch (HttpSenderResponseException e) {
                                 //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
                                 if (e.isServerReached()) {
@@ -783,7 +784,8 @@ public class MavenPomDownloader {
                                             repository.getReleases(),
                                             repository.getSnapshots(),
                                             repository.getUsername(),
-                                            repository.getPassword());
+                                            repository.getPassword(),
+                                            repository.getTimeout());
                                 }
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
@@ -812,7 +814,10 @@ public class MavenPomDownloader {
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         try {
-            return sendRequest(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
+            HttpSender.Request.Builder request = httpSender.get(uriString)
+                    .withConnectTimeout(repo.getTimeout())
+                    .withReadTimeout(repo.getTimeout());
+            return sendRequest(applyAuthenticationToRequest(repo, request).build());
         } catch (HttpSenderResponseException e) {
             if (hasCredentials(repo) && e.isClientSideException()) {
                 return retryRequestAnonymously(uriString, e);
@@ -845,11 +850,20 @@ public class MavenPomDownloader {
      * Returns a request builder with Authorization header set if the provided repository specifies credentials
      */
     private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
-        if (ctx.getSettings() != null && ctx.getSettings().getServers() != null) {
-            for (MavenSettings.Server server : ctx.getSettings().getServers().getServers()) {
-                if (server.getId().equals(repository.getId()) && server.getConfiguration() != null && server.getConfiguration().getHttpHeaders() != null) {
-                    for (MavenSettings.HttpHeader header : server.getConfiguration().getHttpHeaders()) {
-                        request.withHeader(header.getName(), header.getValue());
+        if (mavenSettings != null && mavenSettings.getServers() != null) {
+            for (MavenSettings.Server server : mavenSettings.getServers().getServers()) {
+                if (server.getId().equals(repository.getId()) && server.getConfiguration() != null) {
+                    MavenSettings.ServerConfiguration configuration = server.getConfiguration();
+                    if (server.getConfiguration().getHttpHeaders() != null) {
+                        for (MavenSettings.HttpHeader header : configuration.getHttpHeaders()) {
+                            request.withHeader(header.getName(), header.getValue());
+                        }
+                    }
+                    if (configuration.getTimeout() != null) {
+                        request.withConnectTimeout(Duration.ofMillis(configuration.getTimeout()));
+                    }
+                    if (configuration.getTimeout() != null) {
+                        request.withReadTimeout(Duration.ofMillis(configuration.getTimeout()));
                     }
                 }
             }

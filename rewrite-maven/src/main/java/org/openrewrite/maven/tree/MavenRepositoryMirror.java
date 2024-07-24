@@ -19,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenSettings;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -53,12 +54,16 @@ public class MavenRepositoryMirror {
     @Nullable
     Boolean snapshots;
 
+    @Nullable
+    Long timeout;
+
     private final boolean externalOnly;
     private final List<String> mirrorsOf;
     private final Set<String> excludedRepos;
     private final Set<String> includedRepos;
 
-    public MavenRepositoryMirror(@Nullable String id, @Nullable String url, @Nullable String mirrorOf, @Nullable Boolean releases, @Nullable Boolean snapshots) {
+    public MavenRepositoryMirror(@Nullable String id, @Nullable String url, @Nullable String mirrorOf,
+                                 @Nullable Boolean releases, @Nullable Boolean snapshots, @Nullable MavenSettings.Servers servers) {
         this.id = id;
         this.url = url;
         this.mirrorOf = mirrorOf;
@@ -85,11 +90,25 @@ public class MavenRepositoryMirror {
                     includedRepos.add(mirror);
                 }
             }
+
+            if (id != null && servers != null && servers.getServers() != null) {
+                Optional<MavenSettings.Server> maybeServer = servers.getServers().stream()
+                        .filter(s -> id.equals(s.getId()) && s.getConfiguration() != null)
+                        .findFirst();
+                if (maybeServer.isPresent() && maybeServer.get().getConfiguration() != null){
+                    timeout = maybeServer.get().getConfiguration().getTimeout();
+                } else {
+                    timeout = null;
+                }
+            } else {
+                timeout = null;
+            }
         } else {
             externalOnly = false;
             mirrorsOf = null;
             includedRepos = null;
             excludedRepos = null;
+            timeout = null;
         }
     }
 
@@ -97,7 +116,7 @@ public class MavenRepositoryMirror {
         for (MavenRepositoryMirror mirror : mirrors) {
             MavenRepository mapped = mirror.apply(repo);
             if (mapped != repo) {
-                return  mapped;
+                return mapped;
             }
         }
         return repo;
@@ -110,7 +129,8 @@ public class MavenRepositoryMirror {
                     .withReleases(!Boolean.FALSE.equals(releases) ? "true" : "false")
                     .withSnapshots(!Boolean.FALSE.equals(snapshots) ? "true" : "false")
                     // Since the URL has likely changed we cannot assume that the new repository is known to exist
-                    .withKnownToExist(false);
+                    .withKnownToExist(false)
+                    .withTimeout(repo.getTimeout());
         }
         return repo;
     }
@@ -137,7 +157,7 @@ public class MavenRepositoryMirror {
     }
 
     private boolean isInternal(MavenRepository repo) {
-        if (repo.getUri().regionMatches(true, 0,"file:", 0, 5)) {
+        if (repo.getUri().regionMatches(true, 0, "file:", 0, 5)) {
             return true;
         }
         try {

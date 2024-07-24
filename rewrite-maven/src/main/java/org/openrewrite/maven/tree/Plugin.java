@@ -67,8 +67,7 @@ public class Plugin {
         JsonNode configuration;
     }
 
-    @Nullable
-    public String getConfigurationStringValue(String path) {
+    public @Nullable String getConfigurationStringValue(String path) {
         if (configuration == null) {
             return null;
         }
@@ -86,8 +85,7 @@ public class Plugin {
         return MavenXmlMapper.readMapper().convertValue(current, String.class);
     }
 
-    @Nullable
-    public <T> T getConfiguration(String path, Class<T> configClass) {
+    public <T> @Nullable T getConfiguration(String path, Class<T> configClass) {
         if (configuration == null) {
             return null;
         }

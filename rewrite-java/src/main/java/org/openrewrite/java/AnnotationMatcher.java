@@ -63,6 +63,13 @@ public class AnnotationMatcher {
         this.matchMetaAnnotations = Boolean.TRUE.equals(matchesMetaAnnotations);
     }
 
+    public AnnotationMatcher(Class<?> annotationType) {
+        this("@" + annotationType.getName());
+        if (!annotationType.isAnnotation()) {
+            throw new IllegalArgumentException(annotationType.getName() + " is not an annotation.");
+        }
+    }
+
     public AnnotationMatcher(String signature) {
         this(signature, false);
     }
@@ -88,7 +95,7 @@ public class AnnotationMatcher {
                 return true;
             } else if (matchMetaAnnotations) {
                 for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
-                    if(seenAnnotations == null) {
+                    if (seenAnnotations == null) {
                         seenAnnotations = new HashSet<>();
                     }
                     if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&

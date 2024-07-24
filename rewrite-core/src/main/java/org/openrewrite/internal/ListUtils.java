@@ -319,8 +319,7 @@ public final class ListUtils {
         return newLs;
     }
 
-    @Nullable
-    public static <T> List<T> nullIfEmpty(@Nullable List<T> ls) {
+    public static <T> @Nullable List<T> nullIfEmpty(@Nullable List<T> ls) {
         return ls == null || ls.isEmpty() ? null : ls;
     }
 

@@ -300,14 +300,14 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             visit(fieldAccess.getTarget(), p);
 
             Markers nameMarkers = fieldAccess.getName().getMarkers();
+            String prefix = ".";
             if (nameMarkers.findFirst(NullSafe.class).isPresent()) {
-                p.append('?');
-            }
-            if (nameMarkers.findFirst(StarDot.class).isPresent()) {
-                p.append('*');
+                prefix = "?.";
+            } else if (nameMarkers.findFirst(StarDot.class).isPresent()) {
+                prefix = "*.";
             }
 
-            visitLeftPadded(".", fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
+            visitLeftPadded(prefix, fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
             afterSyntax(fieldAccess, p);
             return fieldAccess;
         }
@@ -397,12 +397,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             return super.visitReturn(return_, p);
         }
 
-        protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {
-            if (paddedStat != null) {
-                visit(paddedStat.getElement(), p);
-                visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
-                visitMarkers(paddedStat.getMarkers(), p);
-            }
+        @Override
+        protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
+            // empty
         }
 
         @Override

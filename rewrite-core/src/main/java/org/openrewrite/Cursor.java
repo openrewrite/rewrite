@@ -160,8 +160,7 @@ public class Cursor {
         }
     }
 
-    @Nullable
-    public <T> T firstEnclosing(Class<T> tClass) {
+    public <T> @Nullable T firstEnclosing(Class<T> tClass) {
         CursorIterator iter = new CursorIterator(this);
         while (iter.hasNext()) {
             Object value = iter.next();
@@ -214,8 +213,7 @@ public class Cursor {
         return cursor;
     }
 
-    @Nullable
-    public Cursor getParent(int levels) {
+    public @Nullable Cursor getParent(int levels) {
         Cursor cursor = this;
         for (int i = 0; i < levels && cursor != null; i++) {
             cursor = cursor.parent;
@@ -223,8 +221,7 @@ public class Cursor {
         return cursor;
     }
 
-    @Nullable
-    public Cursor getParent() {
+    public @Nullable Cursor getParent() {
         return getParent(1);
     }
 
@@ -292,8 +289,7 @@ public class Cursor {
      * @param <T> The expected value of the message.
      * @return The closest message matching the provided key in the cursor stack, or <code>null</code> if none.
      */
-    @Nullable
-    public <T> T getNearestMessage(String key) {
+    public <T> @Nullable T getNearestMessage(String key) {
         @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
         return t == null && parent != null ? parent.getNearestMessage(key) : t;
     }
@@ -316,8 +312,7 @@ public class Cursor {
      * @param <T> The expected value of the message.
      * @return The closest message matching the provided key in the cursor stack, or <code>null</code> if none.
      */
-    @Nullable
-    public <T> T pollNearestMessage(String key) {
+    public <T> @Nullable T pollNearestMessage(String key) {
         @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.remove(key);
         return t == null && parent != null ? parent.pollNearestMessage(key) : t;
     }
@@ -329,8 +324,7 @@ public class Cursor {
      * @param <T> The expected value of the message.
      * @return The message matching the provided key, or <code>null</code> if none.
      */
-    @Nullable
-    public <T> T getMessage(String key) {
+    public <T> @Nullable T getMessage(String key) {
         //noinspection unchecked
         return messages == null ? null : (T) messages.get(key);
     }
@@ -347,8 +341,7 @@ public class Cursor {
      * @param <T> The expected value of the message.
      * @return The message matching the provided key, or <code>null</code> if none.
      */
-    @Nullable
-    public <T> T pollMessage(String key) {
+    public <T> @Nullable T pollMessage(String key) {
         //noinspection unchecked
         return messages == null ? null : (T) messages.remove(key);
     }

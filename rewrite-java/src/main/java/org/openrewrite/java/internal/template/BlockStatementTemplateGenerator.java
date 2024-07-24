@@ -131,9 +131,8 @@ public class BlockStatementTemplateGenerator {
                 return left;
             }
 
-            @Nullable
             @Override
-            public J visit(@Nullable Tree tree, Integer p) {
+            public @Nullable J visit(@Nullable Tree tree, Integer p) {
                 if (done) {
                     return (J) tree;
                 }
@@ -212,11 +211,17 @@ public class BlockStatementTemplateGenerator {
             throw new IllegalArgumentException(
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+        } else if (j instanceof J.MethodInvocation) {
+            before.insert(0, "class Template {{\n");
+            JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
+            if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
+                before.append("Object o = ");
+            }
+            after.append(";\n}}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, "class Template {\n");
             before.append("Object o = ");
-            after.append(";");
-            after.append("\n}");
+            after.append(";\n}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration)
                    && cursor.getValue() instanceof J.Block
                    && (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
@@ -738,8 +743,7 @@ public class BlockStatementTemplateGenerator {
      * Accepts a @FunctionalInterface and returns the single abstract method from it, or null if the single abstract
      * method cannot be found
      */
-    @Nullable
-    private static JavaType.Method findSingleAbstractMethod(@Nullable JavaType javaType) {
+    private static @Nullable JavaType.Method findSingleAbstractMethod(@Nullable JavaType javaType) {
         if (javaType == null) {
             return null;
         }
@@ -753,8 +757,7 @@ public class BlockStatementTemplateGenerator {
     // Visitor for removing any trees having or following the `STOP_COMMENT`
     private static class TemplatedTreeTrimmer {
 
-        @Nullable
-        static J trimTree(J j) {
+        static @Nullable J trimTree(J j) {
             J trimmed = new TemplatedTreeTrimmerVisitor().visit(j, 0);
             if (trimmed == null || trimmed.getMarkers().findFirst(RemoveTreeMarker.class).isPresent()) {
                 return null;

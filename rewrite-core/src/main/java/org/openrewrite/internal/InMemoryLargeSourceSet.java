@@ -128,9 +128,8 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
         return new InMemoryChangeset(changes);
     }
 
-    @Nullable
     @Override
-    public SourceFile getBefore(Path sourcePath) {
+    public @Nullable SourceFile getBefore(Path sourcePath) {
         List<SourceFile> sourceFiles = getInitialState().ls;
         for (SourceFile s : sourceFiles) {
             if (s.getSourcePath().equals(sourcePath)) {

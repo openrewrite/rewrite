@@ -50,8 +50,7 @@ public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
     }
 
     //Note: Properties.Value does not currently implement Properties, so this is a bit of an outlier.
-    @Nullable
-    public Properties.Value visitValue(Properties.Value value, P p) {
+    public @Nullable Properties.Value visitValue(Properties.Value value, P p) {
         return value.withMarkers(visitMarkers(value.getMarkers(), p));
     }
 

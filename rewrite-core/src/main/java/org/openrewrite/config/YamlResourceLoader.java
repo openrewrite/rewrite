@@ -87,8 +87,7 @@ public class YamlResourceLoader implements ResourceLoader {
             this.spec = spec;
         }
 
-        @Nullable
-        public static ResourceType fromSpec(@Nullable String spec) {
+        public static @Nullable ResourceType fromSpec(@Nullable String spec) {
             return Arrays.stream(values())
                     .filter(type -> type.getSpec().equals(spec))
                     .findAny()

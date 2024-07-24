@@ -111,8 +111,7 @@ public class ProtoContainer<T> {
         }
     }
 
-    @Nullable
-    public static <P extends Proto> ProtoContainer<P> withElementsNullable(@Nullable ProtoContainer<P> before, @Nullable List<P> elements) {
+    public static <P extends Proto> @Nullable ProtoContainer<P> withElementsNullable(@Nullable ProtoContainer<P> before, @Nullable List<P> elements) {
         if (before == null) {
             if (elements == null || elements.isEmpty()) {
                 return null;

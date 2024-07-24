@@ -46,8 +46,7 @@ public class FileAttributes {
 
     long size;
 
-    @Nullable
-    public static FileAttributes fromPath(Path path) {
+    public static @Nullable FileAttributes fromPath(Path path) {
         if (Files.exists(path)) {
             try {
                 BasicFileAttributes basicFileAttributes = Files.readAttributes(path, BasicFileAttributes.class);

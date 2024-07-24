@@ -102,7 +102,7 @@ class RecipeLifecycleTest implements RewriteTest {
         public List<Recipe> getRecipeList() {
             return Arrays.asList(
               new DeleteSourceFiles("test.txt"),
-              new FindAndReplace("test", "", null, null, null, null, null));
+              new FindAndReplace("test", "", null, null, null, null, null, null));
         }
     }
 

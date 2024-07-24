@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal.template;
 
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 import org.antlr.v4.runtime.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
@@ -34,6 +35,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @RequiredArgsConstructor
+@ToString
 public class Substitutions {
     private static final Pattern PATTERN_COMMENT = Pattern.compile("__p(\\d+)__");
 
@@ -287,8 +289,7 @@ public class Substitutions {
                 return super.visitLiteral(literal, integer);
             }
 
-            @Nullable
-            private J maybeParameter(J j) {
+            private @Nullable J maybeParameter(J j) {
                 Integer param = parameterIndex(j.getPrefix());
                 if (param != null) {
                     J j2 = (J) parameters[param];
@@ -297,8 +298,7 @@ public class Substitutions {
                 return null;
             }
 
-            @Nullable
-            private Integer parameterIndex(Space space) {
+            private @Nullable Integer parameterIndex(Space space) {
                 for (Comment comment : space.getComments()) {
                     if (comment instanceof TextComment) {
                         Matcher matcher = PATTERN_COMMENT.matcher(((TextComment) comment).getText());

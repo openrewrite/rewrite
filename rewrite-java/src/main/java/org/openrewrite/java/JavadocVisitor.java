@@ -33,8 +33,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         this.javaVisitor = javaVisitor;
     }
 
-    @Nullable
-    protected J javaVisitorVisit(@Nullable Tree tree, P p) {
+    protected @Nullable J javaVisitorVisit(@Nullable Tree tree, P p) {
         Cursor previous = javaVisitor.getCursor();
         J j = javaVisitor.visit(tree, p, getCursor());
         javaVisitor.setCursor(previous);

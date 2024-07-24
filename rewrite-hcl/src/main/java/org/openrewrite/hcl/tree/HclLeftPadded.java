@@ -54,8 +54,7 @@ public class HclLeftPadded<T> {
         }
     }
 
-    @Nullable
-    public static <T> HclLeftPadded<T> withElement(@Nullable HclLeftPadded<T> before, @Nullable T elements) {
+    public static <T> @Nullable HclLeftPadded<T> withElement(@Nullable HclLeftPadded<T> before, @Nullable T elements) {
         if (before == null) {
             if (elements == null) {
                 return null;

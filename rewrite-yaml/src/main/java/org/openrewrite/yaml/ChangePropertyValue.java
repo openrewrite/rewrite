@@ -59,6 +59,14 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
+            example = ".github/workflows/*.yml")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Change YAML property";
@@ -75,7 +83,7 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate().and(
                 Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
                         value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
@@ -83,7 +91,7 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new YamlIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
@@ -96,11 +104,11 @@ public class ChangePropertyValue extends Recipe {
                 }
                 return e;
             }
-        };
+        });
     }
 
-    @Nullable // returns null if value should not change
-    private Yaml.Scalar updateValue(Yaml.Block value) {
+    // returns null if value should not change
+    private @Nullable Yaml.Scalar updateValue(Yaml.Block value) {
         if (!(value instanceof Yaml.Scalar)) {
             return null;
         }

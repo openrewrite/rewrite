@@ -50,6 +50,12 @@ class LatestReleaseTest {
     }
 
     @Test
+    void datetimeVersion() {
+        assertThat(latestRelease.compare(null, "20230504141934.0.0", "20241212141934.0.0")).isNegative();
+        assertThat(latestRelease.compare(null, "20230504141934", "20241212141934")).isNegative();
+    }
+
+    @Test
     void others() {
         assertThat(latestRelease.compare(null, "2.5.6.SEC03", "6.0.4")).isLessThan(0);
     }
@@ -96,6 +102,25 @@ class LatestReleaseTest {
         assertThat(latestRelease.isValid("1.0", "1.1.0-Alpha.1")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.0-Alpha-1")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.0-Alpha=1")).isFalse();
+    }
+
+    @Test
+    void releaseOrLatestKeyword_beatsEverything() {
+        assertThat(latestRelease.compare(null, "RELEASE", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "RELEASE", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "RELEASE", "RELEASE")).isZero();
+
+        assertThat(latestRelease.compare(null, "LATEST", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "LATEST", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "LATEST", "LATEST")).isZero();
+
+        assertThat(latestRelease.compare(null, "reLeaSE", "1.2.3")).isPositive();
+    }
+
+    @Test
+    void latestKeywordIsNewerThanReleaseKeyword() {
+        assertThat(latestRelease.compare(null, "RELEASE", "LATEST")).isNegative();
+        assertThat(latestRelease.compare(null, "LATEST", "RELEASE")).isPositive();
     }
 
     @Test

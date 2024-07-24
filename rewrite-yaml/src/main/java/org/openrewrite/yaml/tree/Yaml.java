@@ -45,8 +45,7 @@ public interface Yaml extends Tree {
         return v.isAdaptableTo(YamlVisitor.class);
     }
 
-    @Nullable
-    default <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+    default <P> @Nullable Yaml acceptYaml(YamlVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 

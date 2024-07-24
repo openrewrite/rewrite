@@ -57,8 +57,7 @@ public class GradleProject implements Marker, Serializable {
         return mavenPluginRepositories == null ? Collections.emptyList() : mavenPluginRepositories;
     }
 
-    @Nullable
-    public GradleDependencyConfiguration getConfiguration(String name) {
+    public @Nullable GradleDependencyConfiguration getConfiguration(String name) {
         return nameToConfiguration.get(name);
     }
 

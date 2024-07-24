@@ -110,8 +110,7 @@ public class SemanticallyEqual {
             return super.visit(unwrap(tree), unwrap(j));
         }
 
-        @Nullable
-        private static J unwrap(@Nullable Tree tree) {
+        private static @Nullable J unwrap(@Nullable Tree tree) {
             if (tree instanceof Expression) {
                 tree = ((Expression) tree).unwrap();
             }
@@ -1088,7 +1087,9 @@ public class SemanticallyEqual {
                     return type;
                 }
 
-                this.visitList(type.getTypeParameters(), compareTo.getTypeParameters());
+                if (!(type.getTypeParameters().get(0) instanceof J.Empty || compareTo.getTypeParameters().get(0) instanceof J.Empty)) {
+                    this.visitList(type.getTypeParameters(), compareTo.getTypeParameters());
+                }
             }
             return type;
         }

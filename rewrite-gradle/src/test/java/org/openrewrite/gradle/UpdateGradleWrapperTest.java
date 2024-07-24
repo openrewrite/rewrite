@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.properties.tree.Properties;
@@ -582,6 +583,44 @@ class UpdateGradleWrapperTest implements RewriteTest {
                     distributionSha256Sum=%s
                     """.formatted(checksum);
               })
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void servicesGradleOrgUnavailable() {
+        HttpSender unhelpfulSender = request -> {
+            if(request.getUrl().toString().contains("services.gradle.org")) {
+                throw new RuntimeException("I'm sorry Dave, I'm afraid I can't do that.");
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(unhelpfulSender)
+          .setLargeFileHttpSender(unhelpfulSender);
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.6", null, null, "https://artifactory.moderne.ninja/artifactory/gradle-distributions/gradle-${version}-bin.zip"))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-5.6.4-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://artifactory.moderne.ninja/artifactory/gradle-distributions/gradle-8.6-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
           ),
           gradlew,
           gradlewBat,

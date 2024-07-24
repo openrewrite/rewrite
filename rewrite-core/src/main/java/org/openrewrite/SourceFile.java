@@ -70,8 +70,7 @@ public interface SourceFile extends Tree {
 
     <T extends SourceFile> T withFileAttributes(@Nullable FileAttributes fileAttributes);
 
-    @Nullable
-    default <S extends Style> S getStyle(Class<S> style) {
+    default <S extends Style> @Nullable S getStyle(Class<S> style) {
         return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
     }
 

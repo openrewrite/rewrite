@@ -106,8 +106,7 @@ public class RemoveDuplicateDependencies extends Recipe {
                 return MANAGED_DEPENDENCIES_MATCHER.matches(getCursor());
             }
 
-            @Nullable
-            private DependencyKey getDependencyKey(Xml.Tag tag) {
+            private @Nullable DependencyKey getDependencyKey(Xml.Tag tag) {
                 Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
                 Scope scope = tag.getChildValue("scope").map(Scope::fromName).orElse(Scope.Compile);
                 if (dependencies.containsKey(scope)) {
@@ -125,8 +124,7 @@ public class RemoveDuplicateDependencies extends Recipe {
                 return null;
             }
 
-            @Nullable
-            private DependencyKey getManagedDependencyKey(Xml.Tag tag) {
+            private @Nullable DependencyKey getManagedDependencyKey(Xml.Tag tag) {
                 ResolvedManagedDependency resolvedDependency = findManagedDependency(tag);
                 return resolvedDependency != null ? DependencyKey.from(resolvedDependency) : null;
             }

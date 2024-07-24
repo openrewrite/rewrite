@@ -28,7 +28,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void simpleDotSeparated() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", null, null, null, null)),
           yaml(
                 """
             my.prop: foo
@@ -41,7 +41,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void simpleIndented() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", null, null, null, null)),
           yaml("""
             my:
               prop: foo
@@ -55,7 +55,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void oldValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", "foo", null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", "foo", null, null, null)),
           yaml("""
             my:
               prop: foo
@@ -69,7 +69,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void badOldValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", "fooz", null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", "fooz", null, null, null)),
           yaml("""
             my:
               prop: foo
@@ -80,7 +80,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void regex() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", "f(o+)", true, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", "f(o+)", true, null, null)),
           yaml("""
             my:
               prop: foooo
@@ -94,7 +94,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void regexDefaultOff() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", ".+", null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", ".+", null, null, null)),
           yaml("""
             my:
               prop: foo
@@ -106,7 +106,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3964")
     void partialMatchWithMultipleRegexReplacements() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("*", "[replaced:$1]", "\\[replaceme:(.*?)]", true, null)),
+          spec -> spec.recipe(new ChangePropertyValue("*", "[replaced:$1]", "\\[replaceme:(.*?)]", true, null, null)),
           yaml(
             """
               multiple: "[replaceme:1][replaceme:2]"
@@ -128,7 +128,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3964")
     void partialMatchNotReplacedWithoutRegexTrue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("*", "replaced", "replaceme", null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("*", "replaced", "replaceme", null, null, null)),
           yaml(
             """
               multiple: "[replaceme:1][replaceme:2]"
@@ -142,6 +142,6 @@ class ChangePropertyValueTest implements RewriteTest {
 
     @Test
     void validatesThatOldValueIsRequiredIfRegexEnabled() {
-        assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null).validate().isInvalid());
+        assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null, null).validate().isInvalid());
     }
 }

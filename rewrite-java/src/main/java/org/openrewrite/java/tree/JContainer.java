@@ -152,8 +152,7 @@ public class JContainer<T> {
         }
     }
 
-    @Nullable
-    public static <J2 extends J> JContainer<J2> withElementsNullable(@Nullable JContainer<J2> before, @Nullable List<J2> elements) {
+    public static <J2 extends J> @Nullable JContainer<J2> withElementsNullable(@Nullable JContainer<J2> before, @Nullable List<J2> elements) {
         if (elements == null || elements.isEmpty()) {
             return null;
         }

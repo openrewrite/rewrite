@@ -43,8 +43,7 @@ public class HclCoordinates implements Coordinates {
         REPLACEMENT
     }
 
-    @Nullable
-    public <H extends Hcl> Comparator<H> getComparator() {
+    public <H extends Hcl> @Nullable Comparator<H> getComparator() {
         //noinspection unchecked
         return (Comparator<H>) comparator;
     }

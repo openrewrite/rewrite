@@ -30,9 +30,9 @@ public class MinimumViableSpacingVisitor<P> extends YamlIsoVisitor<P> {
     public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
         Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
         if (!e.getPrefix().contains("\n")) {
-            if(getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document) {
+            if (getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document) {
                 Yaml.Mapping mapping = getCursor().getParentOrThrow().getValue();
-                if(mapping.getEntries().isEmpty() || mapping.getEntries().get(0) == e) {
+                if (mapping.getEntries().isEmpty() || mapping.getEntries().get(0) == e) {
                     return e;
                 }
             }
@@ -52,24 +52,22 @@ public class MinimumViableSpacingVisitor<P> extends YamlIsoVisitor<P> {
     @Override
     public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
         Yaml.Sequence.Entry e = super.visitSequenceEntry(entry, p);
-        if (!e.getPrefix().contains("\n")) {
+        if (!e.getPrefix().contains("\n") && e.isDash()) {
             return e.withPrefix("\n");
         }
         return e;
     }
 
-    @Nullable
     @Override
-    public Yaml postVisit(Yaml tree, P p) {
+    public @Nullable Yaml postVisit(Yaml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Yaml.Documents.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Yaml visit(@Nullable Tree tree, P p) {
+    public @Nullable Yaml visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Yaml) tree;
         }

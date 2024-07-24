@@ -23,9 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class MavenRepositoryMirrorTest {
 
-    MavenRepositoryMirror one = new MavenRepositoryMirror("one", "https://one.org/m2", "*", true, true);
-    MavenRepositoryMirror two = new MavenRepositoryMirror("two", "https://two.org/m2", "*", true, true);
-    MavenRepository foo = new MavenRepository("foo", "https://foo.org/m2", "true", "true", null, null);
+    MavenRepositoryMirror one = new MavenRepositoryMirror("one", "https://one.org/m2", "*", true, true, null);
+    MavenRepositoryMirror two = new MavenRepositoryMirror("two", "https://two.org/m2", "*", true, true, null);
+    MavenRepository foo = new MavenRepository("foo", "https://foo.org/m2", "true", "true", null, null, null);
 
     @Test
     void useFirstMirror() {
@@ -37,7 +37,7 @@ class MavenRepositoryMirrorTest {
 
     @Test
     void matchById() {
-        MavenRepositoryMirror oneMirror = new MavenRepositoryMirror("mirror", "https://mirror", "one", true, true);
+        MavenRepositoryMirror oneMirror = new MavenRepositoryMirror("mirror", "https://mirror", "one", true, true, null);
 
         MavenRepository one = MavenRepository.builder()
           .id("one")
@@ -59,7 +59,7 @@ class MavenRepositoryMirrorTest {
 
     @Test
     void excludeFromWildcard() {
-        MavenRepositoryMirror oneMirror = new MavenRepositoryMirror("mirror", "https://mirror", "*,!two", true, true);
+        MavenRepositoryMirror oneMirror = new MavenRepositoryMirror("mirror", "https://mirror", "*,!two", true, true, null);
         MavenRepository one = MavenRepository.builder()
           .id("one")
           .uri("https://one")

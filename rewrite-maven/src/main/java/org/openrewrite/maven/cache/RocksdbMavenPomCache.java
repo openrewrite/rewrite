@@ -122,9 +122,8 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         cache = getCache(pomCacheDir.getAbsolutePath());
     }
 
-    @Nullable
     @Override
-    public ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
+    public @Nullable ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
         return null;
     }
 
@@ -132,9 +131,8 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     public void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved) {
     }
 
-    @Nullable
     @Override
-    public Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+    public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
         //The Maven metadata is not something that should be stored long term, as it will change over time.
         return null;
     }
@@ -168,8 +166,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    @Nullable
-    public Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+    public @Nullable Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
         return null;
     }
 
@@ -188,8 +185,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
     }
 
-    @Nullable
-    static Optional<Pom> deserializePom(byte[] bytes) {
+    static @Nullable Optional<Pom> deserializePom(byte[] bytes) {
         try {
             return bytes == null ? null : Optional.of(mapper.readValue(bytes, Pom.class));
         } catch (IOException e) {

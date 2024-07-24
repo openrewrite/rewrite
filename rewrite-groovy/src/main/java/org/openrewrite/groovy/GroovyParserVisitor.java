@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy;
 
+import groovy.lang.GroovySystem;
 import groovyjarjarasm.asm.Opcodes;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -87,6 +88,9 @@ public class GroovyParserVisitor {
      */
     private int columnOffset;
 
+    @Nullable
+    private static Boolean olderThanGroovy3;
+
     @SuppressWarnings("unused")
     public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
@@ -95,6 +99,15 @@ public class GroovyParserVisitor {
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
         this.typeMapping = new GroovyTypeMapping(typeCache);
+    }
+
+    private static boolean isOlderThanGroovy3() {
+        if (olderThanGroovy3 == null) {
+            String groovyVersionText = GroovySystem.getVersion();
+            int majorVersion = Integer.parseInt(groovyVersionText.substring(0, groovyVersionText.indexOf('.')));
+            olderThanGroovy3 = majorVersion < 3;
+        }
+        return olderThanGroovy3;
     }
 
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
@@ -684,7 +697,7 @@ public class GroovyParserVisitor {
                                 .collect(Collectors.toList());
             } else if (!unparsedArgs.isEmpty() && unparsedArgs.get(0) instanceof MapExpression) {
                 // The map literal may or may not be wrapped in "[]"
-                // If it is wrapped in "[]" then this isn't a named arguments situation and we should not lift the parameters out of the enclosing MapExpression
+                // If it is wrapped in "[]" then this isn't a named arguments situation, and we should not lift the parameters out of the enclosing MapExpression
                 saveCursor = cursor;
                 whitespace();
                 boolean isOpeningBracketPresent = '[' == source.charAt(cursor);
@@ -1178,7 +1191,7 @@ public class GroovyParserVisitor {
                 } else if (type == ClassHelper.STRING_TYPE) {
                     jType = JavaType.Primitive.String;
                     // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
-                    int length = sourceLengthOfNext(expression);
+                    int length = sourceLengthOfString(expression);
                     // this is an attribute selector
                     if (source.startsWith("@"+value, cursor)) {
                         length += 1;
@@ -1444,7 +1457,7 @@ public class GroovyParserVisitor {
                     // The sub-strings within a GString have no delimiters of their own, confusing visitConstantExpression()
                     // ConstantExpression.getValue() cannot be trusted for strings as its values don't match source code because sequences like "\\" have already been replaced with a single "\"
                     // Use the AST element's line/column positions to figure out its extent, but those numbers need tweaks to be correct
-                    int length = sourceLengthOfNext(cs);
+                    int length = sourceLengthOfString(cs);
                     if (i == 0 || i == rawExprs.size() - 1) {
                         // The first and last constants within a GString have line/column position which incorrectly include the GString's delimiters
                         length -= delimiter.length();
@@ -1507,147 +1520,149 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodCallExpression(MethodCallExpression call) {
-            Space fmt = whitespace();
+            queue.add(insideParentheses(call, fmt -> {
 
-            ImplicitDot implicitDot = null;
-            JRightPadded<Expression> select = null;
-            if (!call.isImplicitThis()) {
-                Expression selectExpr = visit(call.getObjectExpression());
-                int saveCursor = cursor;
-                Space afterSelect = whitespace();
-                if (source.charAt(cursor) == '.' || source.charAt(cursor) == '?' || source.charAt(cursor) == '*') {
-                    cursor = saveCursor;
-                    afterSelect = sourceBefore(call.isSpreadSafe() ? "*." : call.isSafe() ? "?." : ".");
-                } else {
-                    implicitDot = new ImplicitDot(randomId());
+                ImplicitDot implicitDot = null;
+                JRightPadded<Expression> select = null;
+                if (!call.isImplicitThis()) {
+                    Expression selectExpr = visit(call.getObjectExpression());
+                    int saveCursor = cursor;
+                    Space afterSelect = whitespace();
+                    if (source.charAt(cursor) == '.' || source.charAt(cursor) == '?' || source.charAt(cursor) == '*') {
+                        cursor = saveCursor;
+                        afterSelect = sourceBefore(call.isSpreadSafe() ? "*." : call.isSafe() ? "?." : ".");
+                    } else {
+                        implicitDot = new ImplicitDot(randomId());
+                    }
+                    select = JRightPadded.build(selectExpr).withAfter(afterSelect);
                 }
-                select = JRightPadded.build(selectExpr).withAfter(afterSelect);
-            }
-            // Closure invocations that are written as closure.call() and closure() are parsed into identical MethodCallExpression
-            // closure() has implicitThis set to false
-            // So the "select" that was just parsed _may_ have actually been the method name
-            J.Identifier name;
+                // Closure invocations that are written as closure.call() and closure() are parsed into identical MethodCallExpression
+                // closure() has implicitThis set to false
+                // So the "select" that was just parsed _may_ have actually been the method name
+                J.Identifier name;
 
-            String methodNameExpression = call.getMethodAsString();
-            if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
-                // we have an escaped groovy method name, commonly used for test `def 'some scenario description'() {}`
-                // or to workaround names that are also keywords in groovy
-                methodNameExpression = source.charAt(cursor) + methodNameExpression + source.charAt(cursor);
-            }
+                String methodNameExpression = call.getMethodAsString();
+                if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
+                    // we have an escaped groovy method name, commonly used for test `def 'some scenario description'() {}`
+                    // or to workaround names that are also keywords in groovy
+                    methodNameExpression = source.charAt(cursor) + methodNameExpression + source.charAt(cursor);
+                }
 
+                Space prefix = whitespace();
+                if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
+                    cursor += methodNameExpression.length();
+                    name = new J.Identifier(randomId(), prefix, Markers.EMPTY,
+                            emptyList(), methodNameExpression, null, null);
 
-            if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
-                name = new J.Identifier(randomId(), sourceBefore(methodNameExpression), Markers.EMPTY,
-                        emptyList(), methodNameExpression, null, null);
+                } else if (select != null && select.getElement() instanceof J.Identifier) {
+                    name = (J.Identifier) select.getElement();
+                    select = null;
+                } else {
+                    throw new IllegalArgumentException("Unable to parse method call");
+                }
 
-            } else if (select != null && select.getElement() instanceof J.Identifier) {
-                name = (J.Identifier) select.getElement();
-                select = null;
-            } else {
-                throw new IllegalArgumentException("Unable to parse method call");
-            }
-
-            if (call.isSpreadSafe()) {
-                name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
-            }
-            if (call.isSafe()) {
-                name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
-            }
-            if (implicitDot != null) {
-                name = name.withMarkers(name.getMarkers().add(implicitDot));
-            }
-            // Method invocations may have type information that can enrich the type information of its parameters
-            Markers markers = Markers.EMPTY;
-            if (call.getArguments() instanceof ArgumentListExpression) {
-                ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
-                if (call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
-                    for (org.codehaus.groovy.ast.expr.Expression arg : args.getExpressions()) {
-                        if (!(arg instanceof ClosureExpression)) {
-                            continue;
-                        }
-                        ClosureExpression cl = (ClosureExpression) arg;
-                        ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                        for (Parameter p : cl.getParameters()) {
-                            if (p.isDynamicTyped()) {
-                                p.setType(actualParamTypeRaw);
-                                p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                if (call.isSpreadSafe()) {
+                    name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
+                }
+                if (call.isSafe()) {
+                    name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
+                }
+                if (implicitDot != null) {
+                    name = name.withMarkers(name.getMarkers().add(implicitDot));
+                }
+                // Method invocations may have type information that can enrich the type information of its parameters
+                Markers markers = Markers.EMPTY;
+                if (call.getArguments() instanceof ArgumentListExpression) {
+                    ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
+                    if (call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
+                        for (org.codehaus.groovy.ast.expr.Expression arg : args.getExpressions()) {
+                            if (!(arg instanceof ClosureExpression)) {
+                                continue;
                             }
-                        }
-                        for (Map.Entry<String, Variable> declaredVariable : cl.getVariableScope().getDeclaredVariables().entrySet()) {
-                            if (declaredVariable.getValue() instanceof Parameter && declaredVariable.getValue().isDynamicTyped()) {
-                                Parameter p = (Parameter) declaredVariable.getValue();
-                                p.setType(actualParamTypeRaw);
-                                p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                            ClosureExpression cl = (ClosureExpression) arg;
+                            ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                            for (Parameter p : cl.getParameters()) {
+                                if (p.isDynamicTyped()) {
+                                    p.setType(actualParamTypeRaw);
+                                    p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                                }
+                            }
+                            for (Map.Entry<String, Variable> declaredVariable : cl.getVariableScope().getDeclaredVariables().entrySet()) {
+                                if (declaredVariable.getValue() instanceof Parameter && declaredVariable.getValue().isDynamicTyped()) {
+                                    Parameter p = (Parameter) declaredVariable.getValue();
+                                    p.setType(actualParamTypeRaw);
+                                    p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                                }
                             }
                         }
                     }
-                }
-                // handle the obscure case where there are empty parens ahead of a closure
-                if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
-                    int saveCursor = cursor;
-                    Space prefix = whitespace();
-                    if (source.charAt(cursor) == '(') {
-                        cursor += 1;
-                        Space infix = whitespace();
-                        if (source.charAt(cursor) == ')') {
+                    // handle the obscure case where there are empty parens ahead of a closure
+                    if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
+                        int saveCursor = cursor;
+                        Space argPrefix = whitespace();
+                        if (source.charAt(cursor) == '(') {
                             cursor += 1;
-                            markers = markers.add(new EmptyArgumentListPrecedesArgument(randomId(), prefix, infix));
+                            Space infix = whitespace();
+                            if (source.charAt(cursor) == ')') {
+                                cursor += 1;
+                                markers = markers.add(new EmptyArgumentListPrecedesArgument(randomId(), argPrefix, infix));
+                            } else {
+                                cursor = saveCursor;
+                            }
                         } else {
                             cursor = saveCursor;
                         }
-                    } else {
-                        cursor = saveCursor;
                     }
                 }
-            }
-            JContainer<Expression> args = visit(call.getArguments());
+                JContainer<Expression> args = visit(call.getArguments());
 
-            MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
-            JavaType.Method methodType = null;
-            if (methodNode == null && call.getObjectExpression() instanceof VariableExpression
-                && ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
-                // Groovy doesn't know what kind of object this method is being invoked on
-                // But if this invocation is inside a Closure we may have already enriched its parameters with types from the static type checker
-                // Use any such type information to attempt to find a matching method
-                ClassNode parameterType = staticType(((VariableExpression) call.getObjectExpression()).getAccessedVariable());
-                if (args.getElements().size() == 1 && args.getElements().get(0) instanceof J.Empty) {
-                    methodType = typeMapping.methodType(parameterType.getMethod(name.getSimpleName(), new Parameter[]{}));
-                } else if (call.getArguments() instanceof ArgumentListExpression) {
-                    List<org.codehaus.groovy.ast.expr.Expression> rawArgs = ((ArgumentListExpression) call.getArguments()).getExpressions();
+                MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
+                JavaType.Method methodType = null;
+                if (methodNode == null && call.getObjectExpression() instanceof VariableExpression
+                    && ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
+                    // Groovy doesn't know what kind of object this method is being invoked on
+                    // But if this invocation is inside a Closure we may have already enriched its parameters with types from the static type checker
+                    // Use any such type information to attempt to find a matching method
+                    ClassNode parameterType = staticType(((VariableExpression) call.getObjectExpression()).getAccessedVariable());
+                    if (args.getElements().size() == 1 && args.getElements().get(0) instanceof J.Empty) {
+                        methodType = typeMapping.methodType(parameterType.getMethod(name.getSimpleName(), new Parameter[]{}));
+                    } else if (call.getArguments() instanceof ArgumentListExpression) {
+                        List<org.codehaus.groovy.ast.expr.Expression> rawArgs = ((ArgumentListExpression) call.getArguments()).getExpressions();
                     /*
                       Look through the methods returning the closest match on a best-effort basis
                       Factors which can result in a less accurate match, or no match, include:
                           * The type of each parameter may or may not be known to us
                           * Usage of Groovy's "named parameters" syntactic sugaring throwing off argument count and order
                     */
-                    methodLoop:
-                    for (MethodNode candidateMethod : parameterType.getAllDeclaredMethods()) {
-                        if (!name.getSimpleName().equals(candidateMethod.getName())) {
-                            continue;
-                        }
-                        if (rawArgs.size() != candidateMethod.getParameters().length) {
-                            continue;
-                        }
-                        // Better than nothing
-                        methodType = typeMapping.methodType(candidateMethod);
-
-                        // If all parameter types agree then we have found an exact match
-                        for (int i = 0; i < candidateMethod.getParameters().length; i++) {
-                            JavaType param = typeMapping.type(staticType(candidateMethod.getParameters()[i]));
-                            JavaType arg = typeMapping.type(staticType(rawArgs.get(i)));
-                            if (!TypeUtils.isAssignableTo(param, arg)) {
-                                continue methodLoop;
+                        methodLoop:
+                        for (MethodNode candidateMethod : parameterType.getAllDeclaredMethods()) {
+                            if (!name.getSimpleName().equals(candidateMethod.getName())) {
+                                continue;
                             }
-                        }
-                        break;
-                    }
-                }
+                            if (rawArgs.size() != candidateMethod.getParameters().length) {
+                                continue;
+                            }
+                            // Better than nothing
+                            methodType = typeMapping.methodType(candidateMethod);
 
-            } else {
-                methodType = typeMapping.methodType(methodNode);
-            }
-            queue.add(new J.MethodInvocation(randomId(), fmt, markers,
-                    select, null, name, args, methodType));
+                            // If all parameter types agree then we have found an exact match
+                            for (int i = 0; i < candidateMethod.getParameters().length; i++) {
+                                JavaType param = typeMapping.type(staticType(candidateMethod.getParameters()[i]));
+                                JavaType arg = typeMapping.type(staticType(rawArgs.get(i)));
+                                if (!TypeUtils.isAssignableTo(param, arg)) {
+                                    continue methodLoop;
+                                }
+                            }
+                            break;
+                        }
+                    }
+
+                } else {
+                    methodType = typeMapping.methodType(methodNode);
+                }
+                return new J.MethodInvocation(randomId(), fmt, markers,
+                        select, null, name, args, methodType);
+            }));
         }
 
         @Override
@@ -1732,23 +1747,22 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitPropertyExpression(PropertyExpression prop) {
-            Space fmt = whitespace();
-            Expression target = visit(prop.getObjectExpression());
-            Space beforeDot = prop.isSafe() ? sourceBefore("?.") :
-                    sourceBefore(prop.isSpreadSafe() ? "*." : ".");
-            J name = visit(prop.getProperty());
-            if (name instanceof J.Literal) {
-                String nameStr = ((J.Literal) name).getValueSource();
-                assert nameStr != null;
-                name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameStr, null, null);
-            }
-            if (prop.isSpreadSafe()) {
-                name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
-            }
-            if (prop.isSafe()) {
-                name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
-            }
-            queue.add(new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null));
+            queue.add(insideParentheses(prop, fmt -> {
+                Expression target = visit(prop.getObjectExpression());
+                Space beforeDot = prop.isSpreadSafe() ? sourceBefore("*.") :
+                        sourceBefore(prop.isSafe() ? "?." : ".");
+                J name = visit(prop.getProperty());
+                if (name instanceof J.Literal) {
+                    J.Literal nameLiteral = ((J.Literal) name);
+                    name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameLiteral.getValueSource(), nameLiteral.getType(), null);
+                }
+                if (prop.isSpreadSafe()) {
+                    name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
+                } else if (prop.isSafe()) {
+                    name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
+                }
+                return new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null);
+            }));
         }
 
         @Override
@@ -1772,15 +1786,15 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitShortTernaryExpression(ElvisOperatorExpression ternary) {
-            Space fmt = whitespace();
-            Expression trueExpr = visit(ternary.getBooleanExpression());
-            J.Ternary elvis = new J.Ternary(randomId(), fmt, Markers.EMPTY,
-                    trueExpr,
-                    padLeft(sourceBefore("?"), trueExpr),
-                    padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
-                    typeMapping.type(staticType(ternary)));
-            elvis = elvis.withMarkers(elvis.getMarkers().add(new Elvis(randomId())));
-            queue.add(elvis);
+            queue.add(insideParentheses(ternary, fmt -> {
+                Expression trueExpr = visit(ternary.getBooleanExpression());
+                J.Ternary elvis = new J.Ternary(randomId(), fmt, Markers.EMPTY,
+                        trueExpr,
+                        padLeft(sourceBefore("?"), trueExpr),
+                        padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
+                        typeMapping.type(staticType(ternary)));
+                return elvis.withMarkers(elvis.getMarkers().add(new Elvis(randomId())));
+            }));
         }
 
         @Override
@@ -2282,10 +2296,45 @@ public class GroovyParserVisitor {
     }
 
     /**
-     * Gets the length in characters of the AST node.
+     * Gets the length in characters of a String literal.
+     * Attempts to account for a number of different strange compiler behaviors, old bugs, and edge cases.
      * cursor is presumed to point at the beginning of the node.
      */
-    private int sourceLengthOfNext(ASTNode node) {
+    private int sourceLengthOfString(ConstantExpression expr) {
+        // ConstantExpression.getValue() already has resolved escaped characters. So "\t" and a literal tab will look the same.
+        // Since we cannot differentiate between the two, use this alternate method only when an old version of groovy indicates risk
+        // and the literal doesn't contain any characters which might be from an escape sequence. e.g.: tabs, newlines, carriage returns
+        String value = (String) expr.getValue();
+        if (isOlderThanGroovy3() && value.matches("[^\\t\\r\\n\\\\]*")) {
+            int delimiterLength = getDelimiterLength();
+            return delimiterLength + value.length() + delimiterLength;
+        }
+        return lengthAccordingToAst(expr);
+    }
+
+    private int getDelimiterLength() {
+        String maybeDelimiter = source.substring(cursor, Math.min(cursor + 3, source.length()));
+        int delimiterLength = 0;
+        if (maybeDelimiter.startsWith("$/")) {
+            delimiterLength = 2;
+        } else if (maybeDelimiter.startsWith("\"\"\"") || maybeDelimiter.startsWith("'''")) {
+            delimiterLength = 3;
+        } else if (maybeDelimiter.startsWith("/") || maybeDelimiter.startsWith("\"") || maybeDelimiter.startsWith("'")) {
+            delimiterLength = 1;
+        }
+        return delimiterLength;
+    }
+
+    /**
+     * Gets the length according to the Groovy compiler's attestation of starting/ending line and column numbers.
+     * On older versions of the JDK/Groovy compiler string literals with following whitespace sometimes erroneously include
+     * the length of the whitespace in the length of the AST node.
+     * So in this method invocation:
+     *    foo( 'a' )
+     * the correct source length for the AST node representing 'a' is 3, but in affected groovy versions the length
+     * on the node is '4' because it is also counting the trailing whitespace.
+     */
+    private int lengthAccordingToAst(ConstantExpression node) {
         if (!appearsInSource(node)) {
             return 0;
         }

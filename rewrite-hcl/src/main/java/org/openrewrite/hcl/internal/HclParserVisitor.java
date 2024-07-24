@@ -686,8 +686,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         return terminalNode == null ? "" : prefix(terminalNode.getSymbol());
     }
 
-    @Nullable
-    private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, String, T> conversion) {
+    private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, String, T> conversion) {
         if (ctx == null) {
             return null;
         }

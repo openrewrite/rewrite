@@ -28,7 +28,7 @@ class RecipeRunTest implements RewriteTest {
     @Test
     void printDatatable() {
         rewriteRun(
-          recipeSpec -> recipeSpec.recipe(new FindAndReplace("replace_me", "replacement", null, null, null, null, null))
+          recipeSpec -> recipeSpec.recipe(new FindAndReplace("replace_me", "replacement", null, null, null, null, null, null))
             .afterRecipe(recipeRun -> {
                 StringBuilder output = new StringBuilder();
                 final String dataTableName = SourcesFileResults.class.getName();

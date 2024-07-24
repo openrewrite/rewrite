@@ -53,8 +53,7 @@ public interface JavaType {
     }
 
     // TODO: To be removed with OpenRewrite 9
-    @Nullable
-    default Integer getManagedReference() {
+    default @Nullable Integer getManagedReference() {
         return null;
     }
 
@@ -306,11 +305,9 @@ public interface JavaType {
             }
         }
 
-        @Nullable
-        public abstract FullyQualified getOwningClass();
+        public abstract @Nullable FullyQualified getOwningClass();
 
-        @Nullable
-        public abstract FullyQualified getSupertype();
+        public abstract @Nullable FullyQualified getSupertype();
 
         /**
          * @return The class name without package qualification. If an inner class, outer/inner classes are separated by '.'.
@@ -355,7 +352,8 @@ public interface JavaType {
             Enum,
             Interface,
             Annotation,
-            Record
+            Record,
+            Value
         }
     }
 
@@ -715,7 +713,12 @@ public interface JavaType {
 
         @Override
         public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
-            return type.withFullyQualifiedName(fullyQualifiedName);
+            FullyQualified qualified = type.withFullyQualifiedName(fullyQualifiedName);
+            if (type == qualified) {
+                return this;
+            }
+
+            return new Parameterized(managedReference, qualified, typeParameters);
         }
 
         @Override
@@ -753,9 +756,8 @@ public interface JavaType {
             return type.getMethods();
         }
 
-        @Nullable
         @Override
-        public FullyQualified getOwningClass() {
+        public @Nullable FullyQualified getOwningClass() {
             return type.getOwningClass();
         }
 
@@ -954,8 +956,7 @@ public interface JavaType {
         None,
         Null;
 
-        @Nullable
-        public static Primitive fromKeyword(String keyword) {
+        public static @Nullable Primitive fromKeyword(String keyword) {
             switch (keyword) {
                 case "boolean":
                     return Boolean;
@@ -985,8 +986,7 @@ public interface JavaType {
             return null;
         }
 
-        @Nullable
-        public static Primitive fromClassName(String className) {
+        public static @Nullable Primitive fromClassName(String className) {
             switch (className) {
                 case "java.lang.Boolean":
                     return Boolean;
@@ -1213,8 +1213,7 @@ public interface JavaType {
             return declaringType;
         }
 
-        @Nullable
-        public JavaType.Method getOverride() {
+        public @Nullable JavaType.Method getOverride() {
             if (declaringType instanceof JavaType.Unknown) {
                 return null;
             }
@@ -1435,8 +1434,7 @@ public interface JavaType {
         Variable() {
         }
 
-        @Nullable
-        public JavaType getOwner() {
+        public @Nullable JavaType getOwner() {
             return owner;
         }
 
@@ -1556,15 +1554,13 @@ public interface JavaType {
             return emptyList();
         }
 
-        @Nullable
         @Override
-        public FullyQualified getOwningClass() {
+        public @Nullable FullyQualified getOwningClass() {
             return null;
         }
 
-        @Nullable
         @Override
-        public FullyQualified getSupertype() {
+        public @Nullable FullyQualified getSupertype() {
             return null;
         }
 

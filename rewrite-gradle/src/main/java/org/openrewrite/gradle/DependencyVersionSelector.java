@@ -64,8 +64,7 @@ public class DependencyVersionSelector {
      * @return The selected version, if any.
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
-    @Nullable
-    public String select(GroupArtifact ga,
+    public @Nullable String select(GroupArtifact ga,
                          String configuration,
                          @Nullable String version,
                          @Nullable String versionPattern,
@@ -92,8 +91,7 @@ public class DependencyVersionSelector {
      * @return The selected version, if any.
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
-    @Nullable
-    public String select(ResolvedGroupArtifactVersion gav,
+    public @Nullable String select(ResolvedGroupArtifactVersion gav,
                          String configuration,
                          @Nullable String version,
                          @Nullable String versionPattern,
@@ -114,8 +112,7 @@ public class DependencyVersionSelector {
      * @return The selected version, if any.
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
-    @Nullable
-    public String select(GroupArtifactVersion gav,
+    public @Nullable String select(GroupArtifactVersion gav,
                          @Nullable String configuration,
                          @Nullable String version,
                          @Nullable String versionPattern,

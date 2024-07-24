@@ -35,8 +35,7 @@ public class ProtoLeftPadded<T> {
         return withElement(map.apply(element));
     }
 
-    @Nullable
-    public static <T> ProtoLeftPadded<T> withElement(@Nullable ProtoLeftPadded<T> before, @Nullable T elements) {
+    public static <T> @Nullable ProtoLeftPadded<T> withElement(@Nullable ProtoLeftPadded<T> before, @Nullable T elements) {
         if (before == null) {
             if (elements == null) {
                 return null;

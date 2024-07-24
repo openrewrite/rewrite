@@ -15,11 +15,16 @@
  */
 package org.openrewrite.maven;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class RenamePropertyKeyTest implements RewriteTest {
@@ -222,4 +227,27 @@ class RenamePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nothingToRename() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                 
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <properties>
+                  <a.version>a</a.version>
+                  <bla.version>b</bla.version>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
 }

@@ -93,8 +93,8 @@ public class AnnotationTemplateGenerator {
         List<J.Annotation> annotations = new ArrayList<>();
 
         new JavaIsoVisitor<Integer>() {
-            @Nullable
-            private Comment filterTemplateComment(Comment comment) {
+
+            private @Nullable Comment filterTemplateComment(Comment comment) {
                 return comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT) ?
                         null : comment;
             }
