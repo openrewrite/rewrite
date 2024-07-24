@@ -15,16 +15,11 @@
  */
 package org.openrewrite.maven;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class RenamePropertyKeyTest implements RewriteTest {
@@ -42,15 +37,15 @@ class RenamePropertyKeyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <properties>
                   <guava.version>29.0-jre</guava.version>
                 </properties>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.guava</groupId>
@@ -63,15 +58,15 @@ class RenamePropertyKeyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <properties>
                   <version.com.google.guava>29.0-jre</version.com.google.guava>
                 </properties>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.guava</groupId>
@@ -92,15 +87,15 @@ class RenamePropertyKeyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <properties>
                   <guava.version>29.0-jre</guava.version>
                 </properties>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -115,15 +110,15 @@ class RenamePropertyKeyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <properties>
                   <version.com.google.guava>29.0-jre</version.com.google.guava>
                 </properties>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -146,14 +141,14 @@ class RenamePropertyKeyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <properties>
                   <guava.version>29.0-jre</guava.version>
                   <abc>${guava.version}</abc>
                   <def>prefix ${guava.version}</def>
                   <xyz>${guava.version} suffix ${abc}</xyz>
                 </properties>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -162,14 +157,14 @@ class RenamePropertyKeyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <properties>
                   <version.com.google.guava>29.0-jre</version.com.google.guava>
                   <abc>${version.com.google.guava}</abc>
                   <def>prefix ${version.com.google.guava}</def>
                   <xyz>${version.com.google.guava} suffix ${abc}</xyz>
                 </properties>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -186,7 +181,7 @@ class RenamePropertyKeyTest implements RewriteTest {
           type: specs.openrewrite.org/v1beta/recipe
           name: org.openrewrite.RenamePropertyAndValue
           displayName: RenamePropertyAndValue
-          description: RenamePropertyAndValue description
+          description: RenamePropertyAndValue description.
           recipeList:
             - org.openrewrite.maven.RenamePropertyKey:
                   oldKey: "abc"
@@ -201,11 +196,11 @@ class RenamePropertyKeyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <properties>
                   <abc>1.0</abc>
                 </properties>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -214,11 +209,11 @@ class RenamePropertyKeyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <properties>
                   <def>2.0</def>
                 </properties>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -235,11 +230,11 @@ class RenamePropertyKeyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <properties>
                   <a.version>a</a.version>
                   <bla.version>b</bla.version>
