@@ -21,9 +21,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -137,10 +135,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
-            @Nullable
-            final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
-            @Nullable
-            private Collection<String> availableVersions;
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
 
@@ -158,31 +152,10 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         doAfterVisit(new ChangeTagValueVisitor<>(artifactIdTag.get(), newArtifactId));
                         changed = true;
                     }
-                    if (newVersion != null) {
-                        try {
-                            Optional<Xml.Tag> versionTag = t.getChild("version");
-
-                            if (versionTag.isPresent()) {
-                                String version = versionTag.get().getValue().orElse(null);
-                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, newArtifactId, version);
-                                if (Objects.requireNonNull(version).contains("$")) {
-                                    String propertyVariable = version.substring(2, version.length() - 1);
-                                    String newPropertyVariable = propertyVariable;
-                                    if (Boolean.TRUE.equals(changePropertyVersionNames)){
-                                        newPropertyVariable = newArtifactId + ".version";
-                                        doAfterVisit(new RenamePropertyKey(propertyVariable, newPropertyVariable).getVisitor());
-                                        t = changeChildTagValue(t, "version", "${"+newPropertyVariable+"}", ctx);
-                                    }
-                                    doAfterVisit(new ChangePropertyValue(newPropertyVariable, resolvedNewVersion, false, false).getVisitor());
-                                } else {
-                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
-                                }
-
-                            }
-                            changed = true;
-                        } catch(MavenDownloadingException e) {
-                            return e.warn(t);
-                        }
+                    Optional<Xml.Tag> versionTag = t.getChild("version");
+                    if (versionTag.isPresent() && newVersion != null && !newVersion.equals(versionTag.get().getValue().orElse(null))) {
+                        doAfterVisit(new ChangeVersionValue(newGroupId, newArtifactId, newVersion, versionPattern, ChangeVersionValue.Changes.MANAGED_DEPENDENCY.name()).getVisitor());
+                        changed = true;
                     }
                     if (changed) {
                         maybeUpdateModel();
@@ -190,38 +163,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                 }
                 return t;
-            }
-
-            private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
-                Optional<Xml.Tag> childTag = tag.getChild(childTagName);
-                if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
-                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
-                }
-                return tag;
-            }
-
-            @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
-                if (currentVersion.contains("$")){
-                    String propertyVariable = currentVersion.substring(2, currentVersion.length() - 1);
-                    currentVersion = getResolutionResult().getPom().getProperties().get(propertyVariable);
-                }
-
-                if (versionComparator == null) {
-                    return newVersion;
-                }
-                String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
-                if (availableVersions == null) {
-                    availableVersions = new ArrayList<>();
-                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(finalCurrentVersion, v)) {
-                            availableVersions.add(v);
-                        }
-                    }
-
-                }
-                return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
             }
         };
     }

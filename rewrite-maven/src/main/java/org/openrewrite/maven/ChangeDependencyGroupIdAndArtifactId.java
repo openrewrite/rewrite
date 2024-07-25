@@ -213,21 +213,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                 if (!configuredToOverrideManageVersion && newDependencyManaged || (oldDependencyManaged && configuredToChangeManagedDependency)) {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false).visit(t, ctx);
                                 } else {
-                                    // Otherwise, change the version to the new value.
-                                    if (Objects.requireNonNull(currentVersion).contains("$")) {
-                                        // If the version is a property value, change version in property section and rename the property if changePropertyNames is true.
-                                        String propertyVariable = currentVersion.substring(2, currentVersion.length() - 1);
-                                        String newPropertyVariable = propertyVariable;
-                                        if (Boolean.TRUE.equals(changePropertyVersionNames)){
-                                            newPropertyVariable = newArtifactId + ".version";
-                                            doAfterVisit(new RenamePropertyKey(propertyVariable, newPropertyVariable).getVisitor());
-                                            t = changeChildTagValue(t, "version", "${"+newPropertyVariable+"}", ctx);
-                                        }
-                                        doAfterVisit(new ChangePropertyValue(newPropertyVariable, resolvedNewVersion, false, false).getVisitor());
-                                    } else {
-                                        //If the version is no property value, change it right here.
-                                        t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
-                                    }
+                                    doAfterVisit(new ChangeVersionValue(groupId, artifactId, newVersion, versionPattern, ChangeVersionValue.Changes.DEPENDENCY.name()).getVisitor());
 
                                 }
                             } else if (!(newDependencyManaged && configuredToChangeManagedDependency)) {
