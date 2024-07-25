@@ -884,17 +884,25 @@ public class MavenPomDownloader {
 
     @Getter
     public static class HttpSenderResponseException extends Exception {
-        @Nullable
-        private final Integer responseCode;
+
+        private final int responseCode;
 
         private final String body;
 
-        public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode,
+        public HttpSenderResponseException(@Nullable Throwable cause,
+                                           @Nullable Integer responseCode,
+                                           String body) {
+            this(cause, responseCode == null ? 0 : responseCode, body);
+        }
+
+        public HttpSenderResponseException(@Nullable Throwable cause,
+                                           int responseCode,
                                            String body) {
             super(cause);
             this.responseCode = responseCode;
             this.body = body;
         }
+
 
         /**
          * All 400s are considered client-side exceptions, but we only want to cache ones that are unlikely to change
@@ -903,7 +911,7 @@ public class MavenPomDownloader {
          * For 408 TIMEOUT, 425 TOO_EARLY, and 429 TOO_MANY_REQUESTS, these are likely to change if not cached.
          */
         public boolean isClientSideException() {
-            if (responseCode == null || responseCode < 400 || responseCode > 499) {
+            if (responseCode < 400 || responseCode > 499) {
                 return false;
             }
             return responseCode != 408 && responseCode != 425 && responseCode != 429;
@@ -911,15 +919,13 @@ public class MavenPomDownloader {
 
         @Override
         public String getMessage() {
-            String message = "";
-            if (responseCode != null) {
-                message += "HTTP " + responseCode;
-                if (responseCode < 0) {
-                    message += " - Connection failed";
-                } else if (responseCode > 399) {
-                    message += "\n" + body;
-                }
+            String message = "HTTP " + responseCode;
+            if (responseCode < 0) {
+                message += " - Connection failed";
+            } else if (responseCode > 399) {
+                message += "\n" + body;
             }
+
             Throwable cause = getCause();
             if (cause != null && cause.getMessage() != null) {
                 message += "\nCaused by: " + cause.getMessage();
@@ -928,12 +934,12 @@ public class MavenPomDownloader {
         }
 
         public boolean isAccessDenied() {
-            return responseCode != null && 400 < responseCode && responseCode <= 403;
+            return 400 < responseCode && responseCode <= 403;
         }
 
         // Any response code below 100 implies that no connection was made. Sometimes 0 or -1 is used for connection failures.
         public boolean isServerReached() {
-            return responseCode != null && responseCode >= 100;
+            return responseCode >= 100;
         }
     }
 
