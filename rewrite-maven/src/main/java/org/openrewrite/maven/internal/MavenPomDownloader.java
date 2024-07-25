@@ -374,7 +374,7 @@ public class MavenPomDownloader {
                 return new MavenMetadata(versioning);
             }
         } catch (HttpSenderResponseException e) {
-            if (e.isClientSideException() && e.getResponseCode() != null && e.getResponseCode() != 404) {
+            if (e.isClientSideException() && e.getResponseCode() != 404) {
                 // If access was denied, do not attempt to derive metadata from this repository in the future.
                 repo.setDeriveMetadataIfMissing(false);
             }
