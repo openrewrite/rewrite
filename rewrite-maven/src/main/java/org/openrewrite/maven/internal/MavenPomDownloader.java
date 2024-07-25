@@ -911,9 +911,20 @@ public class MavenPomDownloader {
 
         @Override
         public String getMessage() {
-            return responseCode == null ?
-                    requireNonNull(getCause()).getMessage() :
-                    "HTTP " + responseCode;
+            String message = "";
+            if (responseCode != null) {
+                message += "HTTP " + responseCode;
+                if (responseCode < 0) {
+                    message += " - Connection failed";
+                } else if (responseCode > 399) {
+                    message += "\n" + body;
+                }
+            }
+            Throwable cause = getCause();
+            if (cause != null && cause.getMessage() != null) {
+                message += "\nCaused by: " + cause.getMessage();
+            }
+            return message;
         }
 
         public boolean isAccessDenied() {
