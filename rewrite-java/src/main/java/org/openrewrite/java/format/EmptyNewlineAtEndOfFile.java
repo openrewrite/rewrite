@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Comment;
@@ -61,14 +62,15 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
             public J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                    GeneralFormatStyle generalFormatStyle = ((SourceFile) cu).getStyle(GeneralFormatStyle.class);
+                    GeneralFormatStyle generalFormatStyle = cu.getStyle(GeneralFormatStyle.class);
                     if (generalFormatStyle == null) {
                         generalFormatStyle = autodetectGeneralFormatStyle(cu);
                     }
                     String lineEnding = generalFormatStyle.isUseCRLFNewLines() ? "\r\n" : "\n";
 
                     Space eof = cu.getEof();
-                    if (eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
+                    if (StringUtils.isBlank(eof.getLastWhitespace()) &&
+                        eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
                         if (eof.getComments().isEmpty()) {
                             return cu.withEof(Space.format(lineEnding));
                         } else {
