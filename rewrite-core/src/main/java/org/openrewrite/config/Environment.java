@@ -150,26 +150,28 @@ public class Environment {
             }
         }
         if (!recipesNotFound.isEmpty()) {
+            @SuppressWarnings("deprecation")
             List<String> suggestions = recipesNotFound.stream()
                     .map(r -> recipesByName.keySet().stream()
                             .min(comparingInt(a -> StringUtils.getLevenshteinDistance(a, r)))
                             .orElse(r))
                     .collect(toList());
-            String message = String.format("Recipes not found: %s\nDid you mean: %s",
+            String message = String.format("Recipe(s) not found: %s\nDid you mean: %s",
                     String.join(", ", recipesNotFound),
                     String.join(", ", suggestions));
             throw new RecipeException(message);
+        }
+        if (activatedRecipes.isEmpty()) {
+            return Recipe.noop();
+        }
+        if (activatedRecipes.size() == 1) {
+            return activatedRecipes.get(0);
         }
         return new CompositeRecipe(activatedRecipes);
     }
 
     public Recipe activateRecipes(String... activeRecipes) {
         return activateRecipes(Arrays.asList(activeRecipes));
-    }
-
-    //TODO: Nothing uses this and in most cases it would be a bad idea anyway, should consider removing
-    public Recipe activateAll() {
-        return new CompositeRecipe(listRecipes());
     }
 
     /**
