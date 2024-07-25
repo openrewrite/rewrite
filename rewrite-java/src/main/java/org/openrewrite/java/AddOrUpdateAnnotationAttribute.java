@@ -43,7 +43,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                "or adds the argument if it is not already set.";
     }
 
-    @Option(displayName = "Annotation Type",
+    @Option(displayName = "Annotation type",
             description = "The fully qualified name of the annotation.",
             example = "org.junit.Test")
     String annotationType;
@@ -61,7 +61,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Nullable
     String attributeValue;
 
-    @Option(displayName = "Add Only",
+    @Option(displayName = "Add only",
             description = "When set to `true` will not change existing annotation attribute values.")
     @Nullable
     Boolean addOnly;
@@ -144,22 +144,16 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     foundAttributeWithDesiredValue.set(true);
                                     return it;
                                 }
-
-                                JavaType.ShallowClass newClass = JavaType.ShallowClass.build(newAttributeValue);
-                                Expression currentTarget = value.getTarget();
-                                Expression newTarget = ((J.Identifier) currentTarget)
-                                        .withType(newClass)
-                                        .withSimpleName(newClass.getOwningClass().getClassName());
-                                return value
-                                        .withType(newClass)
-                                        .withTarget(newTarget);
+                                //noinspection ConstantConditions
+                                return ((J.Annotation) JavaTemplate.apply(newAttributeValue, getCursor(), finalA.getCoordinates().replaceArguments()))
+                                        .getArguments().get(0);
                             } else {
                                 //noinspection ConstantConditions
-                                return ((J.Annotation) JavaTemplate.builder("value = #{any(java.lang.Class)}")
+                                return ((J.Annotation) JavaTemplate.builder("value = #{any()}")
                                         .contextSensitive()
                                         .build()
-                                        .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it)
-                                ).getArguments().get(0);
+                                        .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it))
+                                        .getArguments().get(0);
                             }
                         }
                         return it;
