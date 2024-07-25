@@ -230,21 +230,21 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
                       <!-- This parent's dependencyManagement has an entry for commons-lang3 setting the version to 3.9  -->
-              	      <groupId>org.apache.logging.log4j</groupId>
-              	      <artifactId>log4j</artifactId>
-              	      <version>2.13.3</version>
+                      <groupId>org.apache.logging.log4j</groupId>
+                      <artifactId>log4j</artifactId>
+                      <version>2.13.3</version>
                   </parent>
 
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
 
                   <dependencies>
-              		<!-- Pulls in commons-lang3 transitively -->
-              		<dependency>
-              		    <groupId>org.apache.commons</groupId>
-              		    <artifactId>commons-text</artifactId>
-              		    <version>1.12.0</version>
-              		</dependency>
+                      <!-- Pulls in commons-lang3 transitively -->
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-text</artifactId>
+                          <version>1.12.0</version>
+                      </dependency>
                   </dependencies>
               </project>
               """,
@@ -272,12 +272,12 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
 
                   <dependencies>
-              		<!-- Pulls in commons-lang3 transitively -->
-              		<dependency>
-              		    <groupId>org.apache.commons</groupId>
-              		    <artifactId>commons-text</artifactId>
-              		    <version>1.12.0</version>
-              		</dependency>
+                      <!-- Pulls in commons-lang3 transitively -->
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-text</artifactId>
+                          <version>1.12.0</version>
+                      </dependency>
                   </dependencies>
               </project>
               """
