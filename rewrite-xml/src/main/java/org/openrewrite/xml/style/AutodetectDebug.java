@@ -65,7 +65,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
     public TreeVisitor<?, ExecutionContext> getScanner(AutodetectDebug.Accumulator acc) {
         return new XmlVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 acc.overallDetector.sample(document);
                 return document;
             }
@@ -106,13 +106,13 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
             int attributeIndentsMatchingProjectStyle;
 
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Autodetect.Detector detector = new Autodetect.Detector();
                 detector.sample(document);
                 currentDocumentStyle = requireNonNull(NamedStyles.merge(TabsAndIndentsStyle.class, Collections.singletonList(detector.build())));
-                super.visitDocument(document, executionContext);
+                super.visitDocument(document, ctx);
 
-                report.insertRow(executionContext, new XmlStyleReport.Row(
+                report.insertRow(ctx, new XmlStyleReport.Row(
                         document.getSourcePath().toString(),
                         currentDocumentStyle.getUseTabCharacter(),
                         currentDocumentStyle.getIndentSize(),
@@ -131,7 +131,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
 
             int depth = 0;
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 // Depth 0 the expected prefix is always "" for all styles
                 if (depth > 0) {
                     tagPrefixesCounted++;
@@ -144,16 +144,16 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
                 }
 
                 // Attributes have the same depth as their parent tag
-                ListUtils.map(tag.getAttributes(), a -> visitAndCast(a, executionContext));
+                ListUtils.map(tag.getAttributes(), a -> visitAndCast(a, ctx));
 
                 depth++;
-                ListUtils.map(tag.getContent(), a -> visitAndCast(a, executionContext));
+                ListUtils.map(tag.getContent(), a -> visitAndCast(a, ctx));
                 depth--;
                 return tag;
             }
 
             @Override
-            public Xml visitAttribute(Xml.Attribute attribute, ExecutionContext executionContext) {
+            public Xml visitAttribute(Xml.Attribute attribute, ExecutionContext ctx) {
                 // Only attributes with newlines in their prefix are continuation indented
                 if (attribute.getPrefix().contains("\n")) {
                     attributePrefixesCounted++;
