@@ -903,7 +903,6 @@ public class MavenPomDownloader {
             this.body = body;
         }
 
-
         /**
          * All 400s are considered client-side exceptions, but we only want to cache ones that are unlikely to change
          * if requested again in order to save on time spent making HTTP calls.
