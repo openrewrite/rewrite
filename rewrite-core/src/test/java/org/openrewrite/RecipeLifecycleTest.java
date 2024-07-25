@@ -280,6 +280,7 @@ class RecipeLifecycleTest implements RewriteTest {
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - org.openrewrite.NoArgRecipe
             """,
@@ -295,6 +296,7 @@ class RecipeLifecycleTest implements RewriteTest {
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - org.openrewrite.NoArgRecipe:
                   foo: bar
@@ -311,6 +313,7 @@ class RecipeLifecycleTest implements RewriteTest {
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - org.openrewrite.DefaultConstructorRecipe
             """,
@@ -326,18 +329,21 @@ class RecipeLifecycleTest implements RewriteTest {
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe.a
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - test.recipe.b
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe.b
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - test.recipe.c
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe.c
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - org.openrewrite.NoArgRecipe
             """,
@@ -354,6 +360,7 @@ class RecipeLifecycleTest implements RewriteTest {
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.recipe.c
                 displayName: Test Recipe
+                description: Test Recipe.
                 recipeList:
                   - org.openrewrite.NoArgRecipe
                 """.getBytes()),
@@ -363,6 +370,7 @@ class RecipeLifecycleTest implements RewriteTest {
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.recipe.b
                 displayName: Test Recipe
+                description: Test Recipe.
                 recipeList:
                   - test.recipe.c
                 """.getBytes()),
@@ -372,6 +380,7 @@ class RecipeLifecycleTest implements RewriteTest {
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.recipe.a
                 displayName: Test Recipe
+                description: Test Recipe.
                 recipeList:
                   - test.recipe.b
                 """.getBytes()),
@@ -391,7 +400,7 @@ class RecipeLifecycleTest implements RewriteTest {
     void declarativeRecipeChainFromResourcesIncludesImperativeRecipesInDescriptors() {
         rewriteRun(spec -> spec.recipeFromResources("test.declarative.sample.a")
             .afterRecipe(recipeRun -> assertThat(recipeRun.getChangeset().getAllResults().get(0)
-              .getRecipeDescriptorsThatMadeChanges().get(0).getRecipeList().get(0).getRecipeList().get(0)
+              .getRecipeDescriptorsThatMadeChanges().get(0).getRecipeList().get(0)
               .getDisplayName()).isEqualTo("Change text")),
           text("Hi", "after"));
     }

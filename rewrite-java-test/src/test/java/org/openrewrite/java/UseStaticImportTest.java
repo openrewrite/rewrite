@@ -22,6 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
+@SuppressWarnings({"UnnecessaryCallToStringValueOf", "UnnecessaryBoxing", "RedundantTypeArguments", "rawtypes"})
 class UseStaticImportTest implements RewriteTest {
     @Test
     void replaceWithStaticImports() {
@@ -108,7 +109,7 @@ class UseStaticImportTest implements RewriteTest {
                   private int emptyList(String canHaveDifferentArguments) {
                   }
               }
-                """
+              """
           )
         );
     }
@@ -320,6 +321,25 @@ class UseStaticImportTest implements RewriteTest {
                   void reproduce() {
                       Predicate<Object> predicate = x -> false;
                       boolean nonStatic = predicate.test(null);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noStaticImportOfMethodMatchingInstanceMethod() {
+        // Cannot do a static import of Arrays.toString() because it is ambiguous with Object.toString()
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java..* *(..)")),
+          java(
+            """
+              import java.util.Arrays;
+
+              class A {
+                  String s(String[] strings) {
+                      return Arrays.toString(strings);
                   }
               }
               """

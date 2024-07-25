@@ -24,7 +24,10 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestIntegration;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collections;
@@ -278,6 +281,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 if (comparator.equals(Comparator.ANY)) {
                     return true;
                 }
+                if (!isExact(managedVersion)) {
+                    return false;
+                }
                 int comparison = new LatestIntegration(null)
                         .compare(null, managedVersion,
                                 Objects.requireNonNull(getResolutionResult().getPom().getValue(requestedVersion)));
@@ -288,6 +294,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 } else {
                     return comparator.equals(Comparator.EQ) || comparator.equals(Comparator.LTE) || comparator.equals(Comparator.GTE);
                 }
+            }
+
+            private boolean isExact(String managedVersion) {
+                Validated<VersionComparator> maybeVersionComparator = Semver.validate(managedVersion, null);
+                return maybeVersionComparator.isValid() && maybeVersionComparator.getValue() instanceof ExactVersion;
             }
 
             private boolean isNotExcepted(ResolvedDependency d) {

@@ -159,6 +159,7 @@ class DeclarativeRecipeTest implements RewriteTest {
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.PreconditionTest
+            description: Test.
             preconditions:
               - org.openrewrite.text.Find:
                   find: 1
@@ -180,6 +181,7 @@ class DeclarativeRecipeTest implements RewriteTest {
               ---
               type: specs.openrewrite.org/v1beta/recipe
               name: org.openrewrite.PreconditionTest
+              description: Test.
               preconditions:
                 - org.openrewrite.text.Find:
                     find: 1

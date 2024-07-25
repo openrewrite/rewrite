@@ -193,6 +193,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           spec -> spec.recipeFromYaml("""
               type: specs.openrewrite.org/v1beta/recipe
               name: org.openrewrite.ReplaceStringLiteralWithConstantList
+              description: Replace string literals with constants.
               recipeList:
                   - org.openrewrite.java.ReplaceStringLiteralWithConstant:
                       fullyQualifiedConstantName: %s
@@ -221,6 +222,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           spec -> spec.recipeFromYaml("""
               type: specs.openrewrite.org/v1beta/recipe
               name: org.openrewrite.ReplaceStringLiteralWithConstantList
+              description: Replace string literals with constants.
               recipeList:
                   - org.openrewrite.java.ReplaceStringLiteralWithConstant:
                       literalValue: %s

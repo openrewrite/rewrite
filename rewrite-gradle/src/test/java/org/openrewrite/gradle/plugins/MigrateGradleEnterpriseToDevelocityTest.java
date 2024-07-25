@@ -61,7 +61,7 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
               """,
             """
               plugins {
-                  id 'com.gradle.develocity' version '3.17.5'
+                  id 'com.gradle.develocity' version '3.17.6'
               }
               develocity {
                   server = 'https://ge.sam.com/'
@@ -101,7 +101,7 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
               """,
             """
               plugins {
-                  id 'com.gradle.develocity' version '3.17.5'
+                  id 'com.gradle.develocity' version '3.17.6'
               }
               develocity {
                   server = 'https://ge.sam.com/'
@@ -131,7 +131,7 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
               """,
             """
               plugins {
-                  id 'com.gradle.develocity' version '3.17.5'
+                  id 'com.gradle.develocity' version '3.17.6'
               }
               develocity {
                   server = 'https://ge.sam.com/'
@@ -161,7 +161,7 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
               """,
             """
               plugins {
-                  id 'com.gradle.develocity' version '3.17.5'
+                  id 'com.gradle.develocity' version '3.17.6'
               }
               develocity {
                   server = 'https://ge.sam.com/'

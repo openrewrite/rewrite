@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Flag;
@@ -85,6 +86,11 @@ public class UseStaticImport extends Recipe {
                 if (m.getTypeParameters() != null && !m.getTypeParameters().isEmpty()) {
                     return m;
                 }
+
+                if (methodNameConflicts(m.getSimpleName(), getCursor())) {
+                    return m;
+                }
+
                 if (m.getMethodType() != null) {
                     if (!m.getMethodType().hasFlags(Flag.Static)) {
                         return m;
@@ -119,5 +125,44 @@ public class UseStaticImport extends Recipe {
                 }
             };
         }
+    }
+
+    private static boolean methodNameConflicts(String methodName, Cursor cursor) {
+        Cursor cdCursor = cursor.dropParentUntil(it -> it instanceof J.ClassDeclaration || it == Cursor.ROOT_VALUE);
+        Object maybeCd = cdCursor.getValue();
+        if (!(maybeCd instanceof J.ClassDeclaration)) {
+            return false;
+        }
+        J.ClassDeclaration cd = (J.ClassDeclaration) maybeCd;
+        JavaType.FullyQualified ct = cd.getType();
+        if (ct == null) {
+            return false;
+        }
+
+        if(methodNameConflicts(methodName, ct)) {
+            return true;
+        }
+
+        return methodNameConflicts(methodName, cdCursor);
+    }
+
+    private static boolean methodNameConflicts(String methodName, @Nullable JavaType.FullyQualified ct) {
+        if(ct == null) {
+            return false;
+        }
+        for (JavaType.Method method : ct.getMethods()) {
+            if (method.getName().equals(methodName)) {
+                return true;
+            }
+        }
+        if (methodNameConflicts(methodName, ct.getSupertype())) {
+            return true;
+        }
+        for (JavaType.FullyQualified intf : ct.getInterfaces()) {
+            if (methodNameConflicts(methodName, intf)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
