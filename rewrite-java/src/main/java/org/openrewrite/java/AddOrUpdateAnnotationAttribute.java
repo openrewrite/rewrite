@@ -126,6 +126,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 }
                                 return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
                             } else {
+                                // Make the attribute name explicit, before we add the new value below
                                 //noinspection ConstantConditions
                                 return ((J.Annotation) JavaTemplate.builder("value = #{}")
                                         .contextSensitive()
@@ -148,6 +149,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 return ((J.Annotation) JavaTemplate.apply(newAttributeValue, getCursor(), finalA.getCoordinates().replaceArguments()))
                                         .getArguments().get(0);
                             } else {
+                                // Make the attribute name explicit, before we add the new value below
                                 //noinspection ConstantConditions
                                 return ((J.Annotation) JavaTemplate.builder("value = #{any()}")
                                         .contextSensitive()
