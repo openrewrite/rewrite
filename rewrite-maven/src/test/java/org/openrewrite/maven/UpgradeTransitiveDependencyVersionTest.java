@@ -36,45 +36,45 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void singleProject() {
         rewriteRun(
           pomXml(
-                """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>org.openrewrite</groupId>
-                <artifactId>core</artifactId>
-                <version>0.1.0-SNAPSHOT</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.openrewrite</groupId>
-                        <artifactId>rewrite-java</artifactId>
-                        <version>7.0.0</version>
-                    </dependency>
-                </dependencies>
-            </project>
-            """,
             """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>org.openrewrite</groupId>
-                <artifactId>core</artifactId>
-                <version>0.1.0-SNAPSHOT</version>
-                <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.fasterxml.jackson.core</groupId>
-                            <artifactId>jackson-core</artifactId>
-                            <version>2.12.5</version>
-                        </dependency>
-                    </dependencies>
-                </dependencyManagement>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.openrewrite</groupId>
-                        <artifactId>rewrite-java</artifactId>
-                        <version>7.0.0</version>
-                    </dependency>
-                </dependencies>
-            </project>
-            """)
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>core</artifactId>
+                  <version>0.1.0-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.openrewrite</groupId>
+                          <artifactId>rewrite-java</artifactId>
+                          <version>7.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>core</artifactId>
+                  <version>0.1.0-SNAPSHOT</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-core</artifactId>
+                              <version>2.12.5</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.openrewrite</groupId>
+                          <artifactId>rewrite-java</artifactId>
+                          <version>7.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """)
         );
     }
 
@@ -82,21 +82,22 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void leavesDirectDependencyUntouched() {
         rewriteRun(
           pomXml(
-                """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>org.openrewrite</groupId>
-                <artifactId>core</artifactId>
-                <version>0.1.0-SNAPSHOT</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>com.fasterxml.jackson.core</groupId>
-                        <artifactId>jackson-core</artifactId>
-                        <version>2.12.0</version>
-                    </dependency>
-                </dependencies>
-            </project>
-            """)
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>core</artifactId>
+                  <version>0.1.0-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                          <version>2.12.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
         );
     }
 
@@ -111,7 +112,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void upgradeTransitiveDependencyVersion_NewIssue_NotYetFixed() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("commons-codec", "commons-codec", "1.15", null,
-              null, null, null, null, null, null))
+            null, null, null, null, null, null))
 /*            .executionContext(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
@@ -125,17 +126,17 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
                   <modelVersion>4.0.0</modelVersion>
-              
+
                   <parent> <!-- Sets Maven property commons-codec.version = 1.10 -->
                       <groupId>com.ijson.common</groupId>
                       <artifactId>ijson-parent-pom</artifactId>
                       <version>1.0.8</version>
                   </parent>
-                 
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1.0.0</version>
-                 
+
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -148,7 +149,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
-                
+
                   <dependencies>
                       <!-- Pulls in commons-codec transitively -->
                       <dependency>
@@ -164,17 +165,17 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
                   <modelVersion>4.0.0</modelVersion>
-            
+
                   <parent> <!-- Sets Maven property commons-codec.version = 1.10 -->
                       <groupId>com.ijson.common</groupId>
                       <artifactId>ijson-parent-pom</artifactId>
                       <version>1.0.8</version>
                   </parent>
-            
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1.0.0</version>
-            
+
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -192,7 +193,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
-            
+
                   <dependencies>
                       <!-- Pulls in commons-codec transitively -->
                       <dependency>
@@ -213,7 +214,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void upgradeTransitiveDependencyVersion_WorksForMasterPomManagedDeps() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("org.apache.commons", "commons-lang3", "3.14.0", null,
-              null, null, null, null, null, null))
+            null, null, null, null, null, null))
             /*.executionContext(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
@@ -269,7 +270,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
-                  
+
                   <dependencies>
               		<!-- Pulls in commons-lang3 transitively -->
               		<dependency>
@@ -289,7 +290,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void upgradeTransitiveDependencyVersion_WorksForBillOfMaterialsManagedDeps() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("org.springframework.boot", "spring-boot-actuator", "2.7.0", null,
-              null, null, null, null, null, null))
+            null, null, null, null, null, null))
             /*.executionContext(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
@@ -300,37 +301,37 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             )*/,
           pomXml(
             """
-              <project xmlns="http://maven.apache.org/POM/4.0.0"
-               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+               <project xmlns="http://maven.apache.org/POM/4.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
-                  <modelVersion>4.0.0</modelVersion>
+                   <modelVersion>4.0.0</modelVersion>
 
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1.0.0</version>
+                   <groupId>com.mycompany.app</groupId>
+                   <artifactId>my-app</artifactId>
+                   <version>1.0.0</version>
 
-                <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-dependencies</artifactId>
-                            <version>2.5.15</version>
-                            <type>pom</type>
-                            <scope>import</scope>
-                        </dependency>
-                    </dependencies>
-                </dependencyManagement>
-              	
-                <dependencies>
-                    <!-- Pulls in spring-boot-actuator transitively -->
-                    <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-actuator</artifactId>
-                        <version>2.7.0</version>
-                    </dependency>
-                </dependencies>
-              </project>
-             """,
+                 <dependencyManagement>
+                     <dependencies>
+                         <dependency>
+                             <groupId>org.springframework.boot</groupId>
+                             <artifactId>spring-boot-dependencies</artifactId>
+                             <version>2.5.15</version>
+                             <type>pom</type>
+                             <scope>import</scope>
+                         </dependency>
+                     </dependencies>
+                 </dependencyManagement>
+
+                 <dependencies>
+                     <!-- Pulls in spring-boot-actuator transitively -->
+                     <dependency>
+                         <groupId>org.springframework.boot</groupId>
+                         <artifactId>spring-boot-starter-actuator</artifactId>
+                         <version>2.7.0</version>
+                     </dependency>
+                 </dependencies>
+               </project>
+              """,
             """
               <project xmlns="http://maven.apache.org/POM/4.0.0"
                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
