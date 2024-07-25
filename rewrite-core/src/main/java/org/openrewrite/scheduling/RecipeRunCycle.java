@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.unmodifiableSet;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Recipe.PANIC;
 
@@ -105,24 +105,20 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     public LSS generateSources(LSS sourceSet) {
-        List<SourceFile> generatedInThisCycle = allRecipeStack.reduce(sourceSet, recipe, ctx, (acc, recipeStack) -> {
+        Set<SourceFile> generatedInThisCycle = allRecipeStack.reduce(sourceSet, recipe, ctx, (acc, recipeStack) -> {
             Recipe recipe = recipeStack.peek();
             if (recipe instanceof ScanningRecipe) {
                 //noinspection unchecked
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
+                List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableSet(acc), ctx));
                 generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
-                for (SourceFile source : generated) {
-                    if (acc.stream().noneMatch(s -> s.getSourcePath().equals(source.getSourcePath()))) {
-                        acc.add(source);
-                    }
-                }
+                acc.addAll(generated);
                 if (!generated.isEmpty()) {
                     madeChangesInThisCycle.add(recipe);
                 }
             }
             return acc;
-        }, new ArrayList<>());
+        }, new TreeSet<>(Comparator.comparing(SourceFile::getSourcePath)));
 
         // noinspection unchecked
         return (LSS) sourceSet.generate(generatedInThisCycle);

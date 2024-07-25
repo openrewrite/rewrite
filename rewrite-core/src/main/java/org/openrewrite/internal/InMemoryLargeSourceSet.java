@@ -44,8 +44,8 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     }
 
     protected InMemoryLargeSourceSet(@Nullable InMemoryLargeSourceSet initialState,
-                                   @Nullable Map<SourceFile, List<Recipe>> deletions,
-                                   List<SourceFile> ls) {
+                                     @Nullable Map<SourceFile, List<Recipe>> deletions,
+                                     List<SourceFile> ls) {
         this.initialState = initialState;
         this.ls = ls;
         this.deletions = deletions;
@@ -81,8 +81,7 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
             //noinspection ConstantConditions
             return this;
         } else if (ls.isEmpty()) {
-            //noinspection unchecked
-            return withChanges(deletions, (List<SourceFile>) t);
+            return withChanges(deletions, new ArrayList<>(t));
         }
 
         List<SourceFile> newLs = new ArrayList<>(ls);
