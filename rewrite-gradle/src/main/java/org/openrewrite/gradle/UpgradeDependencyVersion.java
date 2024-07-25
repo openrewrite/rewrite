@@ -24,6 +24,7 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
+import org.openrewrite.gradle.util.GradleBuildFileUtils;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
@@ -139,38 +140,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new DependencyVersionState();
     }
 
-    private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(groovy.lang.Closure)");
-    private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
-
-    private static boolean isLikelyDependencyConfiguration(Cursor cursor) {
-        if (!(cursor.getValue() instanceof J.MethodInvocation)) {
-            return false;
-        }
-        J.MethodInvocation m = cursor.getValue();
-        if (DEPENDENCY_CONFIGURATION_MATCHER.matches(m)) {
-            return true;
-        }
-        // If it's a configuration created by a plugin, we may not be able to type-attribute it
-        // In the absence of type-attribution use its presence within a dependencies block to approximate
-        if (m.getType() != null) {
-            return false;
-        }
-        while (cursor != null) {
-            if (cursor.getValue() instanceof J.MethodInvocation) {
-                m = cursor.getValue();
-                String methodName = m.getSimpleName();
-                if ("constraints".equals(methodName) || "project".equals(methodName) || "modules".equals(methodName)
-                    || "module".equals(methodName) || "file".equals(methodName) || "files".equals(methodName)) {
-                    return false;
-                }
-                if (DEPENDENCY_DSL_MATCHER.matches(m)) {
-                    return true;
-                }
-            }
-            cursor = cursor.getParent();
-        }
-        return false;
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
@@ -190,7 +159,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (isLikelyDependencyConfiguration(getCursor())) {
+                if (GradleBuildFileUtils.isLikelyDependencyConfiguration(getCursor())) {
                     if (m.getArguments().get(0) instanceof G.MapEntry) {
                         String groupId = null;
                         String artifactId = null;
@@ -400,7 +369,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return method;
             }
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-            if (isLikelyDependencyConfiguration(getCursor())) {
+            if (GradleBuildFileUtils.isLikelyDependencyConfiguration(getCursor())) {
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m, ctx);
