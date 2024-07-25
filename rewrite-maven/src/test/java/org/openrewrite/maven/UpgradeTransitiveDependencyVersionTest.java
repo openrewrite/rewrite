@@ -301,36 +301,36 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             )*/,
           pomXml(
             """
-               <project xmlns="http://maven.apache.org/POM/4.0.0"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+              <project xmlns="http://maven.apache.org/POM/4.0.0"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
-                   <modelVersion>4.0.0</modelVersion>
+                  <modelVersion>4.0.0</modelVersion>
 
-                   <groupId>com.mycompany.app</groupId>
-                   <artifactId>my-app</artifactId>
-                   <version>1.0.0</version>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
 
-                 <dependencyManagement>
-                     <dependencies>
-                         <dependency>
-                             <groupId>org.springframework.boot</groupId>
-                             <artifactId>spring-boot-dependencies</artifactId>
-                             <version>2.5.15</version>
-                             <type>pom</type>
-                             <scope>import</scope>
-                         </dependency>
-                     </dependencies>
-                 </dependencyManagement>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-dependencies</artifactId>
+                            <version>2.5.15</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
 
-                 <dependencies>
-                     <!-- Pulls in spring-boot-actuator transitively -->
-                     <dependency>
-                         <groupId>org.springframework.boot</groupId>
-                         <artifactId>spring-boot-starter-actuator</artifactId>
-                         <version>2.7.0</version>
-                     </dependency>
-                 </dependencies>
-               </project>
+                <dependencies>
+                    <!-- Pulls in spring-boot-actuator transitively -->
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-actuator</artifactId>
+                        <version>2.7.0</version>
+                    </dependency>
+                </dependencies>
+              </project>
               """,
             """
               <project xmlns="http://maven.apache.org/POM/4.0.0"
