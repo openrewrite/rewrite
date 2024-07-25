@@ -121,7 +121,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }, new TreeSet<>(Comparator.comparing(SourceFile::getSourcePath)));
 
         // noinspection unchecked
-        return (LSS) sourceSet.generate(generatedInThisCycle);
+        return (LSS) sourceSet.generate(new ArrayList<>(generatedInThisCycle));
     }
 
     public LSS editSources(LSS sourceSet) {
