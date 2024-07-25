@@ -394,8 +394,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
     @Test
     void implicitValueToExplicitValue() {
-        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null))
-            .expectedCyclesThatMakeChanges(2),
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null)),
           java(
             """
               package org.junit;
@@ -432,8 +431,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
     @Test
     void implicitValueToExplicitValueClass() {
-        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null))
-            .expectedCyclesThatMakeChanges(2),
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null)),
           java(
             """
               package org.junit;

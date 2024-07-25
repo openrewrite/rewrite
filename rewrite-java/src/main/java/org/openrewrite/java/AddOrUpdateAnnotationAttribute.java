@@ -95,7 +95,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
                 } else {
                     // First assume the value exists amongst the arguments and attempt to update it
-                    AtomicBoolean foundAttributeWithDesiredValue = new AtomicBoolean(false);
+                    AtomicBoolean foundOrSetAttributeWithDesiredValue = new AtomicBoolean(false);
                     final J.Annotation finalA = a;
                     List<Expression> newArgs = ListUtils.map(currentArgs, it -> {
                         if (it instanceof J.Assignment) {
@@ -104,24 +104,24 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             if (attributeName == null || !attributeName.equals(var.getSimpleName())) {
                                 return it;
                             }
+                            foundOrSetAttributeWithDesiredValue.set(true);
                             J.Literal value = (J.Literal) as.getAssignment();
                             if (newAttributeValue == null) {
                                 return null;
                             }
                             if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
-                                foundAttributeWithDesiredValue.set(true);
                                 return it;
                             }
                             return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
                         } else if (it instanceof J.Literal) {
                             // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
                             if (attributeName == null || "value".equals(attributeName)) {
+                                foundOrSetAttributeWithDesiredValue.set(true);
                                 if (newAttributeValue == null) {
                                     return null;
                                 }
                                 J.Literal value = (J.Literal) it;
                                 if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
-                                    foundAttributeWithDesiredValue.set(true);
                                     return it;
                                 }
                                 return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
@@ -136,12 +136,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         } else if (it instanceof J.FieldAccess) {
                             // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
                             if (attributeName == null || "value".equals(attributeName)) {
+                                foundOrSetAttributeWithDesiredValue.set(true);
                                 if (newAttributeValue == null) {
                                     return null;
                                 }
                                 J.FieldAccess value = (J.FieldAccess) it;
                                 if (newAttributeValue.equals(value.toString()) || Boolean.TRUE.equals(addOnly)) {
-                                    foundAttributeWithDesiredValue.set(true);
                                     return it;
                                 }
                                 //noinspection ConstantConditions
@@ -158,8 +158,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         }
                         return it;
                     });
-                    if (foundAttributeWithDesiredValue.get() || newArgs != currentArgs) {
-                        return a.withArguments(newArgs);
+                    if (newArgs != currentArgs) {
+                        a = a.withArguments(newArgs);
+                    }
+                    if (foundOrSetAttributeWithDesiredValue.get()) {
+                        return a;
                     }
                     // There was no existing value to update, so add a new value into the argument list
                     String effectiveName = (attributeName == null) ? "value" : attributeName;
@@ -167,10 +170,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")
                             .contextSensitive()
                             .build()
-                            .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue)
-                    ).getArguments().get(0);
-                    List<Expression> newArguments = ListUtils.concat(as, a.getArguments());
-                    a = a.withArguments(newArguments);
+                            .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue))
+                            .getArguments().get(0);
+                    a = a.withArguments(ListUtils.concat(as, a.getArguments()));
                     a = autoFormat(a, ctx);
                 }
 
