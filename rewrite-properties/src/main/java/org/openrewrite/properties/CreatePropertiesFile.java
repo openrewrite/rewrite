@@ -91,7 +91,7 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(file.getSourcePath())) {
+                if (Boolean.TRUE.equals(overwriteExisting) &&path.equals(file.getSourcePath())) {
                     if (StringUtils.isBlank(fileContents)) {
                         return file.withContent(emptyList());
                     }
