@@ -99,4 +99,3 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         return !isDependency();
     }
 }
-
