@@ -241,8 +241,8 @@ class FindAndReplaceLiteralTest implements RewriteTest {
         );
     }
 
-        @Value
-        @EqualsAndHashCode(callSuper = false)
+    @Value
+    @EqualsAndHashCode(callSuper = false)
     static class MultiFindAndReplaceLiteral extends Recipe {
 
         @Override
