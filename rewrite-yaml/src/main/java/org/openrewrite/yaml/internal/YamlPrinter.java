@@ -201,6 +201,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         }
     }
 
+    // todo if we can keep the current indentation in the context of the printer that would save some cpu cycles
     private int countCurrentIndentation(PrintOutputCapture<P> printOutputCapture) {
         String[] lines = printOutputCapture.out.toString().split("\n");
         String lastLine = lines[lines.length - 1];
