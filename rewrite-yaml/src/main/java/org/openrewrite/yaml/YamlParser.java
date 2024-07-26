@@ -224,6 +224,13 @@ public class YamlParser implements org.openrewrite.Parser {
                                     newLine = "\n";
                                     scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
                                 }
+                                String[] lines = scalarValue.split("\n");
+                                StringBuilder sb = new StringBuilder(lines[0]);
+                                int indentToRemove = blockStack.size() * 2; // todo this should use the parent's prefix in stead of expecting the prefix size of 2
+                                for (int i=1; i<lines.length; i++) {
+                                    sb.append("\n").append(lines[i].substring(indentToRemove));
+                                }
+                                scalarValue = sb.toString();
                                 break;
                             default:
                                 scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);

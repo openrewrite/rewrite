@@ -1137,6 +1137,36 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
+    void addLiteralStyleBlockAtRoot() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.",
+              // language=yaml
+              """
+                script: |
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+              script: |
+                #!/bin/bash
+                echo "hello"
+              """)
+        );
+    }
+
+    @Test
     void addLiteralStyleBlock() {
         rewriteRun(
           spec -> spec

@@ -131,12 +131,18 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
                         .append('\'');
                 break;
             case LITERAL:
-                p.append('|')
-                        .append(scalar.getValue());
+                String[] lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
+                p.append('|').append(lines[0]);
+                for (int i=1; i<lines.length; i++) {
+                    p.append("\n").append("      ").append(lines[i]); // todo somehow get the prefix
+                }
                 break;
             case FOLDED:
-                p.append('>')
-                        .append(scalar.getValue());
+                lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
+                p.append('>').append(lines[0]);
+                for (int i=1; i<lines.length; i++) {
+                    p.append("\n").append("      ").append(lines[i]);
+                }
                 break;
             case PLAIN:
             default:
