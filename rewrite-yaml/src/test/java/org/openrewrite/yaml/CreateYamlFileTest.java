@@ -224,7 +224,8 @@ class CreateYamlFileTest implements RewriteTest {
                   fileContents: |
                     content: yes
             """, "org.openrewrite.CreateYamlPrecondition"),
-          yaml("""
+          yaml(
+                """
             foo: bar
             """, spec -> spec.path("precondition.yml")),
           yaml(
