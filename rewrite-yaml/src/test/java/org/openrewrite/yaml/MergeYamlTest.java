@@ -20,6 +20,8 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import java.nio.file.Path;
+
 import static org.openrewrite.yaml.Assertions.yaml;
 
 @SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
@@ -1133,6 +1135,79 @@ class MergeYamlTest implements RewriteTest {
                   initially: true
               """
           )
+        );
+    }
+
+    @Test
+    void updateOnly() {
+        rewriteRun(
+          spec -> spec
+            .recipeFromYaml(
+              //language=yaml
+              """
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: org.openrewrite.Update
+                displayName: Update only
+                description: Update a yaml file.
+                recipeList:
+                  - org.openrewrite.yaml.MergeYaml:
+                        key: $.some.object
+                        yaml: |
+                          other: A new value
+                ""","org.openrewrite.Update"),
+          yaml(
+            //language=yaml
+            """
+            some:
+              object:
+                with: An existing value
+            """,
+            //language=yaml
+            """
+              some:
+                object:
+                  with: An existing value
+                  other: A new value
+              """, spec -> spec.path(Path.of("updated.yml")))
+        );
+    }
+
+    @Test
+    void createAndUpdate() {
+        rewriteRun(
+          spec -> spec
+            .recipeFromYaml(
+              //language=yaml
+              """
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: org.openrewrite.CreateAndUpdate
+                displayName: Create and update
+                description: Create a file and update it.
+                recipeList:
+                  - org.openrewrite.text.CreateTextFile:
+                      relativeFileName: created.yml
+                      overwriteExisting: false
+                      fileContents: |
+                        some:
+                          object:
+                            with: An existing value
+                  - org.openrewrite.yaml.MergeYaml:
+                        key: $.some.object
+                        yaml: |-
+                          other: A new value
+                ""","org.openrewrite.CreateAndUpdate"),
+          yaml(
+            //language=yaml
+            null,
+            //language=yaml
+            """
+              some:
+                object:
+                  with: An existing value
+                  other: A new value
+              """, spec -> spec.path(Path.of("created.yml")))
         );
     }
 }
