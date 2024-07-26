@@ -53,6 +53,7 @@ public class Semver {
                 .or(TildeRange.build(toVersion, metadataPattern))
                 .or(CaretRange.build(toVersion, metadataPattern))
                 .or(SetRange.build(toVersion, metadataPattern))
+                .or(ExactVersionWithPattern.build(toVersion, metadataPattern))
                 .or(ExactVersion.build(toVersion))
         );
     }

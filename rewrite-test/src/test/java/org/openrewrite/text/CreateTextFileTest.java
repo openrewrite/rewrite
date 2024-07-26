@@ -21,6 +21,8 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import java.nio.file.Path;
+
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -126,6 +128,31 @@ class CreateTextFileTest implements RewriteTest {
             after,
             spec -> spec.path("Jenkinsfile")
           )
+        );
+    }
+
+    @Test
+    void shouldNotOverrideIfCreatedInSameRun() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.test.CreateTextFileDuplication
+            displayName: Create Text File test recipe
+            description: Create Text File test recipe.
+            recipeList:
+              - org.openrewrite.text.CreateTextFile:
+                  relativeFileName: duplicate.txt
+                  overwriteExisting: false
+                  fileContents: |
+                    hi
+              - org.openrewrite.text.CreateTextFile:
+                  relativeFileName: duplicate.txt
+                  overwriteExisting: false
+                  fileContents: |
+                    hello
+            """, "org.openrewrite.test.CreateTextFileDuplication"),
+          text(null, "hi", spec -> spec.path(Path.of("duplicate.txt")))
         );
     }
 }

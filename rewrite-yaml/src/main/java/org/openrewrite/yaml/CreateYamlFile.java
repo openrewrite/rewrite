@@ -87,7 +87,7 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            return YamlParser.builder().build().parse("")
+            return YamlParser.builder().build().parse(getYamlContents(ctx))
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
         }
@@ -98,13 +98,12 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
         Path path = Paths.get(relativeFileName);
         return new YamlVisitor<ExecutionContext>() {
+
             @Override
             public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(documents.getSourcePath())) {
-                    @Language("yml") String yamlContents = fileContents;
-                    if (yamlContents == null && fileContentsUrl != null) {
-                        yamlContents = Remote.builder(path, URI.create(fileContentsUrl)).build().printAll(ctx);
-                    }
+                if (Boolean.TRUE.equals(overwriteExisting) && path.equals(documents.getSourcePath())) {
+                    @Language("yml")
+                    String yamlContents = getYamlContents(ctx);
                     if (StringUtils.isBlank(yamlContents)) {
                         return documents.withDocuments(emptyList());
                     }
@@ -124,5 +123,14 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
                 return documents;
             }
         };
+    }
+
+    @Language("yml")
+    private String getYamlContents(ExecutionContext ctx) {
+        @Language("yml") String yamlContents = fileContents;
+        if (yamlContents == null && fileContentsUrl != null) {
+            yamlContents = Remote.builder(Paths.get(relativeFileName), URI.create(fileContentsUrl)).build().printAll(ctx);
+        }
+        return yamlContents == null ? "" : yamlContents;
     }
 }

@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.unmodifiableSet;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Recipe.PANIC;
 
@@ -105,12 +105,12 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     public LSS generateSources(LSS sourceSet) {
-        List<SourceFile> generatedInThisCycle = allRecipeStack.reduce(sourceSet, recipe, ctx, (acc, recipeStack) -> {
+        Set<SourceFile> generatedInThisCycle = allRecipeStack.reduce(sourceSet, recipe, ctx, (acc, recipeStack) -> {
             Recipe recipe = recipeStack.peek();
             if (recipe instanceof ScanningRecipe) {
                 //noinspection unchecked
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
+                List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableSet(acc), ctx));
                 generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
                 acc.addAll(generated);
                 if (!generated.isEmpty()) {
@@ -118,10 +118,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 }
             }
             return acc;
-        }, new ArrayList<>());
+        }, new TreeSet<>(Comparator.comparing(SourceFile::getSourcePath)));
 
         // noinspection unchecked
-        return (LSS) sourceSet.generate(generatedInThisCycle);
+        return (LSS) sourceSet.generate(new ArrayList<>(generatedInThisCycle));
     }
 
     public LSS editSources(LSS sourceSet) {
@@ -238,7 +238,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     private @Nullable SourceFile handleError(Recipe recipe, SourceFile sourceFile, @Nullable SourceFile after,
-                                   Throwable t) {
+                                             Throwable t) {
         ctx.getOnError().accept(t);
 
         if (t instanceof RecipeRunException) {
