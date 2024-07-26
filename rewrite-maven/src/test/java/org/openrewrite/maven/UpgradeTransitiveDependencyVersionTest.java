@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -74,7 +75,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>
-              """)
+              """
+          )
         );
     }
 
@@ -109,18 +111,11 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         See the XML comments in the "before" XML below.
     */
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4274")
     void upgradeTransitiveDependencyVersion_NewIssue_NotYetFixed() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("commons-codec", "commons-codec", "1.15", null,
-            null, null, null, null, null, null))
-/*            .executionContext(
-              MavenExecutionContextView
-                .view(new InMemoryExecutionContext())
-                .setRepositories(List.of(
-                  MavenRepository.builder().id("jenkins").uri(myOrganizationsInternalMavenRepoURL).build()
-                ))
-
-            )*/,
+            null, null, null, null, null, null)),
           pomXml(
             """
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -159,7 +154,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>
-
               """,
             """
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -203,7 +197,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>
-
               """
           )
         );
@@ -214,15 +207,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void upgradeTransitiveDependencyVersion_WorksForMasterPomManagedDeps() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("org.apache.commons", "commons-lang3", "3.14.0", null,
-            null, null, null, null, null, null))
-            /*.executionContext(
-              MavenExecutionContextView
-                .view(new InMemoryExecutionContext())
-                .setRepositories(List.of(
-                  MavenRepository.builder().id("jenkins").uri(myOrganizationsInternalMavenRepoURL).build()
-                ))
-
-            )*/,
+            null, null, null, null, null, null)),
           pomXml(
             """
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -290,15 +275,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void upgradeTransitiveDependencyVersion_WorksForBillOfMaterialsManagedDeps() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("org.springframework.boot", "spring-boot-actuator", "2.7.0", null,
-            null, null, null, null, null, null))
-            /*.executionContext(
-              MavenExecutionContextView
-                .view(new InMemoryExecutionContext())
-                .setRepositories(List.of(
-                  MavenRepository.builder().id("jenkins").uri(myOrganizationsInternalMavenRepoURL).build()
-                ))
-
-            )*/,
+            null, null, null, null, null, null)),
           pomXml(
             """
               <project xmlns="http://maven.apache.org/POM/4.0.0"
