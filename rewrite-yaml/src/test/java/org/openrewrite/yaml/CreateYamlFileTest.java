@@ -208,4 +208,63 @@ class CreateYamlFileTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void shouldCreateYamlFromYamlRecipe() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.CreateYamlPrecondition
+            displayName: Create yaml file with precondition
+            description: Create a yaml file with a precondition.
+            recipeList:
+              - org.openrewrite.yaml.CreateYamlFile:
+                  relativeFileName: created.yml
+                  overwriteExisting: false
+                  fileContents: |
+                    content: yes
+            """, "org.openrewrite.CreateYamlPrecondition"),
+          yaml("""
+            foo: bar
+            """, spec -> spec.path("precondition.yml")),
+          yaml(
+            null,
+            """
+                    content: yes
+                    """,
+            spec -> spec.path("created.yml")
+          )
+        );
+    }
+
+    @Test
+    void shouldCreateYamlFromYamlRecipeWithPrecondition() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.CreateYamlPrecondition
+            displayName: Create yaml file with precondition
+            description: Create a yaml file with a precondition.
+            preconditions:
+              - org.openrewrite.FindSourceFiles:
+                  filePattern: "**/precondition.yml"
+            recipeList:
+              - org.openrewrite.yaml.CreateYamlFile:
+                  relativeFileName: created.yml
+                  overwriteExisting: false
+                  fileContents: |
+                    content: yes
+            """, "org.openrewrite.CreateYamlPrecondition"),
+          yaml("""
+            foo: bar
+            """, spec -> spec.path("precondition.yml")),
+          yaml(
+            null,
+            """
+                    content: yes
+                    """,
+            spec -> spec.path("created.yml")
+          )
+        );
+    }
 }
