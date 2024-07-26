@@ -132,15 +132,20 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
                 break;
             case LITERAL:
                 String[] lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
+                int indent = countCurrentIndentation(p) + 2;
                 p.append('|').append(lines[0]);
-                for (int i=1; i<lines.length; i++) {
-                    p.append("\n").append("      ").append(lines[i]); // todo somehow get the prefix
+                for (int i = 1; i < lines.length; i++) {
+                    p.append("\n");
+                    for (int j = 0; j < indent; j++) {
+                        p.append(" ");
+                    }
+                    p.append(lines[i]);
                 }
                 break;
             case FOLDED:
                 lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
                 p.append('>').append(lines[0]);
-                for (int i=1; i<lines.length; i++) {
+                for (int i = 1; i < lines.length; i++) {
                     p.append("\n").append("      ").append(lines[i]);
                 }
                 break;
@@ -194,5 +199,19 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         for (Marker marker : y.getMarkers().getMarkers()) {
             p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), YAML_MARKER_WRAPPER));
         }
+    }
+
+    private int countCurrentIndentation(PrintOutputCapture<P> printOutputCapture) {
+        String[] lines = printOutputCapture.out.toString().split("\n");
+        String lastLine = lines[lines.length - 1];
+        int leadingSpacesCount = 0;
+        for (char c : lastLine.toCharArray()) {
+            if (c == ' ') {
+                leadingSpacesCount++;
+            } else {
+                break;
+            }
+        }
+        return leadingSpacesCount;
     }
 }
