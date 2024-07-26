@@ -44,8 +44,8 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     }
 
     protected InMemoryLargeSourceSet(@Nullable InMemoryLargeSourceSet initialState,
-                                   @Nullable Map<SourceFile, List<Recipe>> deletions,
-                                   List<SourceFile> ls) {
+                                     @Nullable Map<SourceFile, List<Recipe>> deletions,
+                                     List<SourceFile> ls) {
         this.initialState = initialState;
         this.ls = ls;
         this.deletions = deletions;

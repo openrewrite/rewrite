@@ -1482,4 +1482,52 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepVersionIfManagedIsNonExact() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework</groupId>
+                              <artifactId>spring-web</artifactId>
+                              <version>[5,6)</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                    <project>
+                        <parent>
+                            <groupId>org.example</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1.0-SNAPSHOT</version>
+                        </parent>
+                        <artifactId>child</artifactId>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework</groupId>
+                                <artifactId>spring-web</artifactId>
+                                <version>5.3.0</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
 }
