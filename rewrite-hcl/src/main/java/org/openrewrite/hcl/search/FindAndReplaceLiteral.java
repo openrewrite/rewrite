@@ -40,22 +40,22 @@ public class FindAndReplaceLiteral extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find and replace string literals in HCL files";
+        return "Find and replace literals in HCL files";
     }
 
     @Override
     public String getDescription() {
-        return "Find and replace string literal values in HCL files. This recipe parses the source files on which it runs"
+        return "Find and replace literal values in HCL files. This recipe parses the source files on which it runs"
                 + "as HCL, meaning you can execute HCL language-specific recipes before and after this recipe in a single recipe run.";
     }
 
     @Option(
-            displayName = "Find", description= "The string literal to find (and replace)", example = "blacklist"
+            displayName = "Find", description= "The literal to find (and replace)", example = "blacklist"
     )
     private final String find;
 
     @Option(displayName = "Replace",
-            description = "The replacement string literal for `find`. This snippet can be multiline.",
+            description = "The replacement literal for `find`. This snippet can be multiline.",
             example = "denylist",
             required = false)
     private final @Nullable String replace;
