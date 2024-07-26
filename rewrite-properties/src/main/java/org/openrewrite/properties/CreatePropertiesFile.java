@@ -78,7 +78,7 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            return PropertiesParser.builder().build().parse(!StringUtils.isBlank(fileContents) ? fileContents : "")
+            return PropertiesParser.builder().build().parse(fileContents == null ? "" : fileContents)
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
         }
@@ -91,7 +91,7 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(file.getSourcePath())) {
+                if (Boolean.TRUE.equals(overwriteExisting) &&path.equals(file.getSourcePath())) {
                     if (StringUtils.isBlank(fileContents)) {
                         return file.withContent(emptyList());
                     }
