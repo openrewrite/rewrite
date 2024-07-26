@@ -278,11 +278,11 @@ class FindAndReplaceLiteralTest implements RewriteTest {
             }
             """,
             """
-               config = {
-                 app_deployment = {
-                   cluster_name = "cluster-4"
-                 }
-               }
+            config = {
+              app_deployment = {
+                cluster_name = "cluster-4"
+              }
+            }
             """
           )
         );

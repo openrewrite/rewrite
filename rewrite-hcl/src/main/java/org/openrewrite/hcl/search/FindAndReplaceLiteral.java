@@ -105,7 +105,7 @@ public class FindAndReplaceLiteral extends Recipe {
         TreeVisitor<?, ExecutionContext> visitor = new HclIsoVisitor<ExecutionContext>(){
 
             @Override
-            public Hcl.Literal visitLiteral(final Hcl.Literal literal, final ExecutionContext executionContext) {
+            public Hcl.Literal visitLiteral(final Hcl.Literal literal, final ExecutionContext ctx) {
                 for(Marker marker : literal.getMarkers().getMarkers()) {
                     if (marker instanceof AlreadyReplaced) {
                         AlreadyReplaced alreadyReplaced = (AlreadyReplaced) marker;
