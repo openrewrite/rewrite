@@ -36,6 +36,8 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -98,10 +100,23 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         return new GradleDependency(
                                 cursor,
                                 new ResolvedGroupArtifactVersion(parts.get("group"), parts.get("name"), parts.get("version")));
+                    } else if (firstArg instanceof G.GString) {
+                        G.GString gString = (G.GString) firstArg;
+                        List<String> strings = gString.getStrings().stream()
+                                .flatMap(s -> s instanceof J.Literal ?
+                                        Stream.of(((J.Literal) s).getValue().toString().split(":")) :
+                                        Stream.of("${" + ((G.GString.Value) s).getTree().toString() + "}"))
+                                .collect(Collectors.toList());
+                        String group = !strings.isEmpty() ? strings.get(0) : null;
+                        String artifact = strings.size() > 1 ? strings.get(1) : null;
+                        String version = strings.size() > 2 ? strings.get(2) : null;
+                        return new GradleDependency(
+                                cursor,
+                                new ResolvedGroupArtifactVersion(group, artifact, version));
                     } else if (firstArg instanceof J.Literal &&
                             ((J.Literal) firstArg).getValue() instanceof String) {
                         // Format: implementation "commons-lang:commons-lang:2.6"
-                        String gav = ((String)((J.Literal) arguments.get(0)).getValue());
+                        String gav = ((String)((J.Literal) firstArg).getValue());
                         String[] parts = gav.split(":");
                         String group = parts[0];
                         String artifact = parts[1];
@@ -113,12 +128,12 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         String artifact = "";
                         try {
                             artifact = ((J.Literal)((J.MethodInvocation) firstArg).getArguments().get(0)).getValue().toString();
+                            return new GradleDependency(
+                                    cursor,
+                                    new ResolvedGroupArtifactVersion(null, artifact, null));
                         } catch (Exception e) {
                             // todo log it
                         }
-                        return new GradleDependency(
-                                cursor,
-                                new ResolvedGroupArtifactVersion(null, artifact, null));
                     }
                 }
                 // If it's a configuration created by a plugin, we may not be able to type-attribute it

@@ -48,6 +48,7 @@ class GradleDependencyTest implements RewriteTest {
               
               dependencies {
                   implementation project(':api')
+                  implementation "commons-lang:commons-lang5:${commonsLangVersion}"
 
                   implementation "commons-lang:commons-lang3"
                   implementation "commons-lang:commons-lang:2.6"
@@ -65,6 +66,7 @@ class GradleDependencyTest implements RewriteTest {
               
               dependencies {
                   /*~~(::api)~~>*/implementation project(':api')
+                  /*~~(commons-lang:commons-lang5:${commonsLangVersion})~~>*/implementation "commons-lang:commons-lang5:${commonsLangVersion}"
               
                   /*~~(commons-lang:commons-lang3)~~>*/implementation "commons-lang:commons-lang3"
                   /*~~(commons-lang:commons-lang:2.6)~~>*/implementation "commons-lang:commons-lang:2.6"
