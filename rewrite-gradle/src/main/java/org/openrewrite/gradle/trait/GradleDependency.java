@@ -72,7 +72,13 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 J.MethodInvocation methodInvocation = cursor.getValue();
                 if (DEPENDENCY_CONFIGURATION_MATCHER.matches(methodInvocation)) {
                     List<Expression> arguments = methodInvocation.getArguments();
-                    if (!arguments.isEmpty() && arguments.get(0) instanceof G.MapEntry) {
+                    if (arguments.isEmpty()) {
+                        return null;
+                    }
+
+                    Object firstArg = arguments.get(0);
+
+                    if (firstArg instanceof G.MapEntry) {
                         // Format: implementation group: "commons-lang":commons-lang:2.6"
                         Map<String, String> parts = new HashMap<>();
                         arguments
@@ -92,9 +98,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         return new GradleDependency(
                                 cursor,
                                 new ResolvedGroupArtifactVersion(parts.get("group"), parts.get("name"), parts.get("version")));
-                    } else if (!arguments.isEmpty() &&
-                            arguments.get(0) instanceof J.Literal &&
-                            ((J.Literal) arguments.get(0)).getValue() instanceof String) {
+                    } else if (firstArg instanceof J.Literal &&
+                            ((J.Literal) firstArg).getValue() instanceof String) {
                         // Format: implementation "commons-lang:commons-lang:2.6"
                         String gav = ((String)((J.Literal) arguments.get(0)).getValue());
                         String[] parts = gav.split(":");
@@ -104,6 +109,16 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         return new GradleDependency(
                                 cursor,
                                 new ResolvedGroupArtifactVersion(group, artifact, version));
+                    } else if (firstArg instanceof J.MethodInvocation) {
+                        String artifact = "";
+                        try {
+                            artifact = ((J.Literal)((J.MethodInvocation) firstArg).getArguments().get(0)).getValue().toString();
+                        } catch (Exception e) {
+                            // todo log it
+                        }
+                        return new GradleDependency(
+                                cursor,
+                                new ResolvedGroupArtifactVersion(null, artifact, null));
                     }
                 }
                 // If it's a configuration created by a plugin, we may not be able to type-attribute it
