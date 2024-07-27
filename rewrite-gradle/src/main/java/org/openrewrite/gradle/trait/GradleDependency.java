@@ -71,11 +71,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
                 J.MethodInvocation methodInvocation = cursor.getValue();
                 if (DEPENDENCY_CONFIGURATION_MATCHER.matches(methodInvocation)) {
-                    // todo cant really use toString
-                    String methodAsString = methodInvocation.toString();
-                    if (methodAsString.contains("group") && methodAsString.contains("name")) {
+                    List<Expression> arguments = methodInvocation.getArguments();
+                    if (!arguments.isEmpty() && arguments.get(0) instanceof G.MapEntry) {
+                        // Format: implementation group: "commons-lang":commons-lang:2.6"
                         Map<String, String> parts = new HashMap<>();
-                        methodInvocation.getArguments()
+                        arguments
                                 .forEach(arg -> {
                                     G.MapEntry mapEntry = (G.MapEntry) arg;
                                     String key = mapEntry.getKey().toString();
@@ -92,16 +92,15 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         return new GradleDependency(
                                 cursor,
                                 new ResolvedGroupArtifactVersion(parts.get("group"), parts.get("name"), parts.get("version")));
-                    } else {
+                    } else if (!arguments.isEmpty() &&
+                            arguments.get(0) instanceof J.Literal &&
+                            ((J.Literal) arguments.get(0)).getValue() instanceof String) {
                         // Format: implementation "commons-lang:commons-lang:2.6"
-                        String gav = methodAsString.replaceAll("\"", "'");
-                        int start = gav.indexOf("'") + 1;
-                        int end = gav.lastIndexOf("'");
-                        gav = gav.substring(start, end);
+                        String gav = ((String)((J.Literal) arguments.get(0)).getValue());
                         String[] parts = gav.split(":");
                         String group = parts[0];
                         String artifact = parts[1];
-                        String version = parts[2];
+                        String version = parts.length > 2 ? parts[2] : null;
                         return new GradleDependency(
                                 cursor,
                                 new ResolvedGroupArtifactVersion(group, artifact, version));

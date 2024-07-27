@@ -4,6 +4,7 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 
 import java.io.Serializable;
 import java.util.Objects;
@@ -27,11 +28,14 @@ public class ResolvedGroupArtifactVersion implements Serializable {
 
     @Override
     public String toString() {
-        return groupId + ":" + artifactId + ":" + version;
-//        return groupId + ":" + artifactId + ":" + (datedSnapshotVersion == null ? version : datedSnapshotVersion);
+        return asGroupArtifactVersion().toString();
     }
 
-//    public GroupArtifact asGroupArtifact() {
+    public GroupArtifactVersion asGroupArtifactVersion() {
+        return new GroupArtifactVersion(groupId, artifactId, version);
+    }
+
+    //    public GroupArtifact asGroupArtifact() {
 //        return new GroupArtifact(groupId, artifactId);
 //    }
 

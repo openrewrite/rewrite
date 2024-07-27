@@ -47,6 +47,7 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
+                  implementation "commons-lang:commons-lang3"
                   implementation "commons-lang:commons-lang:2.6"
                   implementation group: "commons-lang", name: "commons-lang", version: "2.6"
               }
@@ -61,6 +62,7 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
+                  /*~~(commons-lang:commons-lang3)~~>*/implementation "commons-lang:commons-lang3"
                   /*~~(commons-lang:commons-lang:2.6)~~>*/implementation "commons-lang:commons-lang:2.6"
                   /*~~(commons-lang:commons-lang:2.6)~~>*/implementation group: "commons-lang", name: "commons-lang", version: "2.6"
               }
