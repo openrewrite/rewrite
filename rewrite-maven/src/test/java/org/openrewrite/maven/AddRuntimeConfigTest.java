@@ -25,7 +25,7 @@ import static org.openrewrite.maven.AddRuntimeConfig.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class AddRuntimeConfigTest implements RewriteTest {
+class AddRuntimeConfigTest implements RewriteTest {
     private static final SourceSpecs POM_XML_SOURCE_SPEC = pomXml(
         """
           <project>
