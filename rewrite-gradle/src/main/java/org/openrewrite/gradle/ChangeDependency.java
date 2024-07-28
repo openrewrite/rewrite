@@ -180,10 +180,10 @@ public class ChangeDependency extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                GradleDependency gradleDependency = new GradleDependency(getCursor(), null);
-//                if (gradleDependency.isNotDependency()) {
-//                    return m;
-//                }
+                GradleDependency gradleDependency = new GradleDependency(getCursor());
+                if (gradleDependency.getResolvedGroupArtifactVersion() == null) {
+                    return m;
+                }
 
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {

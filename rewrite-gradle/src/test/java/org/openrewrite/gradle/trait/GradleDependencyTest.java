@@ -29,7 +29,7 @@ class GradleDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(RewriteTest.toRecipe(() -> gradleDependency().asVisitor(dep ->
-          SearchResult.found(dep.getTree(), dep.getResolvedDependency().toString()))));
+          SearchResult.found(dep.getTree(), dep.getResolvedGroupArtifactVersion().toString()))));
     }
 
     @Test
