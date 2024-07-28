@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeType extends Recipe {
 
     @Option(displayName = "Old fully-qualified type name",
@@ -56,6 +56,20 @@ public class ChangeType extends Recipe {
     @Override
     public String getDisplayName() {
         return "Change type";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        String oldShort = oldFullyQualifiedTypeName.substring(oldFullyQualifiedTypeName.lastIndexOf('.') + 1);
+        String newShort = newFullyQualifiedTypeName.substring(newFullyQualifiedTypeName.lastIndexOf('.') + 1);
+        if (oldShort.equals(newShort)) {
+            return String.format("`%s` to `%s`",
+                    oldFullyQualifiedTypeName,
+                    newFullyQualifiedTypeName);
+        } else {
+            return String.format("`%s` to `%s`",
+                    oldShort, newShort);
+        }
     }
 
     @Override
@@ -85,8 +99,10 @@ public class ChangeType extends Recipe {
     private static class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
+
         @Nullable
         private J.Identifier importAlias;
+
         @Nullable
         private final Boolean ignoreDefinition;
 
@@ -103,7 +119,7 @@ public class ChangeType extends Recipe {
         @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
-                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                JavaSourceFile cu = (JavaSourceFile) tree;
                 if (!Boolean.TRUE.equals(ignoreDefinition)) {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
                     if (fq != null) {
@@ -158,12 +174,20 @@ public class ChangeType extends Recipe {
         @Override
         public @Nullable J postVisit(J tree, ExecutionContext ctx) {
             J j = super.postVisit(tree, ctx);
-            if (j instanceof J.MethodDeclaration) {
+            if (j instanceof J.ArrayType) {
+                J.ArrayType arrayType = (J.ArrayType) j;
+                JavaType type = updateType(arrayType.getType());
+                j = arrayType.withType(type);
+            } else if (j instanceof J.MethodDeclaration) {
                 J.MethodDeclaration method = (J.MethodDeclaration) j;
-                j = method.withMethodType(updateType(method.getMethodType()));
+                JavaType.Method mt = updateType(method.getMethodType());
+                j = method.withMethodType(mt)
+                        .withName(method.getName().withType(mt));
             } else if (j instanceof J.MethodInvocation) {
                 J.MethodInvocation method = (J.MethodInvocation) j;
-                j = method.withMethodType(updateType(method.getMethodType()));
+                JavaType.Method mt = updateType(method.getMethodType());
+                j = method.withMethodType(mt)
+                        .withName(method.getName().withType(mt));
             } else if (j instanceof J.NewClass) {
                 J.NewClass n = (J.NewClass) j;
                 j = n.withConstructorType(updateType(n.getConstructorType()));
@@ -252,6 +276,10 @@ public class ChangeType extends Recipe {
                         e = i.withType(targetType);
                     }
                     return e;
+                } else if (maybeClass.toString().equals(oldType.getFullyQualifiedName().replace('$', '.'))) {
+                    maybeRemoveImport(oldType.getOwningClass());
+                    return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                            .withPrefix(fieldAccess.getPrefix()));
                 }
             }
             return super.visitFieldAccess(fieldAccess, ctx);
@@ -284,6 +312,22 @@ public class ChangeType extends Recipe {
                         }
                     } else if (targetType instanceof JavaType.Primitive) {
                         ident = ident.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
+                    }
+                }
+
+                // Recreate any static imports as needed
+                JavaSourceFile cu = getCursor().firstEnclosing(JavaSourceFile.class);
+                if (cu != null) {
+                    for (J.Import anImport : cu.getImports()) {
+                        if (anImport.isStatic() && anImport.getQualid().getTarget().getType() != null) {
+                            JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
+                            if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
+                                ident.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
+                                JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
+                                maybeAddImport((targetFqn).getFullyQualifiedName(), ident.getSimpleName());
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -376,8 +420,7 @@ public class ChangeType extends Recipe {
             return typeTree;
         }
 
-        @Nullable
-        private JavaType updateType(@Nullable JavaType oldType) {
+        private @Nullable JavaType updateType(@Nullable JavaType oldType) {
             if (oldType == null || oldType instanceof JavaType.Unknown) {
                 return oldType;
             }
@@ -408,6 +451,7 @@ public class ChangeType extends Recipe {
             } else if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
+                    oldNameToChangedType.put(oldType, targetType);
                     return targetType;
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
@@ -440,8 +484,7 @@ public class ChangeType extends Recipe {
             return oldType;
         }
 
-        @Nullable
-        private JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
+        private @Nullable JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
             if (oldMethodType != null) {
                 JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
                 if (method != null) {
@@ -478,7 +521,16 @@ public class ChangeType extends Recipe {
         @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
-                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                JavaSourceFile cu = (JavaSourceFile) tree;
+                for (J.ClassDeclaration declaration : cu.getClasses()) {
+                    // Check the class name instead of source path, as it might differ
+                    String fqn = declaration.getType().getFullyQualifiedName();
+                    if (fqn.equals(originalType.getFullyQualifiedName())) {
+                        getCursor().putMessage("UPDATE_PACKAGE", true);
+                        break;
+                    }
+                }
+
                 String oldPath = cu.getSourcePath().toString().replace('\\', '/');
                 // The old FQN must exist in the path.
                 String oldFqn = fqnToPath(originalType.getFullyQualifiedName());
@@ -486,7 +538,7 @@ public class ChangeType extends Recipe {
 
                 Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
                 if (updatePath(cu, oldPath, newPath.toString())) {
-                    cu = (JavaSourceFile) cu.withSourcePath(newPath);
+                    cu = cu.withSourcePath(newPath);
                 }
                 return super.visit(cu, ctx);
             }
@@ -507,18 +559,21 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J.Package visitPackage(J.Package pkg, ExecutionContext ctxext) {
-            String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
-            if (original.equals(originalType.getPackageName())) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
-                if (fq != null) {
-                    if (fq.getPackageName().isEmpty()) {
-                        getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
-                        //noinspection DataFlowIssue
-                        return null;
-                    } else {
-                        String newPkg = targetType.getPackageName();
-                        return JavaTemplate.builder(newPkg).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
+        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+            Boolean updatePackage = getCursor().pollNearestMessage("UPDATE_PACKAGE");
+            if (updatePackage != null && updatePackage) {
+                String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+                if (original.equals(originalType.getPackageName())) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
+                    if (fq != null) {
+                        if (fq.getPackageName().isEmpty()) {
+                            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
+                            //noinspection DataFlowIssue
+                            return null;
+                        } else {
+                            String newPkg = targetType.getPackageName();
+                            return JavaTemplate.builder(newPkg).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
+                        }
                     }
                 }
             }
@@ -577,8 +632,7 @@ public class ChangeType extends Recipe {
             return oldType;
         }
 
-        @Nullable
-        private JavaType.Method updateType(@Nullable JavaType.Method mt) {
+        private @Nullable JavaType.Method updateType(@Nullable JavaType.Method mt) {
             if (mt != null) {
                 return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
                         .withReturnType(updateType(mt.getReturnType()))
@@ -595,6 +649,15 @@ public class ChangeType extends Recipe {
     public static boolean containsClassDefinition(JavaSourceFile sourceFile, String fullyQualifiedTypeName) {
         AtomicBoolean found = new AtomicBoolean(false);
         JavaIsoVisitor<AtomicBoolean> visitor = new JavaIsoVisitor<AtomicBoolean>() {
+
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, AtomicBoolean found) {
+                if (found.get()) {
+                    return (J) tree;
+                }
+                return super.visit(tree, found);
+            }
+
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, AtomicBoolean found) {
                 if (found.get()) {
@@ -603,6 +666,7 @@ public class ChangeType extends Recipe {
 
                 if (classDecl.getType() != null && TypeUtils.isOfClassType(classDecl.getType(), fullyQualifiedTypeName)) {
                     found.set(true);
+                    return classDecl;
                 }
                 return super.visitClassDeclaration(classDecl, found);
             }
@@ -612,7 +676,8 @@ public class ChangeType extends Recipe {
     }
 
     public static JavaType.FullyQualified getTopLevelClassName(JavaType.FullyQualified classType) {
-        if (classType.getOwningClass() == null) {
+        if (classType.getOwningClass() == null || TypeUtils.fullyQualifiedNamesAreEqual(classType.getFullyQualifiedName(),
+                classType.getOwningClass().getFullyQualifiedName())) {
             return classType;
         }
         return getTopLevelClassName(classType.getOwningClass());

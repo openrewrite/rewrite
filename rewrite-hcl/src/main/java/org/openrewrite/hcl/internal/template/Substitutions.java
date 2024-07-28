@@ -79,8 +79,7 @@ public class Substitutions {
                 return super.visitExpression(expression, integer);
             }
 
-            @Nullable
-            private Hcl maybeParameter(Hcl h) {
+            private @Nullable Hcl maybeParameter(Hcl h) {
                 Integer param = parameterIndex(h.getPrefix());
                 if (param != null) {
                     Hcl h2 = (Hcl) parameters[param];
@@ -89,8 +88,7 @@ public class Substitutions {
                 return null;
             }
 
-            @Nullable
-            private Integer parameterIndex(Space space) {
+            private @Nullable Integer parameterIndex(Space space) {
                 for (Comment comment : space.getComments()) {
                     java.util.regex.Matcher matcher = PATTERN_COMMENT.matcher(comment.getText());
                     if (matcher.matches()) {

@@ -34,7 +34,7 @@ import java.time.Duration;
 import java.util.*;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveDuplicateDependencies extends Recipe {
 
     @Override
@@ -56,7 +56,7 @@ public class RemoveDuplicateDependencies extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Tag root = document.getRoot();
                 if (root.getChild("dependencies").isPresent() || root.getChild("dependencyManagement").isPresent()) {
                     return SearchResult.found(document);
@@ -106,8 +106,7 @@ public class RemoveDuplicateDependencies extends Recipe {
                 return MANAGED_DEPENDENCIES_MATCHER.matches(getCursor());
             }
 
-            @Nullable
-            private DependencyKey getDependencyKey(Xml.Tag tag) {
+            private @Nullable DependencyKey getDependencyKey(Xml.Tag tag) {
                 Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
                 Scope scope = tag.getChildValue("scope").map(Scope::fromName).orElse(Scope.Compile);
                 if (dependencies.containsKey(scope)) {
@@ -125,8 +124,7 @@ public class RemoveDuplicateDependencies extends Recipe {
                 return null;
             }
 
-            @Nullable
-            private DependencyKey getManagedDependencyKey(Xml.Tag tag) {
+            private @Nullable DependencyKey getManagedDependencyKey(Xml.Tag tag) {
                 ResolvedManagedDependency resolvedDependency = findManagedDependency(tag);
                 return resolvedDependency != null ? DependencyKey.from(resolvedDependency) : null;
             }

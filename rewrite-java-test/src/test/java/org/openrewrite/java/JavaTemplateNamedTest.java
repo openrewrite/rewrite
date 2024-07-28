@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
@@ -23,8 +24,9 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class JavaTemplateNamedTest implements RewriteTest {
+class JavaTemplateNamedTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void replaceSingleStatement() {
         rewriteRun(

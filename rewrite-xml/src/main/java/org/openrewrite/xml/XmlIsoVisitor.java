@@ -39,8 +39,18 @@ public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
+    public Xml.Tag.Closing visitTagClosing(Xml.Tag.Closing closing, P p) {
+        return (Xml.Tag.Closing) super.visitTagClosing(closing, p);
+    }
+
+    @Override
     public Xml.Attribute visitAttribute(Xml.Attribute attribute, P p) {
         return (Xml.Attribute) super.visitAttribute(attribute, p);
+    }
+
+    @Override
+    public Xml.Attribute.Value visitAttributeValue(Xml.Attribute.Value value, P p) {
+        return (Xml.Attribute.Value) super.visitAttributeValue(value, p);
     }
 
     @Override
@@ -59,6 +69,11 @@ public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
+    public Xml.DocTypeDecl.ExternalSubsets visitDocTypeDeclExternalSubsets(Xml.DocTypeDecl.ExternalSubsets externalSubsets, P p) {
+        return (Xml.DocTypeDecl.ExternalSubsets) super.visitDocTypeDeclExternalSubsets(externalSubsets, p);
+    }
+
+    @Override
     public Xml.Prolog visitProlog(Xml.Prolog prolog, P p) {
         return (Xml.Prolog) super.visitProlog(prolog, p);
     }
@@ -66,6 +81,11 @@ public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     @Override
     public Xml.Ident visitIdent(Xml.Ident ident, P p) {
         return (Xml.Ident) super.visitIdent(ident, p);
+    }
+
+    @Override
+    public Xml.JspDirective visitJspDirective(Xml.JspDirective jspDirective, P p) {
+        return (Xml.JspDirective) super.visitJspDirective(jspDirective, p);
     }
 
     @Override

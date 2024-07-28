@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.marker.Markers;
-
-import java.util.Scanner;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
@@ -29,71 +29,93 @@ import static org.openrewrite.Tree.randomId;
 public interface TypeTree extends NameTree {
 
     static <T extends TypeTree & Expression> T build(String fullyQualifiedName) {
-        Scanner scanner = new Scanner(fullyQualifiedName);
-        scanner.useDelimiter("[.$]");
+        return TypeTree.build(fullyQualifiedName, null);
+    }
 
+    static <T extends TypeTree & Expression> T build(String fullyQualifiedName, @Nullable Character escape) {
         StringBuilder fullName = new StringBuilder();
         Expression expr = null;
         String nextLeftPad = "";
-        for (int i = 0; scanner.hasNext(); i++) {
-            StringBuilder whitespaceBefore = new StringBuilder();
-            StringBuilder partBuilder = null;
-            StringBuilder whitespaceBeforeNext = new StringBuilder();
 
-            String segment = scanner.next();
-            for (int j = 0; j < segment.length(); j++) {
-                char c = segment.charAt(j);
-                if (!Character.isWhitespace(c)) {
-                    if (partBuilder == null) {
-                        partBuilder = new StringBuilder();
+        StringBuilder segment = new StringBuilder();
+        StringBuilder whitespaceBefore = new StringBuilder();
+        StringBuilder partBuilder = new StringBuilder();
+        StringBuilder whitespaceBeforeNext = new StringBuilder();
+
+        char esc = escape != null ? escape : 0;
+        boolean inEscape = false;
+
+        for (int index = 0; index < fullyQualifiedName.length(); index++) {
+            char currentChar = fullyQualifiedName.charAt(index);
+            if (currentChar == esc) {
+                inEscape = !inEscape;
+            }
+            if (!inEscape && (currentChar == '.' || currentChar == '$') || index == fullyQualifiedName.length() - 1) {
+                if (index == fullyQualifiedName.length() - 1) {
+                    segment.append(currentChar);
+                }
+                // Process the segment
+                for (int j = 0; j < segment.length(); j++) {
+                    char c = segment.charAt(j);
+                    if (escape != null && c == escape) {
+                        inEscape = !inEscape;
                     }
-                    partBuilder.append(c);
-                } else {
-                    if (partBuilder == null) {
-                        whitespaceBefore.append(c);
+                    if (!Character.isWhitespace(c) || inEscape) {
+                        partBuilder.append(c);
                     } else {
-                        whitespaceBeforeNext.append(c);
+                        if (partBuilder.length() == 0) {
+                            whitespaceBefore.append(c);
+                        } else {
+                            whitespaceBeforeNext.append(c);
+                        }
                     }
                 }
-            }
-
-            assert partBuilder != null;
-            String part = partBuilder.toString();
-
-            if (i == 0) {
-                fullName.append(part);
-                expr = new Identifier(randomId(), Space.format(whitespaceBefore.toString()), Markers.EMPTY, emptyList(), part, null, null);
+                String part = partBuilder.toString();
+                Markers markers = Markers.EMPTY;
+                if (escape != null && part.charAt(0) == esc && part.charAt(part.length() - 1) == esc) {
+                    part = part.substring(1, part.length() - 1);
+                    markers = markers.addIfAbsent(new Quoted(randomId()));
+                }
+                Space whitespaceBeforeStr = Space.format(whitespaceBefore.toString());
+                if (fullName.length() == 0) {
+                    fullName.append(part);
+                    expr = new Identifier(randomId(), whitespaceBeforeStr, markers, emptyList(), part, null, null);
+                } else {
+                    fullName.append('.').append(part);
+                    expr = new J.FieldAccess(
+                            randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            expr,
+                            new JLeftPadded<>(
+                                    Space.format(nextLeftPad),
+                                    new Identifier(
+                                            randomId(),
+                                            whitespaceBeforeStr,
+                                            markers,
+                                            emptyList(),
+                                            part,
+                                            null,
+                                            null
+                                    ),
+                                    Markers.EMPTY
+                            ),
+                            Character.isUpperCase(part.charAt(0)) ?
+                                    JavaType.ShallowClass.build(fullName.toString()) :
+                                    null
+                    );
+                }
+                nextLeftPad = whitespaceBeforeNext.toString();
+                // Reset the StringBuilders
+                segment.setLength(0);
+                whitespaceBefore.setLength(0);
+                partBuilder.setLength(0);
+                whitespaceBeforeNext.setLength(0);
             } else {
-                fullName.append('.').append(part);
-                expr = new J.FieldAccess(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        expr,
-                        new JLeftPadded<>(
-                                Space.format(nextLeftPad),
-                                new Identifier(
-                                        randomId(),
-                                        Space.format(whitespaceBefore.toString()),
-                                        Markers.EMPTY,
-                                        emptyList(),
-                                        part,
-                                        null,
-                                        null
-                                ),
-                                Markers.EMPTY
-                        ),
-                        Character.isUpperCase(part.charAt(0)) ?
-                                JavaType.ShallowClass.build(fullName.toString()) :
-                                null
-                );
+                segment.append(currentChar);
             }
-
-            nextLeftPad = whitespaceBeforeNext.toString();
         }
-
         assert expr != null;
-
         //noinspection unchecked
         return (T) expr;
     }

@@ -29,7 +29,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Incubating(since = "7.24.0")
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddCommentToXmlTag extends Recipe {
 
     @Option(displayName = "XPath",
@@ -44,12 +44,12 @@ public class AddCommentToXmlTag extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Add a comment to a `XML` tag";
+        return "Add a comment to an XML tag";
     }
 
     @Override
     public String getDescription() {
-        return "Adds a comment as the first element in a `XML` tag.";
+        return "Adds a comment as the first element in an XML tag.";
     }
 
     @Override

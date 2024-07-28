@@ -32,38 +32,37 @@ import static org.openrewrite.xml.MapTagChildrenVisitor.mapTagChildren;
 import static org.openrewrite.xml.SemanticallyEqual.areEqual;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddPluginDependency extends Recipe {
     private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
 
-    @Option(displayName = "Plugin Group",
-            description = "GroupId of the plugin to which the dependency will be added. " +
-                    "A GroupId is the first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
+    @Option(displayName = "Plugin group",
+            description = "Group ID of the plugin to which the dependency will be added. " +
+                    "A group ID is the first part of a dependency coordinate `org.openrewrite.maven:rewrite-maven-plugin:VERSION`.",
             example = "org.openrewrite.maven")
     String pluginGroupId;
 
-    @Option(displayName = "Plugin Artifact",
-            description = "ArtifactId of the plugin to which the dependency will be added." +
-                    "The second part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
+    @Option(displayName = "Plugin artifact",
+            description = "Artifact ID of the plugin to which the dependency will be added." +
+                    "The second part of a dependency coordinate `org.openrewrite.maven:rewrite-maven-plugin:VERSION`.",
             example = "rewrite-maven-plugin")
     String pluginArtifactId;
 
     @Option(displayName = "Group",
-            description = "The GroupId of the dependency to add.",
+            description = "The group ID of the dependency to add.",
             example = "org.openrewrite.recipe")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The ArtifactId of the dependency to add.",
+            description = "The artifact ID of the dependency to add.",
             example = "org.openrewrite.recipe")
     String artifactId;
 
     @Option(displayName = "Version",
-            description = "The Version of the dependency to add.",
+            description = "The version of the dependency to add.",
             example = "org.openrewrite.recipe")
     @Nullable
     String version;
-
 
     @Override
     public String getDisplayName() {

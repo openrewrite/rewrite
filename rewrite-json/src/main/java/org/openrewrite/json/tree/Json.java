@@ -39,8 +39,7 @@ public interface Json extends Tree {
         return (R) acceptJson(v.adapt(JsonVisitor.class), p);
     }
 
-    @Nullable
-    default <P> Json acceptJson(JsonVisitor<P> v, P p) {
+    default <P> @Nullable Json acceptJson(JsonVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -82,7 +81,7 @@ public interface Json extends Tree {
         }
 
         public Array withValues(List<JsonValue> values) {
-            return getPadding().withParameters(JsonRightPadded.withElements(this.values, values));
+            return getPadding().withValues(JsonRightPadded.withElements(this.values, values));
         }
 
         @Override
@@ -113,7 +112,7 @@ public interface Json extends Tree {
                 return t.values;
             }
 
-            public Array withParameters(List<JsonRightPadded<JsonValue>> values) {
+            public Array withValues(List<JsonRightPadded<JsonValue>> values) {
                 return t.values == values ? t : new Array(t.id, t.prefix, t.markers, values);
             }
         }
@@ -141,6 +140,7 @@ public interface Json extends Tree {
         Markers markers;
 
         @Nullable // for backwards compatibility
+        @Getter
         @With(AccessLevel.PRIVATE)
         String charsetName;
 

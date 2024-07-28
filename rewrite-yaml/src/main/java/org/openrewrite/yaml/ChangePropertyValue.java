@@ -25,41 +25,56 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePropertyValue extends Recipe {
     @Option(displayName = "Property key",
             description = "The key to look for. Supports glob patterns.",
             example = "management.metrics.binders.*.enabled")
     String propertyKey;
 
-    @Option(displayName = "New value",
+    @Option(example = "newValue", displayName = "New value",
             description = "The new value to be used for key specified by `propertyKey`.")
     String newValue;
 
-    @Option(displayName = "Old value",
+    @Option(example = "oldValue", displayName = "Old value",
             required = false,
             description = "Only change the property value if it matches the configured `oldValue`.")
     @Nullable
     String oldValue;
 
     @Option(displayName = "Regex",
-            description = "Defaults to `false`. If enabled, `oldValue` will be interpreted as a regular expression, and the capture group contents will be available in `newValue`",
+            description = "Default `false`. If enabled, `oldValue` will be interpreted as a Regular Expression, " +
+                          "to replace only all parts that match the regex. Capturing group can be used in `newValue`.",
             required = false)
     @Nullable
     Boolean regex;
 
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
-                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+                          "rules. Default is `true`. Set to `false`  to use exact matching.",
             required = false)
     @Nullable
     Boolean relaxedBinding;
 
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
+            example = ".github/workflows/*.yml")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Change YAML property";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", propertyKey, newValue);
     }
 
     @Override
@@ -68,7 +83,7 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate().and(
                 Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
                         value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
@@ -76,7 +91,7 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new YamlIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
@@ -89,11 +104,11 @@ public class ChangePropertyValue extends Recipe {
                 }
                 return e;
             }
-        };
+        });
     }
 
-    @Nullable // returns null if value should not change
-    private Yaml.Scalar updateValue(Yaml.Block value) {
+    // returns null if value should not change
+    private @Nullable Yaml.Scalar updateValue(Yaml.Block value) {
         if (!(value instanceof Yaml.Scalar)) {
             return null;
         }
@@ -116,9 +131,9 @@ public class ChangePropertyValue extends Recipe {
         }
         Yaml.Scalar scalar = (Yaml.Scalar) value;
         return StringUtils.isNullOrEmpty(oldValue) ||
-                (Boolean.TRUE.equals(regex)
-                        ? scalar.getValue().matches(oldValue)
-                        : scalar.getValue().equals(oldValue));
+               (Boolean.TRUE.equals(regex)
+                       ? Pattern.compile(oldValue).matcher(scalar.getValue()).find()
+                       : scalar.getValue().equals(oldValue));
     }
 
     private static String getProperty(Cursor cursor) {

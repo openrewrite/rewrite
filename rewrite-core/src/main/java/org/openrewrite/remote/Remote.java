@@ -55,11 +55,12 @@ public interface Remote extends SourceFile {
 
     <R extends Remote> R withDescription(String description);
 
-    @Nullable
-    default Checksum getChecksum() {
+    @Override
+    default @Nullable Checksum getChecksum() {
         return null;
     }
 
+    @Override
     default <T extends SourceFile> T withChecksum(@Nullable Checksum checksum) {
         //noinspection unchecked
         return (T) this;

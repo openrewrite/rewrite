@@ -48,8 +48,7 @@ public interface Expression extends J {
         return requireNonNull(unwrap(this));
     }
 
-    @Nullable
-    static Expression unwrap(@Nullable Expression expr) {
+    static @Nullable Expression unwrap(@Nullable Expression expr) {
         if (expr instanceof J.Parentheses<?> && ((J.Parentheses<?>) expr).getTree() instanceof Expression) {
             return ((Expression) ((J.Parentheses<?>) expr).getTree()).unwrap();
         } else {

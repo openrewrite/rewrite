@@ -202,7 +202,7 @@ class SpacesTest implements RewriteTest {
             """
               class Test {
                   void foo() {
-                      foo();
+                      foo()  ;
                       Test test = new Test();
                   }
               }
@@ -212,6 +212,39 @@ class SpacesTest implements RewriteTest {
                   void foo() {
                       foo ();
                       Test test = new Test ();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noSpaceBeforeSemicolon() {
+        rewriteRun(
+          spaces(style -> style),
+          java(
+            """
+              class Test {
+                  boolean b = true    ;
+                  void foo() {
+                      foo()  ;
+                      Test test = new Test()
+                      ;
+                      if (b)
+                          System.out.println("OK")  ;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  boolean b = true;
+                  void foo() {
+                      foo();
+                      Test test = new Test()
+                      ;
+                      if (b)
+                          System.out.println("OK");
                   }
               }
               """
@@ -4797,6 +4830,27 @@ class SpacesTest implements RewriteTest {
                           1,
                           2
                       );
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void spaceBetweenAnnotations() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+              class A {
+                  void m(@Deprecated@SuppressWarnings("ALL") int a) {
+                  }
+              }
+              """,
+            """
+              class A {
+                  void m(@Deprecated @SuppressWarnings("ALL") int a) {
                   }
               }
               """

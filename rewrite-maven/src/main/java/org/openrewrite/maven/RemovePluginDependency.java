@@ -30,18 +30,18 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemovePluginDependency extends Recipe {
     private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
 
-    @Option(displayName = "Plugin Group",
-            description = "GroupId of the plugin from which the dependency will be removed. Supports glob." +
-                    "A GroupId is the first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
+    @Option(displayName = "Plugin group ID",
+            description = "Group ID of the plugin from which the dependency will be removed. Supports glob." +
+                    "A Group ID is the first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
             example = "org.openrewrite.maven")
     String pluginGroupId;
 
-    @Option(displayName = "Plugin Artifact",
-            description = "ArtifactId of the plugin from which the dependency will be removed. Supports glob." +
+    @Option(displayName = "Plugin artifact ID",
+            description = "Artifact ID of the plugin from which the dependency will be removed. Supports glob." +
                     "The second part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
             example = "rewrite-maven-plugin")
     String pluginArtifactId;
@@ -59,6 +59,11 @@ public class RemovePluginDependency extends Recipe {
     @Override
     public String getDisplayName() {
         return "Remove Maven plugin dependency";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("from `%s:%s`", pluginGroupId, pluginArtifactId);
     }
 
     @Override

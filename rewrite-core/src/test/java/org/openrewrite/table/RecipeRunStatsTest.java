@@ -27,7 +27,7 @@ import org.openrewrite.text.PlainTextVisitor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RecipeRunStatsTest implements RewriteTest {
+class RecipeRunStatsTest implements RewriteTest {
 
     @AllArgsConstructor
     static class RecipeWithApplicabilityTest extends Recipe {
@@ -46,7 +46,7 @@ public class RecipeRunStatsTest implements RewriteTest {
             return Preconditions.check(
               new PlainTextVisitor<>() {
                   @Override
-                  public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
                       if (!"sam".equals(text.getText())) {
                           return SearchResult.found(text);
                       }

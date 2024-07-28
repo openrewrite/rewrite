@@ -25,7 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesField;
 import org.openrewrite.java.tree.*;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class ChangeStaticFieldToMethod extends Recipe {
 
@@ -59,6 +59,13 @@ public class ChangeStaticFieldToMethod extends Recipe {
     String newMethodName;
 
     @Override
+    public String getInstanceNameSuffix() {
+        String shortType = oldClassName.substring(oldClassName.lastIndexOf('.') + 1);
+        return String.format("`%s#%s` to `%s`",
+                shortType, oldFieldName, newMethodName);
+    }
+
+    @Override
     public String getDisplayName() {
         return "Change static field access to static method access";
     }
@@ -72,12 +79,12 @@ public class ChangeStaticFieldToMethod extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesField<>(oldClassName, oldFieldName), new JavaVisitor<ExecutionContext>() {
             @Override
-            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext context) {
+            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 if (TypeUtils.isOfClassType(classDecl.getType(), oldClassName)) {
                     // Don't modify the class that declares the static field being replaced
                     return classDecl;
                 }
-                return super.visitClassDeclaration(classDecl, context);
+                return super.visitClassDeclaration(classDecl, ctx);
             }
 
             @Override
@@ -91,7 +98,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
             }
 
             @Override
-            public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
+            public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                 JavaType.Variable varType = ident.getFieldType();
                 if (varType != null &&
                     TypeUtils.isOfClassType(varType.getOwner(), oldClassName) &&
@@ -116,8 +123,14 @@ public class ChangeStaticFieldToMethod extends Recipe {
                     throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class ["
                                                        + newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
                 }
-                return tree.getType() == null ? method :
-                        method.withMethodType(method.getMethodType().withReturnType(tree.getType()));
+                if (tree.getType() != null) {
+                    JavaType.Method mt = method.getMethodType().withReturnType(tree.getType());
+                    method = method.withMethodType(mt);
+                    if (method.getName().getType() != null) {
+                        method = method.withName(method.getName().withType(mt));
+                    }
+                }
+                return method;
             }
 
             @NonNull

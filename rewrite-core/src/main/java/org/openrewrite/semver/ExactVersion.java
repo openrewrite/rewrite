@@ -18,12 +18,20 @@ package org.openrewrite.semver;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 
+/**
+ * Version selector for matching exact version: either explicitly prefixed with "=",
+ * or implicit default when no other version selectors match.
+ */
 public class ExactVersion extends LatestRelease {
     String version;
 
     public ExactVersion(String pattern) {
         super(pattern);
-        this.version = pattern;
+        if (pattern.startsWith("=")) {
+            this.version = pattern.substring(1);
+        } else {
+            this.version = pattern;
+        }
     }
 
     @Override
@@ -32,18 +40,21 @@ public class ExactVersion extends LatestRelease {
     }
 
     public static Validated<ExactVersion> build(String pattern) {
+        if (pattern.startsWith("=")) {
+            return Validated.valid("exactVersion", new ExactVersion(pattern));
+        }
         String versionOnly;
         int hyphenIndex = pattern.indexOf('-');
-        if(hyphenIndex == -1) {
+        if (hyphenIndex == -1) {
             versionOnly = pattern;
         } else {
             versionOnly = pattern.substring(0, hyphenIndex);
         }
-        if(versionOnly.startsWith("latest") ||
-                versionOnly.contains("x") ||
-                versionOnly.contains("^") ||
-                versionOnly.contains("~") ||
-                versionOnly.contains(" ")) {
+        if (versionOnly.startsWith("latest") ||
+            versionOnly.contains("x") ||
+            versionOnly.contains("^") ||
+            versionOnly.contains("~") ||
+            versionOnly.contains(" ")) {
             return Validated.invalid("exactVersion", pattern, "not an exact version number");
         }
         return Validated.valid("exactVersion", new ExactVersion(pattern));

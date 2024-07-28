@@ -24,20 +24,10 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeTagName extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Change XML Tag Name";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Alters the name of XML tags matching the provided expression.";
-    }
-
     @Option(displayName = "Element name",
-            description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath Expression.",
+            description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath expression.",
             example = "/settings/servers/server/username")
     String elementName;
 
@@ -47,16 +37,31 @@ public class ChangeTagName extends Recipe {
     String newName;
 
     @Override
+    public String getDisplayName() {
+        return "Change XML tag name";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", elementName, newName);
+    }
+
+    @Override
+    public String getDescription() {
+        return "Alters the name of XML tags matching the provided expression.";
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new XmlIsoVisitor<ExecutionContext>() {
             private final XPathMatcher xPathMatcher = new XPathMatcher(elementName);
 
             @Override
-            public Xml.Tag visitTag(final Xml.Tag tag, final ExecutionContext executionContext) {
+            public Xml.Tag visitTag(final Xml.Tag tag, final ExecutionContext ctx) {
                 if (xPathMatcher.matches(getCursor())) {
                     return tag.withName(newName);
                 }
-                return super.visitTag(tag, executionContext);
+                return super.visitTag(tag, ctx);
             }
         };
     }

@@ -24,8 +24,6 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 
-import static java.util.Objects.requireNonNull;
-
 public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
     private final MethodMatcher methodMatcher;
 
@@ -48,7 +46,7 @@ public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
     @Override
     public J visit(@Nullable Tree tree, P p) {
         if (tree instanceof JavaSourceFile) {
-            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            JavaSourceFile cu = (JavaSourceFile) tree;
             for (JavaType.Method method : cu.getTypesInUse().getDeclaredMethods()) {
                 if (methodMatcher.matches(method)) {
                     return SearchResult.found(cu);

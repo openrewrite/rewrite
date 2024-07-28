@@ -70,8 +70,7 @@ public interface SourceFile extends Tree {
 
     <T extends SourceFile> T withFileAttributes(@Nullable FileAttributes fileAttributes);
 
-    @Nullable
-    default <S extends Style> S getStyle(Class<S> style) {
+    default <S extends Style> @Nullable S getStyle(Class<S> style) {
         return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
     }
 
@@ -108,8 +107,14 @@ public interface SourceFile extends Tree {
         return printAllTrimmed(0);
     }
 
+    @Override
     default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
         throw new UnsupportedOperationException("SourceFile implementations should override this method");
+    }
+
+    @Incubating(since = "8.2.0")
+    default <S, T extends S> T service(Class<S> service) {
+        throw new UnsupportedOperationException("Service " + service + " not supported");
     }
 
     /**

@@ -16,19 +16,21 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
-public class ChangeExtraPropertyTest implements RewriteTest {
+class ChangeExtraPropertyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangeExtraProperty("foo", "baz"));
     }
 
+    @DocumentExample
     @Test
     void closureStyle() {
         rewriteRun(
@@ -67,6 +69,23 @@ public class ChangeExtraPropertyTest implements RewriteTest {
             """
               project.ext.foo = "baz"
               ext.foo = "baz"
+              """)
+        );
+    }
+
+    @Test
+    void maintainQuoteStyle() {
+        rewriteRun(
+          buildGradle(
+            """
+              ext {
+                foo = 'bar'
+              }
+              """,
+            """
+              ext {
+                foo = 'baz'
+              }
               """)
         );
     }

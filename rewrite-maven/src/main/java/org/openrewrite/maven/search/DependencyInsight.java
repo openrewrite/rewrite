@@ -39,7 +39,7 @@ import java.util.Optional;
  * either match or transitively include a dependency matching {@link #groupIdPattern} and
  * {@link #artifactIdPattern}.
  */
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
@@ -92,6 +92,11 @@ public class DependencyInsight extends Recipe {
     @Override
     public String getDisplayName() {
         return "Maven dependency insight";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupIdPattern, artifactIdPattern);
     }
 
     @Override

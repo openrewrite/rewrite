@@ -64,14 +64,13 @@ public class ResolvedManagedDependency {
      *
      * @return the version of the dependency
      */
-    @Nullable
-    public String getVersion() {
+    public @Nullable String getVersion() {
         return gav.getVersion();
     }
 
-    public boolean matches(String groupId, String artifactId,
+    public boolean matches(@Nullable String groupId, String artifactId,
                            @Nullable String type, @Nullable String classifier) {
-        return groupId.equals(gav.getGroupId()) && artifactId.equals(gav.getArtifactId()) &&
+        return Objects.equals(groupId, gav.getGroupId()) && artifactId.equals(gav.getArtifactId()) &&
                 (type == null ? "jar" : type).equals(this.type == null ? "jar" : this.type) &&
                 Objects.equals(classifier, this.classifier);
     }

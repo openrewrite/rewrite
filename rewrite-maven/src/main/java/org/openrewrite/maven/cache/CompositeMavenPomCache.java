@@ -29,9 +29,8 @@ public class CompositeMavenPomCache implements MavenPomCache {
     private final MavenPomCache l1;
     private final MavenPomCache l2;
 
-    @Nullable
     @Override
-    public ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
+    public @Nullable ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
         ResolvedPom l1r = l1.getResolvedDependencyPom(dependency);
         if(l1r != null) {
             return l1r;
@@ -49,9 +48,8 @@ public class CompositeMavenPomCache implements MavenPomCache {
         l2.putResolvedDependencyPom(dependency, resolved);
     }
 
-    @Nullable
     @Override
-    public Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+    public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
         Optional<MavenMetadata> l1m = l1.getMavenMetadata(repo, gav);
         if(l1m != null) {
             return l1m;
@@ -69,9 +67,8 @@ public class CompositeMavenPomCache implements MavenPomCache {
         l2.putMavenMetadata(repo, gav, metadata);
     }
 
-    @Nullable
     @Override
-    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
+    public @Nullable Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
         Optional<Pom> l1p = l1.getPom(gav);
         if(l1p != null) {
             return l1p;
@@ -89,9 +86,8 @@ public class CompositeMavenPomCache implements MavenPomCache {
         l2.putPom(gav, pom);
     }
 
-    @Nullable
     @Override
-    public Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+    public @Nullable Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
         Optional<MavenRepository> l1r = l1.getNormalizedRepository(repository);
         if(l1r != null) {
             return l1r;

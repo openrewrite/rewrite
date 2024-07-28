@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
@@ -26,7 +27,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.withToolingApi;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.mavenProject;
 
 class RemoveDependencyTest implements RewriteTest {
 
@@ -338,6 +341,115 @@ class RemoveDependencyTest implements RewriteTest {
               
               dependencies {
                   implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4033")
+    @Test
+    void removeFromSubproject() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("org.hibernate", "hibernate-entitymanager", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id "org.openrewrite.rewrite" version "6.8.2"
+              }
+              
+              group = 'org.example'
+              version = '1.0-SNAPSHOT'
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              rewrite {
+                  activeRecipe("com.example.RemoveHibernateEntityManager")
+              }
+              
+              dependencies {
+                  rewrite(platform("org.openrewrite.recipe:rewrite-recipe-bom:2.6.4"))
+              }
+              """
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'OpenRewrite-example'
+              include 'example'
+              """
+          ),
+          mavenProject(
+            "subproject",
+            buildGradle(
+              """
+                plugins {
+                    id 'java'
+                }
+                
+                group = 'org.example'
+                version = '1.0-SNAPSHOT'
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencies {
+                    implementation 'org.hibernate:hibernate-entitymanager:5.6.15.Final'
+                }
+                
+                test {
+                    useJUnitPlatform()
+                }
+                """,
+              """
+                plugins {
+                    id 'java'
+                }
+                
+                group = 'org.example'
+                version = '1.0-SNAPSHOT'
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencies {
+                }
+                
+                test {
+                    useJUnitPlatform()
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void removeBuildscriptDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("org.springframework.boot", "spring-boot-gradle-plugin", null)),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath "org.springframework.boot:spring-boot-gradle-plugin:2.7.18"
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                  }
               }
               """
           )

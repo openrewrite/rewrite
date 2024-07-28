@@ -52,8 +52,7 @@ public class JavaCoordinates implements Coordinates {
         REPLACEMENT
     }
 
-    @Nullable
-    public <J2 extends J> Comparator<J2> getComparator() {
+    public <J2 extends J> @Nullable Comparator<J2> getComparator() {
         //noinspection unchecked
         return (Comparator<J2>) comparator;
     }

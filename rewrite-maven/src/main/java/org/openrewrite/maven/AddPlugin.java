@@ -18,12 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.PathUtils;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -33,7 +28,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddPlugin extends Recipe {
 
     private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
@@ -72,7 +67,7 @@ public class AddPlugin extends Recipe {
 
     @Option(displayName = "Executions",
             description = "Optional executions provided as raw XML.",
-            example = "<execution><phase>generate-sources</phase><goals><goal>add-source</goal></goals></execution>",
+            example = "<executions><execution><phase>generate-sources</phase><goals><goal>add-source</goal></goals></execution></executions>",
             required = false)
     @Nullable
     String executions;
@@ -93,6 +88,11 @@ public class AddPlugin extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, version);
+    }
+
+    @Override
     public String getDescription() {
         return "Add the specified Maven plugin to the pom.xml.";
     }
@@ -105,11 +105,11 @@ public class AddPlugin extends Recipe {
     private class AddPluginVisitor extends MavenIsoVisitor<ExecutionContext> {
 
         @Override
-        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
             if (filePattern != null) {
-                return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, executionContext);
+                return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, ctx);
             }
-            return super.isAcceptable(sourceFile, executionContext);
+            return super.isAcceptable(sourceFile, ctx);
         }
 
         @Override
@@ -148,8 +148,9 @@ public class AddPlugin extends Recipe {
                 if (maybePlugin.isPresent()) {
                     Xml.Tag plugin = maybePlugin.get();
                     if (version != null && !version.equals(plugin.getChildValue("version").orElse(null))) {
-                        //noinspection OptionalGetWithoutIsPresent
-                        t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                        if (plugin.getChild("version").isPresent()) {
+                            t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                        }
                     }
                 } else {
                     Xml.Tag pluginTag = Xml.Tag.build("<plugin>\n" +

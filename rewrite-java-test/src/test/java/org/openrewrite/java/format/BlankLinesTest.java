@@ -926,4 +926,56 @@ class BlankLinesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4154")
+    void eachMethodOnItsOwnLineAnonymousInnerClass() {
+        rewriteRun(
+          blankLines(),
+          java(
+            """
+              public class Test {
+                  void a() {
+                      new Runnable() {
+                          void b() {
+                          }
+                          void c() {
+                          }
+                            
+                          public void run() {
+                          }
+            
+                          public void d() {
+                          }
+                      };
+                  }
+                  void e() {
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void a() {
+                      new Runnable() {
+                          void b() {
+                          }
+                              
+                          void c() {
+                          }
+                              
+                          public void run() {
+                          }
+            
+                          public void d() {
+                          }
+                      };
+                  }
+    
+                  void e() {
+                  }
+              }
+              """
+          )
+        );
+    }
 }

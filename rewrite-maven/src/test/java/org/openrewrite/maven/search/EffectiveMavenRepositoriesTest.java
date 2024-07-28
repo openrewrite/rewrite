@@ -26,7 +26,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class EffectiveMavenRepositoriesTest implements RewriteTest {
+class EffectiveMavenRepositoriesTest implements RewriteTest {
 
     @SuppressWarnings("ConstantConditions")
     //language=xml

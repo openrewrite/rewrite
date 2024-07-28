@@ -49,16 +49,18 @@ public interface ManagedDependency {
 
         List<GroupArtifact> exclusions;
 
+        @Override
         public String getGroupId() {
             return requireNonNull(gav.getGroupId());
         }
 
+        @Override
         public String getArtifactId() {
             return gav.getArtifactId();
         }
 
-        @Nullable
-        public String getVersion() {
+        @Override
+        public @Nullable String getVersion() {
             return gav.getVersion();
         }
 
@@ -74,16 +76,18 @@ public interface ManagedDependency {
     class Imported implements ManagedDependency {
         GroupArtifactVersion gav;
 
+        @Override
         public String getGroupId() {
             return requireNonNull(gav.getGroupId());
         }
 
+        @Override
         public String getArtifactId() {
             return gav.getArtifactId();
         }
 
-        @Nullable
-        public String getVersion() {
+        @Override
+        public @Nullable String getVersion() {
             return gav.getVersion();
         }
 

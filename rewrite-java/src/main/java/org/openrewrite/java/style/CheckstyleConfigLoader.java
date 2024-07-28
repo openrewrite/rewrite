@@ -83,8 +83,7 @@ public class CheckstyleConfigLoader {
                         .collect(toSet()));
     }
 
-    @Nullable
-    private static Set<DefaultComesLastStyle> defaultComesLast(Map<String, List<Module>> conf) {
+    private static @Nullable Set<DefaultComesLastStyle> defaultComesLast(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("DefaultComesLast");
         if (moduleList == null) {
             return null;
@@ -94,8 +93,7 @@ public class CheckstyleConfigLoader {
                 .collect(Collectors.toSet());
     }
 
-    @Nullable
-    private static Set<EmptyBlockStyle> emptyBlock(Map<String, List<Module>> conf) {
+    private static @Nullable Set<EmptyBlockStyle> emptyBlock(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("EmptyBlock");
         if (moduleList == null) {
             return null;
@@ -144,8 +142,7 @@ public class CheckstyleConfigLoader {
                 .collect(Collectors.toSet());
     }
 
-    @Nullable
-    private static Set<EmptyForInitializerPadStyle> emptyForInitializerPadStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<EmptyForInitializerPadStyle> emptyForInitializerPadStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("EmptyForInitializerPad");
         if (moduleList == null) {
             return null;
@@ -160,8 +157,7 @@ public class CheckstyleConfigLoader {
                 .collect(Collectors.toSet());
     }
 
-    @Nullable
-    private static Set<EmptyForIteratorPadStyle> emptyForIteratorPadStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<EmptyForIteratorPadStyle> emptyForIteratorPadStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("EmptyForIteratorPad");
         if (moduleList == null) {
             return null;
@@ -176,8 +172,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<EqualsAvoidsNullStyle> equalsAvoidsNull(Map<String, List<Module>> conf) {
+    private static @Nullable Set<EqualsAvoidsNullStyle> equalsAvoidsNull(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("EqualsAvoidNull");
         if (moduleList == null) {
             return null;
@@ -187,9 +182,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-
-    @Nullable
-    private static Set<FallThroughStyle> fallThrough(Map<String, List<Module>> conf) {
+    private static @Nullable Set<FallThroughStyle> fallThrough(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("FallThrough");
         if (moduleList == null) {
             return null;
@@ -199,8 +192,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<HiddenFieldStyle> hiddenFieldStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<HiddenFieldStyle> hiddenFieldStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("HiddenField");
         if (moduleList == null) {
             return null;
@@ -215,8 +207,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<MethodParamPadStyle> methodParamPadStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<MethodParamPadStyle> methodParamPadStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("MethodParamPad");
         if (moduleList == null) {
             return null;
@@ -234,8 +225,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<NeedBracesStyle> needBracesStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<NeedBracesStyle> needBracesStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("NeedBraces");
         if (moduleList == null) {
             return null;
@@ -248,8 +238,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<NoWhitespaceAfterStyle> noWhitespaceAfterStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<NoWhitespaceAfterStyle> noWhitespaceAfterStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("NoWhitespaceAfter");
         if (moduleList == null) {
             return null;
@@ -307,8 +296,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<NoWhitespaceBeforeStyle> noWhitespaceBeforeStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<NoWhitespaceBeforeStyle> noWhitespaceBeforeStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("NoWhitespaceBefore");
         if (moduleList == null) {
             return null;
@@ -352,8 +340,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<OperatorWrapStyle> operatorWrapStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<OperatorWrapStyle> operatorWrapStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("OperatorWrap");
         if (moduleList == null) {
             return null;
@@ -451,8 +438,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<TypecastParenPadStyle> typecastParenPadStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<TypecastParenPadStyle> typecastParenPadStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("TypecastParenPad");
         if (moduleList == null) {
             return null;
@@ -468,8 +454,7 @@ public class CheckstyleConfigLoader {
     }
 
     @SuppressWarnings("DuplicatedCode")
-    @Nullable
-    private static Set<UnnecessaryParenthesesStyle> unnecessaryParentheses(Map<String, List<Module>> conf) {
+    private static @Nullable Set<UnnecessaryParenthesesStyle> unnecessaryParentheses(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("UnnecessaryParentheses");
         if (moduleList == null) {
             return null;
@@ -536,8 +521,7 @@ public class CheckstyleConfigLoader {
                 .collect(Collectors.toSet());
     }
 
-    @Nullable
-    private static Set<HideUtilityClassConstructorStyle> hideUtilityClassConstructorStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<HideUtilityClassConstructorStyle> hideUtilityClassConstructorStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("HiddenField");
         if (moduleList == null) {
             return null;
@@ -579,9 +563,7 @@ public class CheckstyleConfigLoader {
         }
     }
 
-
-    @Nullable
-    private static Set<ExplicitInitializationStyle> explicitInitialization(Map<String, List<Module>> conf) {
+    private static @Nullable Set<ExplicitInitializationStyle> explicitInitialization(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("ExplicitInitialization");
         if (moduleList == null) {
             return null;

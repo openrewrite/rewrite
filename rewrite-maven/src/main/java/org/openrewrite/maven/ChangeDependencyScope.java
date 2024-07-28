@@ -30,7 +30,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyScope extends Recipe {
 
     @Option(displayName = "Group",
@@ -58,6 +58,11 @@ public class ChangeDependencyScope extends Recipe {
     @Override
     public String getDisplayName() {
         return "Change Maven dependency scope";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("for `%s:%s` to `%s`", groupId, artifactId, newScope);
     }
 
     @Override

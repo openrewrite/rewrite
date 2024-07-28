@@ -19,7 +19,11 @@ import org.openrewrite.internal.lang.Nullable;
 
 public class DependencyStringNotationConverter {
 
-    public static Dependency parse(String notation) {
+    /**
+     * @param notation a String in the format group:artifact:version
+     * @return A corresponding Dependency or null if the notation could not be parsed
+     */
+    public static @Nullable Dependency parse(String notation) {
         int idx = notation.lastIndexOf('@');
         if (idx == -1) {
             return parse(notation, null);
@@ -33,7 +37,7 @@ public class DependencyStringNotationConverter {
         return parse(notation, null);
     }
 
-    private static Dependency parse(String notation, @Nullable String ext) {
+    private static @Nullable Dependency parse(String notation, @Nullable String ext) {
         Dependency dependency = new Dependency(null, null, null, null, ext);
 
         int count = 0;
@@ -51,7 +55,7 @@ public class DependencyStringNotationConverter {
         count++;
 
         if (count < 2 || count > 4) {
-            throw new IllegalArgumentException("Supplied String notation '" + notation + "' is invalid.");
+            return null;
         }
 
         return dependency;

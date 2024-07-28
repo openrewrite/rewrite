@@ -35,7 +35,10 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
+import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,7 +57,7 @@ class RecipeLifecycleTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
               @Override
-              public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+              public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                   fail("Should never have reached a visit method");
                   return tree;
               }
@@ -71,17 +74,17 @@ class RecipeLifecycleTest implements RewriteTest {
             .recipe(toRecipe()
               .withGenerator(() -> List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build()))
               .withName("test.GeneratingRecipe")
+              .withMaxCycles(1)
             )
             .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
               .map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
-              .containsOnly("test.GeneratingRecipe"))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+              .containsOnly("test.GeneratingRecipe")),
           text(null, "test", spec -> spec.path("test.txt"))
         );
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     static class DeleteFirst extends Recipe {
 
         @Override
@@ -99,7 +102,7 @@ class RecipeLifecycleTest implements RewriteTest {
         public List<Recipe> getRecipeList() {
             return Arrays.asList(
               new DeleteSourceFiles("test.txt"),
-              new FindAndReplace("test", "", null, null, null, null, null));
+              new FindAndReplace("test", "", null, null, null, null, null, null));
         }
     }
 
@@ -116,7 +119,7 @@ class RecipeLifecycleTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
               @Override
-              public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext executionContext) {
+              public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext ctx) {
                   return null;
               }
           })),
@@ -250,8 +253,7 @@ class RecipeLifecycleTest implements RewriteTest {
                 assertThat(changes).hasSize(1);
                 assertThat(changes.get(0).getRecipeDescriptorsThatMadeChanges().stream().map(RecipeDescriptor::getName))
                   .containsExactlyInAnyOrder("Change1", "Change2");
-            })
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            }),
           text(
             "Hello",
             "Change2Change1Hello"
@@ -262,11 +264,11 @@ class RecipeLifecycleTest implements RewriteTest {
     private Recipe testRecipe(@Language("markdown") String name) {
         return toRecipe(() -> new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 if (!text.getText().contains(name)) {
                     return text.withText(name + text.getText());
                 }
-                return super.visitText(text, executionContext);
+                return super.visitText(text, ctx);
             }
         }).withName(name);
     }
@@ -278,6 +280,7 @@ class RecipeLifecycleTest implements RewriteTest {
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - org.openrewrite.NoArgRecipe
             """,
@@ -293,6 +296,7 @@ class RecipeLifecycleTest implements RewriteTest {
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - org.openrewrite.NoArgRecipe:
                   foo: bar
@@ -309,6 +313,7 @@ class RecipeLifecycleTest implements RewriteTest {
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - org.openrewrite.DefaultConstructorRecipe
             """,
@@ -324,18 +329,21 @@ class RecipeLifecycleTest implements RewriteTest {
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe.a
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - test.recipe.b
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe.b
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - test.recipe.c
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: test.recipe.c
             displayName: Test Recipe
+            description: Test Recipe.
             recipeList:
               - org.openrewrite.NoArgRecipe
             """,
@@ -352,6 +360,7 @@ class RecipeLifecycleTest implements RewriteTest {
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.recipe.c
                 displayName: Test Recipe
+                description: Test Recipe.
                 recipeList:
                   - org.openrewrite.NoArgRecipe
                 """.getBytes()),
@@ -361,6 +370,7 @@ class RecipeLifecycleTest implements RewriteTest {
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.recipe.b
                 displayName: Test Recipe
+                description: Test Recipe.
                 recipeList:
                   - test.recipe.c
                 """.getBytes()),
@@ -370,6 +380,7 @@ class RecipeLifecycleTest implements RewriteTest {
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.recipe.a
                 displayName: Test Recipe
+                description: Test Recipe.
                 recipeList:
                   - test.recipe.b
                 """.getBytes()),
@@ -389,7 +400,7 @@ class RecipeLifecycleTest implements RewriteTest {
     void declarativeRecipeChainFromResourcesIncludesImperativeRecipesInDescriptors() {
         rewriteRun(spec -> spec.recipeFromResources("test.declarative.sample.a")
             .afterRecipe(recipeRun -> assertThat(recipeRun.getChangeset().getAllResults().get(0)
-              .getRecipeDescriptorsThatMadeChanges().get(0).getRecipeList().get(0).getRecipeList().get(0)
+              .getRecipeDescriptorsThatMadeChanges().get(0).getRecipeList().get(0)
               .getDisplayName()).isEqualTo("Change text")),
           text("Hi", "after"));
     }
@@ -421,11 +432,11 @@ class DefaultConstructorRecipe extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 if (!text.getText().contains(getDisplayName())) {
                     return text.withText(getDisplayName() + text.getText());
                 }
-                return super.visitText(text, executionContext);
+                return super.visitText(text, ctx);
             }
         };
     }
@@ -448,11 +459,11 @@ class NoArgRecipe extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 if (!text.getText().contains(getDisplayName())) {
                     return text.withText(getDisplayName() + text.getText());
                 }
-                return super.visitText(text, executionContext);
+                return super.visitText(text, ctx);
             }
         };
     }

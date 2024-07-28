@@ -29,9 +29,10 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class CustomBuildEnvironment implements BuildEnvironment{
+public class CustomBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
+
     String cloneURL;
     String ref;
     String sha;
@@ -47,8 +48,8 @@ public class CustomBuildEnvironment implements BuildEnvironment{
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
         if (StringUtils.isBlank(cloneURL)
-                || StringUtils.isBlank(ref)
-                || StringUtils.isBlank(sha)) {
+            || StringUtils.isBlank(ref)
+            || StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException();
         } else {
             return new GitProvenance(UUID.randomUUID(), cloneURL, ref, sha,

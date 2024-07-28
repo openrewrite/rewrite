@@ -45,8 +45,7 @@ public interface Yaml extends Tree {
         return v.isAdaptableTo(YamlVisitor.class);
     }
 
-    @Nullable
-    default <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+    default <P> @Nullable Yaml acceptYaml(YamlVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -180,6 +179,11 @@ public interface Yaml extends Tree {
             boolean explicit;
 
             @Override
+            public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+                return v.visitDocumentEnd(this, p);
+            }
+
+            @Override
             public End copyPaste() {
                 return new End(randomId(), prefix, Markers.EMPTY, explicit);
             }
@@ -220,6 +224,7 @@ public interface Yaml extends Tree {
             return new Scalar(randomId(), prefix, Markers.EMPTY, style, anchor, value);
         }
 
+        @Override
         public String toString() {
             return "Yaml.Scalar(" + value + ")";
         }
@@ -435,6 +440,7 @@ public interface Yaml extends Tree {
             return new Alias(randomId(), prefix, Markers.EMPTY, anchor);
         }
 
+        @Override
         public String toString() {
             return "Yaml.Alias(" + anchor + ")";
         }
@@ -469,6 +475,7 @@ public interface Yaml extends Tree {
             return new Anchor(randomId(), prefix, postfix, Markers.EMPTY, key);
         }
 
+        @Override
         public String toString() {
             return "Yaml.Anchor(" + key + ")";
         }
@@ -478,8 +485,10 @@ public interface Yaml extends Tree {
         /**
          * @return A new deep copy of this block with different IDs.
          */
+        @Override
         Block copyPaste();
 
+        @Override
         Block withPrefix(String prefix);
     }
 }

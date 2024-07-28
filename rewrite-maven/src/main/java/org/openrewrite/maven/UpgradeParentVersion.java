@@ -22,28 +22,24 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
 
-import java.util.List;
-
+@Getter
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpgradeParentVersion extends Recipe {
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.springframework.boot:spring-boot-parent:VERSION'.",
             example = "org.springframework.boot")
-    @Getter
     String groupId;
 
     @Option(displayName = "Artifact",
             description = "The second part of a dependency coordinate 'org.springframework.boot:spring-boot-parent:VERSION'.",
             example = "spring-boot-parent")
-    @Getter
     String artifactId;
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number.",
             example = "29.X")
-    @Getter
     String newVersion;
 
     @Option(displayName = "Version pattern",
@@ -51,19 +47,8 @@ public class UpgradeParentVersion extends Recipe {
                           "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
-    @Getter
     @Nullable
     String versionPattern;
-
-    @Option(displayName = "Retain versions",
-            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed " +
-                          "from dependency management in the new parent pom, then it will be retained with an explicit version. " +
-                          "The version can be omitted from the GAV to use the old value from dependency management",
-            example = "com.jcraft:jsch",
-            required = false)
-    @Getter
-    @Nullable
-    List<String> retainVersions;
 
     @Override
     public String getDisplayName() {
@@ -71,8 +56,14 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("to `%s:%s:%s`", groupId, artifactId, newVersion);
+    }
+
+    @Override
     public String getDescription() {
-        return "Set the parent pom version number according to a node-style semver selector or to a specific version number.";
+        return "Set the parent pom version number according to a [version selector](https://docs.openrewrite.org/reference/dependency-version-selectors) " +
+               "or to a specific version number.";
     }
 
     @Override
@@ -92,6 +83,6 @@ public class UpgradeParentVersion extends Recipe {
 
     private ChangeParentPom changeParentPom() {
         return new ChangeParentPom(groupId, null, artifactId, null, newVersion, null, null,
-                versionPattern, false, retainVersions);
+                versionPattern, false);
     }
 }

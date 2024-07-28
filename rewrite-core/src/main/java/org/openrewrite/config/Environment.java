@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import org.apache.commons.lang3.StringUtils;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
@@ -28,7 +29,10 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Comparator.comparingInt;
+import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 public class Environment {
     private final Collection<? extends ResourceLoader> resourceLoaders;
@@ -134,35 +138,40 @@ public class Environment {
     }
 
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
-        List<Recipe> allRecipes = listRecipes();
+        Map<String, Recipe> recipesByName = listRecipes().stream().collect(toMap(Recipe::getName, identity()));
         List<String> recipesNotFound = new ArrayList<>();
         List<Recipe> activatedRecipes = new ArrayList<>();
         for (String activeRecipe : activeRecipes) {
-            boolean foundRecipe = false;
-            for (Recipe recipe : allRecipes) {
-                if (activeRecipe.equals(recipe.getName())) {
-                    activatedRecipes.add(recipe);
-                    foundRecipe = true;
-                    break;
-                }
-            }
-            if (!foundRecipe) {
+            Recipe recipe = recipesByName.get(activeRecipe);
+            if (recipe == null) {
                 recipesNotFound.add(activeRecipe);
+            } else {
+                activatedRecipes.add(recipe);
             }
         }
         if (!recipesNotFound.isEmpty()) {
-            throw new RecipeException("Recipes not found: " + String.join(", ", recipesNotFound));
+            @SuppressWarnings("deprecation")
+            List<String> suggestions = recipesNotFound.stream()
+                    .map(r -> recipesByName.keySet().stream()
+                            .min(comparingInt(a -> StringUtils.getLevenshteinDistance(a, r)))
+                            .orElse(r))
+                    .collect(toList());
+            String message = String.format("Recipe(s) not found: %s\nDid you mean: %s",
+                    String.join(", ", recipesNotFound),
+                    String.join(", ", suggestions));
+            throw new RecipeException(message);
+        }
+        if (activatedRecipes.isEmpty()) {
+            return Recipe.noop();
+        }
+        if (activatedRecipes.size() == 1) {
+            return activatedRecipes.get(0);
         }
         return new CompositeRecipe(activatedRecipes);
     }
 
     public Recipe activateRecipes(String... activeRecipes) {
         return activateRecipes(Arrays.asList(activeRecipes));
-    }
-
-    //TODO: Nothing uses this and in most cases it would be a bad idea anyway, should consider removing
-    public Recipe activateAll() {
-        return new CompositeRecipe(listRecipes());
     }
 
     /**

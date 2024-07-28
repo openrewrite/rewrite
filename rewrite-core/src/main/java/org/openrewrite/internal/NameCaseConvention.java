@@ -56,6 +56,7 @@ public enum NameCaseConvention {
     UPPER_UNDERSCORE;
 
     private static final Pattern CAMEL_CASE_SPLIT = Pattern.compile("[\\s_-]");
+    private static final int uppercaseAbbreviationMinLength = 3;
 
     /**
      * Formats the input to the style of this {@link NameCaseConvention}.
@@ -95,7 +96,64 @@ public enum NameCaseConvention {
     }
 
     public static boolean matches(NameCaseConvention convention, String str) {
-        return str.equals(format(convention, str));
+        switch (convention) {
+            case LOWER_CAMEL:
+                if (!Character.isLowerCase(str.charAt(0)) && str.charAt(0) != '$') {
+                    return false;
+                }
+                for (int i = 1; i < str.length(); i++) {
+                    char p = str.charAt(i - 1);
+                    char c = str.charAt(i);
+                    if (Character.isUpperCase(c) && Character.isUpperCase(p)) {
+                        return false;
+                    } else if (c == '_') {
+                        return false;
+                    }
+                }
+                return true;
+            case UPPER_CAMEL:
+                if (!Character.isUpperCase(str.charAt(0)) && str.charAt(0) != '$') {
+                    return false;
+                }
+                for (int i = 1; i < str.length(); i++) {
+                    char p = str.charAt(i - 1);
+                    char c = str.charAt(i);
+                    if (Character.isUpperCase(c) && Character.isUpperCase(p)) {
+                        return false;
+                    } else if (c == '_') {
+                        return false;
+                    }
+                }
+                return true;
+            case LOWER_UNDERSCORE:
+                for (int i = 0; i < str.length(); i++) {
+                    char c = str.charAt(i);
+                    if (Character.isAlphabetic(c) && Character.isUpperCase(c)) {
+                        return false;
+                    }
+                }
+                return true;
+            case UPPER_UNDERSCORE:
+                for (int i = 0; i < str.length(); i++) {
+                    char c = str.charAt(i);
+                    if (Character.isAlphabetic(c) && Character.isLowerCase(c)) {
+                        return false;
+                    }
+                }
+                return true;
+            case LOWER_HYPHEN:
+                for (int i = 0; i < str.length(); i++) {
+                    char c = str.charAt(i);
+                    if (Character.isAlphabetic(c) && Character.isUpperCase(c)) {
+                        return false;
+                    } else if (c == '_') {
+                        return false;
+                    }
+                }
+                return true;
+            default:
+                return str.equals(format(convention, str));
+        }
     }
 
     /**
@@ -148,16 +206,33 @@ public enum NameCaseConvention {
      */
     private static String toCamelCase(String str, boolean lowerCaseFirstLetter) {
         boolean allUpperCase = true;
-        for (char c : str.toCharArray()) {
-            if(Character.isLowerCase(c)) {
+        final int strLength = str.length();
+
+        boolean uppercaseAbbreviationIncluded = false;
+        int uppercaseAbbreviationEndIndex = -1;
+        int i = 0;
+        while (i < strLength) {
+            final char c = str.charAt(i);
+            if (Character.isLowerCase(c)) {
                 allUpperCase = false;
+                break;
             }
+            i++;
         }
-        if(allUpperCase) {
-            str = str.toLowerCase();
+        if (i > uppercaseAbbreviationMinLength) {
+            uppercaseAbbreviationIncluded = true;
+            uppercaseAbbreviationEndIndex = i - 1;
         }
 
-        StringBuilder sb = new StringBuilder(str.length());
+        StringBuilder sb = new StringBuilder(strLength);
+        if (allUpperCase) {
+            str = str.toLowerCase();
+        } else if (uppercaseAbbreviationIncluded) {
+            final String uppercaseAbbreviation = str.substring(0, uppercaseAbbreviationEndIndex);
+            sb.append(StringUtils.capitalize(uppercaseAbbreviation.toLowerCase()));
+            str = str.substring(uppercaseAbbreviationEndIndex);
+        }
+
         for (String s : CAMEL_CASE_SPLIT.split(str)) {
             String capitalize = StringUtils.capitalize(s);
             sb.append(capitalize);

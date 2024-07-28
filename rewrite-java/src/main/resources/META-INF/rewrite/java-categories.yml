@@ -28,3 +28,8 @@ type: specs.openrewrite.org/v1beta/category
 name: OpenRewrite best practices
 packageName: org.openrewrite.java.recipes
 description: Apply best practices to OpenRewrite recipes.
+---
+type: specs.openrewrite.org/v1beta/category
+name: AI tools
+packageName: org.openrewrite.java.ai
+description: Tools for researching AI integrations.

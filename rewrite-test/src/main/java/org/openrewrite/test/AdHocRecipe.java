@@ -45,7 +45,7 @@ public class AdHocRecipe extends Recipe {
     Boolean causesAnotherCycle;
 
     @With
-    Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
+    transient Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
 
     @With
     @Nullable
@@ -59,6 +59,7 @@ public class AdHocRecipe extends Recipe {
         return new AdHocScanningRecipe(displayName, name, causesAnotherCycle, getVisitor, generator, maintainers, maxCycles);
     }
 
+    @Override
     public String getDisplayName() {
         return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
     }
@@ -68,6 +69,7 @@ public class AdHocRecipe extends Recipe {
         return "An ad hoc recipe used in RewriteTest.";
     }
 
+    @Override
     public String getName() {
         return StringUtils.isBlank(name) ? super.getName() : name;
     }
@@ -82,6 +84,7 @@ public class AdHocRecipe extends Recipe {
         return maxCycles == null ? super.maxCycles() : maxCycles;
     }
 
+    @Override
     public List<Maintainer> getMaintainers() {
         return maintainers == null ? Collections.emptyList() : maintainers;
     }

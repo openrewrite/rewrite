@@ -43,18 +43,16 @@ public class RemoveTrailingWhitespaceVisitor<P> extends XmlIsoVisitor<P> {
         return d.withEof(eof);
     }
 
-    @Nullable
     @Override
-    public Xml visit(@Nullable Tree tree, P p) {
+    public @Nullable Xml visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Xml) tree;
         }
         return super.visit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Xml postVisit(Xml tree, P p) {
+    public @Nullable Xml postVisit(Xml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "stop", true);
         }

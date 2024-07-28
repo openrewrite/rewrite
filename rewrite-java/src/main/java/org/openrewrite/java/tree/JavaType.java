@@ -53,8 +53,7 @@ public interface JavaType {
     }
 
     // TODO: To be removed with OpenRewrite 9
-    @Nullable
-    default Integer getManagedReference() {
+    default @Nullable Integer getManagedReference() {
         return null;
     }
 
@@ -306,11 +305,9 @@ public interface JavaType {
             }
         }
 
-        @Nullable
-        public abstract FullyQualified getOwningClass();
+        public abstract @Nullable FullyQualified getOwningClass();
 
-        @Nullable
-        public abstract FullyQualified getSupertype();
+        public abstract @Nullable FullyQualified getSupertype();
 
         /**
          * @return The class name without package qualification. If an inner class, outer/inner classes are separated by '.'.
@@ -355,7 +352,8 @@ public interface JavaType {
             Enum,
             Interface,
             Annotation,
-            Record
+            Record,
+            Value
         }
     }
 
@@ -438,6 +436,7 @@ public interface JavaType {
         Class() {
         }
 
+        @Override
         public List<FullyQualified> getAnnotations() {
             return annotations == null ? emptyList() : Arrays.asList(annotations);
         }
@@ -455,6 +454,7 @@ public interface JavaType {
         @NonFinal
         FullyQualified[] interfaces;
 
+        @Override
         public List<FullyQualified> getInterfaces() {
             return interfaces == null ? emptyList() : Arrays.asList(interfaces);
         }
@@ -472,6 +472,7 @@ public interface JavaType {
         @NonFinal
         Variable[] members;
 
+        @Override
         public List<Variable> getMembers() {
             return members == null ? emptyList() : Arrays.asList(members);
         }
@@ -489,6 +490,7 @@ public interface JavaType {
         @NonFinal
         Method[] methods;
 
+        @Override
         public List<Method> getMethods() {
             return methods == null ? emptyList() : Arrays.asList(methods);
         }
@@ -609,22 +611,21 @@ public interface JavaType {
             ShallowClass owningClass = null;
 
             int firstClassNameIndex = 0;
-            int lastDot = 0;
-            char[] fullyQualifiedNameChars = fullyQualifiedName.replace('$', '.').toCharArray();
+            int lastDelimiter = 0;
             char prev = ' ';
-            for (int i = 0; i < fullyQualifiedNameChars.length; i++) {
-                char c = fullyQualifiedNameChars[i];
+            for (int i = 0; i < fullyQualifiedName.length(); i++) {
+                char c = fullyQualifiedName.charAt(i);
 
-                if (firstClassNameIndex == 0 && prev == '.' && Character.isUpperCase(c)) {
+                if (firstClassNameIndex == 0 && (prev == '.' || prev == '$') && Character.isUpperCase(c)) {
                     firstClassNameIndex = i;
-                } else if (c == '.') {
-                    lastDot = i;
+                } else if (c == '.' || c == '$') {
+                    lastDelimiter = i;
                 }
                 prev = c;
             }
 
-            if (lastDot > firstClassNameIndex) {
-                owningClass = build(fullyQualifiedName.substring(0, lastDot));
+            if (lastDelimiter > firstClassNameIndex) {
+                owningClass = build(fullyQualifiedName.substring(0, lastDelimiter));
             }
 
             return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, emptyList(), null, owningClass,
@@ -658,7 +659,7 @@ public interface JavaType {
         }
 
         Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type,
-                             @Nullable JavaType[] typeParameters) {
+                      @Nullable JavaType[] typeParameters) {
             this.managedReference = managedReference;
             this.type = unknownIfNull(type);
             this.typeParameters = nullIfEmpty(typeParameters);
@@ -710,8 +711,14 @@ public interface JavaType {
             return type.getFullyQualifiedName();
         }
 
+        @Override
         public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
-            return type.withFullyQualifiedName(fullyQualifiedName);
+            FullyQualified qualified = type.withFullyQualifiedName(fullyQualifiedName);
+            if (type == qualified) {
+                return this;
+            }
+
+            return new Parameterized(managedReference, qualified, typeParameters);
         }
 
         @Override
@@ -749,8 +756,8 @@ public interface JavaType {
             return type.getMethods();
         }
 
-        @Nullable
-        public FullyQualified getOwningClass() {
+        @Override
+        public @Nullable FullyQualified getOwningClass() {
             return type.getOwningClass();
         }
 
@@ -879,9 +886,14 @@ public interface JavaType {
         @NonFinal
         JavaType elemType;
 
-        public Array(@Nullable Integer managedReference, @Nullable JavaType elemType) {
+        @Nullable
+        @NonFinal
+        FullyQualified[] annotations;
+
+        public Array(@Nullable Integer managedReference, @Nullable JavaType elemType, @Nullable FullyQualified[] annotations) {
             this.managedReference = managedReference;
             this.elemType = unknownIfNull(elemType);
+            this.annotations = ListUtils.nullIfEmpty(annotations);
         }
 
         @JsonCreator
@@ -892,14 +904,27 @@ public interface JavaType {
             return elemType;
         }
 
+        public List<FullyQualified> getAnnotations() {
+            return annotations == null ? emptyList() : Arrays.asList(annotations);
+        }
+
+        public Array withAnnotations(@Nullable List<FullyQualified> annotations) {
+            FullyQualified[] annotationsArray = arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY);
+            if (Arrays.equals(annotationsArray, this.annotations)) {
+                return this;
+            }
+            return new Array(this.managedReference, this.elemType, this.annotations);
+        }
+
         @Override
         public Array unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
             return this;
         }
 
-        public Array unsafeSet(JavaType elemType) {
+        public Array unsafeSet(JavaType elemType, @Nullable FullyQualified[] annotations) {
             this.elemType = unknownIfNull(elemType);
+            this.annotations = ListUtils.nullIfEmpty(annotations);
             return this;
         }
 
@@ -931,8 +956,7 @@ public interface JavaType {
         None,
         Null;
 
-        @Nullable
-        public static Primitive fromKeyword(String keyword) {
+        public static @Nullable Primitive fromKeyword(String keyword) {
             switch (keyword) {
                 case "boolean":
                     return Boolean;
@@ -962,8 +986,7 @@ public interface JavaType {
             return null;
         }
 
-        @Nullable
-        public static Primitive fromClassName(String className) {
+        public static @Nullable Primitive fromClassName(String className) {
             switch (className) {
                 case "java.lang.Boolean":
                     return Boolean;
@@ -1131,9 +1154,9 @@ public interface JavaType {
         }
 
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
-               @Nullable JavaType returnType, @Nullable String[] parameterNames,
-               @Nullable JavaType[] parameterTypes, @Nullable FullyQualified[] thrownExceptions,
-               @Nullable FullyQualified[] annotations, @Nullable List<String> defaultValue) {
+                      @Nullable JavaType returnType, @Nullable String[] parameterNames,
+                      @Nullable JavaType[] parameterTypes, @Nullable FullyQualified[] thrownExceptions,
+                      @Nullable FullyQualified[] annotations, @Nullable List<String> defaultValue) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = unknownIfNull(declaringType);
@@ -1190,9 +1213,9 @@ public interface JavaType {
             return declaringType;
         }
 
-        public boolean isOverride() {
+        public @Nullable JavaType.Method getOverride() {
             if (declaringType instanceof JavaType.Unknown) {
-                return false;
+                return null;
             }
 
             Stack<FullyQualified> interfaces = new Stack<>();
@@ -1210,15 +1233,33 @@ public interface JavaType {
                             continue;
                         }
                         for (int i = 0; i < params.size(); i++) {
-                            if (!TypeUtils.isOfType(getParameterTypes().get(i), params.get(i))) {
-                                continue nextMethod;
+                            JavaType param = params.get(i);
+                            JavaType subtypeParam = getParameterTypes().get(i);
+                            if (!TypeUtils.isOfType(subtypeParam, param)) {
+                                if (param instanceof GenericTypeVariable) {
+                                    GenericTypeVariable genericParam = (GenericTypeVariable) param;
+                                    if (genericParam.getBounds().isEmpty()) {
+                                        continue;
+                                    }
+                                    for (JavaType bound : genericParam.getBounds()) {
+                                        if (!TypeUtils.isAssignableTo(bound, subtypeParam)) {
+                                            continue nextMethod;
+                                        }
+                                    }
+                                } else {
+                                    continue nextMethod;
+                                }
                             }
                         }
-                        return true;
+                        return method;
                     }
                 }
             }
-            return false;
+            return null;
+        }
+
+        public boolean isOverride() {
+            return getOverride() != null;
         }
 
         public boolean isInheritedFrom(String fullyQualifiedTypeName) {
@@ -1380,7 +1421,7 @@ public interface JavaType {
         }
 
         Variable(@Nullable Integer managedReference, long flagsBitMap, String name, @Nullable JavaType owner,
-                        @Nullable JavaType type, @Nullable FullyQualified[] annotations) {
+                 @Nullable JavaType type, @Nullable FullyQualified[] annotations) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.name = name;
@@ -1393,8 +1434,7 @@ public interface JavaType {
         Variable() {
         }
 
-        @Nullable
-        public JavaType getOwner() {
+        public @Nullable JavaType getOwner() {
             return owner;
         }
 
@@ -1514,15 +1554,13 @@ public interface JavaType {
             return emptyList();
         }
 
-        @Nullable
         @Override
-        public FullyQualified getOwningClass() {
+        public @Nullable FullyQualified getOwningClass() {
             return null;
         }
 
-        @Nullable
         @Override
-        public FullyQualified getSupertype() {
+        public @Nullable FullyQualified getSupertype() {
             return null;
         }
 

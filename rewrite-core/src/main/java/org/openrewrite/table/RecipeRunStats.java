@@ -59,8 +59,7 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 .recordCallable(scan);
     }
 
-    @Nullable
-    public SourceFile recordEdit(Recipe recipe, Callable<SourceFile> edit) throws Exception {
+    public @Nullable SourceFile recordEdit(Recipe recipe, Callable<SourceFile> edit) throws Exception {
         return Timer.builder("rewrite.recipe.edit")
                 .tag("name", recipe.getName())
                 .publishPercentiles(0.99)

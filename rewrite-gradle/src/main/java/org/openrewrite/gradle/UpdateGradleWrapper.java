@@ -38,17 +38,19 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
+import java.net.URI;
 import java.time.ZonedDateTime;
 import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
+import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.GradleWrapperState> {
 
     @Override
@@ -58,13 +60,17 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     @Override
     public String getDescription() {
-        return "Update the version of Gradle used in an existing Gradle wrapper.";
+        return "Update the version of Gradle used in an existing Gradle wrapper. " +
+               "Queries services.gradle.org to determine the available releases, but prefers the artifact repository URL " +
+               "which already exists within the wrapper properties file. " +
+               "If your artifact repository does not contain the same Gradle distributions as services.gradle.org, " +
+               "then the recipe may suggest a version which is not available in your artifact repository.";
     }
 
     @Getter
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "Defaults to the latest release if not specified.",
+                          "Defaults to the latest release available from services.gradle.org if not specified.",
             example = "7.x",
             required = false)
     @Nullable
@@ -82,21 +88,22 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     final String distribution;
 
     @Getter
-    @Option(displayName = "Repository URL",
-            description = "The URL of the repository to download the Gradle distribution from. Currently only supports " +
-                          "repositories like services.gradle.org, not arbitrary maven or ivy repositories. " +
-                          "Defaults to `https://services.gradle.org/versions/all`.",
-            example = "https://services.gradle.org/versions/all",
-            required = false)
-    @Nullable
-    final String repositoryUrl;
-
-    @Getter
     @Option(displayName = "Add if missing",
             description = "Add a Gradle wrapper, if it's missing. Defaults to `true`.",
             required = false)
     @Nullable
     final Boolean addIfMissing;
+
+    @Getter
+    @Option(example = "https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip", displayName = "Wrapper URI",
+            description = "The URI of the Gradle wrapper distribution. " +
+                          "Lookup of available versions still requires access to https://services.gradle.org " +
+                          "When this is specified the exact literal values supplied for `version` and `distribution` " +
+                          "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively. " +
+                          "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
+            required = false)
+    @Nullable
+    final String wrapperUri;
 
     @Override
     public Validated<Object> validate() {
@@ -112,7 +119,32 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     private GradleWrapper getGradleWrapper(ExecutionContext ctx) {
         if (gradleWrapper == null) {
-            gradleWrapper = GradleWrapper.create(distribution, version, repositoryUrl, ctx);
+            try {
+                gradleWrapper = GradleWrapper.create(distribution, version, null, ctx);
+            } catch (Exception e) {
+                // services.gradle.org is unreachable, possibly because of a firewall
+                // But if the user specified a wrapperUri to an internal repository things might still be workable
+                if (wrapperUri == null) {
+                    throw new IllegalArgumentException(
+                            "Could not reach services.gradle.org and no alternative wrapper URI is provided. " +
+                            "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri.", e);
+                }
+                if (wrapperUri.contains("${version})")) {
+                    if (version == null) {
+                        throw new IllegalArgumentException(
+                                "wrapperUri contains a ${version} interpolation specifier but no version parameter was specified.", e);
+                    }
+                    if(!version.matches("[0-9.]+")) {
+                        throw new IllegalArgumentException(
+                                "Version selectors like \"" + version + "\" are unavailable when services.gradle.org cannot be reached. " +
+                                "Specify an exact, literal version number.", e);
+                    }
+                }
+                String effectiveWrapperUri = wrapperUri
+                        .replace("${version}", version == null ? "" : version)
+                        .replace("${distribution}", distribution == null ? "bin" : distribution);
+                gradleWrapper = GradleWrapper.create(URI.create(effectiveWrapperUri), ctx);
+            }
         }
         return gradleWrapper;
     }
@@ -165,7 +197,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             acc.needsWrapperUpdate = true;
                             acc.updatedMarker = buildTool.withVersion(gradleWrapper.getVersion());
                             return true;
-                        } else return compare == 0;
+                        } else {
+                            return compare == 0;
+                        }
                     }
 
                     @Override
@@ -186,8 +220,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 },
                 new TreeVisitor<Tree, ExecutionContext>() {
                     @Override
-                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-                        if (!super.isAcceptable(sourceFile, executionContext)) {
+                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                        if (!super.isAcceptable(sourceFile, ctx)) {
                             return false;
                         }
 
@@ -234,7 +268,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             "distributionBase=GRADLE_USER_HOME\n" +
                             "distributionPath=wrapper/dists\n" +
                             "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
-                            "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n" +
+                            ((gradleWrapper.getDistributionChecksum() == null) ? "" : "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n") +
                             "zipStoreBase=GRADLE_USER_HOME\n" +
                             "zipStorePath=wrapper/dists")
                     .findFirst()
@@ -287,9 +321,20 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
                 SourceFile sourceFile = (SourceFile) tree;
                 if (acc.updatedMarker != null) {
-                    sourceFile = sourceFile.getMarkers().findFirst(BuildTool.class)
-                            .map(buildTool -> (SourceFile) tree.withMarkers(tree.getMarkers().computeByType(buildTool, (b, a) -> acc.updatedMarker)))
-                            .orElse(sourceFile);
+                    Optional<BuildTool> maybeCurrentMarker = sourceFile.getMarkers().findFirst(BuildTool.class);
+                    if (maybeCurrentMarker.isPresent()) {
+                        BuildTool currentMarker = maybeCurrentMarker.get();
+                        if (currentMarker.getType() != BuildTool.Type.Gradle) {
+                            return sourceFile;
+                        }
+                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
+                        int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
+                        if (compare < 0) {
+                            sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
+                        } else {
+                            return sourceFile;
+                        }
+                    }
                 }
 
                 if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH)) {
@@ -312,7 +357,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     return new WrapperPropertiesVisitor(gradleWrapper).visitNonNull(sourceFile, ctx);
                 }
                 if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
-                    return gradleWrapper.wrapperJar().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
+                    return gradleWrapper.wrapperJar(sourceFile);
                 }
                 return sourceFile;
             }
@@ -388,7 +433,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         return script;
     }
 
-    private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
+    private class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
 
         private static final String DISTRIBUTION_SHA_256_SUM_KEY = "distributionSha256Sum";
         private final GradleWrapper gradleWrapper;
@@ -398,10 +443,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         }
 
         @Override
-        public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
-            Properties p = super.visitFile(file, executionContext);
-            Set<Properties.Entry> properties = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
-            if (properties.isEmpty()) {
+        public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+            Properties p = super.visitFile(file, ctx);
+            Set<Properties.Entry> checksumKey = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
+            if (checksumKey.isEmpty() && gradleWrapper.getDistributionChecksum() != null) {
                 Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, gradleWrapper.getDistributionChecksum().getHexValue());
                 Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", Properties.Entry.Delimiter.EQUALS, propertyValue);
                 List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
@@ -411,11 +456,27 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         }
 
         @Override
-        public Properties visitEntry(Properties.Entry entry, ExecutionContext context) {
+        public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if ("distributionUrl".equals(entry.getKey())) {
-                return entry.withValue(entry.getValue().withText(gradleWrapper.getPropertiesFormattedUrl()));
+                Properties.Value value = entry.getValue();
+                String currentUrl = value.getText();
+                // Prefer wrapperUri specified directly in the recipe over other options
+                // If that isn't set, prefer the existing artifact repository URL over changing to services.gradle.org
+                if (wrapperUri != null) {
+                    String effectiveWrapperUri = formatUriForPropertiesFile(wrapperUri
+                            .replace("${version}", gradleWrapper.getVersion())
+                            .replace("${distribution}", distribution == null ? "bin" : distribution));
+                    return entry.withValue(value.withText(effectiveWrapperUri));
+                } else if (currentUrl.startsWith("https\\://services.gradle.org/distributions/")) {
+                    return entry.withValue(value.withText(gradleWrapper.getPropertiesFormattedUrl()));
+                } else {
+                    String gradleServicesDistributionUrl = gradleWrapper.getDistributionUrl();
+                    String newDistributionFile = gradleServicesDistributionUrl.substring(gradleServicesDistributionUrl.lastIndexOf('/') + 1);
+                    String repositoryUrlPrefix = currentUrl.substring(0, currentUrl.lastIndexOf('/'));
+                    return entry.withValue(value.withText(repositoryUrlPrefix + "/" + newDistributionFile));
+                }
             }
-            if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey())) {
+            if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey()) && gradleWrapper.getDistributionChecksum() != null) {
                 return entry.withValue(entry.getValue().withText(gradleWrapper.getDistributionChecksum().getHexValue()));
             }
             return entry;

@@ -85,10 +85,6 @@ public class ResolvedDependency implements Serializable {
         this.effectiveExclusions = effectiveExclusions;
     }
 
-    public ResolvedGroupArtifactVersion getGav() {
-        return gav;
-    }
-
     public String getGroupId() {
         return gav.getGroupId();
     }
@@ -114,18 +110,15 @@ public class ResolvedDependency implements Serializable {
         return depth != 0;
     }
 
-    @Nullable
-    public String getDatedSnapshotVersion() {
+    public @Nullable String getDatedSnapshotVersion() {
         return gav.getDatedSnapshotVersion();
     }
 
-    @Nullable
-    public ResolvedDependency findDependency(String groupId, String artifactId) {
+    public @Nullable ResolvedDependency findDependency(String groupId, String artifactId) {
         return findDependency0(groupId, artifactId, Collections.newSetFromMap(new IdentityHashMap<>()));
     }
 
-    @Nullable
-    private ResolvedDependency findDependency0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
+    private @Nullable ResolvedDependency findDependency0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
         if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
             return this;
         } else if (!visited.add(this)) {

@@ -27,7 +27,7 @@ import org.openrewrite.marker.Markers;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeValue extends Recipe {
     @Option(displayName = "Key path",
             description = "A JsonPath expression to locate a JSON entry.",
@@ -45,6 +45,11 @@ public class ChangeValue extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKeyPath, value);
+    }
+
+    @Override
     public String getDescription() {
         return "Change a JSON mapping entry value leaving the key intact.";
     }
@@ -54,8 +59,8 @@ public class ChangeValue extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
-            public Json.Member visitMember(Json.Member member, ExecutionContext executionContext) {
-                Json.Member m = super.visitMember(member, executionContext);
+            public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
+                Json.Member m = super.visitMember(member, ctx);
                 if (matcher.matches(getCursor()) && (!(m.getValue() instanceof Json.Literal) || !((Json.Literal) m.getValue()).getValue().equals(value))) {
                     String source = ChangeValue.this.value;
                     if (source.startsWith("'") || source.startsWith("\"")) {

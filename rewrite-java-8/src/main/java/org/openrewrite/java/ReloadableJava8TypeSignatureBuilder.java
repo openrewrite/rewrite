@@ -18,12 +18,14 @@ package org.openrewrite.java;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
+import com.sun.tools.javac.tree.JCTree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
@@ -82,7 +84,41 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     @Override
     public String arraySignature(Object type) {
-        return signature(((Type.ArrayType) type).elemtype) + "[]";
+        Object elemType = type;
+        StringBuilder dimensions = new StringBuilder();
+        while (elemType instanceof Type.ArrayType) {
+            dimensions.append("[]");
+            elemType = ((Type.ArrayType) elemType).elemtype;
+        }
+        return signature(elemType) + dimensions;
+    }
+
+    public String annotatedArraySignature(JCTree.JCAnnotatedType annotatedType) {
+        JCTree tree = annotatedType;
+        StringBuilder dimensions = new StringBuilder();
+        while (tree instanceof JCTree.JCAnnotatedType || tree instanceof JCTree.JCArrayTypeTree) {
+            if (tree instanceof JCTree.JCAnnotatedType) {
+                dimensions.append(mapAnnotations(((JCTree.JCAnnotatedType) tree).annotations));
+                tree = ((JCTree.JCAnnotatedType) tree).getUnderlyingType();
+            }
+            if (tree instanceof JCTree.JCArrayTypeTree) {
+                dimensions.append("[]");
+                tree = ((JCTree.JCArrayTypeTree) tree).getType();
+            }
+        }
+        return signature(tree.type) + dimensions;
+    }
+
+    private String mapAnnotations(List<JCTree.JCAnnotation> annotations) {
+        if (annotations.isEmpty()) {
+            return "";
+        }
+
+        StringJoiner joiner = new StringJoiner(",", "[", "]");
+        for (JCTree.JCAnnotation annotation : annotations) {
+            joiner.add(signature(annotation.type));
+        }
+        return joiner.toString();
     }
 
     @Override
@@ -204,7 +240,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s += "{name=<constructor>,return=" + s;
         } else {
             s += "{name=" + symbol.getSimpleName().toString() +
-                    ",return=" + signature(selectType.getReturnType());
+                 ",return=" + signature(selectType.getReturnType());
         }
 
         return s + ",parameters=" + methodArgumentSignature(selectType) + '}';
@@ -224,7 +260,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s += "{name=<constructor>,return=" + s;
         } else {
             s += "{name=" + symbol.getSimpleName().toString() +
-                    ",return=" + returnType;
+                 ",return=" + returnType;
         }
 
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';

@@ -35,7 +35,7 @@ import java.util.Optional;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveExclusion extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
@@ -47,12 +47,12 @@ public class RemoveExclusion extends Recipe {
             example = "guava")
     String artifactId;
 
-    @Option(displayName = "Exclusion Group",
+    @Option(displayName = "Exclusion group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "com.google.guava")
     String exclusionGroupId;
 
-    @Option(displayName = "Exclusion Artifact",
+    @Option(displayName = "Exclusion artifact",
             description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "guava")
     String exclusionArtifactId;
@@ -69,6 +69,11 @@ public class RemoveExclusion extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", exclusionGroupId, exclusionArtifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "Remove any matching exclusion from any matching dependency.";
     }
@@ -77,7 +82,7 @@ public class RemoveExclusion extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId) || isManagedDependencyTag(groupId, artifactId)) {
                     Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                     if (maybeExclusions.isPresent()) {
@@ -91,7 +96,7 @@ public class RemoveExclusion extends Recipe {
                                             Xml.Tag exclusion = (Xml.Tag) child2;
                                             if (exclusion.getChildValue("groupId").map(g -> matchesGlob(g, exclusionGroupId)).orElse(false) &&
                                                 exclusion.getChildValue("artifactId").map(g -> matchesGlob(g, exclusionArtifactId)).orElse(false) &&
-                                                    !(isEffectiveExclusion(tag, groupArtifact(exclusion)) && Boolean.TRUE.equals(onlyIneffective))) {
+                                                !(isEffectiveExclusion(tag, groupArtifact(exclusion)) && Boolean.TRUE.equals(onlyIneffective))) {
                                                 return null;
                                             }
                                         }
@@ -110,7 +115,7 @@ public class RemoveExclusion extends Recipe {
                         }));
                     }
                 }
-                return super.visitTag(tag, executionContext);
+                return super.visitTag(tag, ctx);
             }
 
             private GroupArtifact groupArtifact(Xml.Tag tag) {

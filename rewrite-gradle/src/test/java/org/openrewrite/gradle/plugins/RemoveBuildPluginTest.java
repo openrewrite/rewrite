@@ -99,7 +99,8 @@ class RemoveBuildPluginTest implements RewriteTest {
     void applySyntax() {
         rewriteRun(
           spec -> spec.recipe(new RemoveBuildPlugin("org.openrewrite.rewrite")),
-          buildGradle("""
+          buildGradle(
+                """
               buildscript {
                 repositories {
                   maven {

@@ -2,6 +2,10 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
+val antlrGeneration by configurations.creating {
+    extendsFrom(configurations.implementation.get())
+}
+
 tasks.register<JavaExec>("generateAntlrSources") {
     mainClass.set("org.antlr.v4.Tool")
 
@@ -11,7 +15,7 @@ tasks.register<JavaExec>("generateAntlrSources") {
             "-visitor"
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
-    classpath = sourceSets["main"].runtimeClasspath
+    classpath = antlrGeneration
 }
 
 dependencies {
@@ -21,8 +25,10 @@ dependencies {
 
     compileOnly(project(":rewrite-test"))
 
-    implementation("org.antlr:antlr4:4.11.1")
+    antlrGeneration("org.antlr:antlr4:4.11.1")
+    implementation("org.antlr:antlr4-runtime:4.11.1")
     implementation("io.micrometer:micrometer-core:1.9.+")
+    implementation("org.apache.commons:commons-text:1.11.+")
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-maven"))

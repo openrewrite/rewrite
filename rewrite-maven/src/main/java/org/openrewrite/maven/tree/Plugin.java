@@ -43,6 +43,7 @@ public class Plugin {
     @Nullable
     String inherited;
 
+    @Nullable
     JsonNode configuration;
 
     List<Dependency> dependencies;
@@ -53,6 +54,8 @@ public class Plugin {
     public static class Execution {
 
         String id;
+
+        @Nullable
         List<String> goals;
 
         String phase;
@@ -64,8 +67,11 @@ public class Plugin {
         JsonNode configuration;
     }
 
-    @Nullable
-    public String getConfigurationStringValue(String path) {
+    public @Nullable String getConfigurationStringValue(String path) {
+        if (configuration == null) {
+            return null;
+        }
+
         JsonNode current = configuration;
         if (!path.isEmpty()) {
             String[] elements = path.split("\\.");
@@ -79,8 +85,11 @@ public class Plugin {
         return MavenXmlMapper.readMapper().convertValue(current, String.class);
     }
 
-    @Nullable
-    public <T> T getConfiguration(String path, Class<T> configClass) {
+    public <T> @Nullable T getConfiguration(String path, Class<T> configClass) {
+        if (configuration == null) {
+            return null;
+        }
+
         JsonNode current = configuration;
         if (!path.isEmpty()) {
             String[] elements = path.split("\\.");
@@ -102,6 +111,10 @@ public class Plugin {
     }
 
     public <T> List<T> getConfigurationList(String path, Class<T> elementClass) {
+        if (configuration == null) {
+            return Collections.emptyList();
+        }
+
         JsonNode current = configuration;
         if (!path.isEmpty()) {
             String[] elements = path.split("\\.");
@@ -127,4 +140,3 @@ public class Plugin {
         return MavenXmlMapper.readMapper().convertValue(current, new TypeReference<List<T>>() {});
     }
 }
-

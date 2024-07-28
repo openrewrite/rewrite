@@ -227,6 +227,19 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 }
 
                 j = keepMaximumLines(j, declMax);
+            } else if (grandparentTree instanceof J.NewClass && parentTree instanceof J.Block) {
+                J.Block block = (J.Block) parentTree;
+
+                int declMax = style.getKeepMaximum().getInDeclarations();
+
+                if (!block.getStatements().isEmpty() && !block.getStatements().iterator().next().isScope(j)) {
+                    if (j instanceof J.MethodDeclaration) {
+                        declMax = Math.max(declMax, style.getMinimum().getAroundMethod());
+                        j = minimumLines(j, style.getMinimum().getAroundMethod());
+                    }
+                }
+
+                j = keepMaximumLines(j, declMax);
             } else {
                 return keepMaximumLines(j, style.getKeepMaximum().getInCode());
             }
@@ -287,7 +300,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 c.withSuffix(minimumLines(c.getSuffix(), min)) : c));
     }
 
-    private String minimumLines(String whitespace, int min) {
+    public static String minimumLines(String whitespace, int min) {
         if (min == 0) {
             return whitespace;
         }
@@ -311,9 +324,8 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
         return newLineCount;
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }

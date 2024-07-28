@@ -25,17 +25,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeTagValue extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Change XML tag value";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Alters the value of XML tags matching the provided expression.";
-    }
 
     @Option(displayName = "Element name",
             description = "The name of the element whose value is to be changed. Interpreted as an XPath Expression.",
@@ -53,6 +44,16 @@ public class ChangeTagValue extends Recipe {
             description = "The new value for the tag.",
             example = "user")
     String newValue;
+
+    @Override
+    public String getDisplayName() {
+        return "Change XML tag value";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Alters the value of XML tags matching the provided expression.";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

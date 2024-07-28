@@ -62,10 +62,11 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     public Json visitArr(JSON5Parser.ArrContext ctx) {
         return convert(ctx, (arr, prefix) -> {
             sourceBefore("[");
-            List<JsonRightPadded<JsonValue>> converted = new ArrayList<>(ctx.value().size());
-            for (int i = 0; i < ctx.value().size(); i++) {
-                JSON5Parser.ValueContext value = ctx.value().get(i);
-                if (i == ctx.value().size() - 1) {
+            List<JSON5Parser.ValueContext> values = ctx.value();
+            List<JsonRightPadded<JsonValue>> converted = new ArrayList<>(values.size());
+            for (int i = 0; i < values.size(); i++) {
+                JSON5Parser.ValueContext value = values.get(i);
+                if (i == values.size() - 1) {
                     JsonRightPadded<JsonValue> unpadded = JsonRightPadded.build((JsonValue) visit(value));
                     if (positionOfNext(",", ']') >= 0) {
                         converted.add(unpadded.withAfter(sourceBefore(",")));
@@ -80,7 +81,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 }
             }
 
-            if (ctx.value().isEmpty()) {
+            if (values.isEmpty()) {
                 converted.add(JsonRightPadded.build((JsonValue) new Json.Empty(randomId(), Space.EMPTY, Markers.EMPTY))
                         .withAfter(sourceBefore("]")));
             }
@@ -91,7 +92,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
     @Override
     public Json.Document visitJson5(JSON5Parser.Json5Context ctx) {
-        return !ctx.children.isEmpty() && "<EOF>".equals(ctx.children.get(0).getText()) ? new Json.Document(
+        return !ctx.children.isEmpty() && ctx.children.get(0) instanceof TerminalNode && ((TerminalNode) ctx.children.get(0)).getSymbol().getType() == JSON5Parser.EOF ? new Json.Document(
                 randomId(),
                 path,
                 Space.EMPTY,
@@ -112,7 +113,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 null,
                 fileAttributes,
                 visitValue(c.value()),
-                Space.format(source.substring(cursor))
+                Space.format(source, cursor, source.length())
         ));
     }
 
@@ -145,10 +146,11 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     public Json visitObj(JSON5Parser.ObjContext ctx) {
         return convert(ctx, (arr, prefix) -> {
             sourceBefore("{");
-            List<JsonRightPadded<Json>> converted = new ArrayList<>(ctx.member().size());
-            for (int i = 0; i < ctx.member().size(); i++) {
-                JSON5Parser.MemberContext member = ctx.member().get(i);
-                if (i == ctx.member().size() - 1) {
+            List<JSON5Parser.MemberContext> members = ctx.member();
+            List<JsonRightPadded<Json>> converted = new ArrayList<>(members.size());
+            for (int i = 0; i < members.size(); i++) {
+                JSON5Parser.MemberContext member = members.get(i);
+                if (i == members.size() - 1) {
                     JsonRightPadded<Json> unpadded = JsonRightPadded.build(visit(member));
                     if (positionOfNext(",", '}') >= 0) {
                         converted.add(unpadded.withAfter(sourceBefore(",")));
@@ -163,7 +165,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 }
             }
 
-            if (ctx.member().isEmpty()) {
+            if (members.isEmpty()) {
                 converted.add(JsonRightPadded.build((Json) new Json.Empty(randomId(), Space.EMPTY, Markers.EMPTY))
                         .withAfter(sourceBefore("}")));
             }
@@ -269,8 +271,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
         if (start < codePointCursor) {
             return Space.EMPTY;
         }
-        String prefix = source.substring(cursor, advanceCursor(start));
-        return Space.format(prefix);
+        return Space.format(source, cursor, advanceCursor(start));
     }
 
     public int advanceCursor(int newCodePointIndex) {
@@ -280,8 +281,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
         return cursor;
     }
 
-    @Nullable
-    private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, Space, T> conversion) {
+    private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, Space, T> conversion) {
         if (ctx == null) {
             return null;
         }
@@ -315,9 +315,9 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
             return Space.EMPTY; // unable to find this delimiter
         }
 
-        String prefix = source.substring(cursor, delimIndex);
-        advanceCursor(codePointCursor + Character.codePointCount(prefix, 0, prefix.length()) + untilDelim.length());
-        return Space.format(prefix);
+        Space space = Space.format(source, cursor, delimIndex);
+        advanceCursor(codePointCursor + Character.codePointCount(source, cursor, delimIndex) + untilDelim.length());
+        return space;
     }
 
     private int positionOfNext(String untilDelim, @Nullable Character stop) {
@@ -331,20 +331,19 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                     inSingleLineComment = false;
                 }
             } else {
-                if (source.length() - untilDelim.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex = delimIndex + 2;
-                            break;
+                if (inMultiLineComment) {
+                    if (source.charAt(delimIndex) == '*' && source.charAt(delimIndex + 1) == '/') {
+                        inMultiLineComment = false;
+                        delimIndex += 2;
+                    }
+                } else if (source.charAt(delimIndex) == '/' && source.length() - untilDelim.length() > delimIndex + 1) {
+                    int next = source.charAt(delimIndex + 1);
+                    if (next == '/') {
+                        inSingleLineComment = true;
+                        delimIndex++;
+                    } else if (next == '*') {
+                        inMultiLineComment = true;
+                        delimIndex++;
                     }
                 }
 

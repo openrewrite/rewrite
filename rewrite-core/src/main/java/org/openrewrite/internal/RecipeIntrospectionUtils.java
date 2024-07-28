@@ -87,8 +87,7 @@ public class RecipeIntrospectionUtils {
         }
     }
 
-    @Nullable
-    public static Constructor<?> getZeroArgsConstructor(Class<?> recipeClass) {
+    public static @Nullable Constructor<?> getZeroArgsConstructor(Class<?> recipeClass) {
         Constructor<?>[] constructors = recipeClass.getConstructors();
         for (Constructor<?> constructor : constructors) {
             if (constructor.getParameterCount() == 0) {

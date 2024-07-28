@@ -22,8 +22,10 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenVisitor;
+import org.openrewrite.maven.table.MavenProperties;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
@@ -32,14 +34,22 @@ import java.util.regex.Pattern;
 
 import static org.openrewrite.Tree.randomId;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class FindProperties extends Recipe {
+    transient MavenProperties mavenProperties = new MavenProperties(this);
 
     @Option(displayName = "Property pattern",
             description = "Regular expression pattern used to match property tag names.",
             example = "guava.*")
     String propertyPattern;
+
+    @Option(displayName = "Value pattern",
+            description = "Regular expression pattern used to match property values.",
+            example = "28.*",
+            required = false)
+    @Nullable
+    String valuePattern;
 
     UUID searchId = randomId();
 
@@ -57,12 +67,22 @@ public class FindProperties extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern propertyMatcher = Pattern.compile(propertyPattern);
         Pattern propertyUsageMatcher = Pattern.compile(".*\\$\\{" + propertyMatcher.pattern() + "}.*");
+        Pattern valueMatcher = valuePattern == null ? null : Pattern.compile(valuePattern);
         return new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (isPropertyTag() && propertyMatcher.matcher(t.getName()).matches()) {
-                    t = SearchResult.found(t);
+                    if (valueMatcher == null) {
+                        t = SearchResult.found(t);
+                        mavenProperties.insertRow(ctx, new MavenProperties.Row(t.getName(), t.getValue().orElse(null)));
+                    } else {
+                        Optional<String> value = t.getValue();
+                        if (value.isPresent() && valueMatcher.matcher(value.get()).matches()) {
+                            t = SearchResult.found(t);
+                            mavenProperties.insertRow(ctx, new MavenProperties.Row(t.getName(), value.get()));
+                        }
+                    }
                 }
 
                 Optional<String> value = t.getValue();
@@ -77,8 +97,7 @@ public class FindProperties extends Recipe {
     }
 
     /**
-     *
-     * @param xml The xml document of the pom.xml
+     * @param xml             The xml document of the pom.xml
      * @param propertyPattern Regular expression pattern used to match property tag names
      * @return Set of Maven project property tags that matches the {@code propertyPattern} within a pom.xml
      */

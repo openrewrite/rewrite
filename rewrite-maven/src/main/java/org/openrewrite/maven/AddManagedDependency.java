@@ -25,6 +25,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -37,7 +38,7 @@ import java.util.Objects;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Scanned> {
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -132,11 +133,16 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, version);
+    }
+
+    @Override
     public String getDescription() {
         return "Add a managed Maven dependency to a `pom.xml` file.";
     }
 
-    static class Scanned {
+    public static class Scanned {
         boolean usingType;
         List<SourceFile> rootPoms = new ArrayList<>();
     }
@@ -158,7 +164,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                         acc.rootPoms.add(document);
                     }
                 });
-                if(acc.usingType) {
+                if (acc.usingType) {
                     return SearchResult.found(document);
                 }
 
@@ -193,12 +199,21 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                 Xml maven = super.visitDocument(document, ctx);
 
                 if (!Boolean.TRUE.equals(addToRootPom) || acc.rootPoms.contains(document)) {
-                    Validated<VersionComparator> versionValidation = Semver.validate(version, versionPattern);
+                    ResolvedPom pom = getResolutionResult().getPom();
+                    String convertedVersion = pom.getValue(version);
+                    if (convertedVersion == null) {
+                        return maven;
+                    }
+                    Validated<VersionComparator> versionValidation = Semver.validate(convertedVersion, versionPattern);
                     if (versionValidation.isValid()) {
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
                         try {
-                            String versionToUse = findVersionToUse(versionComparator, ctx);
-                            if (!Objects.equals(versionToUse, existingManagedDependencyVersion())) {
+                            String versionToUse = findVersionToUse(versionComparator, pom, ctx);
+                            if (!Objects.equals(versionToUse, pom.getValue(existingManagedDependencyVersion()))) {
+                                if (ResolvedPom.placeholderHelper.hasPlaceholders(version) && Objects.equals(convertedVersion, versionToUse)) {
+                                    // revert back to the original version if the version has a placeholder
+                                    versionToUse = version;
+                                }
                                 doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
                                         versionToUse, scope, type, classifier));
                                 maybeUpdateModel();
@@ -212,8 +227,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                 return maven;
             }
 
-            @Nullable
-            private String existingManagedDependencyVersion() {
+            private @Nullable String existingManagedDependencyVersion() {
                 return getResolutionResult().getPom().getDependencyManagement().stream()
                         .map(resolvedManagedDep -> {
                             if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
@@ -229,9 +243,8 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                         .findFirst().orElse(null);
             }
 
-            @Nullable
-            private String findVersionToUse(VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
-                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+            private @Nullable String findVersionToUse(VersionComparator versionComparator, ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
+                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, containingPom, ctx));
                 LatestRelease latest = new LatestRelease(versionPattern);
                 return mavenMetadata.getVersioning().getVersions().stream()
                         .filter(v -> versionComparator.isValid(null, v))

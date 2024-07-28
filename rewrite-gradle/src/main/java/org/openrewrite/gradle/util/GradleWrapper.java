@@ -36,8 +36,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 
 @Value
 public class GradleWrapper {
@@ -86,15 +89,34 @@ public class GradleWrapper {
         }
     }
 
+    private static final Pattern GRADLE_VERSION_PATTERN = Pattern.compile("gradle-([0-9.]+)");
+
+    // Supports org.openrewrite.gradle.toolingapi.Assertions.withToolingApi(URI)
+    // This method is provided to support recipe development at organizations which require gradle to come from
+    // internal repositories. This is not used in contexts where services.gradle.org is accessible
+
+    /**
+     * Construct a Gradle wrapper from a URI.
+     * Can be used in contexts where servcies.gradle.org, normally used for version lookups, is unavailable.
+     */
+    public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
+        String version = "";
+        Matcher matcher = GRADLE_VERSION_PATTERN.matcher(fullDistributionUri.toString());
+        if(matcher.find()) {
+            version = matcher.group(1);
+        }
+        return new GradleWrapper(version, new DistributionInfos(fullDistributionUri.toString(), null, null));
+    }
+
     public String getDistributionUrl() {
         return distributionInfos.getDownloadUrl();
     }
 
     public String getPropertiesFormattedUrl() {
-        return getDistributionUrl().replaceAll("(?<!\\\\)://", "\\\\://");
+        return formatUriForPropertiesFile(getDistributionUrl());
     }
 
-    public Checksum getDistributionChecksum() {
+    public @Nullable Checksum getDistributionChecksum() {
         return distributionInfos.getChecksum();
     }
 
@@ -103,6 +125,13 @@ public class GradleWrapper {
     public Remote wrapperJar() {
         return Remote.builder(
                 WRAPPER_JAR_LOCATION,
+                URI.create(distributionInfos.getDownloadUrl())
+        ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
+    }
+
+    public Remote wrapperJar(SourceFile before) {
+        return Remote.builder(
+                before,
                 URI.create(distributionInfos.getDownloadUrl())
         ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
     }

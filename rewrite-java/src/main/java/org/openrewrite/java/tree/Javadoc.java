@@ -44,8 +44,7 @@ public interface Javadoc extends Tree {
         return v instanceof JavadocVisitor;
     }
 
-    @Nullable
-    default <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
+    default <P> @Nullable Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -140,6 +139,7 @@ public interface Javadoc extends Tree {
 
         String suffix;
 
+        @Override
         @SuppressWarnings("unchecked")
         public DocComment withSuffix(String suffix) {
             if (!suffix.equals(this.suffix)) {
@@ -309,6 +309,7 @@ public interface Javadoc extends Tree {
             return new LineBreak(this.id, margin, this.markers);
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public LineBreak withMarkers(Markers markers) {
             if (markers == this.markers) {
@@ -332,8 +333,7 @@ public interface Javadoc extends Tree {
         @Nullable
         J tree;
 
-        @Nullable
-        public Reference getTreeReference() {
+        public @Nullable Reference getTreeReference() {
             if (tree != null && treeReference == null) {
                 treeReference = new Reference(Tree.randomId(), Markers.EMPTY, tree, null);
             }
@@ -386,8 +386,7 @@ public interface Javadoc extends Tree {
         @Nullable
         J name;
 
-        @Nullable
-        public Reference getNameReference() {
+        public @Nullable Reference getNameReference() {
             if (name != null && nameReference == null) {
                 nameReference = new Reference(Tree.randomId(), Markers.EMPTY, name, null);
             }
@@ -454,8 +453,7 @@ public interface Javadoc extends Tree {
         @Nullable
         J tree;
 
-        @Nullable
-        public Reference getTreeReference() {
+        public @Nullable Reference getTreeReference() {
             if (tree != null && treeReference == null) {
                 treeReference = new Reference(Tree.randomId(), Markers.EMPTY, tree, null);
             }
@@ -700,6 +698,7 @@ public interface Javadoc extends Tree {
         @Nullable
         Markers markers;
 
+        @Override
         public Markers getMarkers() {
             return markers == null ? Markers.EMPTY : markers;
         }

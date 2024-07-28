@@ -22,6 +22,9 @@ recipeList:
   - org.openrewrite.maven.cleanup.ExplicitPluginGroupId
   - org.openrewrite.maven.cleanup.ExplicitPluginVersion
   - org.openrewrite.maven.cleanup.PrefixlessExpressions
+  - org.openrewrite.maven.OrderPomElements
+  - org.openrewrite.maven.RemoveDuplicateDependencies
+  - org.openrewrite.maven.RemoveRedundantDependencyVersions
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.cleanup.PrefixlessExpressions
