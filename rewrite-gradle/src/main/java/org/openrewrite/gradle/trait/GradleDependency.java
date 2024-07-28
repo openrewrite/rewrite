@@ -58,13 +58,15 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         J.MethodInvocation methodInvocation = cursor.getValue();
         if (DEPENDENCY_CONFIGURATION_MATCHER.matches(methodInvocation)) {
             isGradleDependency = true;
-        } else if (methodInvocation.getType() != null) {
-            isGradleDependency = false;
+            // todo revisit this
+//        } else if (methodInvocation.getType() != null) {
+//            isGradleDependency = false;
         } else {
+            // todo - make sure this works
             Cursor tempCursor = cursor;
             while (tempCursor != null) {
-                if (cursor.getValue() instanceof J.MethodInvocation) {
-                    J.MethodInvocation m = cursor.getValue();
+                if (tempCursor.getValue() instanceof J.MethodInvocation) {
+                    J.MethodInvocation m = tempCursor.getValue();
                     String methodName = m.getSimpleName();
                     if ("constraints".equals(methodName) || "project".equals(methodName) || "modules".equals(methodName)
                             || "module".equals(methodName) || "file".equals(methodName) || "files".equals(methodName)) {
@@ -72,8 +74,6 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     }
                     if (DEPENDENCY_DSL_MATCHER.matches(m)) {
                         isGradleDependency = true;
-                        tempCursor = null;
-                        break;
                     }
                 }
                 tempCursor = tempCursor.getParent();

@@ -75,6 +75,7 @@ class ChangeDependencyTest implements RewriteTest {
             """
               plugins {
                   id "java-library"
+                  id "org.hidetake.swagger.generator" version "2.18.2"
               }
               
               repositories {
@@ -89,6 +90,7 @@ class ChangeDependencyTest implements RewriteTest {
               """
               plugins {
                   id "java-library"
+                  id "org.hidetake.swagger.generator" version "2.18.2"
               }
               
               repositories {
