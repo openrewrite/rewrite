@@ -23,29 +23,31 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.groovy.Assertions.groovy;
 
 class DependencyInsightTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new DependencyInsight("com.google.guava", "failureaccess", null,null));
+          .recipe(new DependencyInsight("com.google.guava", "failureaccess", null, null));
     }
 
     @DocumentExample
     @Test
     void findTransitiveDependency() {
         rewriteRun(
-          buildGradle("""
+          buildGradle(
+                """
               plugins {
                   id 'java-library'
               }
-              
+                            
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   implementation 'com.google.guava:guava:31.1-jre'
               }
@@ -54,13 +56,107 @@ class DependencyInsightTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+                            
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   /*~~(com.google.guava:failureaccess:1.0.1)~~>*/implementation 'com.google.guava:guava:31.1-jre'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findPluginDependencyAndAddToDependencyClosure() {
+        rewriteRun(
+          buildGradle("""
+            plugins {
+                id 'groovy-gradle-plugin'
+            }
+            repositories {
+                gradlePluginPortal()
+            }
+              """, spec -> spec.path("buildSrc/build.gradle")),
+          groovy(
+                """
+            plugins{
+                id "java"
+            }
+            dependencies{
+                implementation 'com.google.guava:guava:31.1-jre'
+            }
+            """, spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
+          buildGradle(
+                """
+              plugins {
+                  id 'convention-plugin'
+              }
+                            
+              repositories {
+                  mavenCentral()
+              }
+                            
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:8.0.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'convention-plugin'
+              }
+                            
+              repositories {
+                  mavenCentral()
+              }
+                            
+              /*~~(com.google.guava:failureaccess:1.0.1)~~>*/dependencies {
+                  implementation 'org.openrewrite:rewrite-java:8.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findPluginDependencyAndAddToRoot() {
+        rewriteRun(
+          buildGradle("""
+            plugins {
+                id 'groovy-gradle-plugin'
+            }
+            repositories {
+                gradlePluginPortal()
+            }
+              """, spec -> spec.path("buildSrc/build.gradle")),
+          groovy(
+                """
+            plugins{
+                id "java"
+            }
+            dependencies{
+                implementation 'com.google.guava:guava:31.1-jre'
+            }
+            """, spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
+          buildGradle(
+                """
+              plugins {
+                  id 'convention-plugin'
+              }
+                            
+              repositories {
+                  mavenCentral()
+              }
+              """,
+            """
+              /*~~(com.google.guava:failureaccess:1.0.1)~~>*/plugins {
+                  id 'convention-plugin'
+              }
+                            
+              repositories {
+                  mavenCentral()
               }
               """
           )
@@ -71,19 +167,20 @@ class DependencyInsightTest implements RewriteTest {
     void recursive() {
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("doesnotexist", "doesnotexist", null, null)),
-          buildGradle("""
-              plugins {
-                  id 'java-library'
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-                  implementation 'io.grpc:grpc-services:1.59.0'
-              }
-              """
+          buildGradle(
+                """
+            plugins {
+                id 'java-library'
+            }
+                          
+            repositories {
+                mavenCentral()
+            }
+                          
+            dependencies {
+                implementation 'io.grpc:grpc-services:1.59.0'
+            }
+            """
           )
         );
     }
@@ -91,7 +188,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void pattern() {
         rewriteRun(
-          spec ->  spec.recipe(new DependencyInsight("*", "jackson-core", null, null))
+          spec -> spec.recipe(new DependencyInsight("*", "jackson-core", null, null))
             .dataTable(DependenciesInUse.Row.class, rows -> {
                 assertThat(rows).isNotEmpty();
                 DependenciesInUse.Row row = rows.get(0);
@@ -99,15 +196,16 @@ class DependencyInsightTest implements RewriteTest {
                 assertThat(row.getArtifactId()).isEqualTo("jackson-core");
                 assertThat(row.getVersion()).isEqualTo("2.13.4");
             }),
-          buildGradle("""
+          buildGradle(
+                """
               plugins {
                   id 'java-library'
               }
-              
+                            
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   implementation 'org.openrewrite:rewrite-core:7.39.1'
               }
@@ -116,11 +214,11 @@ class DependencyInsightTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+                            
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   /*~~(com.fasterxml.jackson.core:jackson-core:2.13.4)~~>*/implementation 'org.openrewrite:rewrite-core:7.39.1'
               }
@@ -132,16 +230,17 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void versionSearch() {
         rewriteRun(
-          spec ->  spec.recipe(new DependencyInsight("org.openrewrite", "*", "7.0.0", null)),
-          buildGradle("""
+          spec -> spec.recipe(new DependencyInsight("org.openrewrite", "*", "7.0.0", null)),
+          buildGradle(
+                """
               plugins {
                   id 'java-library'
               }
-              
+                            
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   implementation 'org.openrewrite:rewrite-yaml:7.0.0'
                   implementation 'org.openrewrite:rewrite-java:8.0.0'
@@ -151,11 +250,11 @@ class DependencyInsightTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+                            
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   /*~~(org.openrewrite:rewrite-yaml:7.0.0)~~>*/implementation 'org.openrewrite:rewrite-yaml:7.0.0'
                   implementation 'org.openrewrite:rewrite-java:8.0.0'

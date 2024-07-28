@@ -26,7 +26,7 @@ import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemovePlugin extends Recipe {
 
     @Option(displayName = "Group",
@@ -45,19 +45,24 @@ public class RemovePlugin extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
-        return "Remove the specified Maven plugin from the pom.xml.";
+        return "Remove the specified Maven plugin from the POM.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 for (Xml.Tag plugin : FindPlugin.find(document, groupId, artifactId)) {
                     doAfterVisit(new RemoveContentVisitor<>(plugin, true));
                 }
-                return super.visitDocument(document, executionContext);
+                return super.visitDocument(document, ctx);
             }
         };
     }

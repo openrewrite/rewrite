@@ -31,7 +31,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeMethodTargetToStatic extends Recipe {
 
     /**
@@ -113,11 +113,12 @@ public class ChangeMethodTargetToStatic extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            Expression select = method.getSelect();
             boolean isStatic = method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static);
-            boolean isSameReceiverType = method.getSelect() != null &&
-                                         TypeUtils.isOfClassType(method.getSelect().getType(), fullyQualifiedTargetTypeName);
-
-            if ((!isStatic || !isSameReceiverType) && methodMatcher.matches(method, matchUnknownTypes)) {
+            boolean isSameReceiverType = select != null && TypeUtils.isOfClassType(select.getType(), fullyQualifiedTargetTypeName);
+            boolean calledOnTargetType = select instanceof J.Identifier && ((J.Identifier) select).getFieldType() == null;
+            if ((!isStatic || !isSameReceiverType || !calledOnTargetType) &&
+                methodMatcher.matches(method, matchUnknownTypes)) {
                 JavaType.Method transformedType = null;
                 if (method.getMethodType() != null) {
                     maybeRemoveImport(method.getMethodType().getDeclaringType());
@@ -138,9 +139,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     maybeAddImport(fullyQualifiedTargetTypeName, !matchUnknownTypes);
                     m = method.withSelect(
                             new J.Identifier(randomId(),
-                                    method.getSelect() == null ?
+                                    select == null ?
                                             Space.EMPTY :
-                                            method.getSelect().getPrefix(),
+                                            select.getPrefix(),
                                     Markers.EMPTY,
                                     emptyList(),
                                     classType.getClassName(),
@@ -149,7 +150,8 @@ public class ChangeMethodTargetToStatic extends Recipe {
                             )
                     );
                 }
-                m = m.withMethodType(transformedType);
+                m = m.withMethodType(transformedType)
+                        .withName(m.getName().withType(transformedType));
             }
             return m;
         }

@@ -25,6 +25,7 @@ import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
@@ -34,7 +35,7 @@ import java.util.stream.Collectors;
 /**
  * Finds matching method invocations.
  */
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class FindMethods extends Recipe {
     transient MethodCalls methodCalls = new MethodCalls(this);
@@ -67,8 +68,34 @@ public class FindMethods extends Recipe {
     @Override
     @SuppressWarnings("ConstantConditions")
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
         return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaIsoVisitor<ExecutionContext>() {
+            final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                // In an annotation @Example(value = "") the identifier "value" may have a method type
+                J.Identifier i = super.visitIdentifier(identifier, ctx);
+                if(i.getType() instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) i.getType())
+                   && !(getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
+                    JavaType.Method m = (JavaType.Method) i.getType();
+                    JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                    if(javaSourceFile != null) {
+                        methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                javaSourceFile.getSourcePath().toString(),
+                                m.getName(),
+                                m.getDeclaringType().getFullyQualifiedName(),
+                                m.getName(),
+                                m.getParameterTypes().stream()
+                                        .map(String::valueOf)
+                                        .collect(Collectors.joining(", "))
+
+                        ));
+                    }
+                    i = SearchResult.found(i);
+                }
+                return i;
+            }
+
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
@@ -171,14 +198,14 @@ public class FindMethods extends Recipe {
                             final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
 
                             @Override
-                            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                                 J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
                                 if (enclosingClass != null && methodMatcher.matches(method, getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class))) {
                                     return SearchResult.found(method);
                                 } else if (methodMatcher.matches(method.getMethodType())) {
                                     return SearchResult.found(method);
                                 }
-                                return super.visitMethodDeclaration(method, p);
+                                return super.visitMethodDeclaration(method, ctx);
                             }
                         },
                         j,

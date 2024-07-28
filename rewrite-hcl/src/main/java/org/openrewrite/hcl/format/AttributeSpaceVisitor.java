@@ -132,18 +132,16 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         return (attribute.getPrefix().getIndent() + attribute.getName().print(getCursor())).length();
     }
 
-    @Nullable
     @Override
-    public Hcl postVisit(Hcl tree, P p) {
+    public @Nullable Hcl postVisit(Hcl tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Hcl.ConfigFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Hcl visit(@Nullable Tree tree, P p) {
+    public @Nullable Hcl visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Hcl) tree;
         }

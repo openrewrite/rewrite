@@ -75,8 +75,7 @@ public class HclRightPadded<T> {
         return list;
     }
 
-    @Nullable
-    public static <T> HclRightPadded<T> withElement(@Nullable HclRightPadded<T> before, @Nullable T elements) {
+    public static <T> @Nullable HclRightPadded<T> withElement(@Nullable HclRightPadded<T> before, @Nullable T elements) {
         if (before == null) {
             if (elements == null) {
                 return null;

@@ -35,6 +35,7 @@ class SourceSpecTextBlockIndentationTest implements RewriteTest {
     @Test
     void minimalIndentation() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import org.openrewrite.test.RewriteTest;
@@ -87,6 +88,7 @@ class SourceSpecTextBlockIndentationTest implements RewriteTest {
     @Test
     void startsOnNewline() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import org.openrewrite.test.RewriteTest;

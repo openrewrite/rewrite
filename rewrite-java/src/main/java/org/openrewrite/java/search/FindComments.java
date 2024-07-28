@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class FindComments extends Recipe {
 
@@ -79,7 +79,7 @@ public class FindComments extends Recipe {
 
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public Space visitSpace(Space space, Space.Location loc, ExecutionContext context) {
+            public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
                 return space.withComments(ListUtils.map(space.getComments(), comment -> {
                     if(comment instanceof TextComment) {
                         for (Pattern p : compiledPatterns) {
@@ -94,7 +94,7 @@ public class FindComments extends Recipe {
             }
 
             @Override
-            public J.Literal visitLiteral(J.Literal literal, ExecutionContext context) {
+            public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
                 if (literal.getType() == JavaType.Primitive.Null) {
                     return literal;
                 }

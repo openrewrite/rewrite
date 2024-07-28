@@ -24,7 +24,7 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePropertyValue extends Recipe {
 
     @Option(displayName = "Key",
@@ -56,6 +56,11 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s=%s`", key, newValue);
+    }
+
+    @Override
     public String getDescription() {
         return "Changes the specified Maven project property value leaving the key intact.";
     }
@@ -64,7 +69,7 @@ public class ChangePropertyValue extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 String currentValue = getResolutionResult().getPom().getProperties().get(key);
                 boolean trust = Boolean.TRUE.equals(trustParent);
                 if (!trust && !newValue.equals(currentValue)) {
@@ -94,6 +99,7 @@ public class ChangePropertyValue extends Recipe {
                 if (isPropertyTag() && propertyName.equals(tag.getName()) &&
                     !newValue.equals(tag.getValue().orElse(null))) {
                     doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+                    maybeUpdateModel();
                 }
                 return super.visitTag(tag, ctx);
             }

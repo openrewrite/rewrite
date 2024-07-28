@@ -26,7 +26,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AppendToSequence extends Recipe {
     @Option(displayName = "sequence path",
             description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML sequence.",
@@ -55,6 +55,12 @@ public class AppendToSequence extends Recipe {
     @Override
     public String getDisplayName() {
         return "Append to sequence";
+    }
+
+    @Override
+    public String getInstanceName() {
+        return String.format("Append %s to sequence `%s`",
+                value, sequencePath);
     }
 
     @Override

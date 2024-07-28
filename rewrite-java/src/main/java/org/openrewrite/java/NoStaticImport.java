@@ -30,7 +30,7 @@ import static java.util.Collections.emptyList;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
 @RequiredArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class NoStaticImport extends Recipe {
 
     /**

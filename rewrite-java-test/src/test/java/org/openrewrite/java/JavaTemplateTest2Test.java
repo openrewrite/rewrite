@@ -244,19 +244,19 @@ class JavaTemplateTest2Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  return method.withBody((J.Block) visit(method.getBody(), p));
+              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  return method.withBody((J.Block) visit(method.getBody(), ctx));
               }
 
               @Override
-              public J visitIdentifier(J.Identifier identifier, ExecutionContext p) {
+              public J visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                   if (identifier.getSimpleName().equals("f")) {
                       return JavaTemplate.apply("#{any(java.io.File)}.getCanonicalFile().toPath()",
                         getCursor(), identifier.getCoordinates().replace(), identifier);
                   }
                   return identifier;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          }).withMaxCycles(1)),
           java(
             """
               import java.io.File;

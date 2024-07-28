@@ -36,9 +36,8 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         this.stopAfter = stopAfter;
     }
 
-    @Nullable
     @Override
-    public Yaml visit(@Nullable Tree tree, P p, Cursor parent) {
+    public @Nullable Yaml visit(@Nullable Tree tree, P p, Cursor parent) {
         setCursor(parent);
         for (Cursor c = parent; c != null && c.getValue() instanceof Yaml; c = c.getParent()) {
             Yaml y = c.getValue();
@@ -58,9 +57,8 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         return visit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Yaml preVisit(Yaml tree, P p) {
+    public @Nullable Yaml preVisit(Yaml tree, P p) {
         if (getCursor().getNearestMessage("stop", false)) {
             return tree;
         }
@@ -97,18 +95,16 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
                 getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
     }
 
-    @Nullable
     @Override
-    public Yaml postVisit(Yaml tree, P p) {
+    public @Nullable Yaml postVisit(Yaml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Yaml.Documents.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Yaml visit(@Nullable Tree tree, P p) {
+    public @Nullable Yaml visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Yaml) tree;
         }

@@ -45,6 +45,30 @@ class XmlParserTest implements RewriteTest {
         ));
     }
 
+    @Test
+    void jsp() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+              <%@ taglib prefix="s" uri="/struts-tags" %>
+              <html lang="en">
+                <head>
+                  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+                  <title>Hello World!</title>
+                </head>
+                <body>
+                  <h2><s:property value="messageStore.message" /></h2>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("index.jsp")
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2189")
     @Test
     void specialCharacters() {
@@ -297,7 +321,8 @@ class XmlParserTest implements RewriteTest {
           xml(
             """
               %s<?xml version="1.0" encoding="UTF-8"?><test></test>
-              """.formatted("\uFEFF"))
+              """.formatted("\uFEFF")
+          )
         );
     }
 
@@ -308,7 +333,8 @@ class XmlParserTest implements RewriteTest {
           xml(
             """
               <?xml version = "1.0" encoding    =   "UTF-8" standalone = "no" ?><blah></blah>
-              """)
+              """
+          )
         );
     }
 
@@ -321,7 +347,29 @@ class XmlParserTest implements RewriteTest {
               <?xml version="1.0" encoding="ISO-8859-1"?>
               <?xml-stylesheet type="text/xsl" href="/name/other?link"?>
               <blah></blah>
-              """)
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3442")
+    @Test
+    void preserveWhitespaceOnEntities() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <message><text>&lt;?xml version='1.0' encoding='UTF-8'?&gt;&#13;
+              &lt;note&gt;&#13;
+                  &lt;to&gt;Tove&lt;/to&gt;&#13;
+                  &lt;from&gt;Jani&lt;/from&gt;&#13;
+                  &lt;heading&gt;Reminder&lt;/heading&gt;&#13;
+                  &lt;body&gt;Don't forget me this weekend!&lt;/body&gt;&#13;
+              &lt;/note&gt;&#13;
+              &#13;
+              </text></message>
+              """
+          )
         );
     }
 }

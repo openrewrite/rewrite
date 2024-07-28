@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class FindEmptyMethods extends Recipe {
 
@@ -56,7 +56,7 @@ public class FindEmptyMethods extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-1186");
+        return Collections.singleton("RSPEC-S1186");
     }
 
     @Override

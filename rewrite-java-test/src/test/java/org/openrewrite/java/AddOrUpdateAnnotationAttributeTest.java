@@ -37,15 +37,77 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.example.Foo;
-                            
+
               @Foo
               public class A {
               }
               """,
             """
               import org.example.Foo;
-                            
+
               @Foo("hello")
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addValueAttributeClass() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<? extends Number> value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(Integer.class)
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addValueAttributeFullyQualifiedClass() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "java.math.BigDecimal.class", null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<? extends Number> value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(java.math.BigDecimal.class)
               public class A {
               }
               """
@@ -69,15 +131,47 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.example.Foo;
-                            
+
               @Foo("goodbye")
               public class A {
               }
               """,
             """
               import org.example.Foo;
-                            
+
               @Foo("hello")
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateValueAttributeClass() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<? extends Number> value();
+              }
+              """
+          ),
+
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(Long.class)
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(Integer.class)
               public class A {
               }
               """
@@ -118,6 +212,38 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void removeValueAttributeClass() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<? extends Number> value();
+              }
+              """
+          ),
+
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(Long.class)
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addNamedAttribute() {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null)),
           java(
@@ -131,9 +257,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
-                  
+
                   @Test
                   void foo() {
                   }
@@ -141,9 +267,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
-                  
+
                   @Test(timeout = 500)
                   void foo() {
                   }
@@ -168,9 +294,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
-                  
+
                   @Test(timeout = 1)
                   void foo() {
                   }
@@ -178,9 +304,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
-                  
+
                   @Test(timeout = 500)
                   void foo() {
                   }
@@ -205,9 +331,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
-                  
+
                   @Test(timeout = 1)
                   void foo() {
                   }
@@ -215,9 +341,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
-                  
+
                   @Test
                   void foo() {
                   }
@@ -244,9 +370,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
-                  
+
                   @Test(foo = "")
                   void foo() {
                   }
@@ -254,9 +380,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
-                  
+
                   @Test(timeout = 500, foo = "")
                   void foo() {
                   }
@@ -268,8 +394,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
     @Test
     void implicitValueToExplicitValue() {
-        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null))
-            .cycles(3),
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null)),
           java(
             """
               package org.junit;
@@ -282,9 +407,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
-                            
+
                   @Test("foo")
                   void foo() {
                   }
@@ -292,10 +417,47 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
-                            
+
                   @Test(other = 1, value = "foo")
+                  void foo() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void implicitValueToExplicitValueClass() {
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null)),
+          java(
+            """
+              package org.junit;
+              public @interface Test {
+                  long other() default 0L;
+                  Class<? extends Number> value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.junit.Test;
+
+              class SomeTest {
+
+                  @Test(Integer.class)
+                  void foo() {
+                  }
+              }
+              """,
+            """
+              import org.junit.Test;
+
+              class SomeTest {
+
+                  @Test(other = 1, value = Integer.class)
                   void foo() {
                   }
               }
@@ -320,7 +482,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-                            
+
               class SomeTest {
                   @Test(other = 0)
                   void foo() {

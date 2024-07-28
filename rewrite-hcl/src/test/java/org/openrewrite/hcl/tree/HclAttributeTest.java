@@ -36,7 +36,8 @@ class HclAttributeTest implements RewriteTest {
     @Test
     void objectValueAttributes() {
         rewriteRun(
-          hcl("""
+          hcl(
+                """
             locals {
                 simple_str = "str1"
                 objectvalue = {
@@ -56,8 +57,6 @@ class HclAttributeTest implements RewriteTest {
     void attributeValue() {
         rewriteRun(
           spec -> spec
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .recipe(RewriteTest.toRecipe(() -> new HclVisitor<ExecutionContext>() {
                   @Override
                   public Hcl visitBlock(Hcl.Block block, ExecutionContext executionContext) {
@@ -66,7 +65,7 @@ class HclAttributeTest implements RewriteTest {
                       return block.withAttributeValue("key", "goodbye");
                   }
               }
-            )),
+            ).withMaxCycles(1)),
           hcl(
             """
               provider {

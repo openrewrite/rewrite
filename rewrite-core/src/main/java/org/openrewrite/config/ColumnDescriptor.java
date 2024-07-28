@@ -17,6 +17,7 @@ package org.openrewrite.config;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.NlsRewrite;
 import org.openrewrite.internal.lang.Nullable;
 
 @Value
@@ -30,8 +31,10 @@ public class ColumnDescriptor {
     String type;
 
     @Nullable
+    @NlsRewrite.DisplayName
     String displayName;
 
     @Nullable
+    @NlsRewrite.Description
     String description;
 }

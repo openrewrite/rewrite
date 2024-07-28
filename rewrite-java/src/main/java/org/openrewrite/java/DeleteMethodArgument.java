@@ -33,7 +33,7 @@ import static org.openrewrite.Tree.randomId;
  * which argument is removed.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class DeleteMethodArgument extends Recipe {
 
     /**
@@ -52,6 +52,11 @@ public class DeleteMethodArgument extends Recipe {
             description = "A zero-based index that indicates which argument will be removed from the method invocation.",
             example = "0")
     int argumentIndex;
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("%d in methods `%s`", argumentIndex, methodPattern);
+    }
 
     @Override
     public String getDisplayName() {
@@ -91,8 +96,8 @@ public class DeleteMethodArgument extends Recipe {
             MethodCall m = methodCall;
             List<Expression> originalArgs = m.getArguments();
             if (methodMatcher.matches(m) && originalArgs.stream()
-                    .filter(a -> !(a instanceof J.Empty))
-                    .count() >= argumentIndex + 1) {
+                                                    .filter(a -> !(a instanceof J.Empty))
+                                                    .count() >= argumentIndex + 1) {
                 List<Expression> args = new ArrayList<>(originalArgs);
 
                 args.remove(argumentIndex);
@@ -112,6 +117,9 @@ public class DeleteMethodArgument extends Recipe {
                     m = m.withMethodType(methodType
                             .withParameterNames(parameterNames)
                             .withParameterTypes(parameterTypes));
+                    if (m instanceof J.MethodInvocation && ((J.MethodInvocation) m).getName().getType() != null) {
+                        m = ((J.MethodInvocation) m).withName(((J.MethodInvocation) m).getName().withType(m.getMethodType()));
+                    }
                 }
             }
             return m;

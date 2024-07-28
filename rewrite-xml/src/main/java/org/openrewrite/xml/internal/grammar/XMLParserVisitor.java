@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,6 +97,12 @@ public interface XMLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitElement(XMLParser.ElementContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XMLParser#jspdirective}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitJspdirective(XMLParser.JspdirectiveContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link XMLParser#reference}.
 	 * @param ctx the parse tree

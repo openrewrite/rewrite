@@ -33,15 +33,13 @@ public class ReadOnlyLocalMavenArtifactCache extends LocalMavenArtifactCache {
                 Paths.get(System.getProperty("user.home"), ".m2", "repository"));
     }
 
-    @Nullable
     @Override
-    public Path getArtifact(ResolvedDependency dependency) {
+    public @Nullable Path getArtifact(ResolvedDependency dependency) {
         return super.getArtifact(dependency);
     }
 
-    @Nullable
     @Override
-    public Path putArtifact(ResolvedDependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
+    public @Nullable Path putArtifact(ResolvedDependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
         return null;
     }
 }

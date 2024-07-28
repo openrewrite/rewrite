@@ -31,7 +31,7 @@ import java.util.Collections;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddLicenseHeader extends Recipe {
     /**
      * A method pattern that is used to find matching method declarations/invocations.
@@ -79,13 +79,13 @@ public class AddLicenseHeader extends Recipe {
             }
 
             @Override
-            public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
+            public J.Import visitImport(J.Import _import, ExecutionContext ctx) {
                 // short circuit everything else
                 return _import;
             }
 
             @Override
-            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 // short circuit everything else
                 return classDecl;
             }

@@ -47,7 +47,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
     public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
-                type instanceof NullType) {
+            type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
@@ -92,10 +92,72 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType array(Type type, String signature) {
-        JavaType.Array arr = new JavaType.Array(null, null);
+        JavaType.Array arr = new JavaType.Array(null, null, null);
         typeCache.put(signature, arr);
-        arr.unsafeSet(type(((Type.ArrayType) type).elemtype));
+        arr.unsafeSet(type(((Type.ArrayType) type).elemtype), null);
         return arr;
+    }
+
+    /**
+     * Maps annotated array types to a JavaType through the JCTree instead of the Type tree.
+     * <p>
+     * The JCTree is necessary to preserve annotations on multidimensional arrays in Java 8.
+     * In Java 11+, annotations are available directly on the `Type` tree through TypeMetadata, but
+     * annotations are accessed differently in Java 11 and 17 compared to Java 21.
+     * Annotated array types are mapped through the JCTree so that the mapping is consistent for each version of the
+     * java compiler.
+     */
+    private JavaType annotatedArray(JCTree.JCAnnotatedType annotatedType) {
+        String signature = signatureBuilder.annotatedArraySignature(annotatedType);
+        JavaType.Array existing = typeCache.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+        JavaType.Array arr = new JavaType.Array(null, null, null);
+        typeCache.put(signature, arr);
+
+        Tree tree = annotatedType;
+        List<Tree> trees = new ArrayList<>();
+        while (tree instanceof JCTree.JCAnnotatedType || tree instanceof JCTree.JCArrayTypeTree) {
+            if (tree instanceof JCTree.JCAnnotatedType) {
+                if (((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
+                    trees.add(0, tree);
+                    tree = ((JCTree.JCArrayTypeTree) ((JCTree.JCAnnotatedType) tree).getUnderlyingType()).getType();
+                } else {
+                    tree = ((JCTree.JCAnnotatedType) tree).getUnderlyingType();
+                }
+            } else {
+                trees.add(0, tree);
+                tree = ((JCTree.JCArrayTypeTree) tree).getType();
+            }
+        }
+        return mapElements(type(tree), trees);
+    }
+
+    private JavaType mapElements(JavaType elementType, List<Tree> trees) {
+        int count = trees.size();
+        if (count == 0) {
+            return elementType;
+        }
+        return mapElements(
+                new JavaType.Array(
+                        null,
+                        elementType,
+                        trees.get(0) instanceof JCTree.JCAnnotatedType ? mapAnnotations(((JCTree.JCAnnotatedType) trees.get(0)).annotations) : null
+                ),
+                trees.subList(1, count)
+        );
+    }
+
+    private @Nullable JavaType.FullyQualified[] mapAnnotations(List<JCTree.JCAnnotation> annotations) {
+        List<JavaType.FullyQualified> types = new ArrayList<>(annotations.size());
+        for (JCTree.JCAnnotation annotation : annotations) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(annotation));
+            if (fq != null) {
+                types.add(fq);
+            }
+        }
+        return types.toArray(new JavaType.FullyQualified[0]);
     }
 
     private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature) {
@@ -205,8 +267,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             if (sym.members_field != null) {
                 for (Symbol elem : sym.members_field.getSymbols()) {
                     if (elem instanceof Symbol.VarSymbol &&
-                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                    Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                        (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                             Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
                         if (fqn.equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
@@ -219,7 +281,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                         }
                         fields.add(variableType(elem, clazz));
                     } else if (elem instanceof Symbol.MethodSymbol &&
-                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
+                               (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
                         if (methods == null) {
                             methods = new ArrayList<>();
                         }
@@ -274,6 +336,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
+    @Override
     @SuppressWarnings("ConstantConditions")
     public JavaType type(@Nullable Tree tree) {
         if (tree == null) {
@@ -287,13 +350,14 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             symbol = ((JCTree.JCMethodDecl) tree).sym;
         } else if (tree instanceof JCTree.JCVariableDecl) {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
+        } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
+            return annotatedArray((JCTree.JCAnnotatedType) tree);
         }
 
         return type(((JCTree) tree).type, symbol);
     }
 
-    @Nullable
-    private JavaType type(Type type, Symbol symbol) {
+    private @Nullable JavaType type(Type type, Symbol symbol) {
         if (type instanceof Type.MethodType) {
             return methodInvocationType(type, symbol);
         }
@@ -331,13 +395,11 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
-    @Nullable
-    public JavaType.Variable variableType(@Nullable Symbol symbol) {
+    public @Nullable JavaType.Variable variableType(@Nullable Symbol symbol) {
         return variableType(symbol, null);
     }
 
-    @Nullable
-    private JavaType.Variable variableType(@Nullable Symbol symbol,
+    private @Nullable JavaType.Variable variableType(@Nullable Symbol symbol,
                                            @Nullable JavaType.FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
@@ -367,7 +429,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             resolvedOwner = type instanceof Type.MethodType ?
-                    methodInvocationType(type, sym) :
+                    methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type)) :
                     type(type);
             assert resolvedOwner != null;
         }
@@ -384,8 +446,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    @Nullable
-    public JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
+    public @Nullable JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
@@ -487,8 +548,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
      * @param declaringType The method's declaring type.
      * @return Method type attribution.
      */
-    @Nullable
-    public JavaType.Method methodDeclarationType(@Nullable Symbol symbol, @Nullable JavaType.FullyQualified declaringType) {
+    public @Nullable JavaType.Method methodDeclarationType(@Nullable Symbol symbol, @Nullable JavaType.FullyQualified declaringType) {
         // if the symbol is not a method symbol, there is a parser error in play
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
@@ -510,8 +570,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
             List<String> defaultValues = null;
-            if(methodSymbol.getDefaultValue() != null) {
-                if(methodSymbol.getDefaultValue() instanceof Attribute.Array) {
+            if (methodSymbol.getDefaultValue() != null) {
+                if (methodSymbol.getDefaultValue() instanceof Attribute.Array) {
                     defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
                             .map(attr -> attr.getValue().toString())
                             .collect(Collectors.toList());
@@ -616,8 +676,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
-    @Nullable
-    private List<JavaType.FullyQualified> listAnnotations(Symbol symb) {
+    private @Nullable List<JavaType.FullyQualified> listAnnotations(Symbol symb) {
         List<JavaType.FullyQualified> annotations = null;
         if (!symb.getDeclarationAttributes().isEmpty()) {
             annotations = new ArrayList<>(symb.getDeclarationAttributes().size());
@@ -627,7 +686,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     continue;
                 }
                 Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if(retention != null && retention.value() == RetentionPolicy.SOURCE) {
+                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
                     continue;
                 }
                 annotations.add(annotType);

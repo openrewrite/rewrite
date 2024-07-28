@@ -16,7 +16,6 @@
 package org.openrewrite.maven.utilities;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.SourceFile;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;

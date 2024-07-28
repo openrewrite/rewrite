@@ -23,7 +23,7 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.J;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeMethodAccessLevel extends Recipe {
 
     @Option(displayName = "Method pattern",
@@ -42,6 +42,11 @@ public class ChangeMethodAccessLevel extends Recipe {
             required = false)
     @Nullable
     Boolean matchOverrides;
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", methodPattern, newAccessLevel);
+    }
 
     @Override
     public String getDisplayName() {

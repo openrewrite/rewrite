@@ -42,6 +42,12 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void finalKeyword() {
+        rewriteRun(
+          groovy("final a = 1")
+        );
+    }
 
     @Test
     void singleVariableDeclaration() {
@@ -103,7 +109,8 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void numericValueWithUnderscores() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
           def l1 = 10_000L
           def l2 = 10_000l
           def i = 10_000

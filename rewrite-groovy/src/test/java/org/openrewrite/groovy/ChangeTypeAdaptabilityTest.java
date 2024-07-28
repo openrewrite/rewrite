@@ -31,7 +31,7 @@ import static org.openrewrite.groovy.Assertions.groovy;
 /**
  * Prove that {@link ChangeType}, written for Java, can adapt to working on Groovy code.
  */
-public class ChangeTypeAdaptabilityTest implements RewriteTest {
+class ChangeTypeAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

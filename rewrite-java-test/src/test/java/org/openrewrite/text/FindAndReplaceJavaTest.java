@@ -29,11 +29,19 @@ class FindAndReplaceJavaTest implements RewriteTest {
     @Test
     void findAndReplaceJava() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null, null, null, null, null)),
           java(
             "class Test {}",
             "class Replaced {}"
           )
+        );
+    }
+
+    @Test
+    void ignoresJavaFileWithPlaintextFlagEnabled() {
+        rewriteRun(
+          spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null, null, null, null, true)),
+          java("class Test {}")
         );
     }
 
@@ -45,6 +53,7 @@ class FindAndReplaceJavaTest implements RewriteTest {
               type: specs.openrewrite.org/v1beta/recipe
               name: com.yourorg.FindAndReplaceExample
               displayName: Find and replace example
+              description: Test.
               recipeList:
                 - org.openrewrite.text.FindAndReplace:
                     find: blacklist

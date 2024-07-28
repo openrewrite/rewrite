@@ -20,6 +20,14 @@ packageName: org.openrewrite
 root: true
 ---
 type: specs.openrewrite.org/v1beta/category
+packageName: ai.timefold.solver
+name: Timefold
+root: true
+description: |
+  [Timefold](https://timefold.ai/) is the open source AI solver to optimize operations and scheduling in Java, Python or Kotlin.
+  Timefold is a fork of OptaPlanner by its creator and other experts.
+---
+type: specs.openrewrite.org/v1beta/category
 packageName: io
 root: true
 ---
@@ -30,3 +38,11 @@ root: true
 type: specs.openrewrite.org/v1beta/category
 packageName: org
 root: true
+---
+type: specs.openrewrite.org/v1beta/category
+name: Error Prone Support
+packageName: tech.picnic.errorprone.refasterrules
+description: |
+  [Error Prone Support](https://github.com/PicnicSupermarket/error-prone-support) is a Picnic-opinionated extension of Google's [Error Prone](https://github.com/google/error-prone).
+  It aims to improve code quality, focussing on maintainability, consistency and avoidance of common pitfalls.
+---

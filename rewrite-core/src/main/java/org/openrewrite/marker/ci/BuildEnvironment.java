@@ -23,8 +23,7 @@ import java.util.function.UnaryOperator;
 
 public interface BuildEnvironment extends Marker {
 
-    @Nullable
-    static BuildEnvironment build(UnaryOperator<String> environment) {
+    static @Nullable BuildEnvironment build(UnaryOperator<String> environment) {
         if (environment.apply("BITBUCKET_COMMIT") != null) {
             return BitbucketBuildEnvironment.build(environment);
         }
@@ -47,6 +46,9 @@ public interface BuildEnvironment extends Marker {
         if (environment.apply("CIRCLECI") != null) {
             return CircleCiBuildEnvironment.build(environment);
         }
+        if (environment.apply("TEAMCITY_VERSION") != null) {
+            return TeamcityBuildEnvironment.build(environment);
+        }
         if (environment.apply("TRAVIS") != null) {
             return TravisBuildEnvironment.build(environment);
         }
@@ -54,6 +56,4 @@ public interface BuildEnvironment extends Marker {
     }
 
     GitProvenance buildGitProvenance() throws IncompleteGitConfigException;
-
-
 }

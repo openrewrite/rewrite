@@ -36,7 +36,7 @@ import java.util.List;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyExtension extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -66,6 +66,11 @@ public class ChangeDependencyExtension extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s` to `%s`", groupId, artifactId, newExtension);
+    }
+
+    @Override
     public String getDescription() {
         return "Finds dependencies declared in `build.gradle` files.";
     }
@@ -82,8 +87,8 @@ public class ChangeDependencyExtension extends Recipe {
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (!dependencyDsl.matches(m) || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
                     return m;
                 }
@@ -93,9 +98,9 @@ public class ChangeDependencyExtension extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
-                        if (!newExtension.equals(dependency.getExt()) &&
-                                ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
-                                        (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
+                        if (dependency != null && !newExtension.equals(dependency.getExt()) &&
+                            ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
+                             (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
                             Dependency newDependency = dependency.withExt(newExtension);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
                         }
@@ -138,9 +143,9 @@ public class ChangeDependencyExtension extends Recipe {
                         }
                     }
                     if (groupId == null || artifactId == null
-                            || (version == null && !depMatcher.matches(groupId, artifactId))
-                            || (version != null && !depMatcher.matches(groupId, artifactId, version))
-                            || extension == null) {
+                        || (version == null && !depMatcher.matches(groupId, artifactId))
+                        || (version != null && !depMatcher.matches(groupId, artifactId, version))
+                        || extension == null) {
                         return m;
                     }
                     String delimiter = extensionStringDelimiter;

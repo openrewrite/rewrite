@@ -194,7 +194,7 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
+    // https://rules.sonarsource.com/java/tag/confusing/RSPEC-S3973
     @DocumentExample
     @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Test
@@ -1391,7 +1391,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               enum Scope {
                   None, // the root of a resolution tree
-                  Compile,
+                  Compile
               }
               """
           )

@@ -140,9 +140,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             if (!j.getModifiers().isEmpty()) {
                 j = j.withModifiers(withNewline(j.getModifiers()));
             } else {
-                J.ClassDeclaration.Kind kind = j.getAnnotations().getKind();
+                J.ClassDeclaration.Kind kind = j.getPadding().getKind();
                 if (!kind.getPrefix().getWhitespace().contains("\n")) {
-                    j = j.getAnnotations().withKind(kind.withPrefix(
+                    j = j.getPadding().withKind(kind.withPrefix(
                             kind.getPrefix().withWhitespace("\n" + kind.getPrefix().getWhitespace())
                     ));
                 }
@@ -195,18 +195,16 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return modifiers;
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }

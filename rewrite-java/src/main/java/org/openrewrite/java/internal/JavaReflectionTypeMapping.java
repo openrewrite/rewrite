@@ -77,16 +77,16 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType.Array array(Class<?> clazz, String signature) {
-        JavaType.Array arr = new JavaType.Array(null, null);
+        JavaType.Array arr = new JavaType.Array(null, null, null);
         typeCache.put(signature, arr);
-        arr.unsafeSet(type(clazz.getComponentType()));
+        arr.unsafeSet(type(clazz.getComponentType()), null);
         return arr;
     }
 
     private JavaType.Array array(GenericArrayType type, String signature) {
-        JavaType.Array arr = new JavaType.Array(null, null);
+        JavaType.Array arr = new JavaType.Array(null, null, null);
         typeCache.put(signature, arr);
-        arr.unsafeSet(type(type.getGenericComponentType()));
+        arr.unsafeSet(type(type.getGenericComponentType()), null);
         return arr;
     }
 
@@ -248,8 +248,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         return gtv;
     }
 
-    @Nullable
-    private List<JavaType> genericBounds(Type[] bounds) {
+    private @Nullable List<JavaType> genericBounds(Type[] bounds) {
         List<JavaType> mappedBounds = null;
 
         for (Type bound : bounds) {

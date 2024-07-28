@@ -20,7 +20,10 @@ package org.openrewrite.yaml.tree;
  */
 public interface YamlKey extends Yaml {
     String getValue();
+
+    @Override
     YamlKey copyPaste();
 
+    @Override
     YamlKey withPrefix(String prefix);
 }

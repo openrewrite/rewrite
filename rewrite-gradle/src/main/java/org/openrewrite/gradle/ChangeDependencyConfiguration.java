@@ -33,7 +33,7 @@ import java.time.Duration;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyConfiguration extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -63,6 +63,11 @@ public class ChangeDependencyConfiguration extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s` to `%s`", groupId, artifactId, newConfiguration);
+    }
+
+    @Override
     public String getDescription() {
         return "A common example is the need to change `compile` to `api`/`implementation` as " +
                "[part of the move](https://docs.gradle.org/current/userguide/upgrading_version_6.html) to Gradle 7.x and later.";
@@ -84,8 +89,8 @@ public class ChangeDependencyConfiguration extends Recipe {
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (!dependencyDsl.matches(m) || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
                     return m;
                 }
@@ -99,7 +104,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
 
                     Dependency dependency = DependencyStringNotationConverter.parse((String) arg.getValue());
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else if (args.get(0) instanceof G.GString) {
@@ -114,7 +119,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
 
                     Dependency dependency = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else if (args.get(0) instanceof G.MapEntry && args.size() >= 2) {
@@ -153,7 +158,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                         dependency = DependencyStringNotationConverter.parse((String) value.getValue());
                     }
 
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else {

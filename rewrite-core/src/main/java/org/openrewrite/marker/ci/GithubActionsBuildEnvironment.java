@@ -32,6 +32,7 @@ import static org.openrewrite.Tree.randomId;
 public class GithubActionsBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
+
     String buildNumber;
     String buildId;
     String host;
@@ -67,15 +68,15 @@ public class GithubActionsBuildEnvironment implements BuildEnvironment {
             gitRef = gitRef.replaceFirst("refs/heads/", "");
         }
         if (StringUtils.isBlank(ghRef)
-                || StringUtils.isBlank(host)
-                || StringUtils.isBlank(repository)
-                || StringUtils.isBlank(sha)) {
+            || StringUtils.isBlank(host)
+            || StringUtils.isBlank(repository)
+            || StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException(
                     String.format("Invalid GitHub environment with host: %s, branch: %s, " +
-                    "repository: %s, sha: %s", host, ghRef, repository, sha));
+                                  "repository: %s, sha: %s", host, ghRef, repository, sha));
         }
 
         return new GitProvenance(UUID.randomUUID(), host + "/" + getRepository()
-                + ".git", gitRef, getSha(), null, null, emptyList());
+                                                    + ".git", gitRef, getSha(), null, null, emptyList());
     }
 }

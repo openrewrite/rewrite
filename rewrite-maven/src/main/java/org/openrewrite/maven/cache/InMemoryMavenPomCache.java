@@ -64,15 +64,11 @@ public class InMemoryMavenPomCache implements MavenPomCache {
                                  Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
                                  Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
                                  Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
-        this.pomCache = pomCache;
-        this.mavenMetadataCache = mavenMetadataCache;
-        this.repositoryCache = repositoryCache;
-        this.dependencyCache = dependencyCache;
 
-        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, pomCache, "Maven POMs - " + cacheNickname);
-        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, mavenMetadataCache, "Maven metadata - " + cacheNickname);
-        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, repositoryCache, "Maven repositories - " + cacheNickname);
-        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, dependencyCache, "Resolved dependency POMs - " + cacheNickname);
+        this.pomCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, pomCache, "Maven POMs - " + cacheNickname);
+        this.mavenMetadataCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, mavenMetadataCache, "Maven metadata - " + cacheNickname);
+        this.repositoryCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, repositoryCache, "Maven repositories - " + cacheNickname);
+        this.dependencyCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, dependencyCache, "Resolved dependency POMs - " + cacheNickname);
     }
 
     public InMemoryMavenPomCache(Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache,
@@ -82,9 +78,8 @@ public class InMemoryMavenPomCache implements MavenPomCache {
         this("default", pomCache, mavenMetadataCache, repositoryCache, dependencyCache);
     }
 
-    @Nullable
     @Override
-    public ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
+    public @Nullable ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
         return dependencyCache.getIfPresent(dependency);
     }
 
@@ -93,9 +88,8 @@ public class InMemoryMavenPomCache implements MavenPomCache {
         dependencyCache.put(dependency, resolved.deduplicate());
     }
 
-    @Nullable
     @Override
-    public Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+    public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
         return mavenMetadataCache.getIfPresent(new MetadataKey(repo, gav));
     }
 
@@ -104,9 +98,8 @@ public class InMemoryMavenPomCache implements MavenPomCache {
         mavenMetadataCache.put(new MetadataKey(repo, gav), Optional.ofNullable(metadata));
     }
 
-    @Nullable
     @Override
-    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) {
+    public @Nullable Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) {
         return pomCache.getIfPresent(gav);
     }
 
@@ -116,8 +109,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    @Nullable
-    public Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+    public @Nullable Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
         return repositoryCache.getIfPresent(repository);
     }
 

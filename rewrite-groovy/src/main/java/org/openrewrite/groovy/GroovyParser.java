@@ -207,6 +207,7 @@ public class GroovyParser implements Parser {
     public static class Builder extends Parser.Builder {
         @Nullable
         private Collection<Path> classpath = Collections.emptyList();
+
         @Nullable
         protected Collection<String> artifactNames = Collections.emptyList();
 
@@ -277,8 +278,7 @@ public class GroovyParser implements Parser {
             return this;
         }
 
-        @Nullable
-        private Collection<Path> resolvedClasspath() {
+        private @Nullable Collection<Path> resolvedClasspath() {
             if (artifactNames != null && !artifactNames.isEmpty()) {
                 classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
                 artifactNames = null;
@@ -286,6 +286,7 @@ public class GroovyParser implements Parser {
             return classpath;
         }
 
+        @Override
         public GroovyParser build() {
             return new GroovyParser(resolvedClasspath(), styles, logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
         }

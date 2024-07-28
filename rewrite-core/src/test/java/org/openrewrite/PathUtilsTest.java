@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -96,6 +97,43 @@ class PathUtilsTest {
         assertThat(matchesGlob(path("a/b/test.txt"), "a/**/*.*")).isTrue();
         assertThat(matchesGlob(path("a-test/a-test/test.txt"), "**/*-test/*-test/test.txt")).isTrue();
         assertThat(matchesGlob(path("a-test/test.txt"), "**/*-test/*-test/test.txt")).isFalse();
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/3758")
+    void eitherOr() {
+        // matches with {}'s, used in for instance `"**/{application,application-*,bootstrap,bootstrap-*}.{yml,yaml}"`
+        assertThat(matchesGlob(path("test/"), "test/{foo,bar}")).isFalse();
+        assertThat(matchesGlob(path("test/quz"), "test/{foo,bar}")).isFalse();
+        assertThat(matchesGlob(path("test/foo"), "test/{foo,bar}")).isTrue();
+        assertThat(matchesGlob(path("test/foo"), "test/{f*,bar}")).isTrue();
+        assertThat(matchesGlob(path("test/bar"), "test/{foo,bar}")).isTrue();
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3847")
+    void negation() {
+        assertThat(matchesGlob(path("test.txt"), "test.!(txt)")).isFalse();
+        assertThat(matchesGlob(path("test.java"), "test.!(txt)")).isTrue();
+        assertThat(matchesGlob(path("test/foo"), "test/!(foo|bar)")).isFalse();
+        assertThat(matchesGlob(path("test/bar"), "test/!(foo|bar)")).isFalse();
+        assertThat(matchesGlob(path("test/quz"), "test/!(foo|bar)")).isTrue();
+        assertThat(matchesGlob(path("test/bar"), "test/!(f*|b*)")).isFalse();
+    }
+
+    @Test
+    void combinedTest() {
+        assertThat(matchesGlob(path("a/b/java"), "{a,b}/!(c)/java")).isTrue();
+        assertThat(matchesGlob(path("a/c/java"), "{a,b}/!(c)/java")).isFalse();
+        assertThat(matchesGlob(path("b/d/java"), "{a,b}/!(c)/java")).isTrue();
+        assertThat(matchesGlob(path("b/c/java"), "{a,b}/!(c)/java")).isFalse();
+        assertThat(matchesGlob(path("a/b/java"), "{a,b}/!(c)/java")).isTrue();
+        assertThat(matchesGlob(path("a/java"), "!(a|b|c)/{java,txt}")).isFalse();
+        assertThat(matchesGlob(path("b/java"), "!(a|b|c)/{java,txt}")).isFalse();
+        assertThat(matchesGlob(path("c/java"), "!(a|b|c)/{java,txt}")).isFalse();
+        assertThat(matchesGlob(path("d/java"), "!(a|b|c)/{java,txt}")).isTrue();
+        assertThat(matchesGlob(path("d/txt"), "!(a|b|c)/{java,txt}")).isTrue();
+        assertThat(matchesGlob(path("d/xml"), "!(a|b|c)/{java,txt}")).isFalse();
     }
 
     private static Path path(String path) {

@@ -18,11 +18,16 @@ package org.openrewrite.java.internal;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 
-import java.util.*;
+import java.util.IdentityHashMap;
+import java.util.Objects;
+import java.util.Set;
 
 import static java.util.Collections.newSetFromMap;
 
@@ -47,99 +52,47 @@ public class TypesInUse {
 
     @Getter
     public static class FindTypesInUse extends JavaIsoVisitor<Integer> {
-        private final Set<JavaType> types = newSetFromMap(new NullSkippingMap<>());
-        private final Set<JavaType.Method> declaredMethods = newSetFromMap(new NullSkippingMap<>());
-        private final Set<JavaType.Method> usedMethods = newSetFromMap(new NullSkippingMap<>());
-        private final Set<JavaType.Variable> variables = newSetFromMap(new NullSkippingMap<>());
+        private final Set<JavaType> types = newSetFromMap(new IdentityHashMap<>());
+        private final Set<JavaType.Method> declaredMethods = newSetFromMap(new IdentityHashMap<>());
+        private final Set<JavaType.Method> usedMethods = newSetFromMap(new IdentityHashMap<>());
+        private final Set<JavaType.Variable> variables = newSetFromMap(new IdentityHashMap<>());
 
         @Override
-        public J preVisit(J tree, Integer integer) {
-            if (tree instanceof TypedTree) {
-                if (!(tree instanceof J.ClassDeclaration) &&
-                    !(tree instanceof J.MethodDeclaration) &&
-                    !(tree instanceof J.MethodInvocation) &&
-                    !(tree instanceof J.Lambda) &&
-                    !(tree instanceof J.VariableDeclarations)) {
-                    types.add(((TypedTree) tree).getType());
-                }
-            }
-            return tree;
-        }
-
-        @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration c, Integer p) {
-            visitSpace(c.getPrefix(), Space.Location.ANY, p);
-            for (J.Annotation annotation : c.getAllAnnotations()) {
-                visit(annotation, p);
-            }
-            if (c.getPadding().getTypeParameters() != null) {
-                visitContainer(c.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p);
-            }
-            if (c.getPadding().getExtends() != null) {
-                visitLeftPadded(c.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p);
-            }
-            if (c.getPadding().getImplements() != null) {
-                visitContainer(c.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, p);
-            }
-            if (c.getPrimaryConstructor() != null) {
-                visitContainer(c.getPadding().getPrimaryConstructor(), JContainer.Location.RECORD_STATE_VECTOR, p);
-            }
-            visit(c.getBody(), p);
-            return c;
+        public J.Import visitImport(J.Import _import, Integer p) {
+            return _import;
         }
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
-            variables.add(identifier.getFieldType());
+            Object parent = Objects.requireNonNull(getCursor().getParent()).getValue();
+            if (parent instanceof J.ClassDeclaration) {
+                // skip type of class
+                return identifier;
+            } else if (parent instanceof J.MethodDeclaration && ((J.MethodDeclaration) parent).getName() == identifier) {
+                // skip method name
+                return identifier;
+            }
             return super.visitIdentifier(identifier, p);
         }
 
         @Override
-        public J.Import visitImport(J.Import import_, Integer p) {
-            return import_;
-        }
-
-        @Override
-        public J.Package visitPackage(J.Package pkg, Integer p) {
-            for (J.Annotation annotation : pkg.getAnnotations()) {
-                visit(annotation, p);
+        public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer p) {
+            if (javaType != null && !(javaType instanceof JavaType.Unknown)) {
+                Cursor cursor = getCursor();
+                if (javaType instanceof JavaType.Variable) {
+                    variables.add((JavaType.Variable) javaType);
+                } else if (javaType instanceof JavaType.Method) {
+                    if (cursor.getValue() instanceof J.MethodDeclaration) {
+                        declaredMethods.add((JavaType.Method) javaType);
+                    } else {
+                        usedMethods.add((JavaType.Method) javaType);
+                    }
+                } else if (!(cursor.getValue() instanceof J.ClassDeclaration) && !(cursor.getValue() instanceof J.Lambda)) {
+                    // ignore type representing class declaration itself and inferred lambda types
+                    types.add(javaType);
+                }
             }
-            return pkg;
-        }
-
-        @Override
-        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer p) {
-            usedMethods.add(memberRef.getMethodType());
-            variables.add(memberRef.getVariableType());
-            return super.visitMemberReference(memberRef, p);
-        }
-
-        @Override
-        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
-            declaredMethods.add(method.getMethodType());
-            return super.visitMethodDeclaration(method, p);
-        }
-
-        @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-            usedMethods.add(method.getMethodType());
-            return super.visitMethodInvocation(method, p);
-        }
-
-        @Override
-        public J.NewClass visitNewClass(J.NewClass newClass, Integer integer) {
-            usedMethods.add(newClass.getConstructorType());
-            return super.visitNewClass(newClass, integer);
-        }
-    }
-
-    private static class NullSkippingMap<T> extends IdentityHashMap<T, Boolean> {
-        @Override
-        public Boolean put(@Nullable T key, Boolean value) {
-            if (key != null) {
-                return super.put(key, value);
-            }
-            return null;
+            return javaType;
         }
     }
 }

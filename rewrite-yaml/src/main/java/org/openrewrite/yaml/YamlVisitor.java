@@ -75,6 +75,10 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
                 .withMarkers(visitMarkers(document.getMarkers(), p));
     }
 
+    public Yaml visitDocumentEnd(Yaml.Document.End end, P p) {
+        return end.withMarkers(visitMarkers(end.getMarkers(), p));
+    }
+
     public Yaml visitMapping(Yaml.Mapping mapping, P p) {
         return mapping.withEntries(ListUtils.map(mapping.getEntries(), e -> visitAndCast(e, p)))
                 .withMarkers(visitMarkers(mapping.getMarkers(), p));

@@ -37,7 +37,7 @@ import static java.util.stream.Collectors.toSet;
 
 @Incubating(since = "8.2.0")
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindMultiselect extends Recipe {
 
     @Override
@@ -52,7 +52,7 @@ public class FindMultiselect extends Recipe {
     }
 
     @Option(displayName = "Find",
-            description = "The text to find.",
+            description = "The text to find. This snippet can be multiline.",
             example = "blacklist")
     String find;
 
@@ -144,7 +144,7 @@ public class FindMultiselect extends Recipe {
         if (filePattern != null) {
             //noinspection unchecked
             TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                    .map(HasSourcePath::new)
+                    .map(FindSourceFiles::new)
                     .map(Recipe::getVisitor)
                     .toArray(TreeVisitor[]::new));
 

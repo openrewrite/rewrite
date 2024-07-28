@@ -33,7 +33,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindTypes extends Recipe {
 
     @Option(displayName = "Fully-qualified type name",
@@ -64,18 +64,19 @@ public class FindTypes extends Recipe {
 
         return Preconditions.check(new UsesType<>(fullyQualifiedTypeName, false), new JavaVisitor<ExecutionContext>() {
             @Override
-            public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
+            public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                 if (ident.getType() != null &&
-                    getCursor().firstEnclosing(J.Import.class) == null &&
-                    getCursor().firstEnclosing(J.FieldAccess.class) == null &&
-                    !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType)) {
+                        getCursor().firstEnclosing(J.Import.class) == null &&
+                        getCursor().firstEnclosing(J.FieldAccess.class) == null &&
+                        !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType) &&
+                        !(getCursor().getParentOrThrow().getValue() instanceof J.ArrayType)) {
                     JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                     if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         ident.getSimpleName().equals(type.getClassName())) {
                         return SearchResult.found(ident);
                     }
                 }
-                return super.visitIdentifier(ident, executionContext);
+                return super.visitIdentifier(ident, ctx);
             }
 
             @Override
@@ -83,7 +84,7 @@ public class FindTypes extends Recipe {
                 N n = super.visitTypeName(name, ctx);
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(n.getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
-                    getCursor().firstEnclosing(J.Import.class) == null) {
+                        getCursor().firstEnclosing(J.Import.class) == null) {
                     return SearchResult.found(n);
                 }
                 return n;

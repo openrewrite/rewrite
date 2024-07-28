@@ -41,8 +41,7 @@ public enum Scope {
      * @param scope The scope on the left column of the table.
      * @return The scope inside the table.
      */
-    @Nullable
-    public Scope transitiveOf(@Nullable Scope scope) {
+    public @Nullable Scope transitiveOf(@Nullable Scope scope) {
         if (scope == null) {
             return this;
         }
@@ -121,7 +120,7 @@ public enum Scope {
      *
      * @return Scope with the higher precedence.
      */
-    @Nullable public static Scope maxPrecedence(@Nullable Scope scope1, @Nullable Scope scope2) {
+    public static @Nullable Scope maxPrecedence(@Nullable Scope scope1, @Nullable Scope scope2) {
         if (scope1 == null) {
             return scope2;
         } else if (scope2 == null) {
@@ -130,6 +129,33 @@ public enum Scope {
             return scope1;
         } else {
             return scope2;
+        }
+    }
+
+    /**
+     * It is sometimes convenient for recipes that operate on both Gradle and Maven files to translate a Maven scope
+     * into a Gradle dependency configuration with a similar meaning.
+     * Gradle dependency configurations are more varied and have different semantics than Maven scopes, so this should
+     * be used deliberately and in contexts sufficiently general that the differences are not important.
+     */
+    @SuppressWarnings("unused")
+    public static @Nullable String asGradleConfigurationName(@Nullable Scope scope) {
+        if(scope == null) {
+            return null;
+        }
+        switch (scope) {
+            case Compile:
+                return "implementation";
+            case Provided:
+                return "compileOnly";
+            case Runtime:
+                return "runtimeOnly";
+            case Test:
+                return "testImplementation";
+            case System:
+                return "system";
+            default:
+                return null;
         }
     }
 }

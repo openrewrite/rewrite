@@ -25,7 +25,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
-import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ALL")
@@ -374,6 +373,14 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   def m() {
                       boolean a=true
                       boolean i=a!=true
+                  }
+              }
+              """,
+            """
+              class A {
+                  def m() {
+                      boolean a=true
+                      boolean i=!a
                   }
               }
               """

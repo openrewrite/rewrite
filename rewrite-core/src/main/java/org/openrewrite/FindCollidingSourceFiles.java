@@ -27,8 +27,8 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
-public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSourceFiles.Accumulator>{
+@EqualsAndHashCode(callSuper = false)
+public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSourceFiles.Accumulator> {
 
     transient CollidingSourceFiles collidingSourceFiles = new CollidingSourceFiles(this);
 
@@ -53,13 +53,11 @@ public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSource
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 assert tree instanceof SourceFile;
                 Path p = ((SourceFile) tree).getSourcePath();
-                if(acc.getSourcePaths().contains(p)) {
+                if (!acc.getSourcePaths().add(p)) {
                     acc.getDuplicates().add(p);
-                } else {
-                    acc.getSourcePaths().add(p);
                 }
                 return tree;
             }
@@ -76,11 +74,11 @@ public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSource
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
-                if(tree instanceof SourceFile) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile) {
                     Path p = ((SourceFile) tree).getSourcePath();
-                    if(acc.getDuplicates().contains(p)) {
-                        collidingSourceFiles.insertRow(executionContext, new CollidingSourceFiles.Row(
+                    if (acc.getDuplicates().contains(p)) {
+                        collidingSourceFiles.insertRow(ctx, new CollidingSourceFiles.Row(
                                 p.toString(),
                                 tree.getClass().toString()
                         ));

@@ -34,7 +34,7 @@ class JavaTemplateImportTest implements RewriteTest {
     @Test
     void replaceImport() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
+          spec -> spec
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
                   public J visitImport(J.Import import_, ExecutionContext executionContext) {

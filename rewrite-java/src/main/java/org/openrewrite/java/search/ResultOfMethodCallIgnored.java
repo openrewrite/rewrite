@@ -28,7 +28,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ResultOfMethodCallIgnored extends Recipe {
     /**
      * A method pattern that is used to find matching method invocations.
@@ -60,8 +60,8 @@ public class ResultOfMethodCallIgnored extends Recipe {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
                     if (getCursor().getParentTreeCursor().getValue() instanceof J.Block) {
                         m = SearchResult.found(m);

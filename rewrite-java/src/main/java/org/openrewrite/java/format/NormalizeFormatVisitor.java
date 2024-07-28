@@ -59,9 +59,9 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
             return c;
         }
 
-        if (!c.getAnnotations().getKind().getPrefix().isEmpty()) {
-            c = concatenatePrefix(c, c.getAnnotations().getKind().getPrefix());
-            c = c.getAnnotations().withKind(c.getAnnotations().getKind().withPrefix(Space.EMPTY));
+        if (!c.getPadding().getKind().getPrefix().isEmpty()) {
+            c = concatenatePrefix(c, c.getPadding().getKind().getPrefix());
+            c = c.getPadding().withKind(c.getPadding().getKind().withPrefix(Space.EMPTY));
             return c;
         }
 
@@ -175,18 +175,16 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
                 .withComments(comments));
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }

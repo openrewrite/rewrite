@@ -39,8 +39,7 @@ public interface Proto extends Tree {
         return (R) acceptProto(v.adapt(ProtoVisitor.class), p);
     }
 
-    @Nullable
-    default <P> Proto acceptProto(ProtoVisitor<P> v, P p) {
+    default <P> @Nullable Proto acceptProto(ProtoVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -354,8 +353,7 @@ public interface Proto extends Tree {
         @Nullable
         ProtoContainer<Option> options;
 
-        @Nullable
-        public List<Option> getOptions() {
+        public @Nullable List<Option> getOptions() {
             return options == null ? null : options.getElements();
         }
 
@@ -395,8 +393,7 @@ public interface Proto extends Tree {
                 return t.name == name ? t : new Field(t.id, t.prefix, t.markers, t.label, t.type, name, t.number, t.options);
             }
 
-            @Nullable
-            public ProtoContainer<Option> getOptions() {
+            public @Nullable ProtoContainer<Option> getOptions() {
                 return t.options;
             }
 
@@ -511,8 +508,7 @@ public interface Proto extends Tree {
         @Nullable
         ProtoContainer<Option> options;
 
-        @Nullable
-        public List<Option> getOptions() {
+        public @Nullable List<Option> getOptions() {
             return options == null ? null : options.getElements();
         }
 
@@ -552,8 +548,7 @@ public interface Proto extends Tree {
                 return t.name == name ? t : new EnumField(t.id, t.prefix, t.markers, name, t.number, t.options);
             }
 
-            @Nullable
-            public ProtoContainer<Option> getOptions() {
+            public @Nullable ProtoContainer<Option> getOptions() {
                 return t.options;
             }
 
@@ -588,13 +583,11 @@ public interface Proto extends Tree {
         @Nullable
         ProtoRightPadded<FullName> target;
 
-        @Nullable
-        public FullName getTarget() {
+        public @Nullable FullName getTarget() {
             return target == null ? null : target.getElement();
         }
 
-        @Nullable
-        public FullName withTarget(@Nullable FullName target) {
+        public @Nullable FullName withTarget(@Nullable FullName target) {
             if (target == null) {
                 return getPadding().withTarget(null);
             }
@@ -631,8 +624,7 @@ public interface Proto extends Tree {
         public static class Padding {
             private final FullIdentifier t;
 
-            @Nullable
-            public ProtoRightPadded<FullName> getTarget() {
+            public @Nullable ProtoRightPadded<FullName> getTarget() {
                 return t.target;
             }
 
@@ -808,8 +800,7 @@ public interface Proto extends Tree {
         @Nullable
         ProtoContainer<Option> options;
 
-        @Nullable
-        public List<Option> getOptions() {
+        public @Nullable List<Option> getOptions() {
             return options == null ? null : options.getElements();
         }
 
@@ -873,8 +864,7 @@ public interface Proto extends Tree {
                 return t.name == name ? t : new MapField(t.id, t.prefix, t.markers, t.map, t.keyType, t.valueType, name, t.number, t.options);
             }
 
-            @Nullable
-            public ProtoContainer<Option> getOptions() {
+            public @Nullable ProtoContainer<Option> getOptions() {
                 return t.options;
             }
 
@@ -1196,8 +1186,7 @@ public interface Proto extends Tree {
         @Nullable
         ProtoContainer<Proto> reservations;
 
-        @Nullable
-        public List<Proto> getReservations() {
+        public @Nullable List<Proto> getReservations() {
             return reservations == null ? null : reservations.getElements();
         }
 
@@ -1229,8 +1218,7 @@ public interface Proto extends Tree {
         public static class Padding {
             private final Reserved t;
 
-            @Nullable
-            public ProtoContainer<Proto> getReservations() {
+            public @Nullable ProtoContainer<Proto> getReservations() {
                 return t.reservations;
             }
 
@@ -1301,8 +1289,7 @@ public interface Proto extends Tree {
         public static class Padding {
             private final RpcInOut t;
 
-            @Nullable
-            public ProtoRightPadded<FullName> getType() {
+            public @Nullable ProtoRightPadded<FullName> getType() {
                 return t.type;
             }
 

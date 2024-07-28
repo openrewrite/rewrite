@@ -20,6 +20,8 @@ import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
@@ -27,7 +29,9 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,7 +49,7 @@ class JavaParserTest implements RewriteTest {
             """
               @Deprecated(since=)
               public class A {}
-               """
+              """
           )
         );
     }
@@ -86,10 +90,18 @@ class JavaParserTest implements RewriteTest {
     }
 
     @Test
-    void dependenciesFromResources(@TempDir Path temp) {
+    void dependenciesFromResources(@TempDir Path temp) throws Exception {
         JavaParserExecutionContextView ctx = JavaParserExecutionContextView.view(new InMemoryExecutionContext());
         ctx.setParserClasspathDownloadTarget(temp.toFile());
-        assertThat(JavaParser.dependenciesFromResources(ctx, "guava-31.0-jre")).isNotEmpty();
+        // Put a decoy file in the target directory to ensure that it is not used
+        Files.write(temp.resolve("guava-30.0-jre.jar"), "decoy for test purposes; not a real jar".getBytes());
+        List<Path> classpath = JavaParser.dependenciesFromResources(ctx, "guava");
+        assertThat(classpath)
+          .singleElement()
+          .matches(Files::exists, "File extracted from classpath resources exists on disk")
+          .matches(path -> path.endsWith("guava-31.0-jre.jar"),
+            "classpathFromResources should return guava-31.0-jre.jar from resources, even when the target " +
+            "directory contains guava-30.0-jre.jar which has the same prefix");
     }
 
     @Test
@@ -129,5 +141,20 @@ class JavaParserTest implements RewriteTest {
                   i -> assertThat(i.getType()).hasToString("InterfaceB")
                 )));
         }
+    }
+
+    @ParameterizedTest
+    // language=java
+    @ValueSource(strings = {
+      "package my.example; class PrivateClass { void foo() {} } public class PublicClass { void bar() {} }",
+      "package my.example; public class PublicClass { void bar() {} } class PrivateClass { void foo() {} }"
+    })
+    void shouldResolvePathUsingPublicClasses(@Language("java") String source) {
+        rewriteRun(
+          java(
+            source,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my","example","PublicClass.java")))
+          )
+        );
     }
 }

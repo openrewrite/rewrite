@@ -26,12 +26,18 @@ import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddOwaspDateBoundSuppressions extends Recipe {
+
+    @Option(displayName = "Until date",
+            required = false,
+            description = "Optional. The date to add to the suppression. Default will be 30 days from today.",
+            example = "2023-01-01")
+    @Nullable
+    String untilDate;
 
     @Override
     public String getDisplayName() {
@@ -44,13 +50,6 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
                "For use with the OWASP `dependency-check` tool. " +
                "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
     }
-
-    @Option(displayName = "Until date",
-            required = false,
-            description = "Optional. The date to add to the suppression. Default will be 30 days from today.",
-            example = "2023-01-01")
-    @Nullable
-    String untilDate;
 
     @Override
     public Validated<Object> validate() {
@@ -81,7 +80,7 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
                         }
                     }
                     if (!hasUntil) {
-                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
+                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plusDays(30).toString();
                         return t.withAttributes(ListUtils.concat(attributes, autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
                                 new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
                                 "",

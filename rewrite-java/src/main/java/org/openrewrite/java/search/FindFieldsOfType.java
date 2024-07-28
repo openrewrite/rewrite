@@ -33,7 +33,7 @@ import java.util.Set;
  * Finds fields that have a matching type.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindFieldsOfType extends Recipe {
 
     @Option(displayName = "Fully-qualified type name",
@@ -50,6 +50,11 @@ public class FindFieldsOfType extends Recipe {
     @Override
     public String getDisplayName() {
         return "Find fields of type";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return "on types `" + fullyQualifiedTypeName + "`";
     }
 
     @Override

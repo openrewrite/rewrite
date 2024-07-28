@@ -39,6 +39,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     @Nullable
     private final FileAttributes fileAttributes;
+
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
@@ -282,8 +283,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         return name;
     }
 
-    @Nullable
-    private ProtoContainer<Proto.Option> mapOptionList(@Nullable Protobuf2Parser.OptionListContext ctx) {
+    private @Nullable ProtoContainer<Proto.Option> mapOptionList(@Nullable Protobuf2Parser.OptionListContext ctx) {
         if (ctx == null) {
             return null;
         }
@@ -437,8 +437,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         return Space.format(prefix);
     }
 
-    @Nullable
-    private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, Space, T> conversion) {
+    private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, Space, T> conversion) {
         //noinspection ConstantConditions
         if (ctx == null) {
             return null;

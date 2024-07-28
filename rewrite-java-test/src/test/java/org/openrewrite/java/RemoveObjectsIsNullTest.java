@@ -36,54 +36,22 @@ class RemoveObjectsIsNullTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              import static java.util.Objects.isNull;
+              import java.util.Objects;
               public class A {
                   public void test() {
-                      boolean a = true;
-                      if (java.util.Objects.isNull(a)) {
+                      Boolean a = true;
+                      if (Objects.isNull(a)) {
                           System.out.println("a is null");
                       }
                   }
               }
               """,
             """
-              import static java.util.Objects.isNull;
               public class A {
                   public void test() {
-                      boolean a = true;
+                      Boolean a = true;
                       if (a == null) {
                           System.out.println("a is null");
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1547")
-    @Test
-    void transformCallToIsNullNeedsParentheses() {
-        rewriteRun(
-          java(
-            """
-              import static java.util.Objects.isNull;
-              public class A {
-                  public void test() {
-                      boolean a = true, b = false;
-                      if (isNull(a || b)) {
-                          System.out.println("a || b is null");
-                      }
-                  }
-              }
-              """,
-            """
-              import static java.util.Objects.isNull;
-              public class A {
-                  public void test() {
-                      boolean a = true, b = false;
-                      if ((a || b) == null) {
-                          System.out.println("a || b is null");
                       }
                   }
               }
@@ -101,7 +69,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               import static java.util.Objects.nonNull;
               public class A {
                   public void test() {
-                      boolean a = true;
+                      Boolean a = true;
                       if (java.util.Objects.nonNull(a)) {
                           System.out.println("a is non-null");
                       }
@@ -109,10 +77,9 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               }
               """,
             """
-              import static java.util.Objects.nonNull;
               public class A {
                   public void test() {
-                      boolean a = true;
+                      Boolean a = true;
                       if (a != null) {
                           System.out.println("a is non-null");
                       }
@@ -125,31 +92,141 @@ class RemoveObjectsIsNullTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1547")
     @Test
-    void transformCallToNonNullNeedsParentheses() {
+    void downcastToPrimitiveBoolean() {
         rewriteRun(
           java(
             """
-              import static java.util.Objects.nonNull;
+              import static java.util.Objects.isNull;
               public class A {
                   public void test() {
-                      boolean a = true, b = false;
-                      if (nonNull(a || b)) {
-                          System.out.println("a || b is non-null");
+                      Boolean a = true, b = false;
+                      if (isNull(a || b)) {
+                          System.out.println("a || b is null");
                       }
                   }
               }
               """,
             """
-              import static java.util.Objects.nonNull;
               public class A {
                   public void test() {
-                      boolean a = true, b = false;
-                      if ((a || b) != null) {
-                          System.out.println("a || b is non-null");
+                      Boolean a = true, b = false;
+                      if (false) {
+                          System.out.println("a || b is null");
                       }
                   }
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3915")
+    @Test
+    void upcastToBoolean() {
+        rewriteRun(
+          java(
+            """
+              import static java.util.Objects.isNull;
+              import static java.util.Objects.nonNull;
+              public class A {
+                  public void test(boolean a) {
+                      if (isNull(a)) {
+                          System.out.println("a is null");
+                      }
+                      if (!isNull(a)) {
+                          System.out.println("a is not null");
+                      }
+                      if (nonNull(a)) {
+                          System.out.println("a is not null");
+                      }
+                      if (!nonNull(a)) {
+                          System.out.println("a is null");
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  public void test(boolean a) {
+                      if (false) {
+                          System.out.println("a is null");
+                      }
+                      if (!false) {
+                          System.out.println("a is not null");
+                      }
+                      if (true) {
+                          System.out.println("a is not null");
+                      }
+                      if (!true) {
+                          System.out.println("a is null");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4244")
+    void negatedCallToIsNull() {
+        rewriteRun(
+          java(
+            """
+            package com.helloworld;
+            
+            import java.util.Objects;
+
+            class Hello {
+              public boolean hello(String abc) {
+                return !Objects.isNull(abc);
+              }
+            }
+            """,
+            // "!abc == null" is not a valid expression
+            """
+            package com.helloworld;
+
+            class Hello {
+              public boolean hello(String abc) {
+                return abc != null;
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4244")
+    void comparisonOfCallToFalse() {
+        rewriteRun(
+          java(
+            """
+            package com.helloworld;
+            
+            import java.util.Objects;
+
+            class Hello {
+              public boolean hello(String abc) {
+                if (Objects.isNull(abc) == false) {
+                  return;
+                }
+              }
+            }
+            """,
+            // "!abc == null" is not a valid expression
+            """
+            package com.helloworld;
+
+            class Hello {
+              public boolean hello(String abc) {
+                if (!(abc == null)) {
+                  return;
+                }
+              }
+            }
+            """
           )
         );
     }

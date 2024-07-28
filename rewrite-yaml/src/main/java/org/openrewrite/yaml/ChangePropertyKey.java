@@ -17,10 +17,7 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
@@ -43,7 +40,7 @@ import static org.openrewrite.Tree.randomId;
  * interprets application.yml files.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePropertyKey extends Recipe {
 
     @Option(displayName = "Old property key",
@@ -63,15 +60,28 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Option(displayName = "Except",
+    @Option(example = "List.of(\"group\")", displayName = "Except",
             description = "If any of these property keys exist as direct children of `oldPropertyKey`, then they will not be moved to `newPropertyKey`.",
             required = false)
     @Nullable
     List<String> except;
 
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
+            example = ".github/workflows/*.yml")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Change property key";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldPropertyKey, newPropertyKey);
     }
 
     @Override
@@ -81,7 +91,7 @@ public class ChangePropertyKey extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangePropertyKeyVisitor<>();
+        return Preconditions.check(new FindSourceFiles(filePattern), new ChangePropertyKeyVisitor<>());
     }
 
     private class ChangePropertyKeyVisitor<P> extends YamlIsoVisitor<P> {

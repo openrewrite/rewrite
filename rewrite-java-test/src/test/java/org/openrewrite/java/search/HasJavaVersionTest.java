@@ -15,12 +15,15 @@
  */
 package org.openrewrite.java.search;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.version;
+import static org.openrewrite.java.Assertions.javaVersion;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class HasJavaVersionTest implements RewriteTest {
 
@@ -29,18 +32,16 @@ class HasJavaVersionTest implements RewriteTest {
     void matches(String version) {
         rewriteRun(
           spec -> spec.recipe(new HasJavaVersion(version, false)),
-          version(
-            java(
-              """
-                class Test {
-                }
-                """,
-              """
-                /*~~>*/class Test {
-                }
-                """
-            ),
-            11
+          java(
+            """
+              class Test {
+              }
+              """,
+            """
+              /*~~>*/class Test {
+              }
+              """,
+            spec -> spec.markers(javaVersion(11))
           )
         );
     }
@@ -50,15 +51,130 @@ class HasJavaVersionTest implements RewriteTest {
     void noMatch(String version) {
         rewriteRun(
           spec -> spec.recipe(new HasJavaVersion(version, false)),
-          version(
-            java(
-              """
-                class Test {
-                }
-                """
-            ),
-            17
+          java(
+            """
+              class Test {
+              }
+              """,
+            spec -> spec.markers(javaVersion(17))
           )
         );
     }
+
+    @Test
+    void declarativePrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.PreconditionTest
+            description: Test.
+            preconditions:
+              - org.openrewrite.java.search.HasJavaVersion:
+                  version: 11
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                 toText: 2
+            """, "org.openrewrite.PreconditionTest"),
+          text("1")
+        );
+    }
+
+    @DocumentExample
+    @Test
+    void declarativePreconditionMatch() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.PreconditionTest
+            description: Test.
+            preconditions:
+              - org.openrewrite.java.search.HasJavaVersion:
+                  version: 11
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                 toText: 2
+            """, "org.openrewrite.PreconditionTest"),
+          text("1", "2", spec -> spec.markers(javaVersion(11)))
+        );
+    }
+
+    @Test
+    void combinedWithFindMethod() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.CombinedWithFindMethod
+            description: Test.
+            recipeList:
+              - org.openrewrite.java.search.HasJavaVersion:
+                  version: 11
+              - org.openrewrite.java.search.FindMethods:
+                  methodPattern: java.util.List add(..)
+            """, "org.openrewrite.CombinedWithFindMethod"),
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+              class Test {
+                  void test() {
+                      List<String> list = new ArrayList<>();
+                      list.add("1");
+                  }
+              }
+              """,
+            """
+              /*~~>*/import java.util.List;
+              import java.util.ArrayList;
+              class Test {
+                  void test() {
+                      List<String> list = new ArrayList<>();
+                      /*~~>*/list.add("1");
+                  }
+              }
+              """, spec -> spec.markers(javaVersion(11)))
+        );
+    }
+
+    @Test
+    void combinedWithFindMethodFirst() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.CombinedWithFindMethod
+            description: Test.
+            recipeList:
+              - org.openrewrite.java.search.FindMethods:
+                  methodPattern: java.util.List add(..)
+              - org.openrewrite.java.search.HasJavaVersion:
+                  version: 11
+
+            """, "org.openrewrite.CombinedWithFindMethod"),
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+              class Test {
+                  void test() {
+                      List<String> list = new ArrayList<>();
+                      list.add("1");
+                  }
+              }
+              """,
+            """
+              /*~~>*/import java.util.List;
+              import java.util.ArrayList;
+              class Test {
+                  void test() {
+                      List<String> list = new ArrayList<>();
+                      /*~~>*/list.add("1");
+                  }
+              }
+              """, spec -> spec.markers(javaVersion(11)))
+        );
+    }
+
 }

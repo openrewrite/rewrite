@@ -16,6 +16,7 @@
 package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -24,8 +25,9 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class SearchResultsTest implements RewriteTest {
+class SearchResultsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void searchResultIsOnlyAddedOnceEvenWhenRunMultipleTimesByScheduler() {
         rewriteRun(spec -> {
