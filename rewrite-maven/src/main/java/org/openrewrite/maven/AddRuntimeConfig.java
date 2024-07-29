@@ -142,7 +142,7 @@ public class AddRuntimeConfig extends ScanningRecipe<AddRuntimeConfig.Accumulato
         return Preconditions.check(acc.isMavenProject() && acc.getMatchingRuntimeConfigFile() != null,
                 new PlainTextVisitor<ExecutionContext>() {
                     @Override
-                    public PlainText visitText(PlainText plainText, ExecutionContext executionContext) {
+                    public PlainText visitText(PlainText plainText, ExecutionContext ctx) {
                         if (plainText.getSourcePath().equals(acc.getMatchingRuntimeConfigFile())) {
                             return addOrReplaceConfig(plainText, acc);
                         }
