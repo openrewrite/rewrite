@@ -1065,7 +1065,7 @@ class JavaTemplateTest implements RewriteTest {
             public TreeVisitor<?, ExecutionContext> getVisitor() {
                 return new JavaIsoVisitor<>() {
                     @Override
-                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                         JavaTemplate javaTemplate = JavaTemplate.builder("@Deprecated").javaParser(JavaParser.fromJavaVersion()).build();
                         return javaTemplate.apply(getCursor(), classDecl.getCoordinates().addAnnotation((o1, o2) -> o1.getSimpleName().compareTo(o1.getSimpleName())));
                     }
