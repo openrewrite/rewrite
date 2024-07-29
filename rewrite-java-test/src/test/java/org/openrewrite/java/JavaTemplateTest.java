@@ -1065,7 +1065,7 @@ class JavaTemplateTest implements RewriteTest {
             public TreeVisitor<?, ExecutionContext> getVisitor() {
                 return new JavaIsoVisitor<>() {
                     @Override
-                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                         JavaTemplate javaTemplate = JavaTemplate.builder("""
                           public int getNumber() {
                             return 0;
@@ -1108,7 +1108,7 @@ class JavaTemplateTest implements RewriteTest {
             public TreeVisitor<?, ExecutionContext> getVisitor() {
                 return new JavaIsoVisitor<>() {
                     @Override
-                    public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
+                    public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                         JavaTemplate javaTemplate = JavaTemplate.builder("""
                           public int getNumber() {
                             return 0;
