@@ -15,29 +15,17 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.PathUtils;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import lombok.*;
+import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.text.PlainText;
-import org.openrewrite.text.PlainTextParser;
+import org.openrewrite.text.PlainTextVisitor;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -75,34 +63,16 @@ public class AddRuntimeConfig extends ScanningRecipe<AddRuntimeConfig.Accumulato
             example = "=")
     Separator separator;
 
+    @Getter
     public enum Separator {
         NONE(""),
         SPACE(" "),
         EQUALS("=");
 
-        private final static Map<String, Separator> all = new HashMap<>();
         private final String notation;
-
-        static {
-            for (Separator separator : values()) {
-                all.put(separator.notation, separator);
-            }
-        }
-
-        static Separator forNotation(String notation) {
-            if (!all.containsKey(notation)) {
-                throw new IllegalArgumentException("Unknown notation for separator: " + notation);
-            }
-
-            return all.get(notation);
-        }
 
         Separator(String notation) {
             this.notation = notation;
-        }
-
-        public String getNotation() {
-            return notation;
         }
     }
 
@@ -117,42 +87,40 @@ public class AddRuntimeConfig extends ScanningRecipe<AddRuntimeConfig.Accumulato
     }
 
     @Data
-    static class Accumulator {
+    @RequiredArgsConstructor
+    public static class Accumulator {
+        final String targetRepresentation;
         boolean mavenProject;
         Path matchingRuntimeConfigFile;
-        RealizedConfig realizedConfig;
+
     }
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
-        return new Accumulator();
+        String targetRepresentation = argument == null ? flag : flag + separator.getNotation() + argument;
+        return new Accumulator(targetRepresentation);
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                if (tree instanceof SourceFile) {
+                    Path sourcePath = ((SourceFile) tree).getSourcePath();
+                    switch (PathUtils.separatorsToUnix(sourcePath.toString())) {
+                        case POM_FILENAME:
+                            acc.setMavenProject(true);
+                            break;
+                        case MAVEN_CONFIG_PATH:
+                        case JVM_CONFIG_PATH:
+                            acc.setMatchingRuntimeConfigFile(sourcePath);
+                            break;
+                        default:
+                            break;
+                    }
                 }
-
-                SourceFile sourceFile = (SourceFile) tree;
-                String sourcePath = PathUtils.separatorsToUnix(sourceFile.getSourcePath().toString());
-                acc.setRealizedConfig(new RealizedConfig(flag, argument, separator));
-
-                switch (sourcePath) {
-                    case POM_FILENAME:
-                        acc.setMavenProject(true);
-                        break;
-                    case MAVEN_CONFIG_PATH:
-                    case JVM_CONFIG_PATH:
-                        acc.setMatchingRuntimeConfigFile(sourceFile.getSourcePath());
-                        break;
-                    default:
-                        break;
-                }
-
                 return tree;
             }
         };
@@ -160,87 +128,45 @@ public class AddRuntimeConfig extends ScanningRecipe<AddRuntimeConfig.Accumulato
 
     @Override
     public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
-        if (!acc.isMavenProject() || acc.getMatchingRuntimeConfigFile() != null) {
-            return Collections.emptyList();
+        if (acc.isMavenProject() && acc.getMatchingRuntimeConfigFile() == null) {
+            return Collections.singletonList(PlainText.builder()
+                    .text(acc.getTargetRepresentation())
+                    .sourcePath(Paths.get(MVN_CONFIG_DIR, relativeConfigFileName))
+                    .build());
         }
-
-        List<SourceFile> sources = new ArrayList<>();
-
-        Path path = Paths.get(MVN_CONFIG_DIR, relativeConfigFileName);
-
-        if (!Files.exists(path)) {
-            PlainText newConfigFile = PlainText.builder()
-                    .text(acc.getRealizedConfig().getTargetRepresentation())
-                    .sourcePath(path)
-                    .build();
-            sources.add(newConfigFile);
-        }
-
-        return sources;
-    }
-
-    private static class RealizedConfig {
-        private final String targetRepresentation;
-
-        RealizedConfig(String flag, String argument, Separator separator) {
-            String flagAndArg = flag;
-
-            if (argument != null) {
-                flagAndArg += separator.getNotation() + argument;
-            }
-
-            targetRepresentation = flagAndArg;
-        }
-
-        String getTargetRepresentation() {
-            return targetRepresentation;
-        }
+        return Collections.emptyList();
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if (!acc.isMavenProject() || acc.getMatchingRuntimeConfigFile() == null) {
-            return TreeVisitor.noop();
-        }
+        return Preconditions.check(acc.isMavenProject() && acc.getMatchingRuntimeConfigFile() != null,
+                new PlainTextVisitor<ExecutionContext>() {
+                    @Override
+                    public PlainText visitText(PlainText plainText, ExecutionContext executionContext) {
+                        if (plainText.getSourcePath().equals(acc.getMatchingRuntimeConfigFile())) {
+                            return addOrReplaceConfig(plainText, acc);
+                        }
+                        return plainText;
+                    }
 
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
-                }
+                    private PlainText addOrReplaceConfig(PlainText plainText, Accumulator acc) {
+                        String existingContent = plainText.getText();
+                        Matcher matcher = Pattern.compile(Pattern.quote(flag) + "[=\\s]?[a-zA-Z0-9]*").matcher(existingContent);
+                        if (matcher.find()) {
+                            return plainText.withText(matcher.replaceAll(acc.getTargetRepresentation()));
+                        }
 
-                SourceFile sourceFile = (SourceFile) tree;
+                        String newText = StringUtils.isBlank(existingContent) ? existingContent : existingContent + determineConfigSeparator(plainText);
+                        return plainText.withText(newText + acc.getTargetRepresentation());
+                    }
 
-                if (sourceFile.getSourcePath().equals(acc.getMatchingRuntimeConfigFile())) {
-                    return addOrReplaceConfig(sourceFile, acc);
-                }
-
-                return tree;
-            }
-        };
-    }
-
-    private PlainText addOrReplaceConfig(SourceFile sourceFile, Accumulator acc) {
-        PlainText plainText = PlainTextParser.convert(sourceFile);
-        String existingContent = plainText.getText();
-        String escapedFlag = Pattern.quote(flag);
-        Pattern pattern = Pattern.compile(escapedFlag + "[=\\s]?[a-zA-Z0-9]*");
-        Matcher matcher = pattern.matcher(existingContent);
-
-        if (!matcher.find()) {
-            String separator = determineConfigSeparator(acc.getMatchingRuntimeConfigFile());
-            String newText = existingContent.isEmpty() ? existingContent : existingContent + separator;
-            newText += acc.getRealizedConfig().getTargetRepresentation();
-            return plainText.withText(newText);
-        } else {
-            String newText = matcher.replaceAll(acc.getRealizedConfig().getTargetRepresentation());
-            return plainText.withText(newText);
-        }
-    }
-
-    private String determineConfigSeparator(Path matchingRuntimeConfigFile) {
-        // Use new line for maven.config, space for jvm.config
-        return Paths.get(MAVEN_CONFIG_PATH).equals(matchingRuntimeConfigFile) ? System.lineSeparator() : " ";
+                    private String determineConfigSeparator(PlainText plainText) {
+                        // Use new line for maven.config, space for jvm.config
+                        if (Paths.get(JVM_CONFIG_PATH).equals(plainText.getSourcePath())) {
+                            return " ";
+                        }
+                        return plainText.getText().contains("\r\n") ? "\r\n" : "\n";
+                    }
+                });
     }
 }

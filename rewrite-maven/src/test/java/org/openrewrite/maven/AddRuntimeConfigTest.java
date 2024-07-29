@@ -17,7 +17,9 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
@@ -27,92 +29,93 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class AddRuntimeConfigTest implements RewriteTest {
     private static final SourceSpecs POM_XML_SOURCE_SPEC = pomXml(
+      """
+        <project>
+            <groupId>com.mycompany.app</groupId>
+            <artifactId>my-app</artifactId>
+            <version>1</version>
+        </project>
         """
-          <project>
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-          </project>
-          """
     );
 
     @Test
+    @DocumentExample
     void createConfigFileWithRuntimeConfigIfFileDoesNotExist() {
         rewriteRun(
-            spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
-            POM_XML_SOURCE_SPEC,
-            text(
-                null,
-                "-T=3",
-                spec -> spec.path(MAVEN_CONFIG_PATH)
-            )
+          spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            null,
+            "-T=3",
+            spec -> spec.path(MAVEN_CONFIG_PATH)
+          )
         );
     }
 
     @Test
     void appendRuntimeFlagToEmptyConfigFile() {
         rewriteRun(
-            spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
-            POM_XML_SOURCE_SPEC,
-            text(
-                "",
-                "-T=3",
-                spec -> spec.path(MAVEN_CONFIG_PATH)
-            )
+          spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            "",
+            "-T=3",
+            spec -> spec.path(MAVEN_CONFIG_PATH)
+          )
         );
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", " ", "="})
-    void createConfigFileWithRuntimeConfigForAllSeparators(String separatorNotation) {
+    @EnumSource(Separator.class)
+    void createConfigFileWithRuntimeConfigForAllSeparators(Separator separator) {
         rewriteRun(
-                spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.forNotation(separatorNotation))),
-                POM_XML_SOURCE_SPEC,
-                text(
-                    "",
-                    "-T" + separatorNotation + "3",
-                    spec -> spec.path(MAVEN_CONFIG_PATH)
-                )
+          spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", separator)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            "",
+            "-T" + separator.getNotation() + "3",
+            spec -> spec.path(MAVEN_CONFIG_PATH)
+          )
         );
     }
 
     @Test
     void appendRuntimeFlagIfItDoesNotExist() {
         rewriteRun(
-            spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
-            POM_XML_SOURCE_SPEC,
-            text(
-                "-U",
-                """
-                -U
-                -T=3
-                """,
-                spec -> spec.path(MAVEN_CONFIG_PATH)
-            )
+          spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            "-U",
+            """
+              -U
+              -T=3
+              """,
+            spec -> spec.path(MAVEN_CONFIG_PATH)
+          )
         );
     }
 
     @Test
     void doesNotModifyRuntimeFlagIfExistingWithoutArgument() {
         rewriteRun(
-            spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-U", null, Separator.EQUALS)),
-            POM_XML_SOURCE_SPEC,
-            text(
-                "-U",
-                spec -> spec.path(MAVEN_CONFIG_PATH)
-            )
+          spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-U", null, Separator.EQUALS)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            "-U",
+            spec -> spec.path(MAVEN_CONFIG_PATH)
+          )
         );
     }
 
     @Test
     void doesNotModifyRuntimeFlagIfExistingWithSameArgument() {
         rewriteRun(
-            spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
-            POM_XML_SOURCE_SPEC,
-            text(
-                "-T=3",
-                spec -> spec.path(MAVEN_CONFIG_PATH)
-            )
+          spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            "-T=3",
+            spec -> spec.path(MAVEN_CONFIG_PATH)
+          )
         );
     }
 
@@ -120,13 +123,13 @@ class AddRuntimeConfigTest implements RewriteTest {
     @ValueSource(strings = {"--threads=2", "--threads=3"})
     void appendRuntimeFlagIfExistingForFlagFormatMismatch(String existingConfig) {
         rewriteRun(
-            spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
-            POM_XML_SOURCE_SPEC,
-            text(
-                existingConfig,
-                existingConfig + System.lineSeparator() + "-T=3",
-                spec -> spec.path(MAVEN_CONFIG_PATH)
-            )
+          spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            existingConfig,
+            existingConfig + System.lineSeparator() + "-T=3",
+            spec -> spec.path(MAVEN_CONFIG_PATH)
+          )
         );
     }
 
@@ -134,39 +137,39 @@ class AddRuntimeConfigTest implements RewriteTest {
     @ValueSource(strings = {"-T 3", "-T3", "-T=3"})
     void replaceRuntimeFlagIfExistingWithDifferentArgument(String existingConfig) {
         rewriteRun(
-            spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "4", Separator.EQUALS)),
-            POM_XML_SOURCE_SPEC,
-            text(
-                existingConfig,
-                "-T=4",
-                spec -> spec.path(MAVEN_CONFIG_PATH)
-            )
+          spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "4", Separator.EQUALS)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            existingConfig,
+            "-T=4",
+            spec -> spec.path(MAVEN_CONFIG_PATH)
+          )
         );
     }
 
     @Test
     void addJvmRuntimeFlagOnTheSameLine() {
         rewriteRun(
-            spec -> spec.recipe(new AddRuntimeConfig(JVM_CONFIG_FILENAME, "-XX:MaxPermSize", "512m", Separator.EQUALS)),
-            POM_XML_SOURCE_SPEC,
-            text(
-                "-Xmx2048m -Xms1024m",
-                "-Xmx2048m -Xms1024m -XX:MaxPermSize=512m",
-                spec -> spec.path(JVM_CONFIG_PATH)
-            )
+          spec -> spec.recipe(new AddRuntimeConfig(JVM_CONFIG_FILENAME, "-XX:MaxPermSize", "512m", Separator.EQUALS)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            "-Xmx2048m -Xms1024m",
+            "-Xmx2048m -Xms1024m -XX:MaxPermSize=512m",
+            spec -> spec.path(JVM_CONFIG_PATH)
+          )
         );
     }
 
     @Test
     void replaceJvmRuntimeFlagOnTheSameLine() {
         rewriteRun(
-            spec -> spec.recipe(new AddRuntimeConfig(JVM_CONFIG_FILENAME, "-XX:MaxPermSize", "1024m", Separator.EQUALS)),
-            POM_XML_SOURCE_SPEC,
-            text(
-                "-Xmx2048m -XX:MaxPermSize=512m -Xms1024m",
-                "-Xmx2048m -XX:MaxPermSize=1024m -Xms1024m",
-                spec -> spec.path(JVM_CONFIG_PATH)
-            )
+          spec -> spec.recipe(new AddRuntimeConfig(JVM_CONFIG_FILENAME, "-XX:MaxPermSize", "1024m", Separator.EQUALS)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            "-Xmx2048m -XX:MaxPermSize=512m -Xms1024m",
+            "-Xmx2048m -XX:MaxPermSize=1024m -Xms1024m",
+            spec -> spec.path(JVM_CONFIG_PATH)
+          )
         );
     }
 }
