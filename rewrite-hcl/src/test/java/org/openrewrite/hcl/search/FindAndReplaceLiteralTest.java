@@ -15,14 +15,9 @@
  */
 package org.openrewrite.hcl.search;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
-
-import java.util.List;
 
 import static org.openrewrite.hcl.Assertions.hcl;
 
@@ -32,7 +27,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @DocumentExample
     void defaultNonRegexReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("app-cluster", "new-app-cluster", null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplaceLiteral("app-cluster", "new-app-cluster", null, null)),
           //language=hcl
           hcl(
             """
@@ -56,7 +51,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @Test
     void removeWhenReplaceIsNullOrEmpty() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("prefix-", null, null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplaceLiteral("prefix-", null, null, null)),
           //language=hcl
           hcl(
             """
@@ -80,7 +75,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @Test
     void regexReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral(".", "a", true, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplaceLiteral(".", "a", true, null)),
           //language=hcl
           hcl(
             """
@@ -104,7 +99,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @Test
     void captureGroupsReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("old-([^.]+)", "new-$1", true, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplaceLiteral("old-([^.]+)", "new-$1", true, null)),
           //language=hcl
           hcl(
             """
@@ -128,7 +123,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @Test
     void noRecursiveReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("app", "application", null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplaceLiteral("app", "application", null, null)),
           //language=hcl
           hcl(
             """
@@ -152,7 +147,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @Test
     void compatibleWithDollarSigns() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("$${app-cluster}", "$${new-app-cluster}", null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplaceLiteral("$${app-cluster}", "$${new-app-cluster}", null, null)),
           //language=hcl
           hcl(
             """
@@ -176,7 +171,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @Test
     void doesNotReplaceStringTemplate() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("app-name", "new-app-name", null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplaceLiteral("app-name", "new-app-name", null, null)),
           //language=hcl
           hcl(
             """
@@ -193,7 +188,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @Test
     void doesNothingIfLiteralNotFound() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("hello", "goodbye", null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplaceLiteral("hello", "goodbye", null, null)),
           //language=hcl
           hcl(
             """
@@ -210,7 +205,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @Test
     void doesNotReplaceVariableNames() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("app_deployment", "replacement_deployment_name", null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplaceLiteral("app_deployment", "replacement_deployment_name", null, null)),
           //language=hcl
           hcl(
             """
@@ -227,7 +222,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @Test
     void replacesNumericLiterals() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("2", "1", null, null, null, null, null)),
+          spec -> spec.recipe(new FindAndReplaceLiteral("2", "1", null, null)),
           //language=hcl
           hcl(
             """
@@ -250,34 +245,14 @@ class FindAndReplaceLiteralTest implements RewriteTest {
         );
     }
 
-    @Value
-    @EqualsAndHashCode(callSuper = false)
-    static class MultiFindAndReplaceLiteral extends Recipe {
-
-        @Override
-        public String getDisplayName() {
-            return "Replaces \"cluster-1\" with \"cluster-2\" then \"cluster-3\" then \"cluster-4\"";
-        }
-
-        @Override
-        public String getDescription() {
-            return "Replaces \"cluster-1\" with \"cluster-2\" then \"cluster-3\" then \"cluster-4\".";
-        }
-
-        @Override
-        public List<Recipe> getRecipeList() {
-            return List.of(
-              new FindAndReplaceLiteral("cluster-1", "cluster-2", null, null, null, null, null),
-              new FindAndReplaceLiteral("cluster-2", "cluster-3", null, null, null, null, null),
-              new FindAndReplaceLiteral("cluster-3", "cluster-4", null, null, null, null, null)
-            );
-        }
-    }
-
     @Test
     void successiveReplacement() {
         rewriteRun(
-          spec -> spec.recipe(new MultiFindAndReplaceLiteral()),
+          spec -> spec.recipes(
+            new FindAndReplaceLiteral("cluster-1", "cluster-2", null, null),
+            new FindAndReplaceLiteral("cluster-2", "cluster-3", null, null),
+            new FindAndReplaceLiteral("cluster-3", "cluster-4", null, null)
+          ),
           //language=hcl
           hcl(
             """
