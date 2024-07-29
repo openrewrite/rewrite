@@ -119,6 +119,8 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         if (scalar.getAnchor() != null) {
             visit(scalar.getAnchor(), p);
         }
+        String[] lines;
+        int indent;
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:
                 p.append('"')
@@ -131,8 +133,8 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
                         .append('\'');
                 break;
             case LITERAL:
-                String[] lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
-                int indent = countCurrentIndentation(p) + 2;
+                lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
+                indent = countCurrentIndentation(p) + 1;
                 p.append('|').append(lines[0]);
                 for (int i = 1; i < lines.length; i++) {
                     p.append("\n");
@@ -144,9 +146,14 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
                 break;
             case FOLDED:
                 lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
+                indent = countCurrentIndentation(p) + 1;
                 p.append('>').append(lines[0]);
                 for (int i = 1; i < lines.length; i++) {
-                    p.append("\n").append("      ").append(lines[i]);
+                    p.append("\n");
+                    for (int j = 0; j < indent; j++) {
+                        p.append(" ");
+                    }
+                    p.append(lines[i]);
                 }
                 break;
             case PLAIN:

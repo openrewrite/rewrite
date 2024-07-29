@@ -124,6 +124,7 @@ public class YamlParser implements org.openrewrite.Parser {
             Yaml.Document document = null;
             Stack<BlockBuilder> blockStack = new Stack<>();
             String newLine = "";
+            int currentIndent = 0;
 
             for (Event event = parser.getEvent(); event != null; event = parser.getEvent()) {
                 switch (event.getEventId()) {
@@ -189,6 +190,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             lastEnd = event.getEndMark().getIndex();
                         }
                         blockStack.push(new MappingBuilder(fmt, startBracePrefix, anchor));
+                        currentIndent = countIndent(fmt);
                         break;
                     }
                     case Scalar: {
@@ -224,9 +226,11 @@ public class YamlParser implements org.openrewrite.Parser {
                                     scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
                                 }
                                 String[] lines = scalarValue.split("\n");
+                                //get parent line
+
                                 StringBuilder sb = new StringBuilder(lines[0]);
-                                int indentToRemove = blockStack.size() * 2; // todo this should use the parent's prefix in stead of expecting the prefix size of 2
-                                for (int i=1; i<lines.length; i++) {
+                                int indentToRemove = currentIndent + 1; // Strip off the minimum indent for a string block to be valid
+                                for (int i = 1; i < lines.length; i++) {
                                     sb.append("\n").append(lines[i].substring(indentToRemove));
                                 }
                                 scalarValue = sb.toString();
@@ -630,6 +634,16 @@ public class YamlParser implements org.openrewrite.Parser {
                 return super.visitMapping(mapping, p);
             }
         }.visit(y, 0);
+    }
+
+    private int countIndent(String line) {
+        int count = 0;
+        for (int i = 0; i < line.length(); i++) {
+            if (line.charAt(i) == ' ') {
+                count++;
+            }
+        }
+        return count;
     }
 
     public static Builder builder() {
