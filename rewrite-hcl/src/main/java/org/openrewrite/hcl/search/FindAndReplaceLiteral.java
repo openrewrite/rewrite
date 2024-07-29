@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,14 +15,9 @@
  */
 package org.openrewrite.hcl.search;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.FindSourceFiles;
-import org.openrewrite.Option;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.openrewrite.*;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.lang.Nullable;
@@ -36,6 +31,8 @@ import java.util.regex.Pattern;
 
 import static org.openrewrite.Tree.randomId;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class FindAndReplaceLiteral extends Recipe {
 
     @Override
@@ -45,68 +42,58 @@ public class FindAndReplaceLiteral extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find and replace literal values in HCL files. This recipe parses the source files on which it runs"
-                + "as HCL, meaning you can execute HCL language-specific recipes before and after this recipe in a single recipe run.";
+        return "Find and replace literal values in HCL files. This recipe parses the source files on which it runs as HCL, "
+               + "meaning you can execute HCL language-specific recipes before and after this recipe in a single recipe run.";
     }
 
-    @Option(
-            displayName = "Find", description= "The literal to find (and replace)", example = "blacklist"
-    )
-    private final String find;
+    @Option(displayName = "Find", description = "The literal to find (and replace)", example = "blacklist")
+    String find;
 
     @Option(displayName = "Replace",
             description = "The replacement literal for `find`. This snippet can be multiline.",
             example = "denylist",
             required = false)
-    private final @Nullable String replace;
+    @Nullable
+    String replace;
 
     @Option(displayName = "Regex",
             description = "Default false. If true, `find` will be interpreted as a Regular Expression, and capture group contents will be available in `replace`.",
             required = false)
-    private final @Nullable Boolean regex;
+    @Nullable
+    Boolean regex;
 
     @Option(displayName = "Case sensitive",
             description = "If `true` the search will be sensitive to case. Default `false`.", required = false)
-    private final @Nullable Boolean caseSensitive;
+    @Nullable
+    Boolean caseSensitive;
 
     @Option(displayName = "Regex multiline mode", description =
             "When performing a regex search setting this to `true` allows \"^\" and \"$\" to match the beginning and end of lines, respectively. "
-                    + "When performing a regex search when this is `false` \"^\" and \"$\" will match only the beginning and ending of the entire source file, respectively."
-                    + "Has no effect when not performing a regex search. Default `false`.", required = false)
-    private final @Nullable Boolean multiline;
+            + "When performing a regex search when this is `false` \"^\" and \"$\" will match only the beginning and ending of the entire source file, respectively."
+            + "Has no effect when not performing a regex search. Default `false`.", required = false)
+    @Nullable
+    Boolean multiline;
 
     @Option(displayName = "Regex dot all", description =
             "When performing a regex search setting this to `true` allows \".\" to match line terminators."
-                    + "Has no effect when not performing a regex search. Default `false`.", required = false)
-    private final @Nullable Boolean dotAll;
+            + "Has no effect when not performing a regex search. Default `false`.", required = false)
+    @Nullable
+    Boolean dotAll;
 
     @Option(displayName = "File pattern", description =
             "A glob expression that can be used to constrain which directories or source files should be searched. "
-                    + "Multiple patterns may be specified, separated by a semicolon `;`. "
-                    + "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. "
-                    + "When not set, all source files are searched. ", required = false, example = "**/*.tf")
-    private final @Nullable String filePattern;
-
-    @JsonCreator
-    public FindAndReplaceLiteral(@JsonProperty("find") final String find, @JsonProperty("replace") final @Nullable String replace, @JsonProperty("regex") final @Nullable Boolean regex,
-            @JsonProperty("caseSensitive") final @Nullable Boolean caseSensitive, @JsonProperty("multiline") final @Nullable Boolean multiline, @JsonProperty("dotAll") final @Nullable Boolean dotAll,
-            @JsonProperty("filePattern") final @Nullable String filePattern) {
-        this.find = find;
-        this.replace = replace;
-        this.regex = regex;
-        this.caseSensitive = caseSensitive;
-        this.multiline = multiline;
-        this.dotAll = dotAll;
-        this.filePattern = filePattern;
-    }
+            + "Multiple patterns may be specified, separated by a semicolon `;`. "
+            + "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. "
+            + "When not set, all source files are searched. ", required = false, example = "**/*.tf")
+    @Nullable
+    String filePattern;
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        TreeVisitor<?, ExecutionContext> visitor = new HclIsoVisitor<ExecutionContext>(){
-
+        TreeVisitor<?, ExecutionContext> visitor = new HclIsoVisitor<ExecutionContext>() {
             @Override
             public Hcl.Literal visitLiteral(final Hcl.Literal literal, final ExecutionContext ctx) {
-                for(Marker marker : literal.getMarkers().getMarkers()) {
+                for (Marker marker : literal.getMarkers().getMarkers()) {
                     if (marker instanceof AlreadyReplaced) {
                         AlreadyReplaced alreadyReplaced = (AlreadyReplaced) marker;
                         if (Objects.equals(find, alreadyReplaced.getFind()) && Objects.equals(replace,
@@ -131,10 +118,10 @@ public class FindAndReplaceLiteral extends Recipe {
                 }
                 Pattern pattern = Pattern.compile(searchStr, patternOptions);
                 Matcher matcher = pattern.matcher(literal.getValue().toString());
-                if(!matcher.find()){
+                if (!matcher.find()) {
                     return literal;
                 }
-                String replacement =  replace == null ? "" : replace;
+                String replacement = replace == null ? "" : replace;
                 if (!Boolean.TRUE.equals(regex)) {
                     replacement = replacement.replace("$", "\\$");
                 }
