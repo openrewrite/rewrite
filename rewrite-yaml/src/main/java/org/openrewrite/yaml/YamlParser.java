@@ -196,6 +196,9 @@ public class YamlParser implements org.openrewrite.Parser {
                     }
                     case Scalar: {
                         String fmt = newLine + reader.prefix(lastEnd, event);
+                        if (!newLine.isEmpty()) {
+                            lastEnd--;
+                        }
                         newLine = "";
 
                         ScalarEvent scalar = (ScalarEvent) event;
@@ -351,6 +354,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             lastEnd--;
                         }
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor));
+                        currentIndent = countIndent(fmt);
                         break;
                     }
                     case Alias: {

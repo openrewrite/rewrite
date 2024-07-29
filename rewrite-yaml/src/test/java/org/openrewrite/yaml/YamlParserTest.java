@@ -218,13 +218,13 @@ class YamlParserTest implements RewriteTest {
     }
 
     @Test
-    void literalBlockWithScript() {
+    void literalBlock() {
         rewriteRun(
           yaml(
             """
               some:
                 object:
-                  with: An existing value
+                  with: A value
                   script: |
                     #!/bin/bash
                     echo "hello
@@ -234,13 +234,32 @@ class YamlParserTest implements RewriteTest {
     }
 
     @Test
-    void literalBlockWithScriptMoreIndentation() {
+    void literalBlockMoreIndentation() {
+        rewriteRun(
+          yaml(
+            """
+                    some:
+                        object:
+                            scripts:
+                              - |
+                                #!/bin/bash
+                                echo "hello
+                              - |
+                                #!/bin/bash
+                                echo "hello
+                    """
+          )
+        );
+    }
+
+    @Test
+    void literalBlockSequence() {
         rewriteRun(
           yaml(
             """
               some:
                   object:
-                      with: An existing value
+                      with: A value
                       script: |
                                 #!/bin/bash
                                 echo "hello
@@ -250,13 +269,12 @@ class YamlParserTest implements RewriteTest {
     }
 
     @Test
-    void foldedBlockWithScript() {
+    void foldedBlock() {
         rewriteRun(
           yaml(
             """
               some:
                       object:
-                         with: An existing value
                          script: >-
                              #!/bin/bash
                              echo "hello
