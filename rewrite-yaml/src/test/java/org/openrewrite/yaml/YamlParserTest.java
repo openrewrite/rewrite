@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class YamlParserTest implements RewriteTest {
@@ -233,4 +232,38 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void literalBlockWithScriptMoreIndentation() {
+        rewriteRun(
+          yaml(
+            """
+              some:
+                  object:
+                      with: An existing value
+                      script: |
+                                #!/bin/bash
+                                echo "hello
+              """
+          )
+        );
+    }
+
+    @Test
+    void foldedBlockWithScript() {
+        rewriteRun(
+          yaml(
+            """
+              some:
+                      object:
+                         with: An existing value
+                         script: >-
+                             #!/bin/bash
+                             echo "hello
+              """
+          )
+        );
+    }
+
+
 }
