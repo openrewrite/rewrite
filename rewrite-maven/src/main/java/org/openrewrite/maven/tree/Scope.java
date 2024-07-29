@@ -24,6 +24,7 @@ public enum Scope {
     Runtime,
     Test,
     System,
+    Import,
     Invalid;
 
     /**
@@ -110,6 +111,8 @@ public enum Scope {
                 return Test;
             case "system":
                 return System;
+            case "import":
+                return Import;
             default:
                 return Invalid;
         }
