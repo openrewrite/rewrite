@@ -45,16 +45,16 @@ public class ExactVersion extends LatestRelease {
         }
         String versionOnly;
         int hyphenIndex = pattern.indexOf('-');
-        if(hyphenIndex == -1) {
+        if (hyphenIndex == -1) {
             versionOnly = pattern;
         } else {
             versionOnly = pattern.substring(0, hyphenIndex);
         }
-        if(versionOnly.startsWith("latest") ||
-                versionOnly.contains("x") ||
-                versionOnly.contains("^") ||
-                versionOnly.contains("~") ||
-                versionOnly.contains(" ")) {
+        if (versionOnly.startsWith("latest") ||
+            versionOnly.contains("x") ||
+            versionOnly.contains("^") ||
+            versionOnly.contains("~") ||
+            versionOnly.contains(" ")) {
             return Validated.invalid("exactVersion", pattern, "not an exact version number");
         }
         return Validated.valid("exactVersion", new ExactVersion(pattern));
