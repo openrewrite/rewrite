@@ -110,11 +110,12 @@ class AddKeyValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddKeyValue("$.", "key", "\"val\"", false)),
           //language=json
-          json("""
-            {
-                "key": "x"
-            }
+          json(
             """
+              {
+                  "key": "x"
+              }
+              """
           )
         );
     }
