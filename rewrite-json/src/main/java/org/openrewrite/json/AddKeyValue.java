@@ -21,13 +21,14 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonKey;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -38,24 +39,24 @@ import static org.openrewrite.Tree.randomId;
 public class AddKeyValue extends Recipe {
 
     @Option(displayName = "Key path",
-        description = "A JsonPath expression to locate the *parent* JSON entry.",
-        example = "'$.subjects.*' or '$.' or '$.x[1].y.*' etc.")
+            description = "A JsonPath expression to locate the *parent* JSON entry.",
+            example = "'$.subjects.*' or '$.' or '$.x[1].y.*' etc.")
     String keyPath;
 
     @Option(displayName = "Key",
-        description = "The key to create.",
-        example = "myKey")
+            description = "The key to create.",
+            example = "myKey")
     String key;
 
     @Option(displayName = "Value",
-        description = "The value to add to the array at the specified key. Can be of any type." +
-                      " String values should be quoted to be inserted as Strings.",
-        example = "\"myValue\" or '{\"a\": 1}' or '[ 123 ]'")
+            description = "The value to add to the array at the specified key. Can be of any type." +
+                          " String values should be quoted to be inserted as Strings.",
+            example = "`\"myValue\"` or `{\"a\": 1}` or `[ 123 ]`")
     String value;
 
     @Option(displayName = "Prepend",
-        required = false,
-        description = "If set to `true` the value will be added to the beginning of the object")
+            required = false,
+            description = "If set to `true` the value will be added to the beginning of the object")
     boolean prepend;
 
     @Override
@@ -71,32 +72,27 @@ public class AddKeyValue extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        JsonPathMatcher pathMatcher = new JsonPathMatcher(keyPath);
-
         return new JsonIsoVisitor<ExecutionContext>() {
+            private final JsonPathMatcher pathMatcher = new JsonPathMatcher(keyPath);
 
             @Override
             public Json.JsonObject visitObject(Json.JsonObject obj, ExecutionContext ctx) {
                 obj = super.visitObject(obj, ctx);
 
                 if (pathMatcher.matches(getCursor()) && objectDoesNotContainKey(obj, key)) {
-
-                    boolean jsonIsEmpty = obj.getMembers().isEmpty() || obj.getMembers().get(0) instanceof Json.Empty;
-                    Space space = jsonIsEmpty ? Space.EMPTY : obj.getMembers().get(0).getPrefix();
+                    List<Json> originalMembers = obj.getMembers();
+                    boolean jsonIsEmpty = originalMembers.isEmpty() || originalMembers.get(0) instanceof Json.Empty;
+                    Space space = jsonIsEmpty ? Space.EMPTY : originalMembers.get(0).getPrefix();
 
                     JsonRightPadded<JsonKey> newKey = rightPaddedKey();
                     Json.Literal newValue = valueLiteral();
                     Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, newKey, newValue);
 
-                    List<Json> members = jsonIsEmpty ? new ArrayList<>() : obj.getMembers();
+                    List<Json> newMembers = jsonIsEmpty ? Collections.singletonList(newMember) : prepend ?
+                            ListUtils.concat(newMember, originalMembers) :
+                            ListUtils.concat(originalMembers, newMember);
 
-                    if (prepend) {
-                        members.add(0, newMember);
-                    } else {
-                        members.add(newMember);
-                    }
-
-                    return obj.withMembers(members);
+                    return obj.withMembers(newMembers);
                 }
                 return obj;
             }
@@ -107,14 +103,14 @@ public class AddKeyValue extends Recipe {
 
             private JsonRightPadded<JsonKey> rightPaddedKey() {
                 return new JsonRightPadded<>(
-                    new Json.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "\"" + key + "\"", key),
-                    Space.EMPTY, Markers.EMPTY
+                        new Json.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "\"" + key + "\"", key),
+                        Space.EMPTY, Markers.EMPTY
                 );
             }
 
             private String unQuote(String value) {
                 if (value.startsWith("'") || value.startsWith("\"")) {
-                    value = value.substring(1, value.length() - 1);
+                    return value.substring(1, value.length() - 1);
                 }
                 return value;
             }
@@ -136,7 +132,7 @@ public class AddKeyValue extends Recipe {
                 } else if (jsonKey instanceof Json.Identifier) {
                     return key.equals(((Json.Identifier) jsonKey).getName());
                 }
-                throw new IllegalStateException("Key is not 'Json.Literal' or 'Json.Identifier': " + jsonKey);
+                return false;
             }
 
         };

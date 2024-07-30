@@ -16,6 +16,7 @@
 package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
@@ -23,95 +24,96 @@ import static org.openrewrite.json.Assertions.json;
 class AddKeyValueTest implements RewriteTest {
 
     @Test
+    @DocumentExample
     void shouldAppendSimpleValue() {
         rewriteRun(
-            spec -> spec.recipe(new AddKeyValue("$.", "key", "\"val\"", false)),
-            //language=json
-            json(
-                """
-                    {
-                        "x": "x",
-                        "l": [
-                            1, 2
-                        ]
-                    }
-                    """,
-                """
-                    {
-                        "x": "x",
-                        "l": [
-                            1, 2
-                        ]
-                    ,
-                        "key": "val"}
-                    """)
-
+          spec -> spec.recipe(new AddKeyValue("$.", "key", "\"val\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": "x",
+                  "l": [
+                      1, 2
+                  ]
+              }
+              """,
+            """
+              {
+                  "x": "x",
+                  "l": [
+                      1, 2
+                  ]
+              ,
+                  "key": "val"}
+              """
+          )
         );
     }
 
     @Test
     void shouldAppendToNestedObject() {
         rewriteRun(
-            spec -> spec.recipe(new AddKeyValue("$.x.y.*", "key", "\"val\"", false)),
-            //language=json
-            json(
-                """
-                    {
-                        "x": {
-                            "y": { }
-                        }
-                    }
-                    """,
-                """
-                    {
-                        "x": {
-                            "y": {"key": "val"}
-                        }
-                    }
-                    """)
-
+          spec -> spec.recipe(new AddKeyValue("$.x.y.*", "key", "\"val\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": {
+                      "y": { }
+                  }
+              }
+              """,
+            """
+              {
+                  "x": {
+                      "y": {"key": "val"}
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void shouldAppendToNestedObjectInArray() {
         rewriteRun(
-            spec -> spec.recipe(new AddKeyValue("$.x[1].y.*", "key", "\"val\"", false)),
-            //language=json
-            json(
-                """
-                    {
-                        "x": [
-                            { },
-                            {
-                                "y" : { }
-                            }
-                        ]
-                    }
-                    """,
-                """
-                    {
-                        "x": [
-                            { },
-                            {
-                                "y" : {"key": "val"}
-                            }
-                        ]
-                    }
-                    """)
-
+          spec -> spec.recipe(new AddKeyValue("$.x[1].y.*", "key", "\"val\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": [
+                      { },
+                      {
+                          "y" : { }
+                      }
+                  ]
+              }
+              """,
+            """
+              {
+                  "x": [
+                      { },
+                      {
+                          "y" : {"key": "val"}
+                      }
+                  ]
+              }
+              """
+          )
         );
     }
 
     @Test
     void shouldNotAppendIfExists() {
         rewriteRun(
-            spec -> spec.recipe(new AddKeyValue("$.", "key", "\"val\"", false)),
-            //language=json
-            json("""
-                {
-                    "key": "x"
-                }""")
+          spec -> spec.recipe(new AddKeyValue("$.", "key", "\"val\"", false)),
+          //language=json
+          json("""
+            {
+                "key": "x"
+            }""")
 
         );
     }
@@ -119,61 +121,60 @@ class AddKeyValueTest implements RewriteTest {
     @Test
     void shouldAppendObject() {
         rewriteRun(
-            spec -> spec.recipe(new AddKeyValue(
-                "$.", "key", """
-                    { "a": "b" }
-                """.trim(), false)),
-            //language=json
-            json(
-                """
-                    {
-                        "x": "x",
-                        "l": [
-                            1, 2
-                        ]
-                    }
-                    """,
-                """
-                    {
-                        "x": "x",
-                        "l": [
-                            1, 2
-                        ]
-                    ,
-                        "key": { "a": "b" }}
-                    """)
-
+          spec -> spec.recipe(new AddKeyValue(
+            "$.", "key", """
+                { "a": "b" }
+            """.trim(), false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": "x",
+                  "l": [
+                      1, 2
+                  ]
+              }
+              """,
+            """
+              {
+                  "x": "x",
+                  "l": [
+                      1, 2
+                  ]
+              ,
+                  "key": { "a": "b" }}
+              """
+          )
         );
     }
 
     @Test
     void shouldPrependObject() {
         rewriteRun(
-            spec -> spec.recipe(new AddKeyValue(
-                "$.", "key", """
-                    { "a": "b" }
-                """.trim(), true)),
-            //language=json
-            json(
-                """
-                    {
-                        "x": "x",
-                        "l": [
-                            1, 2
-                        ]
-                    }
-                    """,
-                """
-                    {
-                        "key": { "a": "b" },
-                        "x": "x",
-                        "l": [
-                            1, 2
-                        ]
-                    }
-                    """)
-
+          spec -> spec.recipe(new AddKeyValue(
+            "$.", "key", """
+                { "a": "b" }
+            """.trim(), true)),
+          //language=json
+          json(
+            """
+              {
+                  "x": "x",
+                  "l": [
+                      1, 2
+                  ]
+              }
+              """,
+            """
+              {
+                  "key": { "a": "b" },
+                  "x": "x",
+                  "l": [
+                      1, 2
+                  ]
+              }
+              """
+          )
         );
     }
-
 }
