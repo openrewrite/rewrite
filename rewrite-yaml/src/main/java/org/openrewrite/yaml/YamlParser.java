@@ -29,7 +29,6 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
-import org.openrewrite.yaml.internal.YamlPrinter;
 import org.openrewrite.yaml.tree.Yaml;
 import org.openrewrite.yaml.tree.YamlKey;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -125,7 +124,6 @@ public class YamlParser implements org.openrewrite.Parser {
             Yaml.Document document = null;
             Stack<BlockBuilder> blockStack = new Stack<>();
             String newLine = "";
-            int currentIndent = 0;
 
             for (Event event = parser.getEvent(); event != null; event = parser.getEvent()) {
                 switch (event.getEventId()) {
@@ -191,7 +189,6 @@ public class YamlParser implements org.openrewrite.Parser {
                             lastEnd = event.getEndMark().getIndex();
                         }
                         blockStack.push(new MappingBuilder(fmt, startBracePrefix, anchor));
-                        currentIndent = countLeadingSpaces(fmt);
                         break;
                     }
                     case Scalar: {
@@ -229,14 +226,6 @@ public class YamlParser implements org.openrewrite.Parser {
                                     newLine = "\n";
                                     scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
                                 }
-                                String[] lines = scalarValue.split("\n");
-                                StringBuilder sb = new StringBuilder(lines[0]);
-                                // We strip off the minimum indent for a string block to be valid, any other indent is assumed as part of the block value
-                                int indentToRemove = currentIndent + YamlPrinter.MINIMAL_BLOCK_INDENT;
-                                for (int i = 1; i < lines.length; i++) {
-                                    sb.append("\n").append(lines[i].substring(indentToRemove));
-                                }
-                                scalarValue = sb.toString();
                                 break;
                             default:
                                 scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
@@ -353,7 +342,6 @@ public class YamlParser implements org.openrewrite.Parser {
                             lastEnd--;
                         }
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor));
-                        currentIndent = countLeadingSpaces(fmt);
                         break;
                     }
                     case Alias: {
@@ -638,17 +626,6 @@ public class YamlParser implements org.openrewrite.Parser {
                 return super.visitMapping(mapping, p);
             }
         }.visit(y, 0);
-    }
-
-    //Note: the SnakeYaml parser will complain on any tab indentation, so this should suffice.
-    private int countLeadingSpaces(String line) {
-        int count = 0;
-        for (int i = 0; i < line.length(); i++) {
-            if (line.charAt(i) == ' ') {
-                count++;
-            }
-        }
-        return count;
     }
 
     public static Builder builder() {
