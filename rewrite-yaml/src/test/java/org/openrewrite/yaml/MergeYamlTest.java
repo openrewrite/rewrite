@@ -1135,4 +1135,36 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1598")
+    @Test
+    void mergePropertiesWithExistingComments() {
+        rewriteRun(
+          spec -> spec.recipe(new
+              MergeYaml(
+              "$",
+              //language=yaml
+              """
+                widget:
+                  list:
+                    currentCount: 3
+                """,
+              true, null, null
+            )
+          ),
+          yaml(
+            """
+              widget:
+                list:
+                  itemCount: 5 #number of existing items in the list
+              """,
+            """
+              widget:
+                list:
+                  itemCount: 5 #number of existing items in the list
+                  currentCount: 3
+              """
+          )
+        );
+    }
 }
