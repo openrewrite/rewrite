@@ -36,8 +36,8 @@ import static org.openrewrite.internal.StringUtils.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeVersionValue extends Recipe {
-    private static final Logger log = LoggerFactory.getLogger(ChangeVersionValue.class);
+public class ChangeDependencyVersionValue extends Recipe {
+    private static final Logger log = LoggerFactory.getLogger(ChangeDependencyVersionValue.class);
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
@@ -46,14 +46,14 @@ public class ChangeVersionValue extends Recipe {
             "${version}", "${project.version}", "${pom.version}", "${project.parent.version}"
     ));
 
-    public enum Changes {
+    public enum VersionLocation {
         DEPENDENCY ("DEPENDENCY"),
         MANAGED_DEPENDENCY ("MANAGED_DEPENDENCY"),
         PLUGIN_DEPENDENCY ("PLUGIN_DEPENDENCY");
 
         private final String name;
 
-        Changes(String name) {
+        VersionLocation(String name) {
             this.name = name;
         }
 
@@ -88,36 +88,45 @@ public class ChangeVersionValue extends Recipe {
     @Nullable
     String versionPattern;
 
-    @Option(displayName = "Change property version names",
-            description = "Allows property version names to be changed to best practice naming convention",
-            example = "-jre",
+    @Option(displayName = "Change property version name",
+            description = "Allows property version name to be changed to best practice naming convention or what ever is in the newPropertyVersionName option. The default for this flag is `false`.",
             required = false)
     @Nullable
-    Boolean changePropertyVersionNames;
+    Boolean changePropertyVersionName;
 
-    @Option(displayName = "Change property version names",
-            description = "Allows property version names to be changed to best practice naming convention",
-            example = "-jre",
+    @Option(displayName = "New property version name",
+            description = "The new property version name used as property variable name. If it is set it will be changed. No need to set the changePropertyVersionName to true.",
+            example = "example.property.version",
             required = false)
     @Nullable
-    Changes versionChangePlace;
+    String newPropertyVersionName;
 
-    public ChangeVersionValue(String groupId, String artifactId, @Nullable String newVersion, @Nullable String versionChangePlace) {
-        this(groupId, artifactId, newVersion, null, false, versionChangePlace);
+    @Option(displayName = "Declare the location where the dependency should be changed.",
+            description = "Changes dependency version right where you want it. The default is set to change it everywhere." +
+                    "But you can also specifically target `DEPENDENCY`, `MANAGED_DEPENDENCY` or `PLUGIN_DEPENDENCY`." +
+                    "It also doesn't matter if they are in a profile or not.",
+            example = "DEPENDENCY",
+            required = false)
+    @Nullable
+    ChangeDependencyVersionValue.VersionLocation versionLocation;
+
+    public ChangeDependencyVersionValue(String groupId, String artifactId, @Nullable String newVersion, @Nullable String versionLocation) {
+        this(groupId, artifactId, newVersion, null, false, null, versionLocation);
     }
 
-    public ChangeVersionValue(String groupId, String artifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable String versionChangePlace) {
-        this(groupId, artifactId, newVersion, versionPattern, false, versionChangePlace);
+    public ChangeDependencyVersionValue(String groupId, String artifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean changePropertyVersionName, @Nullable String versionLocation) {
+        this(groupId, artifactId, newVersion, versionPattern, changePropertyVersionName, null, versionLocation);
     }
 
     @JsonCreator
-    public ChangeVersionValue(String groupId, String artifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean changePropertyVersionNames, @Nullable String versionChangePlace) {
+    public ChangeDependencyVersionValue(String groupId, String artifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean changePropertyVersionName, @Nullable String newPropertyVersionName,  @Nullable String versionLocation) {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.newVersion = newVersion;
         this.versionPattern = versionPattern;
-        this.changePropertyVersionNames = changePropertyVersionNames;
-        this.versionChangePlace = versionChangePlace != null ? Changes.valueOf(versionChangePlace) : null;
+        this.changePropertyVersionName = changePropertyVersionName != null && changePropertyVersionName; // False by default
+        this.newPropertyVersionName = newPropertyVersionName;
+        this.versionLocation = versionLocation != null ? VersionLocation.valueOf(versionLocation) : null;
     }
 
     @Override
@@ -142,12 +151,13 @@ public class ChangeVersionValue extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change the version or the referenced property version of dependencies or plugins";
+        return "Change Maven dependency version";
     }
 
     @Override
     public String getDescription() {
-        return "Change the version or the referenced property version of dependencies or plugins.";
+        return "Change a Maven dependency version. Declare `groupId` and `artifactId` of the dependency in which the version should be changed. " +
+                "By adding `versionLocation`, a set of dependencies can be targeted such as managed Dependencies with `MANAGED_DEPENDENCY`.";
     }
 
     @Override
@@ -163,30 +173,37 @@ public class ChangeVersionValue extends Recipe {
 
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                String artifact = artifactId == null ? t.getChildValue("artifactId").orElse(null) : artifactId;
+                if (artifactId != null){
+                    if (matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) && (artifactId == null || matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId))) {
+                        String artifact = artifactId == null ? t.getChildValue("artifactId").orElse(null) : artifactId;
 
-                if (matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) && (artifactId == null || matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId))) {
-                    if (versionChangePlace == null){
-                        return changeVersion(t, ctx, groupId, artifact, newVersion, changePropertyVersionNames);
-                    }
-                    switch (Objects.requireNonNull(versionChangePlace)) {
-                        case DEPENDENCY:
-                        if (isDependencyTag() || PROFILE_DEPENDENCY_MATCHER.matches(getCursor())){
-                                return changeVersion(t, ctx, groupId, artifact, newVersion, changePropertyVersionNames);
+                        if (newVersion != null){
+                            if (versionLocation == null){
+                                return changeVersion(t, ctx);
                             }
-                        break;
-                        case MANAGED_DEPENDENCY:
-                        if (isManagedDependencyTag() || PROFILE_MANAGED_DEPENDENCY_MATCHER.matches(getCursor())){
-                                return changeVersion(t, ctx, groupId, artifact, newVersion, changePropertyVersionNames);
+                            switch (Objects.requireNonNull(versionLocation)) {
+                                case DEPENDENCY:
+                                    if (isDependencyTag() || PROFILE_DEPENDENCY_MATCHER.matches(getCursor())){
+                                        return changeVersion(t, ctx);
+                                    }
+                                    break;
+                                case MANAGED_DEPENDENCY:
+                                    if (isManagedDependencyTag() || PROFILE_MANAGED_DEPENDENCY_MATCHER.matches(getCursor())){
+                                        return changeVersion(t, ctx);
+                                    }
+                                    break;
+                                case PLUGIN_DEPENDENCY:
+                                    if (isPluginDependencyTag(groupId, artifact) || PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())){
+                                        return changeVersion(t, ctx);
+                                    }
+                                    break;
                             }
-                        break;
-                        case PLUGIN_DEPENDENCY:
-                        if (isPluginDependencyTag(groupId, artifact) || PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())){
-                                return changeVersion(t, ctx, groupId, artifact, newVersion, changePropertyVersionNames);
-                            }
-                        break;
+                        }
+
                     }
                 }
+
+
                 return t;
             }
 
@@ -222,7 +239,7 @@ public class ChangeVersionValue extends Recipe {
                 return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
             }
 
-            public Xml.Tag changeVersion(Xml.Tag t, ExecutionContext ctx, String groupId, String artifactId, String newVersion, Boolean changePropertyVersionNames) {
+            public Xml.Tag changeVersion(Xml.Tag t, ExecutionContext ctx) {
 
                 boolean changed = false;
                 if (newVersion != null) {
@@ -235,12 +252,16 @@ public class ChangeVersionValue extends Recipe {
                                 String propertyVariable = version.substring(2, version.length() - 1);
                                 String newPropertyVariable = propertyVariable;
                                 if (!matchesGlob(getResolutionResult().getPom().getProperties().get(propertyVariable), resolvedNewVersion)) {
-                                    if (Boolean.TRUE.equals(changePropertyVersionNames)) {
-                                        newPropertyVariable = artifactId + ".version";
-                                        doAfterVisit(new RenamePropertyKey(propertyVariable, newPropertyVariable).getVisitor());
-                                        t = changeChildTagValue(t, "version", "${" + newPropertyVariable + "}", ctx);
-                                    }
                                     doAfterVisit(new ChangePropertyValue(newPropertyVariable, resolvedNewVersion, false, false).getVisitor());
+                                    changed = true;
+                                }
+                                newPropertyVariable = artifactId + ".version";
+                                if (newPropertyVersionName != null) {
+                                    newPropertyVariable = newPropertyVersionName;
+                                }
+                                if (!getResolutionResult().getPom().getProperties().containsKey(newPropertyVariable) && (Boolean.TRUE.equals(changePropertyVersionName) || newPropertyVersionName != null)) {
+                                    doAfterVisit(new RenamePropertyKey(propertyVariable, newPropertyVariable).getVisitor());
+                                    t = changeChildTagValue(t, "version", "${" + newPropertyVariable + "}", ctx);
                                     changed = true;
                                 }
                             } else {

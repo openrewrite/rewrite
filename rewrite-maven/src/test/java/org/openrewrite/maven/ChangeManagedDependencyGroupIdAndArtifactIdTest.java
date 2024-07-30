@@ -355,7 +355,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void changePropertyVersionProfileManagedDependencyWithChangePropertyVersionName() {
+    void changePropertyVersionProfileManagedDependencyWithChangePropertyVersionNameTrue() {
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -364,7 +364,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation-api",
             "2.1.0",
             null,
-            false
+            true
           )),
           pomXml(
             """
@@ -399,7 +399,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
-                          <javax.activation.version>2.1.0</javax.activation.version>
+                          <jakarta.activation-api.version>2.1.0</jakarta.activation-api.version>
                   </properties>
                   <profiles>
                     <profile>
@@ -409,7 +409,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <dependency>
                                   <groupId>jakarta.activation</groupId>
                                   <artifactId>jakarta.activation-api</artifactId>
-                                  <version>${javax.activation.version}</version>
+                                  <version>${jakarta.activation-api.version}</version>
                               </dependency>
                           </dependencies>
                       </dependencyManagement>

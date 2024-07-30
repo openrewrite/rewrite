@@ -76,12 +76,11 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     @Nullable
     String versionPattern;
 
-    @Option(displayName = "Change property version names",
-            description = "Allows property version names to be changed to best practice naming convention",
-            example = "-jre",
+    @Option(displayName = "Change property version name",
+            description = "Allows property version name to be changed to best practice naming convention. The default for this flag is `false`.",
             required = false)
     @Nullable
-    Boolean changePropertyVersionNames;
+    Boolean changePropertyVersionName;
 
     public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion) {
         this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, null, false);
@@ -92,14 +91,14 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     }
 
     @JsonCreator
-    public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean changePropertyVersionNames) {
+    public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean changePropertyVersionName) {
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
         this.newArtifactId = newArtifactId;
         this.newVersion = newVersion;
         this.versionPattern = versionPattern;
-        this.changePropertyVersionNames = changePropertyVersionNames;
+        this.changePropertyVersionName = changePropertyVersionName != null && changePropertyVersionName; // False by default
     }
 
     @Override
@@ -154,7 +153,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     Optional<Xml.Tag> versionTag = t.getChild("version");
                     if (versionTag.isPresent() && newVersion != null && !newVersion.equals(versionTag.get().getValue().orElse(null))) {
-                        doAfterVisit(new ChangeVersionValue(newGroupId, newArtifactId, newVersion, versionPattern, ChangeVersionValue.Changes.MANAGED_DEPENDENCY.name()).getVisitor());
+                        doAfterVisit(new ChangeDependencyVersionValue(newGroupId, newArtifactId, newVersion, versionPattern, changePropertyVersionName, ChangeDependencyVersionValue.VersionLocation.MANAGED_DEPENDENCY.name()).getVisitor());
                         changed = true;
                     }
                     if (changed) {

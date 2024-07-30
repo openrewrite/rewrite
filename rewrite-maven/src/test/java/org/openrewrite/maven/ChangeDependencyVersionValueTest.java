@@ -7,17 +7,17 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-class ChangeVersionValueTest implements RewriteTest {
+class ChangeDependencyVersionValueTest implements RewriteTest {
 
     @DocumentExample
     @Test
     void changeVersionValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeVersionValue(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
             "jakarta.activation",
             "jakarta.activation-api",
             "2.1.0",
-            ChangeVersionValue.Changes.MANAGED_DEPENDENCY.name()
+            ChangeDependencyVersionValue.VersionLocation.MANAGED_DEPENDENCY.name()
           )),
           pomXml(
             """
@@ -61,11 +61,11 @@ class ChangeVersionValueTest implements RewriteTest {
     @Test
     void changeVersionValueWithDynamicVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeVersionValue(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
             "jakarta.activation",
             "jakarta.activation-api",
             "2.1.x",
-            ChangeVersionValue.Changes.MANAGED_DEPENDENCY.name()
+            ChangeDependencyVersionValue.VersionLocation.MANAGED_DEPENDENCY.name()
           )),
           pomXml(
             """
@@ -96,12 +96,13 @@ class ChangeVersionValueTest implements RewriteTest {
     @Test
     void latestPatchVersionValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeVersionValue(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
             "jakarta.activation",
             "jakarta.activation-api",
             "latest.patch",
             null,
-            ChangeVersionValue.Changes.MANAGED_DEPENDENCY.name()
+            false,
+            ChangeDependencyVersionValue.VersionLocation.MANAGED_DEPENDENCY.name()
           )),
           pomXml(
             """
@@ -145,11 +146,11 @@ class ChangeVersionValueTest implements RewriteTest {
     @Test
     void changePropertyVersionValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeVersionValue(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
             "jakarta.activation",
             "jakarta.activation-api",
             "2.1.0",
-            ChangeVersionValue.Changes.MANAGED_DEPENDENCY.name()
+            ChangeDependencyVersionValue.VersionLocation.MANAGED_DEPENDENCY.name()
           )),
           pomXml(
             """
@@ -199,11 +200,11 @@ class ChangeVersionValueTest implements RewriteTest {
     @Test
     void changeProfileManagedDependencyVersionValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeVersionValue(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
             "jakarta.activation",
             "jakarta.activation-api",
             "2.1.0",
-            ChangeVersionValue.Changes.MANAGED_DEPENDENCY.name()
+            ChangeDependencyVersionValue.VersionLocation.MANAGED_DEPENDENCY.name()
           )),
           pomXml(
             """
@@ -255,11 +256,11 @@ class ChangeVersionValueTest implements RewriteTest {
     @Test
     void changePropertyVersionProfileManagedDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeVersionValue(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
             "jakarta.activation",
             "jakarta.activation-api",
             "2.1.0",
-            ChangeVersionValue.Changes.MANAGED_DEPENDENCY.name()
+            ChangeDependencyVersionValue.VersionLocation.MANAGED_DEPENDENCY.name()
           )),
           pomXml(
             """
@@ -319,12 +320,13 @@ class ChangeVersionValueTest implements RewriteTest {
     @Test
     void changeEveryVersionOfEveryDependencyWithChangePropertyVersionName() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeVersionValue(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
             "jakarta.activation",
             "jakarta.activation-api",
             "2.1.0",
             null,
             true,
+            null,
             null
           )),
           pomXml(
@@ -425,12 +427,13 @@ class ChangeVersionValueTest implements RewriteTest {
     @Test
     void changeOnlyTheVersionOfProfileManagedDependencyWithChangePropertyVersionName() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeVersionValue(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
             "jakarta.activation",
             "jakarta.activation-api",
             "2.1.0",
             null,
             true,
+            null,
             "MANAGED_DEPENDENCY"
           )),
           pomXml(
@@ -520,6 +523,394 @@ class ChangeVersionValueTest implements RewriteTest {
                             </plugin>
                         </plugins>
                       </build>
+                    </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeOnlyTheVersionOfDependencyWithChangePropertyVersionName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.0",
+            null,
+            true,
+            null,
+            "DEPENDENCY"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                          <javax.activation.version>1.2.0</javax.activation.version>
+                  </properties>
+                  <profiles>
+                    <profile>
+                      <id>test</id>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>${javax.activation.version}</version>
+                          </dependency>
+                      </dependencies>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <build>
+                        <plugins>
+                            <plugin>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>jakarta.activation</groupId>
+                                        <artifactId>jakarta.activation-api</artifactId>
+                                        <version>1.2.0</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                      </build>
+                    </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                          <jakarta.activation-api.version>2.1.0</jakarta.activation-api.version>
+                  </properties>
+                  <profiles>
+                    <profile>
+                      <id>test</id>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>${jakarta.activation-api.version}</version>
+                          </dependency>
+                      </dependencies>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <build>
+                        <plugins>
+                            <plugin>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>jakarta.activation</groupId>
+                                        <artifactId>jakarta.activation-api</artifactId>
+                                        <version>1.2.0</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                      </build>
+                    </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeOnlyTheVersionOfPluginDependencyWithChangePropertyVersionName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.0",
+            null,
+            true,
+            null,
+            "PLUGIN_DEPENDENCY"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                          <javax.activation.version>1.2.0</javax.activation.version>
+                  </properties>
+                  <profiles>
+                    <profile>
+                      <id>test</id>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                      </dependencies>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <build>
+                        <plugins>
+                            <plugin>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>jakarta.activation</groupId>
+                                        <artifactId>jakarta.activation-api</artifactId>
+                                        <version>${javax.activation.version}</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                      </build>
+                    </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                          <jakarta.activation-api.version>2.1.0</jakarta.activation-api.version>
+                  </properties>
+                  <profiles>
+                    <profile>
+                      <id>test</id>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                      </dependencies>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>1.2.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <build>
+                        <plugins>
+                            <plugin>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>jakarta.activation</groupId>
+                                        <artifactId>jakarta.activation-api</artifactId>
+                                        <version>${jakarta.activation-api.version}</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                      </build>
+                    </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeOnlyTheVersionOfProfileManagedDependencyWithNewPropertyVersionName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.0",
+            null,
+            false,
+            "test",
+            "MANAGED_DEPENDENCY"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                          <javax.activation.version>1.2.0</javax.activation.version>
+                  </properties>
+                  <profiles>
+                    <profile>
+                      <id>test</id>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                      </dependencies>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>${javax.activation.version}</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <build>
+                        <plugins>
+                            <plugin>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>jakarta.activation</groupId>
+                                        <artifactId>jakarta.activation-api</artifactId>
+                                        <version>1.2.0</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                      </build>
+                    </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                          <test>2.1.0</test>
+                  </properties>
+                  <profiles>
+                    <profile>
+                      <id>test</id>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                      </dependencies>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>${test}</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <build>
+                        <plugins>
+                            <plugin>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>jakarta.activation</groupId>
+                                        <artifactId>jakarta.activation-api</artifactId>
+                                        <version>1.2.0</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                      </build>
+                    </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void alreadyLatestVersionButWithPropertyChange() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyVersionValue(
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.0",
+            null,
+            true,
+            "test",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                          <jakarta.activation-api.version>2.1.0</jakarta.activation-api.version>
+                  </properties>
+                  <profiles>
+                    <profile>
+                      <id>test</id>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>${jakarta.activation-api.version}</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                    </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                          <test>2.1.0</test>
+                  </properties>
+                  <profiles>
+                    <profile>
+                      <id>test</id>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>${test}</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
                     </profile>
                   </profiles>
               </project>

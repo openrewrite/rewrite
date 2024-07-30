@@ -94,11 +94,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     @Nullable
     Boolean changeManagedDependency;
 
-    @Option(displayName = "Update dependency management",
-            description = "Also update the dependency management section. The default for this flag is `true`.",
+    @Option(displayName = "Change property version name",
+            description = "Allows property version name to be changed to best practice naming convention. The default for this flag is `false`.",
             required = false)
     @Nullable
-    Boolean changePropertyVersionNames;
+    Boolean changePropertyVersionName;
 
     public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
         this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, false, true, false);
@@ -109,7 +109,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     }
 
     @JsonCreator
-    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency, @Nullable Boolean changePropertyVersionNames) {
+    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency, @Nullable Boolean changePropertyVersionName) {
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
@@ -118,7 +118,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
         this.versionPattern = versionPattern;
         this.overrideManagedVersion = overrideManagedVersion;
         this.changeManagedDependency = changeManagedDependency;
-        this.changePropertyVersionNames = changePropertyVersionNames;
+        this.changePropertyVersionName = changePropertyVersionName != null && changePropertyVersionName; // False by default
     }
 
     @Override
@@ -173,7 +173,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             oldGroupId, oldArtifactId,
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),
                             Optional.ofNullable(newArtifactId).orElse(oldArtifactId),
-                            newVersion, versionPattern, changePropertyVersionNames).getVisitor());
+                            newVersion, versionPattern, changePropertyVersionName).getVisitor());
                 }
                 return super.visitDocument(document, ctx);
             }
@@ -213,7 +213,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                 if (!configuredToOverrideManageVersion && newDependencyManaged || (oldDependencyManaged && configuredToChangeManagedDependency)) {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false).visit(t, ctx);
                                 } else {
-                                    doAfterVisit(new ChangeVersionValue(groupId, artifactId, newVersion, versionPattern, ChangeVersionValue.Changes.DEPENDENCY.name()).getVisitor());
+                                    doAfterVisit(new ChangeDependencyVersionValue(groupId, artifactId, newVersion, versionPattern, changePropertyVersionName, ChangeDependencyVersionValue.VersionLocation.DEPENDENCY.name()).getVisitor());
 
                                 }
                             } else if (!(newDependencyManaged && configuredToChangeManagedDependency)) {
