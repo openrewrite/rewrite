@@ -29,6 +29,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
+import org.openrewrite.yaml.internal.YamlPrinter;
 import org.openrewrite.yaml.tree.Yaml;
 import org.openrewrite.yaml.tree.YamlKey;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -230,7 +231,8 @@ public class YamlParser implements org.openrewrite.Parser {
                                 }
                                 String[] lines = scalarValue.split("\n");
                                 StringBuilder sb = new StringBuilder(lines[0]);
-                                int indentToRemove = currentIndent + 1; // Strip off the minimum indent for a string block to be valid
+                                // We strip off the minimum indent for a string block to be valid, any other indent is assumed as part of the block value
+                                int indentToRemove = currentIndent + YamlPrinter.MINIMAL_BLOCK_INDENT;
                                 for (int i = 1; i < lines.length; i++) {
                                     sb.append("\n").append(lines[i].substring(indentToRemove));
                                 }

@@ -24,6 +24,8 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.function.UnaryOperator;
 
 public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
+    // we add the minimum indentation only, as the same was removed
+    public static final int MINIMAL_BLOCK_INDENT = 1;
 
     @Override
     public Yaml visitDocuments(Yaml.Documents documents, PrintOutputCapture<P> p) {
@@ -134,7 +136,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
                 break;
             case LITERAL:
                 lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
-                indent = countCurrentIndentation(p) + 1;
+                indent = countCurrentIndentation(p) + MINIMAL_BLOCK_INDENT;
                 p.append('|').append(lines[0]);
                 for (int i = 1; i < lines.length; i++) {
                     p.append("\n");
@@ -146,7 +148,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
                 break;
             case FOLDED:
                 lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
-                indent = countCurrentIndentation(p) + 1;
+                indent = countCurrentIndentation(p) + MINIMAL_BLOCK_INDENT;
                 p.append('>').append(lines[0]);
                 for (int i = 1; i < lines.length; i++) {
                     p.append("\n");
