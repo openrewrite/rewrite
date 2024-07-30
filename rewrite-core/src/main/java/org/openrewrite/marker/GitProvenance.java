@@ -39,6 +39,8 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
@@ -46,6 +48,10 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @With
 public class GitProvenance implements Marker {
+    private static final Pattern AZURE_DEVOPS_HTTP_REMOTE =
+            Pattern.compile("https://(?:[\\w-]+@)?dev\\.azure\\.com/([^/]+)/([^/]+)/_git/(.*)");
+    private static final Pattern AZURE_DEVOPS_SSH_REMOTE =
+            Pattern.compile("git@ssh\\.dev\\.azure\\.com:v3/([^/]+)/([^/]+)/(.*)");
     UUID id;
 
     @Nullable
@@ -78,9 +84,13 @@ public class GitProvenance implements Marker {
         if (origin == null) {
             return null;
         }
+
         int schemeEndIndex = baseUrl.indexOf("://");
         if (schemeEndIndex != -1) {
             baseUrl = baseUrl.substring(schemeEndIndex + 3);
+        }
+        if (baseUrl.endsWith("dev.azure.com")) {
+            return getOrganizationName();
         }
         if (baseUrl.startsWith("git@")) {
             baseUrl = baseUrl.substring(4);
@@ -102,18 +112,26 @@ public class GitProvenance implements Marker {
      */
     @Deprecated
     public @Nullable String getOrganizationName() {
-        if (origin == null) {
-            return null;
+        if (origin != null) {
+            Matcher matcher = AZURE_DEVOPS_HTTP_REMOTE.matcher(origin);
+            if (matcher.matches()) {
+                return matcher.group(1) + '/' + matcher.group(2);
+            }
+            matcher = AZURE_DEVOPS_SSH_REMOTE.matcher(origin);
+            if (matcher.matches()) {
+                return matcher.group(1) + '/' + matcher.group(2);
+            }
+
+            try {
+                String path = new URIish(origin).getPath();
+                // Strip off any trailing repository name
+                path = path.substring(0, path.lastIndexOf('/'));
+                // Strip off any leading sub organization names
+                return path.substring(path.lastIndexOf('/') + 1);
+            } catch (URISyntaxException e) {
+            }
         }
-        try {
-            String path = new URIish(origin).getPath();
-            // Strip off any trailing repository name
-            path = path.substring(0, path.lastIndexOf('/'));
-            // Strip off any leading sub organization names
-            return path.substring(path.lastIndexOf('/') + 1);
-        } catch (URISyntaxException e) {
-            return null;
-        }
+        return null;
     }
 
     public @Nullable String getRepositoryName() {
