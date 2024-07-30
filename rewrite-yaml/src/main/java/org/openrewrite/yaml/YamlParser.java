@@ -229,8 +229,6 @@ public class YamlParser implements org.openrewrite.Parser {
                                     scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
                                 }
                                 String[] lines = scalarValue.split("\n");
-                                //get parent line
-
                                 StringBuilder sb = new StringBuilder(lines[0]);
                                 int indentToRemove = currentIndent + 1; // Strip off the minimum indent for a string block to be valid
                                 for (int i = 1; i < lines.length; i++) {
