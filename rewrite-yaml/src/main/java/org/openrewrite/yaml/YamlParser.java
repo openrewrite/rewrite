@@ -191,7 +191,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             lastEnd = event.getEndMark().getIndex();
                         }
                         blockStack.push(new MappingBuilder(fmt, startBracePrefix, anchor));
-                        currentIndent = countIndent(fmt);
+                        currentIndent = countLeadingSpaces(fmt);
                         break;
                     }
                     case Scalar: {
@@ -352,7 +352,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             lastEnd--;
                         }
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor));
-                        currentIndent = countIndent(fmt);
+                        currentIndent = countLeadingSpaces(fmt);
                         break;
                     }
                     case Alias: {
@@ -639,7 +639,8 @@ public class YamlParser implements org.openrewrite.Parser {
         }.visit(y, 0);
     }
 
-    private int countIndent(String line) {
+    //Note: the SnakeYaml parser will complain on any tab indentation, so this should suffice.
+    private int countLeadingSpaces(String line) {
         int count = 0;
         for (int i = 0; i < line.length(); i++) {
             if (line.charAt(i) == ' ') {
