@@ -121,8 +121,6 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         if (scalar.getAnchor() != null) {
             visit(scalar.getAnchor(), p);
         }
-        String[] lines;
-        int indent;
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:
                 p.append('"')
@@ -135,28 +133,10 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
                         .append('\'');
                 break;
             case LITERAL:
-                lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
-                indent = countCurrentIndentation(p) + MINIMAL_BLOCK_INDENT;
-                p.append('|').append(lines[0]);
-                for (int i = 1; i < lines.length; i++) {
-                    p.append("\n");
-                    for (int j = 0; j < indent; j++) {
-                        p.append(" ");
-                    }
-                    p.append(lines[i]);
-                }
+                formatBlock(p, scalar, '|');
                 break;
             case FOLDED:
-                lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
-                indent = countCurrentIndentation(p) + MINIMAL_BLOCK_INDENT;
-                p.append('>').append(lines[0]);
-                for (int i = 1; i < lines.length; i++) {
-                    p.append("\n");
-                    for (int j = 0; j < indent; j++) {
-                        p.append(" ");
-                    }
-                    p.append(lines[i]);
-                }
+                formatBlock(p, scalar, '>');
                 break;
             case PLAIN:
             default:
@@ -166,6 +146,22 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         }
         afterSyntax(scalar, p);
         return scalar;
+    }
+
+    private void formatBlock(PrintOutputCapture<P> p, Yaml.Scalar scalar, char blockStyleCharacter) {
+        String[] lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
+        p.append(blockStyleCharacter).append(lines[0]);
+        if (lines.length == 1) {
+            return;
+        }
+        int indent = countCurrentIndentation(p) + MINIMAL_BLOCK_INDENT;
+        for (int i = 1; i < lines.length; i++) {
+            p.append("\n");
+            for (int j = 0; j < indent; j++) {
+                p.append(" ");
+            }
+            p.append(lines[i]);
+        }
     }
 
     @Override
