@@ -1136,7 +1136,7 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1598")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
     @Test
     void mergePropertiesWithExistingComments() {
         rewriteRun(
