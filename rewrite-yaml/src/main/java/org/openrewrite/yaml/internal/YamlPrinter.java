@@ -24,8 +24,6 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.function.UnaryOperator;
 
 public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
-    // we add the minimum indentation only, as the same was removed
-    public static final int MINIMAL_BLOCK_INDENT = 1;
 
     @Override
     public Yaml visitDocuments(Yaml.Documents documents, PrintOutputCapture<P> p) {
@@ -133,10 +131,12 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
                         .append('\'');
                 break;
             case LITERAL:
-                formatBlock(p, scalar, '|');
+                p.append('|')
+                        .append(scalar.getValue());
                 break;
             case FOLDED:
-                formatBlock(p, scalar, '>');
+                p.append('>')
+                        .append(scalar.getValue());
                 break;
             case PLAIN:
             default:
@@ -146,22 +146,6 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         }
         afterSyntax(scalar, p);
         return scalar;
-    }
-
-    private void formatBlock(PrintOutputCapture<P> p, Yaml.Scalar scalar, char blockStyleCharacter) {
-        String[] lines = scalar.getValue().split("\n", Integer.MAX_VALUE);
-        p.append(blockStyleCharacter).append(lines[0]);
-        if (lines.length == 1) {
-            return;
-        }
-        int indent = countCurrentIndentation(p) + MINIMAL_BLOCK_INDENT;
-        for (int i = 1; i < lines.length; i++) {
-            p.append("\n");
-            for (int j = 0; j < indent; j++) {
-                p.append(" ");
-            }
-            p.append(lines[i]);
-        }
     }
 
     @Override
@@ -204,20 +188,5 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         for (Marker marker : y.getMarkers().getMarkers()) {
             p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), YAML_MARKER_WRAPPER));
         }
-    }
-
-    // todo if we can keep the current indentation in the context of the printer that would save some cpu cycles
-    private int countCurrentIndentation(PrintOutputCapture<P> printOutputCapture) {
-        String[] lines = printOutputCapture.out.toString().split("\n");
-        String lastLine = lines[lines.length - 1];
-        int leadingSpacesCount = 0;
-        for (char c : lastLine.toCharArray()) {
-            if (c == ' ') {
-                leadingSpacesCount++;
-            } else {
-                break;
-            }
-        }
-        return leadingSpacesCount;
     }
 }
