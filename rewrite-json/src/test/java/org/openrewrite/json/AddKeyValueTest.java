@@ -43,9 +43,9 @@ class AddKeyValueTest implements RewriteTest {
                   "x": "x",
                   "l": [
                       1, 2
-                  ]
-              ,
-                  "key": "val"}
+                  ],
+                  "key": "val"
+              }
               """
           )
         );
@@ -113,8 +113,9 @@ class AddKeyValueTest implements RewriteTest {
           json("""
             {
                 "key": "x"
-            }""")
-
+            }
+            """
+          )
         );
     }
 
@@ -140,9 +141,9 @@ class AddKeyValueTest implements RewriteTest {
                   "x": "x",
                   "l": [
                       1, 2
-                  ]
-              ,
-                  "key": { "a": "b" }}
+                  ],
+                  "key": { "a": "b" }
+              }
               """
           )
         );
