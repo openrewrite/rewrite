@@ -49,7 +49,6 @@ class EmptyNewlineAtEndOfFileTest implements RewriteTest {
         };
     }
 
-
     @Issue("https://github.com/openrewrite/rewrite/issues/1045")
     @Test
     void usesCRLF() {

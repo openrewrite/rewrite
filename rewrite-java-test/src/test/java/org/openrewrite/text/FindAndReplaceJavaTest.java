@@ -53,6 +53,7 @@ class FindAndReplaceJavaTest implements RewriteTest {
               type: specs.openrewrite.org/v1beta/recipe
               name: com.yourorg.FindAndReplaceExample
               displayName: Find and replace example
+              description: Test.
               recipeList:
                 - org.openrewrite.text.FindAndReplace:
                     find: blacklist

@@ -1528,11 +1528,9 @@ public interface J extends Tree {
                 };
 
                 @Override
-                public @Nullable J visit(@Nullable Tree tree, AtomicInteger n) {
-                    if (tree != null) {
-                        n.incrementAndGet();
-                    }
-                    return super.visit(tree, n);
+                public @Nullable J preVisit(J tree, AtomicInteger n) {
+                    n.incrementAndGet();
+                    return tree;
                 }
 
                 @Override
