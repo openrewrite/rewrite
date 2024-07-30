@@ -82,23 +82,26 @@ public class AddKeyValue extends Recipe {
                 if (pathMatcher.matches(getCursor()) && objectDoesNotContainKey(obj, key)) {
                     List<Json> originalMembers = obj.getMembers();
                     boolean jsonIsEmpty = originalMembers.isEmpty() || originalMembers.get(0) instanceof Json.Empty;
-                    Space space = jsonIsEmpty ? Space.EMPTY : originalMembers.get(0).getPrefix();
+                    Space space = jsonIsEmpty || prepend ? originalMembers.get(0).getPrefix() : Space.SINGLE_SPACE;
 
                     JsonRightPadded<JsonKey> newKey = rightPaddedKey();
                     Json.Literal newValue = valueLiteral();
                     Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, newKey, newValue);
 
-                    List<Json> newMembers = jsonIsEmpty ? Collections.singletonList(newMember) : prepend ?
+                    if (jsonIsEmpty) {
+                        return obj.withMembers(Collections.singletonList(newMember));
+                    }
+
+                    List<Json> newMembers = prepend ?
                             ListUtils.concat(newMember, originalMembers) :
                             ListUtils.concat(originalMembers, newMember);
-
                     return obj.withMembers(newMembers);
                 }
                 return obj;
             }
 
             private Json.Literal valueLiteral() {
-                return new Json.Literal(randomId(), Space.build(" ", emptyList()), Markers.EMPTY, value, unQuote(value));
+                return new Json.Literal(randomId(), Space.SINGLE_SPACE, Markers.EMPTY, value, unQuote(value));
             }
 
             private JsonRightPadded<JsonKey> rightPaddedKey() {
@@ -134,7 +137,6 @@ public class AddKeyValue extends Recipe {
                 }
                 return false;
             }
-
         };
     }
 }
