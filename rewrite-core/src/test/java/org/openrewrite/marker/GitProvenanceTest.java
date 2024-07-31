@@ -39,11 +39,11 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.openrewrite.Tree.randomId;
@@ -54,46 +54,54 @@ class GitProvenanceTest {
 
     private static Stream<Arguments> remotes() {
         return Stream.of(
-            Arguments.of("ssh://git@github.com/openrewrite/rewrite.git", "openrewrite", "rewrite"),
-            Arguments.of("https://github.com/openrewrite/rewrite.git", "openrewrite", "rewrite"),
-            Arguments.of("file:///openrewrite/rewrite.git", "openrewrite", "rewrite"),
-            Arguments.of("http://localhost:7990/scm/openrewrite/rewrite.git", "openrewrite", "rewrite"),
-            Arguments.of("http://localhost:7990/scm/some/openrewrite/rewrite.git", "openrewrite", "rewrite"),
-            Arguments.of("git@github.com:openrewrite/rewrite.git", "openrewrite", "rewrite"),
-            Arguments.of("org-12345678@github.com:openrewrite/rewrite.git", "openrewrite", "rewrite"),
-            Arguments.of("https://dev.azure.com/openrewrite/rewrite/_git/rewrite", "openrewrite/rewrite", "rewrite"),
-            Arguments.of("https://openrewrite@dev.azure.com/openrewrite/rewrite/_git/rewrite", "openrewrite/rewrite", "rewrite"),
-            Arguments.of("git@ssh.dev.azure.com:v3/openrewrite/rewrite/rewrite", "openrewrite/rewrite", "rewrite")
+          Arguments.of("ssh://git@github.com/openrewrite/rewrite.git", "openrewrite", null, "rewrite"),
+          Arguments.of("https://github.com/openrewrite/rewrite.git", "openrewrite", null, "rewrite"),
+          Arguments.of("file:///openrewrite/rewrite.git", "openrewrite", null, "rewrite"),
+          Arguments.of("http://localhost:7990/scm/openrewrite/rewrite.git", "openrewrite", null, "rewrite"),
+          Arguments.of("http://localhost:7990/scm/some/openrewrite/rewrite.git", "openrewrite", null, "rewrite"),
+          Arguments.of("git@github.com:openrewrite/rewrite.git", "openrewrite", null, "rewrite"),
+          Arguments.of("org-12345678@github.com:openrewrite/rewrite.git", "openrewrite", null, "rewrite"),
+          Arguments.of("https://dev.azure.com/openrewrite/rewrite/_git/rewrite", "openrewrite", "rewrite", "rewrite"),
+          Arguments.of(
+            "https://openrewrite@dev.azure.com/openrewrite/rewrite/_git/rewrite",
+            "openrewrite",
+            "rewrite",
+            "rewrite"),
+          Arguments.of("git@ssh.dev.azure.com:v3/openrewrite/rewrite/rewrite", "openrewrite", "rewrite", "rewrite"),
+          Arguments.of(
+            "ssh://git@ssh.dev.azure.com:v3/openrewrite/rewrite/rewrite",
+            "openrewrite",
+            "rewrite",
+            "rewrite")
         );
     }
 
     @SuppressWarnings("deprecation")
     @ParameterizedTest
     @MethodSource("remotes")
-    void getOrganizationName(String remote, String org, String repo) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getOrganizationName())
-          .isEqualTo(org);
+    void getRepositoryPath(String origin, String expectedOrg, String expectedProject, String expectedRepo) {
+        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of());
+        assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
+        assertThat(gitProvenance.getProjectName()).isEqualTo(expectedProject);
+        assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
+        String expectedPath = expectedProject != null ?
+          expectedOrg + '/' + expectedProject + '/' + expectedRepo :
+          expectedOrg + '/' + expectedRepo;
+        assertThat(gitProvenance.getRepositoryPath(origin)).isEqualTo(expectedPath);
     }
 
     @ParameterizedTest
     @CsvSource({
       "git@gitlab.acme.com:organization/subgroup/repository.git, https://gitlab.acme.com, organization/subgroup",
       "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, organization/subgroup",
-      "https://dev.azure.com/organization/project/_git/repository, https://dev.azure.com, organization/project",
-      "https://organization@dev.azure.com/organization/project/_git/repository, https://dev.azure.com, organization/project",
-      "git@ssh.dev.azure.com:v3/organization/project/repository, git@ssh.dev.azure.com, organization/project"
+      "https://dev.azure.com/organization/project/_git/repository, https://dev.azure.com, organization",
+      "https://organization@dev.azure.com/organization/project/_git/repository, https://dev.azure.com, organization",
+      "git@ssh.dev.azure.com:v3/organization/project/repository, git@ssh.dev.azure.com, organization"
 
     })
     void getOrganizationNameWithBaseUrl(String gitOrigin, String baseUrl, String organizationName) {
-        assertThat(new GitProvenance(randomId(), gitOrigin, "main", "123", null, null, emptyList()).getOrganizationName(baseUrl))
-          .isEqualTo(organizationName);
-    }
-
-    @ParameterizedTest
-    @MethodSource("remotes")
-    void getRepositoryName(String remote, String org, String repo) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getRepositoryName())
-          .isEqualTo(repo);
+        GitProvenance gitProvenance = new GitProvenance(randomId(), gitOrigin, "main", "123", null, null, List.of());
+        assertThat(gitProvenance.getOrganizationName(baseUrl)).isEqualTo(organizationName);
     }
 
     @Test
@@ -207,13 +215,14 @@ class GitProvenanceTest {
     @ParameterizedTest
     @MethodSource("baseUrls")
     void multiplePathSegments(String baseUrl) {
-        GitProvenance provenance = new GitProvenance(randomId(),
+        GitProvenance provenance = new GitProvenance(
+          randomId(),
           "http://gitlab.com/group/subgroup1/subgroup2/repo.git",
           "master",
           "1234567890abcdef1234567890abcdef12345678",
           null,
           null,
-          emptyList());
+          List.of());
 
         assertThat(provenance.getOrganizationName(baseUrl)).isEqualTo("group/subgroup1/subgroup2");
         assertThat(provenance.getRepositoryName()).isEqualTo("repo");
@@ -228,7 +237,10 @@ class GitProvenanceTest {
         var cloneDir = projectDir.resolve("clone1");
         try (var remoteRepo = fileKey.open(false)) {
             remoteRepo.create(true);
-            try (Git git = Git.cloneRepository().setURI(remoteRepo.getDirectory().getAbsolutePath()).setDirectory(cloneDir.toFile()).call()) {
+            try (Git git = Git.cloneRepository()
+              .setURI(remoteRepo.getDirectory().getAbsolutePath())
+              .setDirectory(cloneDir.toFile())
+              .call()) {
                 Files.writeString(projectDir.resolve("test.txt"), "hi");
                 git.add().addFilepattern("*").call();
                 git.commit().setMessage("init").setSign(false).call();
@@ -261,7 +273,10 @@ class GitProvenanceTest {
 
             // push an initial commit to the remote
             var cloneDir = projectDir.resolve("clone1");
-            try (Git gitSetup = Git.cloneRepository().setURI(remoteRepo.getDirectory().getAbsolutePath()).setDirectory(cloneDir.toFile()).call()) {
+            try (Git gitSetup = Git.cloneRepository()
+              .setURI(remoteRepo.getDirectory().getAbsolutePath())
+              .setDirectory(cloneDir.toFile())
+              .call()) {
                 Files.writeString(projectDir.resolve("test.txt"), "hi");
                 gitSetup.add().addFilepattern("*").call();
                 var commit = gitSetup.commit().setMessage("init").setSign(false).call();
@@ -270,8 +285,16 @@ class GitProvenanceTest {
                 //Now create new workspace directory, git init and then fetch from remote.
                 var workspaceDir = projectDir.resolve("workspace");
                 try (Git git = Git.init().setDirectory(workspaceDir.toFile()).call()) {
-                    git.remoteAdd().setName("origin").setUri(new URIish(remoteRepo.getDirectory().getAbsolutePath())).call();
-                    git.fetch().setRemote("origin").setForceUpdate(true).setTagOpt(TagOpt.FETCH_TAGS).setRefSpecs("+refs/heads/*:refs/remotes/origin/*").call();
+                    git.remoteAdd()
+                      .setName("origin")
+                      .setUri(new URIish(remoteRepo.getDirectory().getAbsolutePath()))
+                      .call();
+                    git.fetch()
+                      .setRemote("origin")
+                      .setForceUpdate(true)
+                      .setTagOpt(TagOpt.FETCH_TAGS)
+                      .setRefSpecs("+refs/heads/*:refs/remotes/origin/*")
+                      .call();
                     git.checkout().setName(commit.getName()).call();
                 }
             }
@@ -291,7 +314,8 @@ class GitProvenanceTest {
         envVars.put("GITHUB_SHA", "287364287357");
         envVars.put("GITHUB_HEAD_REF", "");
 
-        GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
+        GitProvenance prov = GitProvenance.fromProjectDirectory(
+          projectDir,
           GithubActionsBuildEnvironment.build(envVars::get));
         assertThat(prov).isNotNull();
         assertThat(prov.getOrigin()).isEqualTo("https://github.com/octocat/Hello-World.git");
@@ -308,7 +332,8 @@ class GitProvenanceTest {
         envVars.put("GITHUB_SHA", "287364287357");
         envVars.put("GITHUB_HEAD_REF", "");
         try (Git ignored = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
-            GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
+            GitProvenance prov = GitProvenance.fromProjectDirectory(
+              projectDir,
               GithubActionsBuildEnvironment.build(envVars::get));
             assertThat(prov).isNotNull();
             assertThat(prov.getOrigin()).isNotEqualTo("https://github.com/octocat/Hello-World.git");
@@ -324,7 +349,8 @@ class GitProvenanceTest {
         envVars.put("CUSTOM_GIT_REF", "main");
         envVars.put("CUSTOM_GIT_SHA", "287364287357");
 
-        GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
+        GitProvenance prov = GitProvenance.fromProjectDirectory(
+          projectDir,
           CustomBuildEnvironment.build(envVars::get));
 
         assertThat(prov).isNotNull();
@@ -340,7 +366,8 @@ class GitProvenanceTest {
         envVars.put("CI_COMMIT_REF_NAME", "main");
         envVars.put("CI_COMMIT_SHA", "287364287357");
 
-        GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
+        GitProvenance prov = GitProvenance.fromProjectDirectory(
+          projectDir,
           GitlabBuildEnvironment.build(envVars::get));
 
         assertThat(prov).isNotNull();
@@ -357,7 +384,8 @@ class GitProvenanceTest {
         envVars.put("DRONE_REMOTE_URL", "https://github.com/octocat/Hello-World.git");
         envVars.put("DRONE_COMMIT_SHA", "287364287357");
 
-        GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
+        GitProvenance prov = GitProvenance.fromProjectDirectory(
+          projectDir,
           DroneBuildEnvironment.build(envVars::get));
 
         assertThat(prov).isNotNull();
