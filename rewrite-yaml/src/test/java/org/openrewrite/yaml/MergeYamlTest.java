@@ -1146,24 +1146,52 @@ class MergeYamlTest implements RewriteTest {
               "$",
               //language=yaml
               """
-                widget:
-                  list:
-                    currentCount: 3
+                a:
+                  c: 2 #The value 2
                 """,
               true, null, null
             )
           ),
           yaml(
             """
-              widget:
-                list:
-                  itemCount: 5 #number of existing items in the list
+              a:
+                b: 1 #The value 1
               """,
             """
-              widget:
-                list:
-                  itemCount: 5 #number of existing items in the list
-                  currentCount: 3
+              a:
+                b: 1 #The value 1
+                c: 2 #The value 2
+              """
+          ));
+    }
+
+    @Test
+    void mergePropertiesWithExistingCommentsNonEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new
+              MergeYaml(
+              "$",
+              //language=yaml
+              """
+                a:
+                  d: 3 #The value 3
+                """,
+              true, null, null
+            )
+          ),
+          yaml(
+            """
+              a:
+                b: 1 #The value 1
+                c: 2 #The value 2
+              e: 4 #The value 3
+              """,
+            """
+              a:
+                b: 1 #The value 1
+                c: 2 #The value 2
+                d: 3 #The value 3
+              e: 4 #The value 3
               """
           ));
     }
