@@ -1136,6 +1136,7 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2218")
     @Test
     void mergePropertiesWithExistingComments() {
@@ -1165,6 +1166,154 @@ class MergeYamlTest implements RewriteTest {
                   currentCount: 3
               """
           )
+
+    @Test
+    void addLiteralStyleBlockAtRoot() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.",
+              // language=yaml
+              """
+                script: |
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+              script: |
+                #!/bin/bash
+                echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: |
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |
+                    #!/bin/bash
+                    echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleMinusBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: |-
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |-
+                    #!/bin/bash
+                    echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addFoldedStyleBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: >
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: >
+                    #!/bin/bash
+                    echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addFoldedStyleMinusBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: >-
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: >-
+                    #!/bin/bash
+                    echo "hello"
+              """)
         );
     }
 }
