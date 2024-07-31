@@ -38,6 +38,7 @@ import static org.openrewrite.internal.StringUtils.*;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyVersionValue extends Recipe {
     private static final Logger log = LoggerFactory.getLogger(ChangeDependencyVersionValue.class);
+
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
@@ -57,6 +58,7 @@ public class ChangeDependencyVersionValue extends Recipe {
             this.name = name;
         }
 
+        @Override
         public String toString() {
             return this.name;
         }
