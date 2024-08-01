@@ -18,18 +18,12 @@ package org.openrewrite.scm;
 import lombok.Getter;
 import org.openrewrite.internal.lang.Nullable;
 
-/**
- * Can be used for GitLab
- */
 @Getter
-public class GroupPathScm implements Scm {
+public class GitLabScm implements Scm {
     private final String origin;
 
-    public GroupPathScm(String origin) {
-        if (origin.startsWith("ssh://") || origin.startsWith("http://") || origin.startsWith("https://")) {
-            origin = cleanHostAndPath(origin);
-        }
-        this.origin = origin.replaceFirst("/$", "");
+    public GitLabScm() {
+        this.origin = "gitlab.com";
     }
 
     @Override

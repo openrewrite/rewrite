@@ -52,7 +52,7 @@ public class GitProvenance implements Marker {
     private static final Set<Scm> KNOWN_SCMS = new LinkedHashSet<>(Arrays.asList(
             new SimpleScm("github.com"),
             new SimpleScm("bitbucket.org"),
-            new GroupPathScm("gitlab.com"),
+            new GitLabScm(),
             new AzureDevOpsScm()
     ));
 
