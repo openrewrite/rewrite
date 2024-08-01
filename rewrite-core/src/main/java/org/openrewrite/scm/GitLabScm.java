@@ -47,6 +47,11 @@ public class GitLabScm implements Scm {
     }
 
     @Override
+    public @Nullable String determineOrganization(String path) {
+        return determineGroupPath(path);
+    }
+
+    @Override
     public String determineRepositoryName(String path) {
         return path.substring(path.lastIndexOf("/") + 1);
     }

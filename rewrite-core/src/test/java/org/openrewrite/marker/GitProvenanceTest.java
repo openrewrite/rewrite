@@ -29,6 +29,7 @@ import org.openrewrite.jgit.transport.TagOpt;
 import org.openrewrite.jgit.transport.URIish;
 import org.openrewrite.jgit.util.FS;
 import org.openrewrite.marker.ci.*;
+import org.openrewrite.scm.GitLabScm;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -77,6 +78,7 @@ class GitProvenanceTest {
       "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, organization/subgroup"
     })
     void getOrganizationNameWithBaseUrl(String gitOrigin, String baseUrl, String organizationName) {
+        GitProvenance.registerScm(new GitLabScm(baseUrl));
         assertThat(new GitProvenance(randomId(), gitOrigin, "main", "123", null, null, emptyList()).getOrganizationName(baseUrl))
           .isEqualTo(organizationName);
     }
