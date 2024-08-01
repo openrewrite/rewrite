@@ -45,7 +45,7 @@ public interface Scm extends Comparable<Scm> {
     }
 
     default String determineRepositoryName(String path) {
-        if (!path.contains("/")) {
+        if (path.contains("/")) {
             return path.substring(path.indexOf("/") + 1);
         }
         return path;
