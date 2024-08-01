@@ -16,6 +16,7 @@
 package org.openrewrite.marker;
 
 
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Incubating;
@@ -30,6 +31,7 @@ import org.openrewrite.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.IncompleteGitConfigException;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
+import org.openrewrite.scm.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -45,9 +47,21 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @With
+@AllArgsConstructor
 public class GitProvenance implements Marker {
+    private static final Set<Scm> KNOWN_SCMS = new LinkedHashSet<>(Arrays.asList(
+            new SimpleScm("github.com"),
+            new SimpleScm("bitbucket.org"),
+            new GroupPathScm("gitlab.com"),
+            new AzureDevOpsScm()
+    ));
+
     UUID id;
 
+    /**
+     * The URL of the origin remote, not to be confused with the SCM origin
+     * which can be found under scmUrlComponents.getOrigin() which contains the base url to the SCM server
+     */
     @Nullable
     String origin;
 
@@ -67,14 +81,34 @@ public class GitProvenance implements Marker {
     @Incubating(since = "8.9.0")
     List<Committer> committers;
 
+    @Incubating(since = "8.33.0")
+    @Nullable
+    ScmUrlComponents scmUrlComponents;
+
+    public GitProvenance(UUID id, @Nullable String origin, @Nullable String branch, @Nullable String change, @Nullable AutoCRLF autocrlf, @Nullable EOL eol, @Nullable List<Committer> committers) {
+        this.id = id;
+        this.origin = origin;
+        this.branch = branch;
+        this.change = change;
+        this.autocrlf = autocrlf;
+        this.eol = eol;
+        this.committers = committers;
+        scmUrlComponents = determineScmUrlComponents(origin);
+    }
+
     /**
      * Extract the organization name, including sub-organizations for git hosting services which support such a concept,
      * from the origin URL. Needs to be supplied with the
      *
      * @param baseUrl the portion of the URL which precedes the organization
      * @return the portion of the git origin URL which corresponds to the organization the git repository is organized under
+     * @deprecated use {@link #getScmUrlComponents().getOrganization()} instead }
      */
+    @Deprecated
     public @Nullable String getOrganizationName(String baseUrl) {
+        if (scmUrlComponents != null) {
+            return scmUrlComponents.getOrganization();
+        }
         if (origin == null) {
             return null;
         }
@@ -102,6 +136,9 @@ public class GitProvenance implements Marker {
      */
     @Deprecated
     public @Nullable String getOrganizationName() {
+        if (scmUrlComponents != null) {
+            return scmUrlComponents.getOrganization();
+        }
         if (origin == null) {
             return null;
         }
@@ -206,9 +243,10 @@ public class GitProvenance implements Marker {
         if (branch == null) {
             branch = resolveBranchFromGitConfig(repository);
         }
-        return new GitProvenance(randomId(), getOrigin(repository), branch, changeset,
+        String remoteOriginUrl = getRemoteOriginUrl(repository);
+        return new GitProvenance(randomId(), remoteOriginUrl, branch, changeset,
                 getAutocrlf(repository), getEOF(repository),
-                getCommitters(repository));
+                getCommitters(repository), determineScmUrlComponents(remoteOriginUrl));
     }
 
     static @Nullable String resolveBranchFromGitConfig(Repository repository) {
@@ -268,7 +306,7 @@ public class GitProvenance implements Marker {
         return branch;
     }
 
-    private static @Nullable String getOrigin(Repository repository) {
+    private static @Nullable String getRemoteOriginUrl(Repository repository) {
         Config storedConfig = repository.getConfig();
         String url = storedConfig.getString("remote", "origin", "url");
         if (url == null) {
@@ -354,6 +392,27 @@ public class GitProvenance implements Marker {
         return url;
     }
 
+    public static void registerScm(Scm scm) {
+        KNOWN_SCMS.add(scm);
+    }
+
+    @Nullable
+    public static ScmUrlComponents determineScmUrlComponents(@Nullable String cloneUrl) {
+        if (cloneUrl == null) {
+            return null;
+        }
+        Scm selected = null;
+        for (Scm scm : KNOWN_SCMS) {
+            if (scm.belongsToScm(cloneUrl)) {
+                selected = scm;
+            }
+        }
+        if (selected == null) {
+            selected = new UnknownScm(cloneUrl);
+        }
+        return selected.determineScmUrlComponents(cloneUrl);
+    }
+
     public enum AutoCRLF {
         False,
         True,
@@ -373,4 +432,5 @@ public class GitProvenance implements Marker {
         String email;
         NavigableMap<LocalDate, Integer> commitsByDay;
     }
+
 }
