@@ -192,6 +192,16 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Override
+    public J visitErroneous(ErroneousTree node, Space fmt) {
+        String erroneousNode = source.substring(((JCTree) node).getStartPosition(), ((JCTree) node).getEndPosition(endPosTable));
+        return new J.Erroneous(
+                randomId(),
+                fmt,
+                Markers.EMPTY,
+                erroneousNode);
+    }
+
+    @Override
     public J visitBinary(BinaryTree node, Space fmt) {
         Expression left = convert(node.getLeftOperand());
 
@@ -1687,13 +1697,21 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 t instanceof JCReturn ||
                 t instanceof JCThrow ||
                 t instanceof JCUnary ||
-                t instanceof JCExpressionStatement ||
                 t instanceof JCVariableDecl) {
             return sourceBefore(";");
         }
 
         if (t instanceof JCLabeledStatement) {
             return statementDelim(((JCLabeledStatement) t).getStatement());
+        }
+
+        if (t instanceof JCExpressionStatement) {
+            ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
+            if (expTree instanceof ErroneousTree) {
+                return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable),((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
+            } else {
+                return sourceBefore(";");
+            }
         }
 
         if (t instanceof JCMethodDecl) {
