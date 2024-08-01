@@ -340,6 +340,7 @@ public class Space {
         ENUM_VALUE_PREFIX,
         ENUM_VALUE_SET_PREFIX,
         ENUM_VALUE_SUFFIX,
+        ERRONEOUS,
         EXPRESSION_PREFIX,
         EXTENDS,
         FIELD_ACCESS_NAME,

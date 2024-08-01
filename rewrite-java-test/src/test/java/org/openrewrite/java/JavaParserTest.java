@@ -27,6 +27,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -164,5 +165,65 @@ class JavaParserTest implements RewriteTest {
     void moduleInfo(){
         // Ignored until properly handled: https://github.com/openrewrite/rewrite/issues/4054#issuecomment-2267605739
         assertFalse(JavaParser.fromJavaVersion().build().accept(Path.of("src/main/java/foo/module-info.java")));
+    }
+
+    @ParameterizedTest
+    // language=java
+    @ValueSource(strings = {
+      """
+                package com.example.demo;
+                class FooBar {
+                    public void test() {
+                      ownerR
+                    }
+                }
+      """,
+      """
+                package com.example.demo;
+                class FooBar {
+                    public void test(int num string msg) {
+                      String a; this.ownerR
+                      System.out.println();
+                    }
+                }
+      """,
+      """
+                package com.example.demo;
+                class FooBar {
+                    public void test(int num string msg) {
+                      String a; this.ownerR // comment
+                      System.out.println();
+                    }
+                }
+      """,
+      """
+                package com.example.demo;
+                class FooBar {
+                    public void test(int num) {
+                      // comment
+                      this.ownerR
+                    }
+                }
+      """,
+      """
+                package com.example.demo;
+                class FooBar {
+                    public void test(int param ) {
+                      this.ownerR
+                      // comment
+                    }
+                }
+      """
+    })
+    void erroneousTest(@Language("java") String source) {
+        JavaParser javaParser = JavaParser.fromJavaVersion().build();
+        List<SourceFile> list = javaParser.parse(source).map(sf -> {
+            if (sf instanceof ParseError pe) {
+                return pe.getErroneous();
+            }
+            return sf;
+        }).toList();
+        SourceFile beforeSource = list.get(0);
+        assertThat(beforeSource.printAll()).isEqualTo(source);
     }
 }

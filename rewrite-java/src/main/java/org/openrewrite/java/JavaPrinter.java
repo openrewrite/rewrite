@@ -1194,6 +1194,14 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         return yield;
     }
 
+    @Override
+    public J visitErroneous(Erroneous error, PrintOutputCapture<P> p) {
+        beforeSyntax(error, Space.Location.ERRONEOUS, p);
+        p.append(error.getText());
+        afterSyntax(error, p);
+        return error;
+    }
+
     private static final UnaryOperator<String> JAVA_MARKER_WRAPPER =
             out -> "/*~~" + out + (out.isEmpty() ? "" : "~~") + ">*/";
 
