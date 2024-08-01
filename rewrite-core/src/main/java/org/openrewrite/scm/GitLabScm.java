@@ -22,8 +22,23 @@ import org.openrewrite.internal.lang.Nullable;
 public class GitLabScm implements Scm {
     private final String origin;
 
+    /**
+     * Configure a GitLab SaaS SCM instance
+     */
     public GitLabScm() {
         this.origin = "gitlab.com";
+    }
+
+    /**
+     * Configure a self-hosted gitlab SCM and register with GitProvenance.registerScm(new GitLabScm(origin));
+     *
+     * @param origin the url and path pointing to your GitLab instance.
+     */
+    public GitLabScm(String origin) {
+        if (origin.startsWith("ssh://") || origin.startsWith("http://") || origin.startsWith("https://")) {
+            origin = cleanHostAndPath(origin);
+        }
+        this.origin = origin.replaceFirst("/$", "");
     }
 
     @Override
