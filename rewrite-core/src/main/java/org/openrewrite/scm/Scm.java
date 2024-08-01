@@ -28,7 +28,10 @@ public interface Scm extends Comparable<Scm> {
 
     @Nullable
     default String determineOrganization(String path) {
-        return path.substring(0, path.indexOf("/"));
+        if (path.contains("/")) {
+            return path.substring(0, path.indexOf("/"));
+        }
+        return null;
     }
 
     @Nullable
@@ -42,10 +45,16 @@ public interface Scm extends Comparable<Scm> {
     }
 
     default String determineRepositoryName(String path) {
-        return path.substring(path.indexOf("/") + 1);
+        if (!path.contains("/")) {
+            return path.substring(path.indexOf("/") + 1);
+        }
+        return path;
     }
 
     default ScmUrlComponents determineScmUrlComponents(String cloneUrl) {
+        if (cloneUrl.length() < getOrigin().length() + 1) {
+            return new ScmUrlComponents(getOrigin(), null, null, null, determineRepositoryName(cloneUrl));
+        }
         String path = cleanHostAndPath(cloneUrl).substring(getOrigin().length() + 1);
         return new ScmUrlComponents(getOrigin(), determineOrganization(path), determineGroupPath(path), determineProject(path), determineRepositoryName(path));
     }
