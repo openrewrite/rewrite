@@ -44,7 +44,7 @@ public class FindKey extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find YAML entries that match the specified [JsonPath](https://github.com/json-path/JsonPath) expression.";
+        return "Find YAML entries that match the specified [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression.";
     }
 
     @Override

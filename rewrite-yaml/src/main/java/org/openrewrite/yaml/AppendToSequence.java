@@ -28,8 +28,8 @@ import java.util.List;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AppendToSequence extends Recipe {
-    @Option(displayName = "sequence path",
-            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML sequence.",
+    @Option(displayName = "Sequence path",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a YAML sequence.",
             example = "$.universe.planets")
     String sequencePath;
 

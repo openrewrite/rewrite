@@ -29,7 +29,7 @@ import java.nio.file.Path;
 @EqualsAndHashCode(callSuper = false)
 public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Option(displayName = "Old key path",
-            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML key/value pair to copy.",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a YAML key/value pair to copy.",
             example = "$.source.kind")
     String oldKeyPath;
 
@@ -42,7 +42,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     String oldFilePath;
 
     @Option(displayName = "New key path",
-            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression defining where the value should be written.",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression defining where the value should be written.",
             example = "$.dest.kind")
     String newKey;
 
