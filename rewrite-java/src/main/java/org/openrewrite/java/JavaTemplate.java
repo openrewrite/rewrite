@@ -47,14 +47,26 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         if (TEMPLATE_CLASSPATH_DIR == null) {
             try {
                 TEMPLATE_CLASSPATH_DIR = Files.createTempDirectory("java-template");
+                TEMPLATE_CLASSPATH_DIR.toFile().deleteOnExit();
                 Path templateDir = Files.createDirectories(TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal/template"));
+                for (Path subDir : new Path[] {
+                   TEMPLATE_CLASSPATH_DIR.resolve("org"),
+                   TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite"),
+                   TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java"),
+                   TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal")
+                }) {
+                  subDir.toFile().deleteOnExit();
+                }
+                templateDir.toFile().deleteOnExit();
                 try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__M__.class")) {
                     assert in != null;
                     Files.copy(in, templateDir.resolve("__M__.class"));
+                    templateDir.resolve("__M__.class").toFile().deleteOnExit();
                 }
                 try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__P__.class")) {
                     assert in != null;
                     Files.copy(in, templateDir.resolve("__P__.class"));
+                    templateDir.resolve("__P__.class").toFile().deleteOnExit();
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
