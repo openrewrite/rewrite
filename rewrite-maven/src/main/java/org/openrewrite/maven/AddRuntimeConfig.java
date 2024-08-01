@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
@@ -65,8 +66,11 @@ public class AddRuntimeConfig extends ScanningRecipe<AddRuntimeConfig.Accumulato
 
     @Getter
     public enum Separator {
+        @JsonProperty("")
         NONE(""),
+        @JsonProperty(" ")
         SPACE(" "),
+        @JsonProperty("=")
         EQUALS("=");
 
         private final String notation;
