@@ -17,18 +17,28 @@ package org.openrewrite.scm;
 
 import lombok.Value;
 
+import java.util.Arrays;
+import java.util.List;
+
 @Value
 public class GitLabCloneUrl implements CloneUrl {
     String cloneUrl;
     String origin;
     String path;
+    List<String> groups;
+    String organization;
+    String repositoryName;
 
-    String getGroupPath() {
-        try {
-            String path = getPath();
-            return path.substring(0, path.lastIndexOf("/"));
-        } catch (IndexOutOfBoundsException ex) {
-            throw new IllegalStateException("GitLab clone url path must contain at least 1 group", ex);
+    public GitLabCloneUrl(String cloneUrl, String origin, String path) {
+        this.cloneUrl = cloneUrl;
+        this.origin = origin;
+        this.path = path;
+        if (!this.path.contains("/")) {
+            throw new IllegalArgumentException("GitLab path must contain 1 or more groups and a repository name");
         }
+        String[] parts = this.path.split("/");
+        groups = Arrays.asList(parts).subList(0, parts.length - 1);
+        organization = String.join("/", groups);
+        repositoryName = parts[parts.length - 1];
     }
 }

@@ -24,8 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AzureDevOpsScmTest {
 
     @CsvSource(textBlock = """
-      https://dev.azure.com/org/project/_git/repo.git, true, dev.azure.com, org/project/repo, org, project
-      git@ssh.dev.azure.com:v3/org/project/repo.git, true, dev.azure.com, org/project/repo, org, project
+      https://dev.azure.com/org/project/_git/repo.git, true, dev.azure.com, org/project/repo, project, org
+      git@ssh.dev.azure.com:v3/org/project/repo.git, true, dev.azure.com, org/project/repo, project, org
                   
       https://github.com/org/repo, false,,,,
       https://gitlab.com/org/repo, false,,,,

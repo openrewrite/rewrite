@@ -18,8 +18,21 @@ package org.openrewrite.scm;
 import lombok.Value;
 
 @Value
-public class SimpleCloneUrl implements CloneUrl{
+public class SimpleCloneUrl implements CloneUrl {
     String cloneUrl;
     String origin;
     String path;
+    String organization;
+    String repositoryName;
+
+    public SimpleCloneUrl(String cloneUrl, String origin, String path) {
+        this.cloneUrl = cloneUrl;
+        this.origin = origin;
+        this.path = path;
+        if (!this.path.contains("/")) {
+            throw new IllegalArgumentException("Path must contain organizat a repository name");
+        }
+        organization = path.substring(0, path.lastIndexOf("/"));
+        repositoryName = path.substring(path.lastIndexOf("/") + 1);
+    }
 }

@@ -15,8 +15,6 @@
  */
 package org.openrewrite.scm;
 
-import org.openrewrite.internal.lang.Nullable;
-
 public interface CloneUrl {
 
     String getCloneUrl();
@@ -25,20 +23,8 @@ public interface CloneUrl {
 
     String getPath();
 
-    default String getRepositoryName() {
-        String path = getPath();
-        if (path.contains("/")) {
-            return path.substring(path.lastIndexOf("/") + 1);
-        }
-        return path;
-    }
+    String getOrganization();
 
-    @Nullable
-    default String getOrganization() {
-        String path = getPath();
-        if (path.contains("/")) {
-            return path.substring(0, path.lastIndexOf("/"));
-        }
-        return null;
-    }
+    String getRepositoryName();
+
 }
