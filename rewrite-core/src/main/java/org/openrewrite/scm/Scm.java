@@ -30,10 +30,10 @@ public interface Scm extends Comparable<Scm> {
 
     default CloneUrl parseCloneUrl(String cloneUrl) {
         if (cloneUrl.length() < getOrigin().length() + 1) {
-            return new SimpleCloneUrl(getOrigin(), "");
+            return new SimpleCloneUrl(cloneUrl, getOrigin(), "");
         }
         String path = cleanHostAndPath(cloneUrl).substring(getOrigin().length() + 1);
-        return new SimpleCloneUrl(getOrigin(), path);
+        return new SimpleCloneUrl(cloneUrl, getOrigin(), path);
     }
 
     @Override

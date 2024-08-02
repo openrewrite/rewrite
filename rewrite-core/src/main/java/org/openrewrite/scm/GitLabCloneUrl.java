@@ -19,6 +19,7 @@ import lombok.Value;
 
 @Value
 public class GitLabCloneUrl implements CloneUrl {
+    String cloneUrl;
     String origin;
     String path;
 

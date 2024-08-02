@@ -4,6 +4,7 @@ import lombok.Value;
 
 @Value
 public class AzureDevopsCloneUrl implements CloneUrl {
+    String cloneUrl;
     String origin;
     String path;
 

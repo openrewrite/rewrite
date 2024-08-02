@@ -52,6 +52,6 @@ public class GitLabScm implements Scm {
     @Override
     public CloneUrl parseCloneUrl(String cloneUrl) {
         CloneUrl parsed = Scm.super.parseCloneUrl(cloneUrl);
-        return new GitLabCloneUrl(parsed.getOrigin(), parsed.getPath());
+        return new GitLabCloneUrl(cloneUrl, getOrigin(), parsed.getPath());
     }
 }

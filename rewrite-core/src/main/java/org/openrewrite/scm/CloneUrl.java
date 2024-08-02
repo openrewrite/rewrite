@@ -19,6 +19,8 @@ import org.openrewrite.internal.lang.Nullable;
 
 public interface CloneUrl {
 
+    String getCloneUrl();
+
     String getOrigin();
 
     String getPath();

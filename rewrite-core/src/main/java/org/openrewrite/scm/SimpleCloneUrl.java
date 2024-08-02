@@ -19,6 +19,7 @@ import lombok.Value;
 
 @Value
 public class SimpleCloneUrl implements CloneUrl{
+    String cloneUrl;
     String origin;
     String path;
 }
