@@ -77,9 +77,15 @@ public class GitProvenance implements Marker {
 
     @Incubating(since = "8.33.0")
     @Nullable
-    CloneUrl cloneUrl;
+    transient CloneUrl cloneUrl;
 
-    public GitProvenance(UUID id, @Nullable String origin, @Nullable String branch, @Nullable String change, @Nullable AutoCRLF autocrlf, @Nullable EOL eol, @Nullable List<Committer> committers) {
+    public GitProvenance(UUID id,
+                         @Nullable String origin,
+                         @Nullable String branch,
+                         @Nullable String change,
+                         @Nullable AutoCRLF autocrlf,
+                         @Nullable EOL eol,
+                         @Nullable List<Committer> committers) {
         this.id = id;
         this.origin = origin;
         this.branch = branch;
@@ -130,34 +136,15 @@ public class GitProvenance implements Marker {
      */
     @Deprecated
     public @Nullable String getOrganizationName() {
-        if (cloneUrl != null) {
-            return cloneUrl.getOrganization();
-        }
-        if (origin == null) {
-            return null;
-        }
-        try {
-            String path = new URIish(origin).getPath();
-            // Strip off any trailing repository name
-            path = path.substring(0, path.lastIndexOf('/'));
-            // Strip off any leading sub organization names
-            return path.substring(path.lastIndexOf('/') + 1);
-        } catch (URISyntaxException e) {
-            return null;
-        }
+        return Optional.ofNullable(cloneUrl).map(CloneUrl::getOrganization).orElse(null);
     }
 
     public @Nullable String getRepositoryName() {
-        if (origin == null) {
-            return null;
-        }
-        try {
-            String path = new URIish(origin).getPath();
-            return path.substring(path.lastIndexOf('/') + 1)
-                    .replaceAll("\\.git$", "");
-        } catch (URISyntaxException e) {
-            return null;
-        }
+        return Optional.ofNullable(cloneUrl).map(CloneUrl::getRepositoryName).orElse(null);
+    }
+
+    public static String getRepositoryPath(String origin) {
+        return Optional.of(origin).map(GitProvenance::parseCloneUrl).map(CloneUrl::getPath).orElse("");
     }
 
     /**
