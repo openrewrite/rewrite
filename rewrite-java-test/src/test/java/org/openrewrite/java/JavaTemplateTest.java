@@ -1222,14 +1222,15 @@ class JavaTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
-                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if (new MethodMatcher("batch.StepBuilder create()").matches(method)) {
                         return JavaTemplate.builder("new StepBuilder()")
+                          //.doBeforeParseTemplate(System.out::println)
                           .contextSensitive()
                           .build()
                           .apply(getCursor(), method.getCoordinates().replace());
                     }
-                    return super.visitMethodInvocation(method, executionContext);
+                    return super.visitMethodInvocation(method, ctx);
                 }
             }))
             .parser(JavaParser.fromJavaVersion().dependsOn(
