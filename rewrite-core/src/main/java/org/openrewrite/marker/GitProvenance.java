@@ -117,12 +117,11 @@ public class GitProvenance implements Marker {
 
     private static @Nullable String getOrganizationNameFromOrigin(String origin) {
         Matcher matcher = AZURE_DEVOPS_HTTP_REMOTE.matcher(origin);
-        if (matcher.matches()) {
-            return matcher.group(1);
+        if (!matcher.matches()) {
+            matcher = AZURE_DEVOPS_SSH_REMOTE.matcher(origin);
         }
-        matcher = AZURE_DEVOPS_SSH_REMOTE.matcher(origin);
         if (matcher.matches()) {
-            return matcher.group(1);
+            return matcher.group(1) + '/' + matcher.group(2);
         }
 
         try {
@@ -132,22 +131,6 @@ public class GitProvenance implements Marker {
             // Strip off any leading sub organization names
             return path.substring(path.lastIndexOf('/') + 1);
         } catch (URISyntaxException e) {
-        }
-        return null;
-    }
-
-    public @Nullable String getProjectName() {
-        return Optional.ofNullable(origin).map(GitProvenance::getProjectName).orElse(null);
-    }
-
-    private static @Nullable String getProjectName(String origin) {
-        Matcher matcher = AZURE_DEVOPS_HTTP_REMOTE.matcher(origin);
-        if (matcher.matches()) {
-            return matcher.group(2);
-        }
-        matcher = AZURE_DEVOPS_SSH_REMOTE.matcher(origin);
-        if (matcher.matches()) {
-            return matcher.group(2);
         }
         return null;
     }
@@ -169,10 +152,6 @@ public class GitProvenance implements Marker {
     public static String getRepositoryPath(String origin) {
         StringBuilder builder = new StringBuilder(64);
         builder.append(getOrganizationNameFromOrigin(origin));
-        String projectName = getProjectName(origin);
-        if (projectName != null) {
-            builder.append('/').append(projectName);
-        }
         String repositoryName = getRepositoryName(origin);
         if (repositoryName != null) {
             builder.append('/').append(repositoryName);
