@@ -28,7 +28,7 @@ class GitLabScmTest {
     @CsvSource(textBlock = """
       https://gitlab.com/group/repo.git, true, gitlab.com, group/repo, group, group
       https://gitlab.com/group/subgroup/subergroup/subestgroup/repo.git, true, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, group
-            
+
       https://dev.azure.com/org/project/_git/repo.git, false,,,
       git@ssh.dev.azure.com:v3/org/project/repo.git, false,,,
       https://github.com/org/repo, false,,,,
