@@ -1200,19 +1200,69 @@ class JavaTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
           java(
+            """
+              import org.jetbrains.annotations.NotNull;
+              
+              class A {
+                  String testMethod(@NotNull final String test) {}
+              }
+              """, """
+              import lombok.NonNull;
+              
+              class A {
+                  String testMethod(@NonNull final String test) {}
+              }
+              """)
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-spring/pull/284")
+    void replaceMethodInChainFollowedByGenericTypeParameters() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                    if (new MethodMatcher("batch.StepBuilder create()").matches(method)) {
+                        return JavaTemplate.builder("new StepBuilder()")
+                          .contextSensitive()
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace());
+                    }
+                    return super.visitMethodInvocation(method, executionContext);
+                }
+            }))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
                 """
-                    import org.jetbrains.annotations.NotNull;
-                    
-                    class A {
-                        String testMethod(@NotNull final String test) {}
-                    }
-                    """, """
-                    import lombok.NonNull;
-                    
-                    class A {
-                        String testMethod(@NonNull final String test) {}
-                    }
-                    """)
+                  package batch;
+                  public class StepBuilder {
+                      public static StepBuilder create() { return new StepBuilder(); }
+                      public StepBuilder() {}
+                      public <T> T method() { return null; }
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import batch.StepBuilder;
+              class Foo {
+                  void test() {
+                      StepBuilder.create()
+                          .<String>method();
+                  }
+              }
+              """,
+            """
+              import batch.StepBuilder;
+              class Foo {
+                  void test() {
+                      new StepBuilder()
+                          .<String>method();
+                  }
+              }
+              """
+          )
         );
     }
 }
