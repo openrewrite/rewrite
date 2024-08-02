@@ -213,7 +213,31 @@ class JavaParserTest implements RewriteTest {
                       // comment
                     }
                 }
+      """,
       """
+          package com.example.demo;
+          class FooBar {
+              pet
+              public void test() {
+              }
+          }
+      """,
+      """
+          package com.example.demo;
+          class FooBar {
+              public void test() {
+              }
+              pet
+          }
+      """,
+//      """
+//          package com.example.demo;
+//          class FooBar {
+//              public void test(int) {
+//              }
+//              pet
+//          }
+//      """
     })
     void erroneousTest(@Language("java") String source) {
         JavaParser javaParser = JavaParser.fromJavaVersion().build();
