@@ -47,26 +47,28 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         if (TEMPLATE_CLASSPATH_DIR == null) {
             try {
                 TEMPLATE_CLASSPATH_DIR = Files.createTempDirectory("java-template");
-                TEMPLATE_CLASSPATH_DIR.toFile().deleteOnExit();
                 Path templateDir = Files.createDirectories(TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal/template"));
-                for (Path subDir : new Path[] {
-                   TEMPLATE_CLASSPATH_DIR.resolve("org"),
-                   TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite"),
-                   TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java"),
-                   TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal")
-                }) {
-                  subDir.toFile().deleteOnExit();
+                Path mClass = templateDir.resolve("__M__.class");
+                Path pClass = templateDir.resolve("__P__.class");
+
+                // Delete in reverse order to avoid issues with non-empty directories
+                for (Path path : new Path[]{
+                        TEMPLATE_CLASSPATH_DIR,
+                        TEMPLATE_CLASSPATH_DIR.resolve("org"),
+                        TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite"),
+                        TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java"),
+                        TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal"),
+                        templateDir, mClass, pClass}) {
+                    path.toFile().deleteOnExit();
                 }
-                templateDir.toFile().deleteOnExit();
+
                 try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__M__.class")) {
                     assert in != null;
-                    Files.copy(in, templateDir.resolve("__M__.class"));
-                    templateDir.resolve("__M__.class").toFile().deleteOnExit();
+                    Files.copy(in, mClass);
                 }
                 try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__P__.class")) {
                     assert in != null;
-                    Files.copy(in, templateDir.resolve("__P__.class"));
-                    templateDir.resolve("__P__.class").toFile().deleteOnExit();
+                    Files.copy(in, pClass);
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -86,7 +88,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         this(code, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports));
     }
 
-    private static JavaParser.Builder<?,?> augmentClasspath(JavaParser.Builder<?,?> parserBuilder) {
+    private static JavaParser.Builder<?, ?> augmentClasspath(JavaParser.Builder<?, ?> parserBuilder) {
         return parserBuilder.addClasspathEntry(getTemplateClasspathDir());
     }
 
