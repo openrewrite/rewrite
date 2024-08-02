@@ -15,10 +15,8 @@
  */
 package org.openrewrite.gradle;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -398,7 +396,7 @@ class ChangeDependencyTest implements RewriteTest {
           )
         );
     }
-    
+
     @Test
     void relocateDependencyInJvmTestSuite() {
         rewriteRun(
