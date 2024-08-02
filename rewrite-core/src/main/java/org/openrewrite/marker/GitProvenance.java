@@ -31,7 +31,8 @@ import org.openrewrite.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.IncompleteGitConfigException;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
-import org.openrewrite.scm.*;
+import org.openrewrite.scm.CloneUrl;
+import org.openrewrite.scm.Scm;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,13 +50,6 @@ import static org.openrewrite.Tree.randomId;
 @With
 @AllArgsConstructor
 public class GitProvenance implements Marker {
-    private static final Set<Scm> KNOWN_SCMS = new LinkedHashSet<>(Arrays.asList(
-            new SimpleScm("github.com"),
-            new SimpleScm("bitbucket.org"),
-            new GitLabScm(),
-            new AzureDevOpsScm()
-    ));
-
     UUID id;
 
     /**
@@ -83,7 +77,7 @@ public class GitProvenance implements Marker {
 
     @Incubating(since = "8.33.0")
     @Nullable
-    ScmUrlComponents scmUrlComponents;
+    CloneUrl cloneUrl;
 
     public GitProvenance(UUID id, @Nullable String origin, @Nullable String branch, @Nullable String change, @Nullable AutoCRLF autocrlf, @Nullable EOL eol, @Nullable List<Committer> committers) {
         this.id = id;
@@ -93,7 +87,7 @@ public class GitProvenance implements Marker {
         this.autocrlf = autocrlf;
         this.eol = eol;
         this.committers = committers;
-        scmUrlComponents = determineScmUrlComponents(origin);
+        cloneUrl = parseCloneUrl(origin);
     }
 
     /**
@@ -102,12 +96,12 @@ public class GitProvenance implements Marker {
      *
      * @param baseUrl the portion of the URL which precedes the organization
      * @return the portion of the git origin URL which corresponds to the organization the git repository is organized under
-     * @deprecated use {@link #getScmUrlComponents().getOrganization()} instead }
+     * @deprecated use {@link #getCloneUrl().getOrganization()} instead }
      */
     @Deprecated
     public @Nullable String getOrganizationName(String baseUrl) {
-        if (scmUrlComponents != null) {
-            return scmUrlComponents.getOrganization();
+        if (cloneUrl != null) {
+            return cloneUrl.getOrganization();
         }
         if (origin == null) {
             return null;
@@ -136,8 +130,8 @@ public class GitProvenance implements Marker {
      */
     @Deprecated
     public @Nullable String getOrganizationName() {
-        if (scmUrlComponents != null) {
-            return scmUrlComponents.getOrganization();
+        if (cloneUrl != null) {
+            return cloneUrl.getOrganization();
         }
         if (origin == null) {
             return null;
@@ -246,7 +240,7 @@ public class GitProvenance implements Marker {
         String remoteOriginUrl = getRemoteOriginUrl(repository);
         return new GitProvenance(randomId(), remoteOriginUrl, branch, changeset,
                 getAutocrlf(repository), getEOF(repository),
-                getCommitters(repository), determineScmUrlComponents(remoteOriginUrl));
+                getCommitters(repository), parseCloneUrl(remoteOriginUrl));
     }
 
     static @Nullable String resolveBranchFromGitConfig(Repository repository) {
@@ -392,25 +386,13 @@ public class GitProvenance implements Marker {
         return url;
     }
 
-    public static void registerScm(Scm scm) {
-        KNOWN_SCMS.add(scm);
-    }
-
     @Nullable
-    public static ScmUrlComponents determineScmUrlComponents(@Nullable String cloneUrl) {
+    public static CloneUrl parseCloneUrl(@Nullable String cloneUrl) {
         if (cloneUrl == null) {
             return null;
         }
-        Scm selected = null;
-        for (Scm scm : KNOWN_SCMS) {
-            if (scm.belongsToScm(cloneUrl)) {
-                selected = scm;
-            }
-        }
-        if (selected == null) {
-            selected = new UnknownScm(cloneUrl);
-        }
-        return selected.determineScmUrlComponents(cloneUrl);
+        Scm scm = Scm.findMatchingScm(cloneUrl);
+        return scm.parseCloneUrl(cloneUrl);
     }
 
     public enum AutoCRLF {

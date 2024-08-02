@@ -34,8 +34,8 @@ class BitbucketServerScmTest {
         assertThat(scm.belongsToScm(cloneUrl)).isEqualTo(matchesScm);
         if (matchesScm) {
             assertThat(scm.getOrigin()).isEqualTo(expectedOrigin);
-            assertThat(scm.determineScmUrlComponents(cloneUrl).getOrigin()).isEqualTo(expectedOrigin);
-            assertThat(scm.determineScmUrlComponents(cloneUrl).getPath()).isEqualTo(expectedPath);
+            assertThat(scm.parseCloneUrl(cloneUrl).getOrigin()).isEqualTo(expectedOrigin);
+            assertThat(scm.parseCloneUrl(cloneUrl).getPath()).isEqualTo(expectedPath);
         }
     }
 

@@ -36,7 +36,7 @@ class UnknownScmTest {
         Scm scm = new UnknownScm(cloneUrl);
         assertThat(scm.belongsToScm(cloneUrl)).isTrue();
         assertThat(scm.getOrigin()).isEqualTo(expectedOrigin);
-        assertThat(scm.determineScmUrlComponents(cloneUrl).getOrigin()).isEqualTo(expectedOrigin);
-        assertThat(scm.determineScmUrlComponents(cloneUrl).getPath()).isEqualTo(expectedPath);
+        assertThat(scm.parseCloneUrl(cloneUrl).getOrigin()).isEqualTo(expectedOrigin);
+        assertThat(scm.parseCloneUrl(cloneUrl).getPath()).isEqualTo(expectedPath);
     }
 }

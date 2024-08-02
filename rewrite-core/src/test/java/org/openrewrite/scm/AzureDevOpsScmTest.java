@@ -24,23 +24,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AzureDevOpsScmTest {
 
     @CsvSource(textBlock = """
-            https://dev.azure.com/org/project/_git/repo.git, true, dev.azure.com, org/project/repo
-            git@ssh.dev.azure.com:v3/org/project/repo.git, true, dev.azure.com, org/project/repo
-            
-            https://github.com/org/repo, false,,
-            https://gitlab.com/org/repo, false,,
-            https://scm.company.com/scm/project/repo.git, false,,
-            git@scm.company.com:context/path/scm/project/repo.git, false,,
-            """)
+      https://dev.azure.com/org/project/_git/repo.git, true, dev.azure.com, org/project/repo, org, project
+      git@ssh.dev.azure.com:v3/org/project/repo.git, true, dev.azure.com, org/project/repo, org, project
+                  
+      https://github.com/org/repo, false,,,,
+      https://gitlab.com/org/repo, false,,,,
+      https://scm.company.com/scm/project/repo.git, false,,,,
+      git@scm.company.com:context/path/scm/project/repo.git, false,,,,
+      """)
     @ParameterizedTest
-    void splitOriginPath(String cloneUrl, boolean matchesScm, @Nullable String expectedOrigin, @Nullable String expectedPath) {
+    void splitOriginPath(String cloneUrl, boolean matchesScm, @Nullable String expectedOrigin, @Nullable String expectedPath, @Nullable String expectedProject, @Nullable String expectedOrganization) {
         Scm scm = new AzureDevOpsScm();
         assertThat(scm.belongsToScm(cloneUrl)).isEqualTo(matchesScm);
-        if(matchesScm) {
+        if (matchesScm) {
             assertThat(scm.getOrigin()).isEqualTo(expectedOrigin);
-            ScmUrlComponents urlParts = scm.determineScmUrlComponents(cloneUrl);
-            assertThat(urlParts.getOrigin()).isEqualTo(expectedOrigin);
-            assertThat(urlParts.getPath()).isEqualTo(expectedPath);
+            CloneUrl parsed = scm.parseCloneUrl(cloneUrl);
+            assertThat(parsed).isInstanceOf(AzureDevopsCloneUrl.class);
+            AzureDevopsCloneUrl azureDevopsCloneUrl = (AzureDevopsCloneUrl) parsed;
+            assertThat(azureDevopsCloneUrl.getOrigin()).isEqualTo(expectedOrigin);
+            assertThat(azureDevopsCloneUrl.getPath()).isEqualTo(expectedPath);
+            assertThat(azureDevopsCloneUrl.getProject()).isEqualTo(expectedProject);
+            assertThat(azureDevopsCloneUrl.getOrganization()).isEqualTo(expectedOrganization);
         }
     }
 

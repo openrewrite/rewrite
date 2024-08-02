@@ -15,8 +15,6 @@
  */
 package org.openrewrite.scm;
 
-import org.openrewrite.internal.lang.Nullable;
-
 public class AzureDevOpsScm implements Scm {
 
     @Override
@@ -41,13 +39,8 @@ public class AzureDevOpsScm implements Scm {
     }
 
     @Override
-    public String determineRepositoryName(String path) {
-        return path.substring(path.lastIndexOf("/") + 1);
-    }
-
-    @Nullable
-    @Override
-    public String determineProject(String path) {
-        return path.substring(path.indexOf("/") + 1, path.lastIndexOf("/"));
+    public CloneUrl parseCloneUrl(String cloneUrl) {
+        CloneUrl parsed = Scm.super.parseCloneUrl(cloneUrl);
+        return new AzureDevopsCloneUrl(parsed.getOrigin(), parsed.getPath());
     }
 }

@@ -16,7 +16,6 @@
 package org.openrewrite.scm;
 
 import lombok.Getter;
-import org.openrewrite.internal.lang.Nullable;
 
 @Getter
 public class GitLabScm implements Scm {
@@ -42,26 +41,17 @@ public class GitLabScm implements Scm {
     }
 
     @Override
-    public @Nullable String determineGroupPath(String path) {
-        return path.substring(0, path.lastIndexOf("/"));
-    }
-
-    @Override
-    public @Nullable String determineOrganization(String path) {
-        return determineGroupPath(path);
-    }
-
-    @Override
-    public String determineRepositoryName(String path) {
-        return path.substring(path.lastIndexOf("/") + 1);
-    }
-
-    @Override
     public String cleanHostAndPath(String url) {
         UrlComponents uri = UrlComponents.parse(url);
         String hostAndPath = uri.getHost() + uri.maybePort() + "/" + uri.getPath()
                 .replaceFirst("^/", "")
                 .replaceFirst("\\.git$", "");
         return hostAndPath.replaceFirst("/$", "");
+    }
+
+    @Override
+    public CloneUrl parseCloneUrl(String cloneUrl) {
+        CloneUrl parsed = Scm.super.parseCloneUrl(cloneUrl);
+        return new GitLabCloneUrl(parsed.getOrigin(), parsed.getPath());
     }
 }

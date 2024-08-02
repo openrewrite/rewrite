@@ -15,7 +15,9 @@
  */
 package org.openrewrite.scm;
 
-import org.openrewrite.internal.lang.Nullable;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 public interface Scm extends Comparable<Scm> {
     String getOrigin();
@@ -26,37 +28,12 @@ public interface Scm extends Comparable<Scm> {
         return cleanHostAndPath(cloneUrl).startsWith(getOrigin());
     }
 
-    @Nullable
-    default String determineOrganization(String path) {
-        if (path.contains("/")) {
-            return path.substring(0, path.indexOf("/"));
-        }
-        return null;
-    }
-
-    @Nullable
-    default String determineGroupPath(String path) {
-        return null;
-    }
-
-    @Nullable
-    default String determineProject(String path) {
-        return null;
-    }
-
-    default String determineRepositoryName(String path) {
-        if (path.contains("/")) {
-            return path.substring(path.indexOf("/") + 1);
-        }
-        return path;
-    }
-
-    default ScmUrlComponents determineScmUrlComponents(String cloneUrl) {
+    default CloneUrl parseCloneUrl(String cloneUrl) {
         if (cloneUrl.length() < getOrigin().length() + 1) {
-            return new ScmUrlComponents(getOrigin(), null, null, null, determineRepositoryName(cloneUrl));
+            return new SimpleCloneUrl(getOrigin(), "");
         }
         String path = cleanHostAndPath(cloneUrl).substring(getOrigin().length() + 1);
-        return new ScmUrlComponents(getOrigin(), determineOrganization(path), determineGroupPath(path), determineProject(path), determineRepositoryName(path));
+        return new SimpleCloneUrl(getOrigin(), path);
     }
 
     @Override
@@ -64,4 +41,23 @@ public interface Scm extends Comparable<Scm> {
         return getOrigin().compareTo(o.getOrigin());
     }
 
+    Set<Scm> KNOWN_SCM = new LinkedHashSet<>(Arrays.asList(
+            new SimpleScm("github.com"),
+            new SimpleScm("bitbucket.org"),
+            new GitLabScm(),
+            new AzureDevOpsScm()
+    ));
+
+    static void registerScm(Scm scm) {
+        KNOWN_SCM.add(scm);
+    }
+
+    static Scm findMatchingScm(String cloneUrl) {
+        for (Scm scm : KNOWN_SCM) {
+            if (scm.belongsToScm(cloneUrl)) {
+                return scm;
+            }
+        }
+        return new UnknownScm(cloneUrl);
+    }
 }
