@@ -43,6 +43,7 @@ import java.util.UUID;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatExceptionOfType;
 import static org.openrewrite.Recipe.noop;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -287,6 +288,43 @@ class RecipeLifecycleTest implements RewriteTest {
           "test.recipe"
           ),
           text("Hi", "NoArgRecipeHi"));
+    }
+
+    @Test
+    void canCallImperativeRecipeWithUnnecessaryArgsWhenFailOnUnknownPropertiesFalse() {
+        rewriteRun(spec -> spec.failOnUnknownProperties(false)
+            .recipeFromYaml("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe
+                displayName: Test Recipe
+                description: Test Recipe.
+                recipeList:
+                  - org.openrewrite.NoArgRecipe:
+                      foo: bar
+                """,
+              "test.recipe"
+            ),
+          text("Hi", "NoArgRecipeHi"));
+    }
+
+    @Test
+    void cannotCallImperativeRecipeWithUnnecessaryArgsWhenFailOnUnknownPropertiesTrue() {
+        assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
+            rewriteRun(spec -> spec.failOnUnknownProperties(true)
+              .recipeFromYaml("""
+                  ---
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.recipe
+                  displayName: Test Recipe
+                  description: Test Recipe.
+                  recipeList:
+                    - org.openrewrite.NoArgRecipe:
+                        foo: bar
+                  """,
+                "test.recipe"
+              )))
+          .withMessageContaining("Unrecognized field \"foo\"");
     }
 
     @Test

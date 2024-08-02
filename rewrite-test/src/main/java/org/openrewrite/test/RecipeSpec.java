@@ -15,6 +15,7 @@
  */
 package org.openrewrite.test;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
@@ -101,6 +102,8 @@ public class RecipeSpec {
     @Nullable
     RecipePrinter recipePrinter;
 
+    Properties resourceLoaderProperties = new Properties();
+
     /**
      * Configuration that applies to all source file inputs.
      */
@@ -120,32 +123,37 @@ public class RecipeSpec {
     }
 
     public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {
-        return recipe(recipeFromInputStream(yaml, activeRecipes));
+        return recipe(recipeFromInputStream(yaml, this.resourceLoaderProperties, activeRecipes));
     }
 
     public RecipeSpec recipeFromYaml(@Language("yaml") String yaml, String... activeRecipes) {
-        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromYaml", yaml, key(activeRecipes)),
+        return recipe(RECIPE_CACHE.computeIfAbsent(
+                key("recipeFromYaml", yaml, key(activeRecipes), this.resourceLoaderProperties.toString()),
                 k -> recipeFromInputStream(
-                        new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)), activeRecipes)));
+                        new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)),
+                        this.resourceLoaderProperties, activeRecipes)));
     }
 
     public RecipeSpec recipeFromResource(String yamlResource, String... activeRecipes) {
-        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromResource", yamlResource, key(activeRecipes)),
+        return recipe(RECIPE_CACHE.computeIfAbsent(
+                key("recipeFromResource", yamlResource, key(activeRecipes), this.resourceLoaderProperties.toString()),
                 k -> recipeFromInputStream(
-                        Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), activeRecipes)));
+                        Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)),
+                        this.resourceLoaderProperties, activeRecipes)));
     }
 
     public RecipeSpec recipeFromResources(String... activeRecipes) {
-        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromResources", key(activeRecipes)),
-                k -> Environment.builder()
+        return recipe(RECIPE_CACHE.computeIfAbsent(
+                key("recipeFromResources", key(activeRecipes), this.resourceLoaderProperties.toString()),
+                k -> Environment.builder(this.resourceLoaderProperties)
                         .scanYamlResources()
                         .build()
                         .activateRecipes(activeRecipes)));
     }
 
-    private static Recipe recipeFromInputStream(InputStream yaml, String... activeRecipes) {
+    private static Recipe recipeFromInputStream(InputStream yaml, Properties properties, String... activeRecipes) {
         return Environment.builder()
-                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
+                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), properties))
                 .build()
                 .activateRecipes(activeRecipes);
     }
@@ -249,6 +257,11 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public RecipeSpec validateRecipeSerialization(boolean validate) {
         this.serializationValidation = validate;
+        return this;
+    }
+
+    public RecipeSpec failOnUnknownProperties(boolean failOnUnknownProperties) {
+        this.resourceLoaderProperties.put(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, failOnUnknownProperties);
         return this;
     }
 

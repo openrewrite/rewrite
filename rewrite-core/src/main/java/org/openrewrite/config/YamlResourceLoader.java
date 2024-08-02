@@ -146,8 +146,12 @@ public class YamlResourceLoader implements ResourceLoader {
                 .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .build()
-                .registerModule(new ParameterNamesModule())
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+                .registerModule(new ParameterNamesModule());
+
+        if (Boolean.FALSE.equals(properties.getOrDefault(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false))) {
+            mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        }
+
         maybeAddKotlinModule(mapper);
 
         this.classLoader = classLoader;
