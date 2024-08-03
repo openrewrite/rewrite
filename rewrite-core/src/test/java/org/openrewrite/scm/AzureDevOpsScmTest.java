@@ -29,6 +29,7 @@ class AzureDevOpsScmTest {
     @CsvSource(textBlock = """
       https://dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project
       git@ssh.dev.azure.com:v3/org/project/repo, dev.azure.com, org/project/repo, org/project
+      ssh://ssh.dev.azure.com:22/v3/org/project/repo, dev.azure.com, org/project/repo, org/project
       """)
     void splitOriginPathWithValidUrls(String cloneUrl,
                                       @Nullable String expectedOrigin,
@@ -51,7 +52,7 @@ class AzureDevOpsScmTest {
       "https://scm.company.com/scm/project/repo.git",
       "git@scm.company.com:context/path/scm/project/repo.git"
     })
-    void splitOriginPathWithInvalidUrls(String cloneUrl) {
+    void otherScmDoNotMatch(String cloneUrl) {
         assertThat(scm.belongsToScm(cloneUrl)).isFalse();
     }
 }

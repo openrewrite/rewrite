@@ -25,15 +25,16 @@ public class AzureDevOpsCloneUrl implements CloneUrl {
     String organization;
     String repositoryName;
 
-    public AzureDevOpsCloneUrl(String cloneUrl,
-                               String origin,
-                               String organization,
-                               String project,
-                               String repositoryName) {
+    public AzureDevOpsCloneUrl(String cloneUrl, String origin, String path) {
         this.cloneUrl = cloneUrl;
         this.origin = origin;
-        this.organization = organization + '/' + project;
-        this.repositoryName = repositoryName;
-        this.path = this.organization + '/' + repositoryName;
+        this.path = path;
+        if (!this.path.contains("/")) {
+            throw new IllegalArgumentException("Azure DevOps clone url path must contain organization, project and repository");
+        }
+        String azureDevOpsOrganization = path.substring(0, path.indexOf("/"));
+        String azureDevOpsProject = path.substring(path.indexOf("/") + 1, path.lastIndexOf("/"));
+        this.repositoryName = path.substring(path.lastIndexOf("/") + 1);
+        this.organization = azureDevOpsOrganization + '/' + azureDevOpsProject;
     }
 }

@@ -15,16 +15,7 @@
  */
 package org.openrewrite.scm;
 
-import org.openrewrite.internal.lang.Nullable;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 public class AzureDevOpsScm implements Scm {
-    private static final Pattern AZURE_DEVOPS_HTTP_REMOTE =
-            Pattern.compile("https://(?:[\\w-]+@)?dev\\.azure\\.com/([^/]+)/([^/]+)/_git/(.*)");
-    private static final Pattern AZURE_DEVOPS_SSH_REMOTE =
-            Pattern.compile("(?:ssh://)?git@ssh\\.dev\\.azure\\.com:v3/([^/]+)/([^/]+)/(.*)");
 
     @Override
     public String getOrigin() {
@@ -33,27 +24,23 @@ public class AzureDevOpsScm implements Scm {
 
     @Override
     public String cleanHostAndPath(String url) {
-        Matcher matcher = getUrlMatcher(url);
-        if (matcher != null) {
-            return getOrigin() + '/' + matcher.group(1) + '/' + matcher.group(2) + '/' + matcher.group(3);
+        UrlComponents uri = UrlComponents.parse(url);
+        String host = uri.getHost();
+        String path = uri.getPath();
+        if (uri.isSsh() && host.startsWith("ssh.")) {
+            host = host.substring(4);
+            path = path.replaceFirst("v3/", "");
+        } else {
+            path = path.replaceFirst("_git/", "");
         }
-        return url;
+        String hostAndPath = host + "/" + path
+                .replaceFirst("\\.git$", "");
+        return hostAndPath.replaceFirst("/$", "");
     }
 
     @Override
     public CloneUrl parseCloneUrl(String cloneUrl) {
-        Matcher matcher = getUrlMatcher(cloneUrl);
-        if (matcher == null) {
-            throw new IllegalArgumentException("Unable to parse Azure DevOps repository URL: " + cloneUrl);
-        }
-        return new AzureDevOpsCloneUrl(cloneUrl, getOrigin(), matcher.group(1), matcher.group(2), matcher.group(3));
-    }
-
-    private @Nullable Matcher getUrlMatcher(String cloneUrl) {
-        Matcher matcher = AZURE_DEVOPS_HTTP_REMOTE.matcher(cloneUrl);
-        if (!matcher.matches()) {
-            matcher = AZURE_DEVOPS_SSH_REMOTE.matcher(cloneUrl);
-        }
-        return matcher.matches() ? matcher : null;
+        CloneUrl parsed = Scm.super.parseCloneUrl(cloneUrl);
+        return new AzureDevOpsCloneUrl(cloneUrl, getOrigin(), parsed.getPath());
     }
 }
