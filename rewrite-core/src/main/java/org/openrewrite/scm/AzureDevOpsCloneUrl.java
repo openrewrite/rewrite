@@ -29,7 +29,7 @@ public class AzureDevOpsCloneUrl implements CloneUrl {
         this.cloneUrl = cloneUrl;
         this.origin = origin;
         this.path = path;
-        if (!this.path.contains("/")) {
+        if (!path.contains("/")) {
             throw new IllegalArgumentException("Azure DevOps clone url path must contain organization, project and repository");
         }
         String azureDevOpsOrganization = path.substring(0, path.indexOf("/"));
