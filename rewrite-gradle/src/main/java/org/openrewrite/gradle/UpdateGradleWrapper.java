@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
+import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -150,6 +151,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     }
 
     public static class GradleWrapperState {
+        boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
         BuildTool updatedMarker;
         boolean addGradleWrapperProperties = true;
@@ -225,6 +227,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return false;
                         }
 
+                        if (new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile) {
+                            acc.gradleProject = true;
+                        }
+
                         if ((sourceFile instanceof Quark || sourceFile instanceof Remote) &&
                             equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
                             acc.addGradleWrapperJar = false;
@@ -250,6 +256,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Override
     public Collection<SourceFile> generate(GradleWrapperState acc, ExecutionContext ctx) {
         if (Boolean.FALSE.equals(addIfMissing)) {
+            return Collections.emptyList();
+        }
+
+        if (!acc.gradleProject) {
             return Collections.emptyList();
         }
 
