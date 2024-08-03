@@ -17,35 +17,42 @@ package org.openrewrite.scm;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.internal.lang.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AzureDevOpsScmTest {
+    Scm scm = new AzureDevOpsScm();
 
-    @CsvSource(textBlock = """
-      https://dev.azure.com/org/project/_git/repo.git, true, dev.azure.com, org/project/repo, project, org
-      git@ssh.dev.azure.com:v3/org/project/repo.git, true, dev.azure.com, org/project/repo, project, org
-                  
-      https://github.com/org/repo, false,,,,
-      https://gitlab.com/org/repo, false,,,,
-      https://scm.company.com/scm/project/repo.git, false,,,,
-      git@scm.company.com:context/path/scm/project/repo.git, false,,,,
-      """)
     @ParameterizedTest
-    void splitOriginPath(String cloneUrl, boolean matchesScm, @Nullable String expectedOrigin, @Nullable String expectedPath, @Nullable String expectedProject, @Nullable String expectedOrganization) {
-        Scm scm = new AzureDevOpsScm();
-        assertThat(scm.belongsToScm(cloneUrl)).isEqualTo(matchesScm);
-        if (matchesScm) {
-            assertThat(scm.getOrigin()).isEqualTo(expectedOrigin);
-            CloneUrl parsed = scm.parseCloneUrl(cloneUrl);
-            assertThat(parsed).isInstanceOf(AzureDevopsCloneUrl.class);
-            AzureDevopsCloneUrl azureDevopsCloneUrl = (AzureDevopsCloneUrl) parsed;
-            assertThat(azureDevopsCloneUrl.getOrigin()).isEqualTo(expectedOrigin);
-            assertThat(azureDevopsCloneUrl.getPath()).isEqualTo(expectedPath);
-            assertThat(azureDevopsCloneUrl.getProject()).isEqualTo(expectedProject);
-            assertThat(azureDevopsCloneUrl.getOrganization()).isEqualTo(expectedOrganization);
-        }
+    @CsvSource(textBlock = """
+      https://dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project
+      git@ssh.dev.azure.com:v3/org/project/repo, dev.azure.com, org/project/repo, org/project
+      ssh://ssh.dev.azure.com:22/v3/org/project/repo, dev.azure.com, org/project/repo, org/project
+      """)
+    void splitOriginPathWithValidUrls(String cloneUrl,
+                                      @Nullable String expectedOrigin,
+                                      @Nullable String expectedPath,
+                                      @Nullable String expectedOrganization) {
+        assertThat(scm.belongsToScm(cloneUrl)).isTrue();
+        assertThat(scm.getOrigin()).isEqualTo(expectedOrigin);
+        CloneUrl parsed = scm.parseCloneUrl(cloneUrl);
+        assertThat(parsed).isInstanceOf(AzureDevOpsCloneUrl.class);
+        AzureDevOpsCloneUrl azureDevopsCloneUrl = (AzureDevOpsCloneUrl) parsed;
+        assertThat(azureDevopsCloneUrl.getOrigin()).isEqualTo(expectedOrigin);
+        assertThat(azureDevopsCloneUrl.getPath()).isEqualTo(expectedPath);
+        assertThat(azureDevopsCloneUrl.getOrganization()).isEqualTo(expectedOrganization);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "https://github.com/org/repo",
+      "https://gitlab.com/org/repo",
+      "https://scm.company.com/scm/project/repo.git",
+      "git@scm.company.com:context/path/scm/project/repo.git"
+    })
+    void otherScmDoNotMatch(String cloneUrl) {
+        assertThat(scm.belongsToScm(cloneUrl)).isFalse();
+    }
 }

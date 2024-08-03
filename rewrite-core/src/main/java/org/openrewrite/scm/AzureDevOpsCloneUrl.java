@@ -18,23 +18,23 @@ package org.openrewrite.scm;
 import lombok.Value;
 
 @Value
-public class AzureDevopsCloneUrl implements CloneUrl {
+public class AzureDevOpsCloneUrl implements CloneUrl {
     String cloneUrl;
     String origin;
     String path;
     String organization;
-    String project;
     String repositoryName;
 
-    public AzureDevopsCloneUrl(String cloneUrl, String origin, String path) {
+    public AzureDevOpsCloneUrl(String cloneUrl, String origin, String path) {
         this.cloneUrl = cloneUrl;
         this.origin = origin;
         this.path = path;
         if (!path.contains("/")) {
             throw new IllegalArgumentException("Azure DevOps clone url path must contain organization, project and repository");
         }
-        this.organization = path.substring(0, path.indexOf("/"));
-        this.project = path.substring(path.indexOf("/") + 1, path.lastIndexOf("/"));
+        String azureDevOpsOrganization = path.substring(0, path.indexOf("/"));
+        String azureDevOpsProject = path.substring(path.indexOf("/") + 1, path.lastIndexOf("/"));
         this.repositoryName = path.substring(path.lastIndexOf("/") + 1);
+        this.organization = azureDevOpsOrganization + '/' + azureDevOpsProject;
     }
 }

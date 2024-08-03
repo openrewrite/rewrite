@@ -41,6 +41,6 @@ public class AzureDevOpsScm implements Scm {
     @Override
     public CloneUrl parseCloneUrl(String cloneUrl) {
         CloneUrl parsed = Scm.super.parseCloneUrl(cloneUrl);
-        return new AzureDevopsCloneUrl(cloneUrl, getOrigin(), parsed.getPath());
+        return new AzureDevOpsCloneUrl(cloneUrl, getOrigin(), parsed.getPath());
     }
 }

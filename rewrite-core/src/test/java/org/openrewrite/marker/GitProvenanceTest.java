@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.jgit.api.Git;
@@ -40,6 +41,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -53,30 +55,47 @@ import static org.openrewrite.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION;
 @SuppressWarnings({"ConstantConditions", "HttpUrlsUsage"})
 class GitProvenanceTest {
 
-    private static Stream<String> remotes() {
+    private static Stream<Arguments> remotes() {
         return Stream.of(
-          "ssh://git@github.com/openrewrite/rewrite.git",
-          "https://github.com/openrewrite/rewrite.git",
-          "file:///openrewrite/rewrite.git",
-          "http://localhost:7990/scm/openrewrite/rewrite.git",
-          "http://localhost:7990/scm/some/openrewrite/rewrite.git",
-          "git@github.com:openrewrite/rewrite.git",
-          "org-12345678@github.com:openrewrite/rewrite.git"
+          Arguments.of("ssh://git@github.com/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("https://github.com/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("file:///openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("http://localhost:7990/scm/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("http://localhost:7990/scm/some/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("git@github.com:openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("org-12345678@github.com:openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("https://dev.azure.com/openrewrite/rewrite/_git/rewrite", "openrewrite/rewrite", "rewrite"),
+          Arguments.of("https://openrewrite@dev.azure.com/openrewrite/rewrite/_git/rewrite",
+            "openrewrite/rewrite",
+            "rewrite"),
+          Arguments.of("git@ssh.dev.azure.com:v3/openrewrite/rewrite/rewrite", "openrewrite/rewrite", "rewrite"),
+          Arguments.of(
+            "ssh://git@ssh.dev.azure.com:v3/openrewrite/rewrite/rewrite",
+            "openrewrite/rewrite",
+            "rewrite")
         );
     }
 
     @SuppressWarnings("deprecation")
     @ParameterizedTest
     @MethodSource("remotes")
-    void getOrganizationName(String remote) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getOrganizationName())
-          .isEqualTo("openrewrite");
+    void getRepositoryPath(String origin, String expectedOrg, String expectedRepo) {
+        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of());
+        assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
+        assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
+        String expectedPath = expectedOrg + '/' + expectedRepo;
+        assertThat(GitProvenance.getRepositoryPath(origin)).isEqualTo(expectedPath);
     }
 
     @ParameterizedTest
     @CsvSource({
       "git@gitlab.acme.com:organization/subgroup/repository.git, https://gitlab.acme.com, organization/subgroup",
-      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, organization/subgroup"
+      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, organization/subgroup",
+      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, organization/subgroup",
+      "https://dev.azure.com/organization/project/_git/repository, https://dev.azure.com, organization/project",
+      "https://organization@dev.azure.com/organization/project/_git/repository, https://dev.azure.com, organization/project",
+      "git@ssh.dev.azure.com:v3/organization/project/repository, git@ssh.dev.azure.com, organization/project"
+
     })
     void getOrganizationNameWithBaseUrl(String gitOrigin, String baseUrl, String organizationName) {
         Scm.registerScm(new GitLabScm(baseUrl));
