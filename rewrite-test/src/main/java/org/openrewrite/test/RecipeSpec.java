@@ -102,8 +102,6 @@ public class RecipeSpec {
     @Nullable
     RecipePrinter recipePrinter;
 
-    Properties resourceLoaderProperties = new Properties();
-
     /**
      * Configuration that applies to all source file inputs.
      */
@@ -123,37 +121,33 @@ public class RecipeSpec {
     }
 
     public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {
-        return recipe(recipeFromInputStream(yaml, this.resourceLoaderProperties, activeRecipes));
+        return recipe(recipeFromInputStream(yaml, activeRecipes));
     }
 
     public RecipeSpec recipeFromYaml(@Language("yaml") String yaml, String... activeRecipes) {
-        return recipe(RECIPE_CACHE.computeIfAbsent(
-                key("recipeFromYaml", yaml, key(activeRecipes), this.resourceLoaderProperties.toString()),
+        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromYaml", yaml, key(activeRecipes)),
                 k -> recipeFromInputStream(
-                        new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)),
-                        this.resourceLoaderProperties, activeRecipes)));
+                        new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)), activeRecipes)));
     }
 
     public RecipeSpec recipeFromResource(String yamlResource, String... activeRecipes) {
-        return recipe(RECIPE_CACHE.computeIfAbsent(
-                key("recipeFromResource", yamlResource, key(activeRecipes), this.resourceLoaderProperties.toString()),
+        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromResource", yamlResource, key(activeRecipes)),
                 k -> recipeFromInputStream(
-                        Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)),
-                        this.resourceLoaderProperties, activeRecipes)));
+                        Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), activeRecipes)));
     }
 
     public RecipeSpec recipeFromResources(String... activeRecipes) {
-        return recipe(RECIPE_CACHE.computeIfAbsent(
-                key("recipeFromResources", key(activeRecipes), this.resourceLoaderProperties.toString()),
-                k -> Environment.builder(this.resourceLoaderProperties)
+        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromResources", key(activeRecipes)),
+                k -> Environment.builder()
                         .scanYamlResources()
                         .build()
                         .activateRecipes(activeRecipes)));
     }
 
-    private static Recipe recipeFromInputStream(InputStream yaml, Properties properties, String... activeRecipes) {
+    private static Recipe recipeFromInputStream(InputStream yaml, String... activeRecipes) {
         return Environment.builder()
-                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), properties))
+                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, Collections.emptyList(),
+                        mapper -> mapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)))
                 .build()
                 .activateRecipes(activeRecipes);
     }
@@ -257,11 +251,6 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public RecipeSpec validateRecipeSerialization(boolean validate) {
         this.serializationValidation = validate;
-        return this;
-    }
-
-    public RecipeSpec failOnUnknownProperties(boolean failOnUnknownProperties) {
-        this.resourceLoaderProperties.put(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, failOnUnknownProperties);
         return this;
     }
 
