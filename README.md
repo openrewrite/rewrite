@@ -25,8 +25,8 @@ Start with our [quickstart guide](https://docs.openrewrite.org/running-recipes/g
 Get and stay informed:
 * Read the [documentation](http://docs.openrewrite.org).
 * Join us on [Slack](https://join.slack.com/t/rewriteoss/shared_invite/zt-nj42n3ea-b~62rIHzb3Vo0E1APKCXEA) or [Discord](https://discord.gg/xk3ZKrhWAb)! We're happy to answer your questions directly.
-* Check out [Community Office Hours](https://www.youtube.com/@moderne-auto-remediation/streams) where we deep dive topics and answer questions.
-* Subscribe to our [YouTube](https://www.youtube.com/@moderne-auto-remediation) channel for great videos on OpenRewrite recipes.
+* Check out [Community Office Hours](https://www.youtube.com/@moderne-and-openrewrite/streams) where we deep dive topics and answer questions.
+* Subscribe to our [YouTube](https://www.youtube.com/@moderne-and-openrewrite) channel for great videos on OpenRewrite recipes.
 * Follow us on [Twitter](https://twitter.com/openrewrite) and [LinkedIn](https://www.linkedin.com/company/moderneinc).
 
 OpenRewrite is Apache2 licensed and maintained by Moderne. OpenRewrite's refactoring engine and recipes will always be open source.
