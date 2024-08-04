@@ -30,7 +30,7 @@ public class SimpleCloneUrl implements CloneUrl {
         this.origin = origin;
         this.path = path;
         if (!this.path.contains("/")) {
-            throw new IllegalArgumentException("Path must contain organizat a repository name");
+            throw new IllegalArgumentException("Path must contain an organization and a repository name");
         }
         organization = path.substring(0, path.lastIndexOf("/"));
         repositoryName = path.substring(path.lastIndexOf("/") + 1);

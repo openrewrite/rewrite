@@ -81,7 +81,7 @@ public class GitProvenance implements Marker {
     @NonFinal
     transient CloneUrl cloneUrl = null;
 
-    public @Nullable CloneUrl getCloneUrl() {
+    private @Nullable CloneUrl getCloneUrl() {
         if (cloneUrl == null) {
             cloneUrl = parseCloneUrl(origin);
         }
@@ -129,13 +129,13 @@ public class GitProvenance implements Marker {
      */
     @Deprecated
     public @Nullable String getOrganizationName() {
-        return Optional.ofNullable(cloneUrl)
+        return Optional.ofNullable(getCloneUrl())
                 .map(CloneUrl::getOrganization)
                 .orElse(null);
     }
 
     public @Nullable String getRepositoryName() {
-        return Optional.ofNullable(cloneUrl)
+        return Optional.ofNullable(getCloneUrl())
                 .map(CloneUrl::getRepositoryName)
                 .orElse(null);
     }
