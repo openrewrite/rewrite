@@ -28,17 +28,17 @@ import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.jgit.lib.*;
 import org.openrewrite.jgit.revwalk.RevCommit;
 import org.openrewrite.jgit.transport.RemoteConfig;
+import org.openrewrite.jgit.transport.URIish;
 import org.openrewrite.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.IncompleteGitConfigException;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
-import org.openrewrite.scm.CloneUrl;
-import org.openrewrite.scm.Scm;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.*;
@@ -79,13 +79,17 @@ public class GitProvenance implements Marker {
     @Incubating(since = "8.33.0")
     @Nullable
     @NonFinal
-    transient CloneUrl cloneUrl = null;
+    transient GitRemote gitRemote = null;
 
-    private @Nullable CloneUrl getCloneUrl() {
-        if (cloneUrl == null) {
-            cloneUrl = parseCloneUrl(origin);
+    private @Nullable GitRemote determineGitRemote(GitRemote.Parser parser) {
+        return parser.parse(origin);
+    }
+
+    private @Nullable GitRemote getGitRemote() {
+        if (gitRemote == null) {
+            gitRemote = determineGitRemote(new GitRemote.Parser());
         }
-        return cloneUrl;
+        return gitRemote;
     }
 
     /**
@@ -94,13 +98,13 @@ public class GitProvenance implements Marker {
      *
      * @param baseUrl the portion of the URL which precedes the organization
      * @return the portion of the git origin URL which corresponds to the organization the git repository is organized under
-     * @deprecated use {@link #getCloneUrl().getOrganization()} instead }
+     * @deprecated use {@link #getOrganizationName()} instead }
      */
     @Deprecated
     public @Nullable String getOrganizationName(String baseUrl) {
-        CloneUrl cloneUrl = getCloneUrl();
-        if (cloneUrl != null) {
-            return cloneUrl.getOrganization();
+        GitRemote gitRemote = getGitRemote();
+        if (gitRemote != null) {
+            return gitRemote.getOrganization();
         }
         if (origin == null) {
             return null;
@@ -122,28 +126,21 @@ public class GitProvenance implements Marker {
         return remainder.substring(0, remainder.lastIndexOf('/'));
     }
 
-    /**
-     * There is too much variability in how different git hosting services arrange their organizations to reliably
-     * determine the organization component of the URL without additional information. The version of this method
-     * which accepts a "baseUrl" parameter should be used instead
-     */
-    @Deprecated
     public @Nullable String getOrganizationName() {
-        return Optional.ofNullable(getCloneUrl())
-                .map(CloneUrl::getOrganization)
+        return Optional.ofNullable(getGitRemote())
+                .map(GitRemote::getOrganization)
                 .orElse(null);
     }
 
     public @Nullable String getRepositoryName() {
-        return Optional.ofNullable(getCloneUrl())
-                .map(CloneUrl::getRepositoryName)
+        return Optional.ofNullable(getGitRemote())
+                .map(GitRemote::getRepositoryName)
                 .orElse(null);
     }
 
     public static String getRepositoryPath(String origin) {
-        return Optional.of(origin)
-                .map(GitProvenance::parseCloneUrl)
-                .map(CloneUrl::getPath)
+        return Optional.ofNullable(new GitRemote.Parser().parse(origin))
+                .map(GitRemote::getPath)
                 .orElse("");
     }
 
@@ -373,15 +370,6 @@ public class GitProvenance implements Marker {
         return url;
     }
 
-    @Nullable
-    public static CloneUrl parseCloneUrl(@Nullable String cloneUrl) {
-        if (cloneUrl == null) {
-            return null;
-        }
-        Scm scm = Scm.findMatchingScm(cloneUrl);
-        return scm.parseCloneUrl(cloneUrl);
-    }
-
     public enum AutoCRLF {
         False,
         True,
@@ -402,4 +390,135 @@ public class GitProvenance implements Marker {
         NavigableMap<LocalDate, Integer> commitsByDay;
     }
 
+    @Value
+    public static class GitRemote {
+        Service service;
+        String url;
+        String origin;
+        String path;
+
+        @Nullable
+        String organization;
+
+        String repositoryName;
+
+        public enum Service {
+            GitHub,
+            GitLab,
+            Bitbucket,
+            BitbucketCloud,
+            AzureDevOps,
+            Unknown
+        }
+
+        public static class Parser {
+            private final Map<String, GitRemote.Service> origins;
+
+            public Parser() {
+                origins = new LinkedHashMap<>();
+                origins.put("github.com", Service.GitHub);
+                origins.put("gitlab.com", Service.GitLab);
+                origins.put("bitbucket.org", Service.BitbucketCloud);
+                origins.put("dev.azure.com", Service.AzureDevOps);
+                origins.put("ssh.dev.azure.com", Service.AzureDevOps);
+            }
+
+            public Parser registerRemote(Service service, String origin) {
+                if (origin.startsWith("https://") || origin.startsWith("http://") || origin.startsWith("ssh://")) {
+                    origin = new HostAndPath(origin).concat();
+                }
+                origins.put(origin, service);
+                return this;
+            }
+
+            public @Nullable GitRemote parse(@Nullable String url) {
+                if (url == null) {
+                    return null;
+                }
+                HostAndPath hostAndPath = new HostAndPath(url);
+
+                String origin = hostAndPath.host;
+                Service service = origins.get(origin);
+                if (service == null) {
+                    for (String maybeOrigin : origins.keySet()) {
+                        if (hostAndPath.concat().startsWith(maybeOrigin)) {
+                            service = origins.get(maybeOrigin);
+                            origin = maybeOrigin;
+                            break;
+                        }
+                    }
+                }
+
+                if (service == null) {
+                    // If we cannot find a service, we assume the last 2 path segments are the organization and repository name
+                    service = Service.Unknown;
+                    String hostPath = hostAndPath.concat();
+                    origin = hostPath.substring(0, hostPath.lastIndexOf("/"))
+                            .substring(0, hostPath.lastIndexOf("/"));
+                }
+
+                String repositoryPath = hostAndPath.remainder(origin)
+                        .replaceFirst("/$", "")
+                        .replaceFirst(".git$", "")
+                        .replaceFirst("^/", "");
+
+
+                switch (service) {
+                    case AzureDevOps:
+                        if (origin.equals("ssh.dev.azure.com")) {
+                            origin = "dev.azure.com";
+                            repositoryPath = repositoryPath.replaceFirst("v3/", "");
+                        } else {
+                            repositoryPath = repositoryPath.replaceFirst("/_git/", "/");
+                        }
+
+                    case Bitbucket:
+                        if (url.startsWith("http")) {
+                            repositoryPath = repositoryPath.replaceFirst("scm/", "");
+                        }
+                        break;
+                }
+                String organization = null;
+                String repositoryName;
+                if (repositoryPath.contains("/")) {
+                    organization = repositoryPath.substring(0, repositoryPath.lastIndexOf("/"));
+                    repositoryName = repositoryPath.substring(repositoryPath.lastIndexOf("/") + 1);
+                } else {
+                    repositoryName = repositoryPath;
+                }
+                return new GitRemote(service, url, origin, repositoryPath, organization, repositoryName);
+            }
+
+            private static class HostAndPath {
+                String host;
+                String path;
+
+                public HostAndPath(String url) {
+                    try {
+                        URIish uri = new URIish(url);
+                        host = uri.getHost();
+                        path = uri.getPath().replaceFirst("/$", "");
+                    } catch (URISyntaxException e) {
+                        throw new IllegalStateException("Unable to parse origin", e);
+                    }
+                }
+
+                private String concat() {
+                    String hostAndPath = host;
+                    if (!path.isEmpty()) {
+                        hostAndPath = hostAndPath + "/" + path;
+                    }
+                    return hostAndPath;
+                }
+
+                private String remainder(String prefix) {
+                    String hostAndPath = concat();
+                    if (!hostAndPath.startsWith(prefix)) {
+                        throw new IllegalArgumentException("Unable to find prefix '" + prefix + "' in '" + hostAndPath + "'");
+                    }
+                    return hostAndPath.substring(prefix.length());
+                }
+            }
+        }
+    }
 }
