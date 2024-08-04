@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.openrewrite.java.Assertions.java;
 
 /**
@@ -156,5 +157,12 @@ class JavaParserTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my","example","PublicClass.java")))
           )
         );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1895")
+    void moduleInfo(){
+        // Ignored until properly handled: https://github.com/openrewrite/rewrite/issues/4054#issuecomment-2267605739
+        assertFalse(JavaParser.fromJavaVersion().build().accept(Path.of("src/main/java/foo/module-info.java")));
     }
 }
