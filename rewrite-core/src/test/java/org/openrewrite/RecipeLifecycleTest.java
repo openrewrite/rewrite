@@ -41,8 +41,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.Recipe.noop;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -276,47 +275,48 @@ class RecipeLifecycleTest implements RewriteTest {
     @Test
     void canCallImperativeRecipeWithoutArgsFromDeclarative() {
         rewriteRun(spec -> spec.recipeFromYaml("""
-            ---
-            type: specs.openrewrite.org/v1beta/recipe
-            name: test.recipe
-            displayName: Test Recipe
-            description: Test Recipe.
-            recipeList:
-              - org.openrewrite.NoArgRecipe
-            """,
-          "test.recipe"
-          ),
-          text("Hi", "NoArgRecipeHi"));
-    }
-
-    @Test
-    void canCallImperativeRecipeWithUnnecessaryArgsFromDeclarative() {
-        rewriteRun(spec -> spec.recipeFromYaml("""
-            ---
-            type: specs.openrewrite.org/v1beta/recipe
-            name: test.recipe
-            displayName: Test Recipe
-            description: Test Recipe.
-            recipeList:
-              - org.openrewrite.NoArgRecipe:
-                  foo: bar
-            """,
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe
+              displayName: Test Recipe
+              description: Test Recipe.
+              recipeList:
+                - org.openrewrite.NoArgRecipe
+              """,
             "test.recipe"
           ),
           text("Hi", "NoArgRecipeHi"));
     }
 
     @Test
+    void canNotCallImperativeRecipeWithUnnecessaryArgsFromDeclarativeInTests() {
+        assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
+          rewriteRun(spec -> spec.recipeFromYaml("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe
+                displayName: Test Recipe
+                description: Test Recipe.
+                recipeList:
+                  - org.openrewrite.NoArgRecipe:
+                      foo: bar
+                """,
+              "test.recipe"
+            ),
+            text("Hi", "NoArgRecipeHi")));
+    }
+
+    @Test
     void canCallRecipeWithNoExplicitConstructor() {
         rewriteRun(spec -> spec.recipeFromYaml("""
-            ---
-            type: specs.openrewrite.org/v1beta/recipe
-            name: test.recipe
-            displayName: Test Recipe
-            description: Test Recipe.
-            recipeList:
-              - org.openrewrite.DefaultConstructorRecipe
-            """,
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe
+              displayName: Test Recipe
+              description: Test Recipe.
+              recipeList:
+                - org.openrewrite.DefaultConstructorRecipe
+              """,
             "test.recipe"
           ),
           text("Hi", "DefaultConstructorRecipeHi"));
@@ -325,28 +325,28 @@ class RecipeLifecycleTest implements RewriteTest {
     @Test
     void declarativeRecipeChain() {
         rewriteRun(spec -> spec.recipeFromYaml("""
-            ---
-            type: specs.openrewrite.org/v1beta/recipe
-            name: test.recipe.a
-            displayName: Test Recipe
-            description: Test Recipe.
-            recipeList:
-              - test.recipe.b
-            ---
-            type: specs.openrewrite.org/v1beta/recipe
-            name: test.recipe.b
-            displayName: Test Recipe
-            description: Test Recipe.
-            recipeList:
-              - test.recipe.c
-            ---
-            type: specs.openrewrite.org/v1beta/recipe
-            name: test.recipe.c
-            displayName: Test Recipe
-            description: Test Recipe.
-            recipeList:
-              - org.openrewrite.NoArgRecipe
-            """,
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe.a
+              displayName: Test Recipe
+              description: Test Recipe.
+              recipeList:
+                - test.recipe.b
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe.b
+              displayName: Test Recipe
+              description: Test Recipe.
+              recipeList:
+                - test.recipe.c
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe.c
+              displayName: Test Recipe
+              description: Test Recipe.
+              recipeList:
+                - org.openrewrite.NoArgRecipe
+              """,
             "test.recipe.a"
           ),
           text("Hi", "NoArgRecipeHi"));
@@ -356,34 +356,34 @@ class RecipeLifecycleTest implements RewriteTest {
     void declarativeRecipeChainAcrossFiles() {
         rewriteRun(spec -> spec.recipe(Environment.builder()
             .load(new YamlResourceLoader(new ByteArrayInputStream("""
-                ---
-                type: specs.openrewrite.org/v1beta/recipe
-                name: test.recipe.c
-                displayName: Test Recipe
-                description: Test Recipe.
-                recipeList:
-                  - org.openrewrite.NoArgRecipe
-                """.getBytes()),
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe.c
+              displayName: Test Recipe
+              description: Test Recipe.
+              recipeList:
+                - org.openrewrite.NoArgRecipe
+              """.getBytes()),
               URI.create("rewrite.yml"), new Properties()))
             .load(new YamlResourceLoader(new ByteArrayInputStream("""
-                ---
-                type: specs.openrewrite.org/v1beta/recipe
-                name: test.recipe.b
-                displayName: Test Recipe
-                description: Test Recipe.
-                recipeList:
-                  - test.recipe.c
-                """.getBytes()),
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe.b
+              displayName: Test Recipe
+              description: Test Recipe.
+              recipeList:
+                - test.recipe.c
+              """.getBytes()),
               URI.create("rewrite.yml"), new Properties()))
             .load(new YamlResourceLoader(new ByteArrayInputStream("""
-                ---
-                type: specs.openrewrite.org/v1beta/recipe
-                name: test.recipe.a
-                displayName: Test Recipe
-                description: Test Recipe.
-                recipeList:
-                  - test.recipe.b
-                """.getBytes()),
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe.a
+              displayName: Test Recipe
+              description: Test Recipe.
+              recipeList:
+                - test.recipe.b
+              """.getBytes()),
               URI.create("rewrite.yml"), new Properties()))
             .build()
             .activateRecipes("test.recipe.a")),
