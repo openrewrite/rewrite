@@ -16,6 +16,7 @@
 package org.openrewrite.marker;
 
 
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Incubating;
@@ -46,6 +47,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @With
+@AllArgsConstructor
 public class GitProvenance implements Marker {
     UUID id;
 
