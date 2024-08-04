@@ -273,7 +273,7 @@ public interface JavaParser extends Parser {
 
     @Override
     default boolean accept(Path path) {
-        return path.toString().endsWith(".java");
+        return path.toString().endsWith(".java") && !path.endsWith("module-info.java");
     }
 
     /**
