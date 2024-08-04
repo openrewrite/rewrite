@@ -16,17 +16,16 @@
 package org.openrewrite.marker;
 
 
-import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.Lazy;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.jgit.lib.*;
 import org.openrewrite.jgit.revwalk.RevCommit;
 import org.openrewrite.jgit.transport.RemoteConfig;
-import org.openrewrite.jgit.transport.URIish;
 import org.openrewrite.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.IncompleteGitConfigException;
@@ -38,7 +37,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.*;
@@ -48,7 +46,6 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @With
-@AllArgsConstructor
 public class GitProvenance implements Marker {
     UUID id;
 
@@ -76,8 +73,7 @@ public class GitProvenance implements Marker {
     List<Committer> committers;
 
     @Incubating(since = "8.33.0")
-    @Nullable
-    transient CloneUrl cloneUrl;
+    transient Lazy<CloneUrl> cloneUrl;
 
     public GitProvenance(UUID id,
                          @Nullable String origin,
@@ -93,7 +89,11 @@ public class GitProvenance implements Marker {
         this.autocrlf = autocrlf;
         this.eol = eol;
         this.committers = committers;
-        cloneUrl = parseCloneUrl(origin);
+        this.cloneUrl = new Lazy<>(() -> parseCloneUrl(origin));
+    }
+
+    public @Nullable CloneUrl getCloneUrl() {
+        return cloneUrl.get();
     }
 
     /**
@@ -106,6 +106,7 @@ public class GitProvenance implements Marker {
      */
     @Deprecated
     public @Nullable String getOrganizationName(String baseUrl) {
+        CloneUrl cloneUrl = getCloneUrl();
         if (cloneUrl != null) {
             return cloneUrl.getOrganization();
         }
@@ -136,15 +137,24 @@ public class GitProvenance implements Marker {
      */
     @Deprecated
     public @Nullable String getOrganizationName() {
-        return Optional.ofNullable(cloneUrl).map(CloneUrl::getOrganization).orElse(null);
+        return Optional.of(cloneUrl)
+                .map(Lazy::get)
+                .map(CloneUrl::getOrganization)
+                .orElse(null);
     }
 
     public @Nullable String getRepositoryName() {
-        return Optional.ofNullable(cloneUrl).map(CloneUrl::getRepositoryName).orElse(null);
+        return Optional.of(cloneUrl)
+                .map(Lazy::get)
+                .map(CloneUrl::getRepositoryName)
+                .orElse(null);
     }
 
     public static String getRepositoryPath(String origin) {
-        return Optional.of(origin).map(GitProvenance::parseCloneUrl).map(CloneUrl::getPath).orElse("");
+        return Optional.of(origin)
+                .map(GitProvenance::parseCloneUrl)
+                .map(CloneUrl::getPath)
+                .orElse("");
     }
 
     /**
@@ -227,7 +237,7 @@ public class GitProvenance implements Marker {
         String remoteOriginUrl = getRemoteOriginUrl(repository);
         return new GitProvenance(randomId(), remoteOriginUrl, branch, changeset,
                 getAutocrlf(repository), getEOF(repository),
-                getCommitters(repository), parseCloneUrl(remoteOriginUrl));
+                getCommitters(repository));
     }
 
     static @Nullable String resolveBranchFromGitConfig(Repository repository) {
