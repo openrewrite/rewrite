@@ -17,10 +17,11 @@ package org.openrewrite.marker;
 
 
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.NonFinal;
 import org.openrewrite.Incubating;
-import org.openrewrite.internal.Lazy;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.api.errors.GitAPIException;
@@ -47,6 +48,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @With
+@RequiredArgsConstructor
 @AllArgsConstructor
 public class GitProvenance implements Marker {
     UUID id;
@@ -75,27 +77,15 @@ public class GitProvenance implements Marker {
     List<Committer> committers;
 
     @Incubating(since = "8.33.0")
-    transient Lazy<CloneUrl> cloneUrl;
-
-    public GitProvenance(UUID id,
-                         @Nullable String origin,
-                         @Nullable String branch,
-                         @Nullable String change,
-                         @Nullable AutoCRLF autocrlf,
-                         @Nullable EOL eol,
-                         @Nullable List<Committer> committers) {
-        this.id = id;
-        this.origin = origin;
-        this.branch = branch;
-        this.change = change;
-        this.autocrlf = autocrlf;
-        this.eol = eol;
-        this.committers = committers;
-        this.cloneUrl = new Lazy<>(() -> parseCloneUrl(origin));
-    }
+    @Nullable
+    @NonFinal
+    transient CloneUrl cloneUrl = null;
 
     public @Nullable CloneUrl getCloneUrl() {
-        return cloneUrl.get();
+        if (cloneUrl == null) {
+            cloneUrl = parseCloneUrl(origin);
+        }
+        return cloneUrl;
     }
 
     /**
@@ -139,15 +129,13 @@ public class GitProvenance implements Marker {
      */
     @Deprecated
     public @Nullable String getOrganizationName() {
-        return Optional.of(cloneUrl)
-                .map(Lazy::get)
+        return Optional.ofNullable(cloneUrl)
                 .map(CloneUrl::getOrganization)
                 .orElse(null);
     }
 
     public @Nullable String getRepositoryName() {
-        return Optional.of(cloneUrl)
-                .map(Lazy::get)
+        return Optional.ofNullable(cloneUrl)
                 .map(CloneUrl::getRepositoryName)
                 .orElse(null);
     }
