@@ -16,10 +16,7 @@
 package org.openrewrite.marker;
 
 
-import lombok.AllArgsConstructor;
-import lombok.RequiredArgsConstructor;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.openrewrite.GitRemote;
 import org.openrewrite.Incubating;
@@ -46,7 +43,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@AllArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PACKAGE) // required for @With and tests
 @RequiredArgsConstructor
 @With
 public class GitProvenance implements Marker {
@@ -93,9 +90,7 @@ public class GitProvenance implements Marker {
      *
      * @param baseUrl the portion of the URL which precedes the organization
      * @return the portion of the git origin URL which corresponds to the organization the git repository is organized under
-     * @deprecated use {@link #getOrganizationName()} instead }
      */
-    @Deprecated
     public @Nullable String getOrganizationName(String baseUrl) {
         if (origin == null) {
             return null;
@@ -139,14 +134,6 @@ public class GitProvenance implements Marker {
             return null;
         }
         return getGitRemote().getOrigin();
-    }
-
-    public static String getRepositoryPath(String origin) {
-        return getRepositoryPath(origin, new GitRemote.Parser());
-    }
-
-    public static String getRepositoryPath(String origin, GitRemote.Parser parser) {
-        return parser.parse(origin).getPath();
     }
 
     /**

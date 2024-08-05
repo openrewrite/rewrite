@@ -112,7 +112,7 @@ public class GitRemote {
                     } else {
                         repositoryPath = repositoryPath.replaceFirst("/_git/", "/");
                     }
-
+                    break;
                 case Bitbucket:
                     if (url.startsWith("http")) {
                         repositoryPath = repositoryPath.replaceFirst("scm/", "");

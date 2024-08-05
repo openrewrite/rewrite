@@ -16,7 +16,6 @@
 package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -75,18 +74,8 @@ class GitProvenanceTest {
 
     @ParameterizedTest
     @MethodSource("remotes")
-    void getRepositoryPathWithBaseUrl(String origin, String expectedOrg, String expectedRepo) {
-        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of(), null);
-        assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
-        assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
-        String expectedPath = expectedOrg + '/' + expectedRepo;
-        assertThat(GitProvenance.getRepositoryPath(origin)).isEqualTo(expectedPath);
-    }
-
-    @ParameterizedTest
-    @MethodSource("remotes")
     void getRepositoryPath(String origin, String expectedOrg, String expectedRepo) {
-        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of(), null);
+        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of());
         assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
         assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
         String expectedPath = expectedOrg + '/' + expectedRepo;
@@ -96,7 +85,7 @@ class GitProvenanceTest {
     @ParameterizedTest
     @MethodSource("remotes")
     void getRepositoryOrigin(String origin, String expectedOrg, String expectedRepo) {
-        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of(), null);
+        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of());
         assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
         assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
         assertThat(gitProvenance.getOrigin()).isEqualTo(origin);
