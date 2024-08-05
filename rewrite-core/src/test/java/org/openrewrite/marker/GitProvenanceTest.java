@@ -72,7 +72,6 @@ class GitProvenanceTest {
         );
     }
 
-    @SuppressWarnings("deprecation")
     @ParameterizedTest
     @MethodSource("remotes")
     void getRepositoryPath(String origin, String expectedOrg, String expectedRepo) {
@@ -214,6 +213,7 @@ class GitProvenanceTest {
         );
     }
 
+    @SuppressWarnings("deprecation")
     @ParameterizedTest
     @MethodSource("baseUrls")
     void multiplePathSegments(String baseUrl) {

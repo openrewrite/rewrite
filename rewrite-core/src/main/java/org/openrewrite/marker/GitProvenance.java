@@ -156,9 +156,7 @@ public class GitProvenance implements Marker {
      * @param environment In detached head scenarios, the branch is best
      *                    determined from a {@link BuildEnvironment} marker if possible.
      * @return A marker containing git provenance information.
-     * @deprecated Use {@link #fromProjectDirectory(Path, BuildEnvironment, GitRemote.Parser) instead}.
      */
-    @Deprecated
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment environment) {
         return fromProjectDirectory(projectDir, environment, new GitRemote.Parser());
     }
