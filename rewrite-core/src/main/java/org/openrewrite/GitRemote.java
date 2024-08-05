@@ -18,7 +18,6 @@ package org.openrewrite;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.transport.URIish;
-import org.openrewrite.marker.GitProvenance;
 
 import java.net.URISyntaxException;
 import java.util.Arrays;
@@ -147,7 +146,7 @@ public class GitRemote {
                             .replaceFirst(".git$", "")
                             .replaceFirst("^/", "");
                 } catch (URISyntaxException e) {
-                    throw new IllegalStateException("Unable to parse origin", e);
+                    throw new IllegalStateException("Unable to parse origin from: " + url, e);
                 }
             }
 
