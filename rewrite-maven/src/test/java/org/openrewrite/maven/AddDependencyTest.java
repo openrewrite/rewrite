@@ -1277,7 +1277,6 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null, null);
     }
