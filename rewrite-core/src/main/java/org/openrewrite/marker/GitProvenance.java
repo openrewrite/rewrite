@@ -106,8 +106,10 @@ public class GitProvenance implements Marker {
         if (schemeEndIndex != -1) {
             baseUrl = baseUrl.substring(schemeEndIndex + 3);
         }
+        if (baseUrl.startsWith("git@")) {
+            baseUrl = baseUrl.substring(4);
+        }
         String remainder = origin.substring(origin.indexOf(baseUrl) + baseUrl.length())
-                .replaceFirst("^git@", "")
                 .replaceFirst("^:", "")
                 .replaceFirst("^/", "");
         return remainder.substring(0, remainder.lastIndexOf('/'));
