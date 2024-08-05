@@ -158,7 +158,7 @@ public class GitProvenance implements Marker {
      * @return A marker containing git provenance information.
      */
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment environment) {
-        return fromProjectDirectory(projectDir, environment, new GitRemote.Parser());
+        return fromProjectDirectory(projectDir, environment, null);
     }
 
     /**
