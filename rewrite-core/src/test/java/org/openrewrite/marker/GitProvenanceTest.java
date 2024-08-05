@@ -74,12 +74,22 @@ class GitProvenanceTest {
 
     @ParameterizedTest
     @MethodSource("remotes")
-    void getRepositoryPath(String origin, String expectedOrg, String expectedRepo) {
+    void getRepositoryPathWithBaseUrl(String origin, String expectedOrg, String expectedRepo) {
         GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of(), null);
         assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
         assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
         String expectedPath = expectedOrg + '/' + expectedRepo;
         assertThat(GitProvenance.getRepositoryPath(origin)).isEqualTo(expectedPath);
+    }
+
+    @ParameterizedTest
+    @MethodSource("remotes")
+    void getRepositoryPath(String origin, String expectedOrg, String expectedRepo) {
+        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of(), null);
+        assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
+        assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
+        String expectedPath = expectedOrg + '/' + expectedRepo;
+        assertThat(gitProvenance.getRepositoryPath()).isEqualTo(expectedPath);
     }
 
     @ParameterizedTest

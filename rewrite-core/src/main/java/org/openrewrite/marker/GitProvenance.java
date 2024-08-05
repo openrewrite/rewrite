@@ -129,6 +129,13 @@ public class GitProvenance implements Marker {
         return getGitRemote().getRepositoryName();
     }
 
+    public @Nullable String getRepositoryPath() {
+        if (getGitRemote() == null) {
+            return null;
+        }
+        return getGitRemote().getPath();
+    }
+
     public static String getRepositoryPath(String origin) {
         return getRepositoryPath(origin, new GitRemote.Parser());
     }
