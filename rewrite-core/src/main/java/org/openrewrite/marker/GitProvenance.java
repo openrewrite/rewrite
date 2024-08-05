@@ -83,7 +83,7 @@ public class GitProvenance implements Marker {
     GitRemote gitRemote;
 
     public @Nullable GitRemote getGitRemote() {
-        if (gitRemote == null) {
+        if (gitRemote == null && origin != null) {
             gitRemote = new GitRemote.Parser().parse(origin);
         }
         return gitRemote;
@@ -148,11 +148,7 @@ public class GitProvenance implements Marker {
     }
 
     public static String getRepositoryPath(String origin, GitRemote.Parser parser) {
-        GitRemote remote = parser.parse(origin);
-        if (remote == null) {
-            return "";
-        }
-        return remote.getPath();
+        return parser.parse(origin).getPath();
     }
 
     /**
@@ -250,7 +246,12 @@ public class GitProvenance implements Marker {
             branch = resolveBranchFromGitConfig(repository);
         }
         String remoteOriginUrl = getRemoteOriginUrl(repository);
-        GitRemote remote = gitRemoteParser.parse(remoteOriginUrl);
+        GitRemote remote;
+        if (remoteOriginUrl == null) {
+            remote = null;
+        } else {
+            remote = gitRemoteParser.parse(remoteOriginUrl);
+        }
         return new GitProvenance(randomId(), remoteOriginUrl, branch, changeset,
                 getAutocrlf(repository), getEOF(repository),
                 getCommitters(repository), remote);
@@ -468,10 +469,7 @@ public class GitProvenance implements Marker {
                 return this;
             }
 
-            public @Nullable GitRemote parse(@Nullable String url) {
-                if (url == null) {
-                    return null;
-                }
+            public GitRemote parse(String url) {
                 HostAndPath hostAndPath = new HostAndPath(url);
 
                 String origin = hostAndPath.host;
