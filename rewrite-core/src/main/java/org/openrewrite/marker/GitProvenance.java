@@ -56,7 +56,7 @@ public class GitProvenance implements Marker {
 
     /**
      * The URL of the origin remote, not to be confused with the SCM origin
-     * which can be found under scmUrlComponents.getOrigin() which contains the base url to the SCM server
+     * which can be found under gitRemote.getOrigin() which contains the base url of the remote SCM server
      */
     @Nullable
     String origin;
