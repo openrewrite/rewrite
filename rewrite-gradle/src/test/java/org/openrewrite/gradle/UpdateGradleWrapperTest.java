@@ -41,6 +41,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
@@ -67,7 +69,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UpdateGradleWrapper("7.4.2", null, null, null));
+        spec.recipe(new UpdateGradleWrapper("7.4.2", null, null, null))
+          .beforeRecipe(withToolingApi());
     }
 
     @Test
@@ -95,7 +98,14 @@ class UpdateGradleWrapperTest implements RewriteTest {
               assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
               assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
               assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
-          })
+          }),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              """
+          )
         );
     }
 
@@ -218,7 +228,10 @@ class UpdateGradleWrapperTest implements RewriteTest {
               zipStorePath=wrapper/dists
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          )
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
         );
     }
 
@@ -325,7 +338,10 @@ class UpdateGradleWrapperTest implements RewriteTest {
               distributionSha256Sum=1f3067073041bc44554d0efe5d402a33bc3d3c93cc39ab684f308586d732a80d
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          )
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
         );
     }
 
@@ -383,7 +399,10 @@ class UpdateGradleWrapperTest implements RewriteTest {
               distributionSha256Sum=1f3067073041bc44554d0efe5d402a33bc3d3c93cc39ab684f308586d732a80d
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          )
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
         );
     }
 

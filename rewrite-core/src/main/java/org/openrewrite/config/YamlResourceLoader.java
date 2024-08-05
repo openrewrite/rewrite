@@ -131,6 +131,7 @@ public class YamlResourceLoader implements ResourceLoader {
      * @param source      Declarative recipe source
      * @param properties  Placeholder properties
      * @param classLoader Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
+     * @param dependencyResourceLoaders Optional resource loaders for recipes from dependencies
      * @throws UncheckedIOException On unexpected IOException
      */
     public YamlResourceLoader(InputStream yamlInput,
@@ -138,6 +139,26 @@ public class YamlResourceLoader implements ResourceLoader {
                               Properties properties,
                               @Nullable ClassLoader classLoader,
                               Collection<? extends ResourceLoader> dependencyResourceLoaders) throws UncheckedIOException {
+        this(yamlInput, source, properties, classLoader, dependencyResourceLoaders, jsonMapper -> {
+        });
+    }
+
+    /**
+     * Load a declarative recipe, optionally using the specified classloader and optionally including resource loaders
+     * for recipes from dependencies.
+     *
+     * @param yamlInput                 Declarative recipe yaml input stream
+     * @param source                    Declarative recipe source
+     * @param properties                Placeholder properties
+     * @param classLoader               Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
+     * @param dependencyResourceLoaders Optional resource loaders for recipes from dependencies
+     * @param mapperCustomizer          Customizer for the ObjectMapper
+     * @throws UncheckedIOException On unexpected IOException
+     */
+    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties,
+                              @Nullable ClassLoader classLoader,
+                              Collection<? extends ResourceLoader> dependencyResourceLoaders,
+                              Consumer<ObjectMapper> mapperCustomizer) {
         this.source = source;
         this.dependencyResourceLoaders = dependencyResourceLoaders;
 
@@ -148,6 +169,8 @@ public class YamlResourceLoader implements ResourceLoader {
                 .build()
                 .registerModule(new ParameterNamesModule())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+        mapperCustomizer.accept(mapper);
         maybeAddKotlinModule(mapper);
 
         this.classLoader = classLoader;
@@ -482,7 +505,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     @Language("markdown")
                     String packageName = (String) c.get("packageName");
                     if (packageName.endsWith("." + CategoryTree.CORE) ||
-                            packageName.contains("." + CategoryTree.CORE + ".")) {
+                        packageName.contains("." + CategoryTree.CORE + ".")) {
                         throw new IllegalArgumentException("The package name 'core' is reserved.");
                     }
 
