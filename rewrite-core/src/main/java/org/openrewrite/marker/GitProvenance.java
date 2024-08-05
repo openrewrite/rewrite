@@ -120,15 +120,17 @@ public class GitProvenance implements Marker {
     }
 
     public @Nullable String getOrganizationName() {
-        return Optional.ofNullable(getGitRemote())
-                .map(GitRemote::getOrganization)
-                .orElse(null);
+        if (getGitRemote() == null) {
+            return null;
+        }
+        return getGitRemote().getOrganization();
     }
 
     public @Nullable String getRepositoryName() {
-        return Optional.ofNullable(getGitRemote())
-                .map(GitRemote::getRepositoryName)
-                .orElse(null);
+        if (getGitRemote() == null) {
+            return null;
+        }
+        return getGitRemote().getRepositoryName();
     }
 
     public static String getRepositoryPath(String origin) {
@@ -136,9 +138,11 @@ public class GitProvenance implements Marker {
     }
 
     public static String getRepositoryPath(String origin, GitRemote.Parser parser) {
-        return Optional.ofNullable(parser.parse(origin))
-                .map(GitRemote::getPath)
-                .orElse("");
+        GitRemote remote = parser.parse(origin);
+        if (remote == null) {
+            return "";
+        }
+        return remote.getPath();
     }
 
     /**
