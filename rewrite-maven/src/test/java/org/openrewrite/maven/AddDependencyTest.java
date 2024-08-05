@@ -421,14 +421,17 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependencyAcceptsTransitiveAlreadyInTestScope() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.10.3", null, true)),
+          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.10.3", "org.junit.jupiter..*", true)),
           mavenProject(
             "project",
-            srcMainJava(java("""
-                class MyClass {
-                    void clz() {}
-                }
+            srcMainJava(
+              java(
                 """
+                  class MyMain {
+                      @org.junit.jupiter.api.Test
+                      void test() {}
+                  }
+                  """
               )
             ),
             srcTestJava(
