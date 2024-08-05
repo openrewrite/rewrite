@@ -42,14 +42,15 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@With
-@RequiredArgsConstructor
 @AllArgsConstructor
+@RequiredArgsConstructor
+@With
 public class GitProvenance implements Marker {
     UUID id;
 
@@ -77,17 +78,13 @@ public class GitProvenance implements Marker {
     List<Committer> committers;
 
     @Incubating(since = "8.33.0")
-    @Nullable
     @NonFinal
-    transient GitRemote gitRemote = null;
+    @Nullable
+    GitRemote gitRemote;
 
-    private @Nullable GitRemote determineGitRemote(GitRemote.Parser parser) {
-        return parser.parse(origin);
-    }
-
-    private @Nullable GitRemote getGitRemote() {
+    public @Nullable GitRemote getGitRemote() {
         if (gitRemote == null) {
-            gitRemote = determineGitRemote(new GitRemote.Parser());
+            gitRemote = new GitRemote.Parser().parse(origin);
         }
         return gitRemote;
     }
@@ -139,7 +136,11 @@ public class GitProvenance implements Marker {
     }
 
     public static String getRepositoryPath(String origin) {
-        return Optional.ofNullable(new GitRemote.Parser().parse(origin))
+        return getRepositoryPath(origin, new GitRemote.Parser());
+    }
+
+    public static String getRepositoryPath(String origin, GitRemote.Parser parser) {
+        return Optional.ofNullable(parser.parse(origin))
                 .map(GitRemote::getPath)
                 .orElse("");
     }
@@ -147,7 +148,7 @@ public class GitProvenance implements Marker {
     /**
      * @param projectDir The project directory.
      * @return A marker containing git provenance information.
-     * @deprecated Use {@link #fromProjectDirectory(Path, BuildEnvironment) instead}.
+     * @deprecated Use {@link #fromProjectDirectory(Path, BuildEnvironment, GitRemote.Parser) instead}.
      */
     @Deprecated
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir) {
@@ -159,8 +160,27 @@ public class GitProvenance implements Marker {
      * @param environment In detached head scenarios, the branch is best
      *                    determined from a {@link BuildEnvironment} marker if possible.
      * @return A marker containing git provenance information.
+     * @deprecated Use {@link #fromProjectDirectory(Path, BuildEnvironment, GitRemote.Parser) instead}.
      */
+    @Deprecated
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment environment) {
+        return fromProjectDirectory(projectDir, environment, new GitRemote.Parser());
+    }
+
+    /**
+     * @param projectDir      The project directory.
+     * @param environment     In detached head scenarios, the branch is best
+     *                        determined from a {@link BuildEnvironment} marker if possible.
+     * @param gitRemoteParser Parses the remote url into a {@link GitRemote}. Custom remotes can be registered to it,
+     *                        or a default with known git hosting services can be used.
+     * @return A marker containing git provenance information.
+     */
+    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
+                                                               @Nullable BuildEnvironment environment,
+                                                               @Nullable GitRemote.Parser gitRemoteParser) {
+        if (gitRemoteParser == null) {
+            gitRemoteParser = new GitRemote.Parser();
+        }
         if (environment != null) {
             if (environment instanceof JenkinsBuildEnvironment) {
                 JenkinsBuildEnvironment jenkinsBuildEnvironment = (JenkinsBuildEnvironment) environment;
@@ -168,7 +188,7 @@ public class GitProvenance implements Marker {
                     String branch = jenkinsBuildEnvironment.getLocalBranch() != null
                             ? jenkinsBuildEnvironment.getLocalBranch()
                             : localBranchName(repository, jenkinsBuildEnvironment.getBranch());
-                    return fromGitConfig(repository, branch, getChangeset(repository));
+                    return fromGitConfig(repository, branch, getChangeset(repository), gitRemoteParser);
                 } catch (IllegalArgumentException | GitAPIException e) {
                     // Silently ignore if the project directory is not a git repository
                     printRequireGitDirOrWorkTreeException(e);
@@ -180,18 +200,18 @@ public class GitProvenance implements Marker {
                 File gitDir = new RepositoryBuilder().findGitDir(projectDir.toFile()).getGitDir();
                 if (gitDir != null && gitDir.exists()) {
                     //it has been cloned with --depth > 0
-                    return fromGitConfig(projectDir);
+                    return fromGitConfig(projectDir, gitRemoteParser);
                 } else {
                     //there is not .git config
                     try {
                         return environment.buildGitProvenance();
                     } catch (IncompleteGitConfigException e) {
-                        return fromGitConfig(projectDir);
+                        return fromGitConfig(projectDir, gitRemoteParser);
                     }
                 }
             }
         } else {
-            return fromGitConfig(projectDir);
+            return fromGitConfig(projectDir, gitRemoteParser);
         }
     }
 
@@ -201,14 +221,14 @@ public class GitProvenance implements Marker {
         }
     }
 
-    private static @Nullable GitProvenance fromGitConfig(Path projectDir) {
+    private static @Nullable GitProvenance fromGitConfig(Path projectDir, GitRemote.Parser gitRemoteParser) {
         String branch = null;
         try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
             String changeset = getChangeset(repository);
             if (!repository.getBranch().equals(changeset)) {
                 branch = repository.getBranch();
             }
-            return fromGitConfig(repository, branch, changeset);
+            return fromGitConfig(repository, branch, changeset, gitRemoteParser);
         } catch (IllegalArgumentException e) {
             printRequireGitDirOrWorkTreeException(e);
             return null;
@@ -217,14 +237,15 @@ public class GitProvenance implements Marker {
         }
     }
 
-    private static GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset) {
+    private static GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset, GitRemote.Parser gitRemoteParser) {
         if (branch == null) {
             branch = resolveBranchFromGitConfig(repository);
         }
         String remoteOriginUrl = getRemoteOriginUrl(repository);
+        GitRemote remote = gitRemoteParser.parse(remoteOriginUrl);
         return new GitProvenance(randomId(), remoteOriginUrl, branch, changeset,
                 getAutocrlf(repository), getEOF(repository),
-                getCommitters(repository));
+                getCommitters(repository), remote);
     }
 
     static @Nullable String resolveBranchFromGitConfig(Repository repository) {
@@ -427,6 +448,9 @@ public class GitProvenance implements Marker {
                 if (origin.startsWith("https://") || origin.startsWith("http://") || origin.startsWith("ssh://")) {
                     origin = new HostAndPath(origin).concat();
                 }
+                if (origin.contains("@")) {
+                    origin = new HostAndPath("https://" + origin).concat();
+                }
                 origins.put(origin, service);
                 return this;
             }
@@ -453,15 +477,15 @@ public class GitProvenance implements Marker {
                     // If we cannot find a service, we assume the last 2 path segments are the organization and repository name
                     service = Service.Unknown;
                     String hostPath = hostAndPath.concat();
-                    origin = hostPath.substring(0, hostPath.lastIndexOf("/"))
-                            .substring(0, hostPath.lastIndexOf("/"));
+                    String[] segments = hostPath.split("/");
+                    if (segments.length <= 2) {
+                        origin = null;
+                    } else {
+                        origin = Arrays.stream(segments, 0, segments.length - 2).collect(Collectors.joining("/"));
+                    }
                 }
 
-                String repositoryPath = hostAndPath.remainder(origin)
-                        .replaceFirst("/$", "")
-                        .replaceFirst(".git$", "")
-                        .replaceFirst("^/", "");
-
+                String repositoryPath = hostAndPath.repositoryPath(origin);
 
                 switch (service) {
                     case AzureDevOps:
@@ -490,33 +514,47 @@ public class GitProvenance implements Marker {
             }
 
             private static class HostAndPath {
+                String scheme;
                 String host;
                 String path;
 
                 public HostAndPath(String url) {
                     try {
                         URIish uri = new URIish(url);
+                        scheme = uri.getScheme();
                         host = uri.getHost();
-                        path = uri.getPath().replaceFirst("/$", "");
+                        if (host == null && !"file".equals(scheme)) {
+                            throw new IllegalStateException("No host in url: " + url);
+                        }
+                        path = uri.getPath().replaceFirst("/$", "")
+                                .replaceFirst(".git$", "")
+                                .replaceFirst("^/", "");
                     } catch (URISyntaxException e) {
                         throw new IllegalStateException("Unable to parse origin", e);
                     }
                 }
 
                 private String concat() {
-                    String hostAndPath = host;
+                    String hostAndPath = host == null ? "" : host;
                     if (!path.isEmpty()) {
-                        hostAndPath = hostAndPath + "/" + path;
+                        if (!hostAndPath.isEmpty()) {
+                            hostAndPath += "/";
+                        }
+                        hostAndPath += path;
                     }
                     return hostAndPath;
                 }
 
-                private String remainder(String prefix) {
-                    String hostAndPath = concat();
-                    if (!hostAndPath.startsWith(prefix)) {
-                        throw new IllegalArgumentException("Unable to find prefix '" + prefix + "' in '" + hostAndPath + "'");
+                private String repositoryPath(@Nullable String origin) {
+                    if (origin == null) {
+                        origin = "";
                     }
-                    return hostAndPath.substring(prefix.length());
+                    String hostAndPath = concat();
+                    if (!hostAndPath.startsWith(origin)) {
+                        throw new IllegalArgumentException("Unable to find origin '" + origin + "' in '" + hostAndPath + "'");
+                    }
+                    return hostAndPath.substring(origin.length())
+                            .replaceFirst("^/", "");
                 }
             }
         }

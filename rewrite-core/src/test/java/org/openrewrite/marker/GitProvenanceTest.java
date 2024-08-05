@@ -16,6 +16,7 @@
 package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -30,8 +31,6 @@ import org.openrewrite.jgit.transport.TagOpt;
 import org.openrewrite.jgit.transport.URIish;
 import org.openrewrite.jgit.util.FS;
 import org.openrewrite.marker.ci.*;
-import org.openrewrite.scm.GitLabScm;
-import org.openrewrite.scm.Scm;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -69,10 +68,7 @@ class GitProvenanceTest {
             "openrewrite/rewrite",
             "rewrite"),
           Arguments.of("git@ssh.dev.azure.com:v3/openrewrite/rewrite/rewrite", "openrewrite/rewrite", "rewrite"),
-          Arguments.of(
-            "ssh://git@ssh.dev.azure.com:v3/openrewrite/rewrite/rewrite",
-            "openrewrite/rewrite",
-            "rewrite")
+          Arguments.of("ssh://git@ssh.dev.azure.com/v3/openrewrite/rewrite/rewrite", "openrewrite/rewrite", "rewrite")
         );
     }
 
@@ -80,7 +76,7 @@ class GitProvenanceTest {
     @ParameterizedTest
     @MethodSource("remotes")
     void getRepositoryPath(String origin, String expectedOrg, String expectedRepo) {
-        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of());
+        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of(), null);
         assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
         assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
         String expectedPath = expectedOrg + '/' + expectedRepo;
@@ -89,24 +85,24 @@ class GitProvenanceTest {
 
     @ParameterizedTest
     @CsvSource({
-      "git@gitlab.acme.com:organization/subgroup/repository.git, https://gitlab.acme.com, organization/subgroup",
-      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, organization/subgroup",
-      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, organization/subgroup",
-      "https://dev.azure.com/organization/project/_git/repository, https://dev.azure.com, organization/project",
-      "https://organization@dev.azure.com/organization/project/_git/repository, https://dev.azure.com, organization/project",
-      "git@ssh.dev.azure.com:v3/organization/project/repository, git@ssh.dev.azure.com, organization/project"
-
+      "git@gitlab.acme.com:organization/subgroup/repository.git, https://gitlab.acme.com, GitLab, organization/subgroup",
+      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, GitLab, organization/subgroup",
+      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, GitLab, organization/subgroup",
+      "https://dev.azure.com/organization/project/_git/repository, https://dev.azure.com, AzureDevOps, organization/project",
+      "https://organization@dev.azure.com/organization/project/_git/repository, https://dev.azure.com, AzureDevOps, organization/project",
+      "git@ssh.dev.azure.com:v3/organization/project/repository, git@ssh.dev.azure.com, AzureDevOps, organization/project"
     })
-    void getOrganizationNameWithBaseUrl(String gitOrigin, String baseUrl, String organizationName) {
-        Scm.registerScm(new GitLabScm(baseUrl));
-        assertThat(new GitProvenance(randomId(), gitOrigin, "main", "123", null, null, emptyList()).getOrganizationName(baseUrl))
+    void getOrganizationName(String gitOrigin, String baseUrl, GitProvenance.GitRemote.Service service, String organizationName) {
+        GitProvenance.GitRemote.Parser parser = new GitProvenance.GitRemote.Parser();
+        parser.registerRemote(service, baseUrl);
+        assertThat(new GitProvenance(randomId(), gitOrigin, "main", "123", null, null, emptyList(), parser.parse(gitOrigin)).getOrganizationName())
           .isEqualTo(organizationName);
     }
 
     @ParameterizedTest
     @MethodSource("remotes")
     void getRepositoryName(String remote) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getRepositoryName())
+        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList(), null).getRepositoryName())
           .isEqualTo("rewrite");
     }
 
@@ -227,7 +223,8 @@ class GitProvenanceTest {
           "1234567890abcdef1234567890abcdef12345678",
           null,
           null,
-          emptyList());
+          emptyList(),
+          null);
 
         assertThat(provenance.getOrganizationName(baseUrl)).isEqualTo("group/subgroup1/subgroup2");
         assertThat(provenance.getRepositoryName()).isEqualTo("repo");
@@ -402,6 +399,79 @@ class GitProvenanceTest {
               .waitFor(5, TimeUnit.SECONDS);
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    @Nested
+    class GitRemoteParsing {
+
+        @ParameterizedTest
+        @CsvSource(textBlock = """
+          https://github.com/org/repo, github.com, org/repo, org, repo
+          git@github.com:org/repo.git, github.com, org/repo, org, repo
+          ssh://github.com/org/repo.git, github.com, org/repo, org, repo
+          
+          https://gitlab.com/group/repo.git, gitlab.com, group/repo, group, repo
+          https://gitlab.com/group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+          git@gitlab.com:group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+          ssh://git@gitlab.com:22/group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+          
+          https://bitbucket.org/PRJ/repo, bitbucket.org, PRJ/repo, PRJ, repo
+          git@bitbucket.org:PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
+          ssh://bitbucket.org/PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
+          
+          https://dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
+          git@ssh.dev.azure.com:v3/org/project/repo, dev.azure.com, org/project/repo, org/project, repo
+          ssh://ssh.dev.azure.com:22/v3/org/project/repo, dev.azure.com, org/project/repo, org/project, repo
+          """)
+        void parseKnownRemotes(String cloneUrl, String expectedOrigin, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
+            GitProvenance.GitRemote.Parser parser = new GitProvenance.GitRemote.Parser();
+            GitProvenance.GitRemote remote = parser.parse(cloneUrl);
+            assertThat(remote.getOrigin()).isEqualTo(expectedOrigin);
+            assertThat(remote.getPath()).isEqualTo(expectedPath);
+            assertThat(remote.getOrganization()).isEqualTo(expectedOrganization);
+            assertThat(remote.getRepositoryName()).isEqualTo(expectedRepositoryName);
+        }
+
+        @ParameterizedTest
+        @CsvSource(textBlock = """
+          https://scm.company.com/stash/scm/org/repo.git, scm.company.com/stash/scm, org/repo, org, repo
+          git@scm.company.com:stash/org/repo.git, scm.company.com/stash, org/repo, org, repo
+          ssh://scm.company.com/stash/org/repo, scm.company.com/stash, org/repo, org, repo
+          
+          git@scm.company.com:very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, org/repo, org, repo
+          """)
+        void parseUnknownRemote(String cloneUrl, String expectedOrigin, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
+            GitProvenance.GitRemote.Parser parser = new GitProvenance.GitRemote.Parser();
+            GitProvenance.GitRemote remote = parser.parse(cloneUrl);
+            assertThat(remote.getOrigin()).isEqualTo(expectedOrigin);
+            assertThat(remote.getPath()).isEqualTo(expectedPath);
+            assertThat(remote.getOrganization()).isEqualTo(expectedOrganization);
+            assertThat(remote.getRepositoryName()).isEqualTo(expectedRepositoryName);
+        }
+
+        @ParameterizedTest
+        @CsvSource(textBlock = """
+          https://scm.company.com/stash/scm/org/repo.git, scm.company.com/stash, Bitbucket, org/repo, org, repo
+          git@scm.company.com:stash/org/repo.git, scm.company.com/stash, Bitbucket, org/repo, org, repo
+          ssh://scm.company.com/stash/org/repo, scm.company.com/stash, Bitbucket, org/repo, org, repo
+          
+          git@scm.company.com:very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, Bitbucket, org/repo, org, repo
+          
+          https://scm.company.com/group/subgroup/subergroup/subestgroup/repo, scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+          git@scm.company.com:group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+          ssh://scm.company.com:22/group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+          
+          https://scm.company.com/very/long/context/path/group/subgroup/subergroup/subestgroup/repo, scm.company.com/very/long/context/path, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+          """)
+        void parseRegisteredRemote(String cloneUrl, String origin, GitProvenance.GitRemote.Service service, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
+            GitProvenance.GitRemote.Parser parser = new GitProvenance.GitRemote.Parser();
+            parser.registerRemote(service, origin);
+            GitProvenance.GitRemote remote = parser.parse(cloneUrl);
+            assertThat(remote.getOrigin()).isEqualTo(origin);
+            assertThat(remote.getPath()).isEqualTo(expectedPath);
+            assertThat(remote.getOrganization()).isEqualTo(expectedOrganization);
+            assertThat(remote.getRepositoryName()).isEqualTo(expectedRepositoryName);
         }
     }
 }
