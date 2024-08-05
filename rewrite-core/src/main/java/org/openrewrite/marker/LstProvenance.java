@@ -44,6 +44,7 @@ public class LstProvenance implements Marker {
         Maven,
         Bazel,
         Cli,
-        CobolCli
+        CobolCli,
+        DotNet
     }
 }
