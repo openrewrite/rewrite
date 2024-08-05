@@ -99,10 +99,6 @@ public class GitProvenance implements Marker {
      */
     @Deprecated
     public @Nullable String getOrganizationName(String baseUrl) {
-        GitRemote gitRemote = getGitRemote();
-        if (gitRemote != null) {
-            return gitRemote.getOrganization();
-        }
         if (origin == null) {
             return null;
         }
