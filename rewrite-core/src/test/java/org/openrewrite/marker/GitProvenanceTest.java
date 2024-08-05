@@ -93,6 +93,15 @@ class GitProvenanceTest {
     }
 
     @ParameterizedTest
+    @MethodSource("remotes")
+    void getRepositoryOrigin(String origin, String expectedOrg, String expectedRepo) {
+        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of(), null);
+        assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
+        assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
+        assertThat(gitProvenance.getOrigin()).isEqualTo(origin);
+    }
+
+    @ParameterizedTest
     @CsvSource({
       "git@gitlab.acme.com:organization/subgroup/repository.git, https://gitlab.acme.com, GitLab, organization/subgroup",
       "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, GitLab, organization/subgroup",

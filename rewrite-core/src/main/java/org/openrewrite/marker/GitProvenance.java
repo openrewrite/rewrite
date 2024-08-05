@@ -136,6 +136,13 @@ public class GitProvenance implements Marker {
         return getGitRemote().getPath();
     }
 
+    public @Nullable String getRepositoryOrigin() {
+        if (getGitRemote() == null) {
+            return null;
+        }
+        return getGitRemote().getOrigin();
+    }
+
     public static String getRepositoryPath(String origin) {
         return getRepositoryPath(origin, new GitRemote.Parser());
     }
@@ -452,7 +459,12 @@ public class GitProvenance implements Marker {
                 if (origin.contains("@")) {
                     origin = new HostAndPath("https://" + origin).concat();
                 }
-                origins.put(origin, service);
+                if (service == Service.Unknown) {
+                    // Do not override a known with an unknown service
+                    origins.putIfAbsent(origin, service);
+                } else {
+                    origins.put(origin, service);
+                }
                 return this;
             }
 
