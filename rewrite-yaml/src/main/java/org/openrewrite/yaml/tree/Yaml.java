@@ -190,6 +190,17 @@ public interface Yaml extends Tree {
         }
     }
 
+    interface Block extends Yaml {
+        /**
+         * @return A new deep copy of this block with different IDs.
+         */
+        @Override
+        Block copyPaste();
+
+        @Override
+        Block withPrefix(String prefix);
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
@@ -479,16 +490,5 @@ public interface Yaml extends Tree {
         public String toString() {
             return "Yaml.Anchor(" + key + ")";
         }
-    }
-
-    interface Block extends Yaml {
-        /**
-         * @return A new deep copy of this block with different IDs.
-         */
-        @Override
-        Block copyPaste();
-
-        @Override
-        Block withPrefix(String prefix);
     }
 }
