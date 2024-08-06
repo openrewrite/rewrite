@@ -15,6 +15,8 @@
  */
 package org.openrewrite.gradle.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
@@ -32,12 +34,21 @@ import java.util.*;
  */
 @SuppressWarnings("unused")
 @Value
+@AllArgsConstructor(onConstructor_ = { @JsonCreator })
 public class GradleProject implements Marker, Serializable {
     @With
     UUID id;
 
     @With
+    @Nullable
+    String group;
+
+    @With
     String name;
+
+    @With
+    @Nullable
+    String version;
 
     @With
     String path;
@@ -52,6 +63,19 @@ public class GradleProject implements Marker, Serializable {
     List<MavenRepository> mavenPluginRepositories;
 
     Map<String, GradleDependencyConfiguration> nameToConfiguration;
+
+    // Backwards compatibility to ease convoluted release process with rewrite-gradle-tooling-model
+    public GradleProject(
+            UUID id,
+            String name,
+            String path,
+            List<GradlePluginDescriptor> plugins,
+            List<MavenRepository> mavenRepositories,
+            List<MavenRepository> mavenPluginRepositories,
+            Map<String, GradleDependencyConfiguration> nameToConfiguration
+    ) {
+        this(id, "", name, "", path, plugins, mavenRepositories, mavenPluginRepositories, nameToConfiguration);
+    }
 
     public List<MavenRepository> getMavenPluginRepositories() {
         return mavenPluginRepositories == null ? Collections.emptyList() : mavenPluginRepositories;
@@ -120,7 +144,9 @@ public class GradleProject implements Marker, Serializable {
 
         return new GradleProject(
                 id,
+                group,
                 name,
+                version,
                 path,
                 plugins,
                 mavenRepositories,
