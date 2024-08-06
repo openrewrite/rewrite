@@ -1876,26 +1876,27 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     void upgradeManagedInParentWithBom() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("ch.qos.logback", "logback-classic", "1.5.6", null, true, null)),
-          pomXml("""
-              <project>
-                <groupId>com.mycompany.lib</groupId>
-                <artifactId>my-lib</artifactId>
-                <version>1</version>
-                <properties>
-                  <micronaut.version>2.5.11</micronaut.version>
-                </properties>
-                <dependencyManagement>
-                  <dependencies>
-                    <dependency>
-                        <groupId>io.micronaut</groupId>
-                        <artifactId>micronaut-bom</artifactId>
-                        <version>${micronaut.version}</version>
-                        <type>pom</type>
-                        <scope>import</scope>
-                    </dependency>
-                  </dependencies>
-                </dependencyManagement>
-              </project>
+          pomXml(
+                """
+            <project>
+              <groupId>com.mycompany.lib</groupId>
+              <artifactId>my-lib</artifactId>
+              <version>1</version>
+              <properties>
+                <micronaut.version>2.5.11</micronaut.version>
+              </properties>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                      <groupId>io.micronaut</groupId>
+                      <artifactId>micronaut-bom</artifactId>
+                      <version>${micronaut.version}</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
             """),
           pomXml(
             """
