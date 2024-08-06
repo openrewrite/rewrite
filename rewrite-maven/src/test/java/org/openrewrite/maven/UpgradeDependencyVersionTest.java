@@ -1571,7 +1571,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
+                  
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1583,7 +1583,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
+                  
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1600,7 +1600,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
+                  
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1612,7 +1612,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
+                  
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1637,7 +1637,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
+                  
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1649,7 +1649,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
+                  
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1665,7 +1665,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
+                  
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1677,7 +1677,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
+                  
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1702,7 +1702,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
+                  
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1714,7 +1714,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
+                  
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1730,7 +1730,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
+                  
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1742,7 +1742,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
+                  
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1770,7 +1770,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
+                  
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1782,7 +1782,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
+                  
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1802,7 +1802,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
+                  
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1814,7 +1814,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
+                  
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
