@@ -18,6 +18,7 @@ package org.openrewrite.java.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.PathUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.JavaType;
@@ -44,6 +45,18 @@ public class JavaSourceSet implements SourceSet {
     List<JavaType.FullyQualified> classpath;
 
     /**
+     * Mapping of a String taking the form "group:artifact:version" to the types provided by that artifact.
+     * Does not include java standard library types.
+     */
+    Map<String, List<JavaType.FullyQualified>> gavToTypes;
+
+    /**
+     * Mapping of a JavaType to the String "group:artifact:version" of the artifact that provides that type.
+     * Does not include java standard library types.
+     */
+    Map<JavaType.FullyQualified, String> typeToGav;
+
+    /**
      * Extract type information from the provided classpath.
      *
      * @param fullTypeInformation Not used, does not do anything, to be deleted
@@ -57,11 +70,66 @@ public class JavaSourceSet implements SourceSet {
 
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath) {
         List<JavaType.FullyQualified> types = getJavaStandardLibraryTypes();
+        Map<String, List<JavaType.FullyQualified>> gavToTypes = new LinkedHashMap<>();
+        Map<JavaType.FullyQualified, String> typeToGav = new LinkedHashMap<>();
         for (Path path : classpath) {
-            types.addAll(typesFromPath(path, null));
+            List<JavaType.FullyQualified> typesFromPath = typesFromPath(path, null);
+
+            types.addAll(typesFromPath);
+            String gav = gavFromPath(path);
+            if(gav != null) {
+                gavToTypes.put(gav, typesFromPath);
+                for(JavaType.FullyQualified type : typesFromPath) {
+                    typeToGav.put(type, gav);
+                }
+            }
         }
-        return new JavaSourceSet(randomId(), sourceSetName, types);
+        return new JavaSourceSet(randomId(), sourceSetName, types, gavToTypes, typeToGav);
     }
+
+    /**
+     * Assuming the provided path is to a jar file in a local maven repository or Gradle cache, derive the GAV coordinate from it.
+     * If no GAV can be determined returns null.
+     *
+     */
+    @Nullable
+    static String gavFromPath(Path path) {
+        String pathStr = PathUtils.separatorsToUnix(path.toString());
+        List<String> pathParts = Arrays.asList(pathStr.split("/"));
+        // Example maven path: ~/.m2/repository/org/openrewrite/rewrite-core/8.32.0/rewrite-core-8.32.0.jar
+        // Example gradle path: ~/.gradle/caches/modules-2/files-2.1/org.openrewrite/rewrite-core/8.32.0/64ddcc371f1bf29593b4b27e907757d5554d1a83/rewrite-core-8.32.0.jar
+
+        // Either of these directories may be relocated, so a fixed index is unreliable
+        String groupId = null;
+        String artifactId = null;
+        String version = null;
+        if (pathStr.contains("modules-2/files-2.1") && pathParts.size() >= 5) {
+            groupId = pathParts.get(pathParts.size() - 5);
+            artifactId = pathParts.get(pathParts.size() - 4);
+            version = pathParts.get(pathParts.size() - 3);
+        } else if (pathParts.size() >= 4) {
+            version = pathParts.get(pathParts.size() - 2);
+            artifactId = pathParts.get(pathParts.size() - 3);
+            // Unknown how many of the next several path parts will together comprise the groupId
+            // Maven repository root will have a "repository.xml" file
+            StringBuilder groupIdBuilder = new StringBuilder();
+            int i = pathParts.size() - 3;
+            while(i > 0) {
+                Path maybeRepositoryRoot = Paths.get(String.join("/", pathParts.subList(0, i)));
+                if(maybeRepositoryRoot.endsWith("repository") || Files.exists(maybeRepositoryRoot.resolve("repository.xml"))) {
+                    groupId = groupIdBuilder.substring(1); // Trim off the preceding "."
+                    break;
+                }
+                groupIdBuilder.insert(0, "." + pathParts.get(i - 1));
+                i--;
+            }
+        }
+        if(groupId == null || artifactId == null || version == null) {
+            return null;
+        }
+        return groupId + ":" + artifactId + ":" + version;
+    }
+
 
     // Worth caching as there is typically substantial overlap in dependencies in use within the same repository
     // Even a single module project will typically have at least two source sets, main and test

@@ -233,6 +233,6 @@ public class Assertions {
 
     private static JavaSourceSet javaSourceSet(String sourceSet) {
         return javaSourceSets.computeIfAbsent(sourceSet, name ->
-                new JavaSourceSet(Tree.randomId(), name, Collections.emptyList()));
+                new JavaSourceSet(Tree.randomId(), name, Collections.emptyList(), Collections.emptyMap(), Collections.emptyMap()));
     }
 }

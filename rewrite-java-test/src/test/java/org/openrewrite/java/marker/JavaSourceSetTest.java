@@ -20,11 +20,13 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.JavaType;
 
+import java.nio.file.Paths;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.java.marker.JavaSourceSet.gavFromPath;
 
 class JavaSourceSetTest {
 
@@ -41,10 +43,12 @@ class JavaSourceSetTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1677")
     @Test
     void shadedJar() {
-        var shaded = JavaSourceSet.build("test", JavaParser.dependenciesFromClasspath("hbase-shaded-client"))
-          .getClasspath().stream().filter(o -> o.getFullyQualifiedName().startsWith("org.apache.hadoop.hbase.shaded")).collect(Collectors.toList());
-        assertThat(shaded).isNotEmpty();
-        assertThat(shaded.get(0)).isInstanceOf(JavaType.FullyQualified.class);
+        JavaSourceSet jss = JavaSourceSet.build("test", JavaParser.dependenciesFromClasspath("hbase-shaded-client"));
+        var shaded = jss.getClasspath().stream()
+          .filter(o -> o.getFullyQualifiedName().startsWith("org.apache.hadoop.hbase.CacheEvictionStats"))
+          .findAny();
+        assertThat(shaded).isPresent();
+        assertThat(jss.getTypeToGav().get(shaded.get())).isEqualTo("org.apache.hbase:hbase-shaded-client:2.4.11");
     }
 
     @Test
@@ -53,5 +57,17 @@ class JavaSourceSetTest {
           .stream().filter(it -> it.getFullyQualifiedName().contains("org.openrewrite"))
           .toList();
         assertThat(jss).isNotEmpty();
+    }
+
+    @Test
+    void gavCoordinateFromGradle() {
+        assertThat(gavFromPath(Paths.get("C:/Users/Sam/.gradle/caches/modules-2/files-2.1/org.openrewrite/rewrite-core/8.32.0/64ddcc371f1bf29593b4b27e907757d5554d1a83/rewrite-core-8.32.0.jar")))
+          .isEqualTo("org.openrewrite:rewrite-core:8.32.0");
+    }
+
+    @Test
+    void gavCoordinateFromMaven() {
+        assertThat(gavFromPath(Paths.get("C:/Users/Sam/.m2/repository/org/openrewrite/rewrite-core/8.32.0/rewrite-core-8.32.0.jar")))
+          .isEqualTo("org.openrewrite:rewrite-core:8.32.0");
     }
 }
