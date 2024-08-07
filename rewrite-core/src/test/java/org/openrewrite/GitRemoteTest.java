@@ -31,7 +31,7 @@ public class GitRemoteTest {
       https://gitlab.com/group/repo.git, gitlab.com, group/repo, group, repo
       https://gitlab.com/group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       git@gitlab.com:group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      ssh://git@gitlab.com:22/group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      ssh://git@gitlab.com:22/group/subgroup/subergroup/subestgroup/repo.git, gitlab.com:22, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
 
       https://bitbucket.org/PRJ/repo, bitbucket.org, PRJ/repo, PRJ, repo
       git@bitbucket.org:PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
@@ -83,7 +83,7 @@ public class GitRemoteTest {
       https://scm.company.com/group/subgroup/subergroup/subestgroup/repo, scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       https://scm.company.com:1234/group/subgroup/subergroup/subestgroup/repo, scm.company.com:1234, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       git@scm.company.com:group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      ssh://scm.company.com:22/group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      ssh://scm.company.com:22/group/subgroup/subergroup/subestgroup/repo.git, scm.company.com:22, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
 
       https://scm.company.com/very/long/context/path/group/subgroup/subergroup/subestgroup/repo, scm.company.com/very/long/context/path, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       """)

@@ -53,6 +53,7 @@ public class GitRemote {
             origins = new LinkedHashMap<>();
             origins.put("github.com", Service.GitHub);
             origins.put("gitlab.com", Service.GitLab);
+            origins.put("gitlab.com:22", Service.GitLab);
             origins.put("bitbucket.org", Service.BitbucketCloud);
             origins.put("dev.azure.com", Service.AzureDevOps);
             origins.put("ssh.dev.azure.com", Service.AzureDevOps);
@@ -78,6 +79,9 @@ public class GitRemote {
             Parser.HostAndPath hostAndPath = new Parser.HostAndPath(url);
 
             String origin = hostAndPath.host;
+            if (hostAndPath.port > 0) {
+                origin = origin + ':' + hostAndPath.port;
+            }
             Service service = origins.get(origin);
             if (service == null) {
                 for (String maybeOrigin : origins.keySet()) {
@@ -177,9 +181,7 @@ public class GitRemote {
                 if (!hostAndPath.startsWith(origin)) {
                     throw new IllegalArgumentException("Unable to find origin '" + origin + "' in '" + hostAndPath + "'");
                 }
-                return hostAndPath.substring(origin.length())
-                        .replaceFirst("^:\\d+", "")
-                        .replaceFirst("^/", "");
+                return hostAndPath.substring(origin.length()).replaceFirst("^/", "");
             }
         }
     }
