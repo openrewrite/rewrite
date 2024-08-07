@@ -15,7 +15,6 @@
  */
 package org.openrewrite.yaml;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -24,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class CommentOutPropertyTest implements RewriteTest {
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new CommentOutProperty("management.metrics.binders.files.enabled", "some comments"));
@@ -96,18 +96,18 @@ class CommentOutPropertyTest implements RewriteTest {
             "Some comments")),
           yaml(
             """
-                with:
-                  java-cache: 'maven'
-                  java-version: 11
-                  test: 'bar'
-                """,
+              with:
+                java-cache: 'maven'
+                java-version: 11
+                test: 'bar'
+              """,
             """
-                with:
-                  java-cache: 'maven'
-                  # Some comments
-                  # java-version: 11
-                  test: 'bar'
-                """
+              with:
+                java-cache: 'maven'
+                # Some comments
+                # java-version: 11
+                test: 'bar'
+              """
           )
         );
     }
@@ -119,40 +119,39 @@ class CommentOutPropertyTest implements RewriteTest {
             "Some comments")),
           yaml(
             """
-                with:
-                  java-cache: 'maven'
-                  java-version: 11
-                """,
+              with:
+                java-cache: 'maven'
+                java-version: 11
+              """,
             """
-                with:
-                  java-cache: 'maven'
-                  # Some comments
-                  # java-version: 11
-                """
+              with:
+                java-cache: 'maven'
+                # Some comments
+                # java-version: 11
+              """
           )
         );
     }
 
     @Test
-    @Disabled("Still needs to be fixed")
     void commentLastPropertyOfFirstDocument() {
         rewriteRun(
           spec -> spec.recipe(new CommentOutProperty("with.java-version",
             "Some comments")),
           yaml(
             """
-                with:
-                  java-cache: 'maven'
-                  java-version: 11
-                ---
-                """,
+              with:
+                java-cache: 'maven'
+                java-version: 11
+              ---
+              """,
             """
-                with:
-                  java-cache: 'maven'
-                  # Some comments
-                  # java-version: 11
-                ---
-                """
+              with:
+                java-cache: 'maven'
+                # Some comments
+                # java-version: 11
+              ---
+              """
           )
         );
     }
