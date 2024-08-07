@@ -53,6 +53,7 @@ public class GitRemote {
             origins = new LinkedHashMap<>();
             origins.put("github.com", Service.GitHub);
             origins.put("gitlab.com", Service.GitLab);
+            origins.put("gitlab.com:22", Service.GitLab);
             origins.put("bitbucket.org", Service.BitbucketCloud);
             origins.put("dev.azure.com", Service.AzureDevOps);
             origins.put("ssh.dev.azure.com", Service.AzureDevOps);
@@ -78,6 +79,9 @@ public class GitRemote {
             Parser.HostAndPath hostAndPath = new Parser.HostAndPath(url);
 
             String origin = hostAndPath.host;
+            if (hostAndPath.port > 0) {
+                origin = origin + ':' + hostAndPath.port;
+            }
             Service service = origins.get(origin);
             if (service == null) {
                 for (String maybeOrigin : origins.keySet()) {
@@ -132,6 +136,7 @@ public class GitRemote {
         private static class HostAndPath {
             String scheme;
             String host;
+            int port;
             String path;
 
             public HostAndPath(String url) {
@@ -139,6 +144,7 @@ public class GitRemote {
                     URIish uri = new URIish(url);
                     scheme = uri.getScheme();
                     host = uri.getHost();
+                    port = uri.getPort();
                     if (host == null && !"file".equals(scheme)) {
                         throw new IllegalStateException("No host in url: " + url);
                     }
@@ -151,14 +157,20 @@ public class GitRemote {
             }
 
             private String concat() {
-                String hostAndPath = host == null ? "" : host;
-                if (!path.isEmpty()) {
-                    if (!hostAndPath.isEmpty()) {
-                        hostAndPath += "/";
-                    }
-                    hostAndPath += path;
+                StringBuilder builder = new StringBuilder(64);
+                if (host != null) {
+                    builder.append(host);
                 }
-                return hostAndPath;
+                if (port > 0) {
+                    builder.append(':').append(port);
+                }
+                if (!path.isEmpty()) {
+                    if (builder.length() != 0) {
+                        builder.append('/');
+                    }
+                    builder.append(path);
+                }
+                return builder.toString();
             }
 
             private String repositoryPath(@Nullable String origin) {
@@ -169,8 +181,7 @@ public class GitRemote {
                 if (!hostAndPath.startsWith(origin)) {
                     throw new IllegalArgumentException("Unable to find origin '" + origin + "' in '" + hostAndPath + "'");
                 }
-                return hostAndPath.substring(origin.length())
-                        .replaceFirst("^/", "");
+                return hostAndPath.substring(origin.length()).replaceFirst("^/", "");
             }
         }
     }

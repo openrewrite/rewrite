@@ -68,9 +68,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Only if managed version is ...",
             description = "Only remove the explicit version if the managed version has the specified comparative relationship to the explicit version. " +
-                    "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
-                    "Default `eq`.",
-            valid = { "any", "eq", "lt", "lte", "gt", "gte" },
+                          "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
+                          "Default `eq`.",
+            valid = {"any", "eq", "lt", "lte", "gt", "gte"},
             required = false)
     @Nullable
     Comparator onlyIfManagedVersionIs;
@@ -85,12 +85,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Deprecated
     public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
-            @Nullable Boolean onlyIfVersionsMatch, @Nullable List<String> except) {
+                                             @Nullable Boolean onlyIfVersionsMatch, @Nullable List<String> except) {
         this(groupPattern, artifactPattern, onlyIfVersionsMatch, null, except);
     }
 
     public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
-            @Nullable Comparator onlyIfManagedVersionIs, @Nullable List<String> except) {
+                                             @Nullable Comparator onlyIfManagedVersionIs, @Nullable List<String> except) {
         this(groupPattern, artifactPattern, null, onlyIfManagedVersionIs, except);
     }
 
@@ -98,8 +98,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Deprecated
     @SuppressWarnings("DeprecatedIsStillUsed")
     public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
-            @Nullable Boolean onlyIfVersionsMatch, @Nullable Comparator onlyIfManagedVersionIs,
-            @Nullable List<String> except) {
+                                             @Nullable Boolean onlyIfVersionsMatch, @Nullable Comparator onlyIfManagedVersionIs,
+                                             @Nullable List<String> except) {
         this.groupPattern = groupPattern;
         this.artifactPattern = artifactPattern;
         this.onlyIfVersionsMatch = onlyIfVersionsMatch;
@@ -194,6 +194,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 } else if (isManagedDependencyTag()) {
                     ResolvedManagedDependency managed = findManagedDependency(tag);
                     if (managed != null && matchesGroup(managed) && matchesArtifact(managed) && matchesVersion(managed, ctx)) {
+                        if (tag.getChild("exclusions").isPresent()) {
+                            return tag;
+                        }
                         //noinspection DataFlowIssue
                         return null;
                     }

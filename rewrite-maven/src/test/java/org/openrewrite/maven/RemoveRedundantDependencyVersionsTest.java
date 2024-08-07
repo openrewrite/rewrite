@@ -501,7 +501,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <artifactId>myApiApp</artifactId>
                             <version>1.0.0</version>
                         </parent>
-                        
+
                         <dependencies>
                             <dependency>
                                 <groupId>com.google.guava</groupId>
@@ -550,7 +550,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <artifactId>myApiApp</artifactId>
                             <version>1.0.0</version>
                         </parent>
-                        
+
                         <dependencies>
                             <dependency>
                                 <groupId>com.google.guava</groupId>
@@ -1063,7 +1063,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>
-                """
+              """
           )
         );
     }
@@ -1305,11 +1305,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     <version>2.3.0.RELEASE</version>
                     <relativePath/>
                 </parent>
-            
+
                 <groupId>com.example</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
-            
+
                 <modelVersion>4.0.0</modelVersion>
                 <build>
                     <plugins>
@@ -1329,11 +1329,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     <version>2.3.0.RELEASE</version>
                     <relativePath/>
                 </parent>
-            
+
                 <groupId>com.example</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
-            
+
                 <modelVersion>4.0.0</modelVersion>
                 <build>
                     <plugins>
@@ -1362,13 +1362,13 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     <version>2.5.4</version>
                     <relativePath/>
                 </parent>
-            
+
                 <groupId>com.example</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
-            
+
                 <modelVersion>4.0.0</modelVersion>
-                
+
                 <dependencies>
                     <dependency>
                         <groupId>org.springframework</groupId>
@@ -1385,13 +1385,13 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     <version>2.5.4</version>
                     <relativePath/>
                 </parent>
-            
+
                 <groupId>com.example</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
-            
+
                 <modelVersion>4.0.0</modelVersion>
-                
+
                 <dependencies>
                     <dependency>
                         <groupId>org.springframework</groupId>
@@ -1527,6 +1527,51 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </project>
                 """
             )
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/discussions/4386")
+    void dontOverrideDependencyConfigurations() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>2.3.12.RELEASE</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>acme</artifactId>
+                    <version>0.0.1-SNAPSHOT</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-starter-web</artifactId>
+                                <version>2.2.13.RELEASE</version>
+                                <!-- This exclusion should be kept -->
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>org.slf4j</groupId>
+                                        <artifactId>slf4j-api</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-web</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
           )
         );
     }
