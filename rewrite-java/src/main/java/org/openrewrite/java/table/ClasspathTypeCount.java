@@ -44,4 +44,3 @@ public class ClasspathTypeCount extends DataTable<ClasspathTypeCount.Row> {
         int types;
     }
 }
-
