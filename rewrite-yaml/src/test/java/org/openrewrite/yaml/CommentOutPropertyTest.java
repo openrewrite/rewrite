@@ -112,7 +112,7 @@ class CommentOutPropertyTest implements RewriteTest {
     }
 
     @Test
-    void commentLastProperty() {
+    void commentLastPropertyWithIndent() {
         rewriteRun(
           spec -> spec.recipe(new CommentOutProperty("with.java-version",
             "Some comments")),
@@ -127,6 +127,23 @@ class CommentOutPropertyTest implements RewriteTest {
                   java-cache: 'maven'
                   # Some comments
                   # java-version: 11
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentLastProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("test",
+            "Some comments")),
+          yaml(
+            """
+                test: foo
+              """,
+            """
+                # Some comments
+                # test: foo
               """
           )
         );

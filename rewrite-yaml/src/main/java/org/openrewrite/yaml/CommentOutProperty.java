@@ -63,6 +63,17 @@ public class CommentOutProperty extends Recipe {
             private String indentation = "";
 
             @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext executionContext) {
+                Yaml.Document doc = super.visitDocument(document, executionContext);
+                // Add any leftover comment to the end of document
+                if (!comment.isEmpty()) {
+                    String newPrefix = indentation + "# " + commentText + (indentation.contains("\n") ? "" : "\n") + (indentation.contains("\n") ? comment : comment.replace("#", "# "));
+                    return document.withEnd(doc.getEnd().withPrefix(newPrefix));
+                }
+                return doc;
+            }
+
+            @Override
             public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry,
                                                           ExecutionContext ctx) {
                 indentation = entry.getPrefix();
