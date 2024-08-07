@@ -1553,7 +1553,6 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <dependency>
                                 <groupId>org.springframework.boot</groupId>
                                 <artifactId>spring-boot-starter-web</artifactId>
-                                <!-- The version number should be dropped -->
                                 <version>2.2.13.RELEASE</version>
                                 <!-- This exclusion should be kept -->
                                 <exclusions>
