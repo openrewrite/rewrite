@@ -132,6 +132,7 @@ public class GitRemote {
         private static class HostAndPath {
             String scheme;
             String host;
+            int port;
             String path;
 
             public HostAndPath(String url) {
@@ -139,6 +140,7 @@ public class GitRemote {
                     URIish uri = new URIish(url);
                     scheme = uri.getScheme();
                     host = uri.getHost();
+                    port = uri.getPort();
                     if (host == null && !"file".equals(scheme)) {
                         throw new IllegalStateException("No host in url: " + url);
                     }
@@ -151,14 +153,20 @@ public class GitRemote {
             }
 
             private String concat() {
-                String hostAndPath = host == null ? "" : host;
-                if (!path.isEmpty()) {
-                    if (!hostAndPath.isEmpty()) {
-                        hostAndPath += "/";
-                    }
-                    hostAndPath += path;
+                StringBuilder builder = new StringBuilder(64);
+                if (host != null) {
+                    builder.append(host);
                 }
-                return hostAndPath;
+                if (port > 0) {
+                    builder.append(':').append(port);
+                }
+                if (!path.isEmpty()) {
+                    if (builder.length() != 0) {
+                        builder.append('/');
+                    }
+                    builder.append(path);
+                }
+                return builder.toString();
             }
 
             private String repositoryPath(@Nullable String origin) {
@@ -170,6 +178,7 @@ public class GitRemote {
                     throw new IllegalArgumentException("Unable to find origin '" + origin + "' in '" + hostAndPath + "'");
                 }
                 return hostAndPath.substring(origin.length())
+                        .replaceFirst("^:\\d+", "")
                         .replaceFirst("^/", "");
             }
         }
