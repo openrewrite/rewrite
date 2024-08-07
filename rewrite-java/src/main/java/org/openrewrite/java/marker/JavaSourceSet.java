@@ -15,6 +15,10 @@
  */
 package org.openrewrite.java.marker;
 
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ClassInfoList;
+import io.github.classgraph.ScanResult;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
@@ -58,6 +62,9 @@ public class JavaSourceSet implements SourceSet {
 
     /**
      * Extract type information from the provided classpath.
+     * Uses ClassGraph to compute the classpath.
+
+     * Does not support gavToTypes or typeToGav mapping
      *
      * @param fullTypeInformation Not used, does not do anything, to be deleted
      * @param ignore Not used, does not do anything, to be deleted
@@ -65,9 +72,136 @@ public class JavaSourceSet implements SourceSet {
     @Deprecated
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath,
                                       JavaTypeCache ignore, boolean fullTypeInformation) {
-        return build(sourceSetName, classpath);
+        if (fullTypeInformation) {
+            throw new UnsupportedOperationException();
+        }
+
+        List<String> typeNames;
+        if (!classpath.iterator().hasNext()) {
+            // Only load JRE-provided types
+            try (ScanResult scanResult = new ClassGraph()
+                    .enableClassInfo()
+                    .enableSystemJarsAndModules()
+                    .acceptPackages("java")
+                    .ignoreClassVisibility()
+                    .scan()) {
+                typeNames = packagesToTypeDeclarations(scanResult);
+            }
+        } else {
+            // Load types from the classpath
+            try (ScanResult scanResult = new ClassGraph()
+                    .overrideClasspath(classpath)
+                    .enableSystemJarsAndModules()
+                    .enableClassInfo()
+                    .ignoreClassVisibility()
+                    .scan()) {
+                typeNames = packagesToTypeDeclarations(scanResult);
+            }
+        }
+
+        // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
+        typeNames.add("java.lang.Object");
+        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), null, null);
     }
 
+
+    /*
+     * Create a map of package names to types contained within that package. Type names are not fully qualified, except for type parameter bounds.
+     * e.g.: "java.util" -> [List, Date]
+     */
+    private static List<String> packagesToTypeDeclarations(ScanResult scanResult) {
+        List<String> result = new ArrayList<>();
+        for (ClassInfo classInfo : scanResult.getAllClasses()) {
+            // Skip private classes, allowing package-private
+            if (classInfo.isAnonymousInnerClass() || classInfo.isPrivate() || classInfo.isSynthetic() || classInfo.getName().contains(".enum.")) {
+                continue;
+            }
+            if (classInfo.isStandardClass() && !classInfo.getName().startsWith("java.")) {
+                continue;
+            }
+            // Although the classfile says its bytecode version is 50 (within the range Java 8 supports),
+            // the Java 8 compiler says these class files from kotlin-reflect are invalid
+            // The error is severe enough that all subsequent stubs have missing type information, so exclude that package
+            if (classInfo.getPackageName().startsWith("kotlin.reflect.jvm.internal.impl.resolve.jvm")) {
+                continue;
+            }
+            String typeDeclaration = declarableFullyQualifiedName(classInfo);
+            if (typeDeclaration == null) {
+                continue;
+            }
+            result.add(typeDeclaration);
+        }
+        return result;
+    }
+
+    private static List<JavaType.FullyQualified> typesFrom(List<String> typeNames) {
+        List<JavaType.FullyQualified> types = new ArrayList<>(typeNames.size());
+        for (String typeName : typeNames) {
+            types.add(JavaType.ShallowClass.build(typeName));
+        }
+        return types;
+    }
+
+    /**
+     * Java allows "$" in class names, and also uses "$" as part of the names of inner classes. e.g.: OuterClass$InnerClass
+     * So if you only look at the textual representation of a class name, you can't tell if "A$B" means "class A$B {}" or "class A { class B {}}"
+     * The declarable name of "class A$B {}" is "A$B"
+     * The declarable name of class B in "class A { class B {}}" is "A.B"
+     * ClassInfo.getPackageName() does not understand this and will always replace "$" in names with "."
+     * <p>
+     * This method takes all of these considerations into account and returns a fully qualified name which replaces
+     * inner-class signifying "$" with ".", while preserving
+     */
+    private static @Nullable String declarableFullyQualifiedName(ClassInfo classInfo) {
+        String name;
+        if (classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
+            // Because we put java-supplied types into another package, we cannot access package-private types
+            return null;
+        }
+        if (classInfo.isInnerClass()) {
+            StringBuilder sb = new StringBuilder();
+            ClassInfoList outerClasses = classInfo.getOuterClasses();
+            // Classgraph orders this collection innermost -> outermost, but type names are declared outermost -> innermost
+            for (int i = outerClasses.size() - 1; i >= 0; i--) {
+                ClassInfo outerClass = outerClasses.get(i);
+                if (outerClass.isPrivate() || outerClass.isAnonymousInnerClass() || outerClass.isSynthetic() || outerClass.isExternalClass()) {
+                    return null;
+                }
+                if (i == outerClasses.size() - 1) {
+                    sb.append(outerClass.getName()).append(".");
+                } else if (!outerClass.getName().startsWith(sb.toString())) {
+                    // Code obfuscators can generate inner classes which don't share a common package prefix with their outer class
+                    return classInfo.getName();
+                } else {
+                    sb.append(outerClass.getName().substring(sb.length())).append(".");
+                }
+            }
+            if (!classInfo.getName().startsWith(sb.toString())) {
+                // Code obfuscators can generate inner classes which don't share a common package prefix with their outer class
+                return classInfo.getName();
+            }
+            String nameFragment = classInfo.getName().substring(sb.length());
+
+            if (!isDeclarable(nameFragment)) {
+                return null;
+            }
+            sb.append(nameFragment);
+            name = sb.toString();
+        } else {
+            name = classInfo.getName();
+        }
+        if (!isDeclarable(name)) {
+            return null;
+        }
+        return name;
+    }
+
+
+    // Purely IO-based classpath scanning below this point
+    /**
+     * Extract type information from the provided classpath.
+     * Uses file I/O to compute the classpath.
+     */
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath) {
         List<JavaType.FullyQualified> types = getJavaStandardLibraryTypes();
         Map<String, List<JavaType.FullyQualified>> gavToTypes = new LinkedHashMap<>();
@@ -133,45 +267,42 @@ public class JavaSourceSet implements SourceSet {
 
     // Worth caching as there is typically substantial overlap in dependencies in use within the same repository
     // Even a single module project will typically have at least two source sets, main and test
-    private static final Map<Path, List<JavaType.FullyQualified>> PATH_TO_TYPES = new LinkedHashMap<>();
     private static List<JavaType.FullyQualified> typesFromPath(Path path, @Nullable String acceptPackage) {
-        return PATH_TO_TYPES.computeIfAbsent(path, unused -> {
-            List<JavaType.FullyQualified> types = new ArrayList<>();
-            try {
-                // Paths will be to either directories of class files or jar files
-                if (Files.isRegularFile(path)) {
-                    try (JarFile jarFile = new JarFile(path.toFile())) {
-                        Enumeration<JarEntry> entries = jarFile.entries();
-                        while(entries.hasMoreElements()) {
-                            String entryName = entries.nextElement().getName();
-                            if(entryName.endsWith(".class")) {
-                                String s = entryNameToClassName(entryName);
-                                if(isDeclarable(s)) {
-                                    types.add(JavaType.ShallowClass.build(s));
-                                }
+        List<JavaType.FullyQualified> types = new ArrayList<>();
+        try {
+            // Paths will be to either directories of class files or jar files
+            if (Files.isRegularFile(path)) {
+                try (JarFile jarFile = new JarFile(path.toFile())) {
+                    Enumeration<JarEntry> entries = jarFile.entries();
+                    while(entries.hasMoreElements()) {
+                        String entryName = entries.nextElement().getName();
+                        if(entryName.endsWith(".class")) {
+                            String s = entryNameToClassName(entryName);
+                            if(isDeclarable(s)) {
+                                types.add(JavaType.ShallowClass.build(s));
                             }
                         }
                     }
-                } else {
-                    Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
-                        @Override
-                        public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
-                            String pathStr = file.toString();
-                            if (pathStr.endsWith(".class")) {
-                                String s = entryNameToClassName(pathStr);
-                                if((acceptPackage == null || s.startsWith(acceptPackage)) &&isDeclarable(s)) {
-                                    types.add(JavaType.ShallowClass.build(s));
-                                }
-                            }
-                            return java.nio.file.FileVisitResult.CONTINUE;
-                        }
-                    });
                 }
-            } catch (IOException e) {
-                // Partial results better than no results
+            } else {
+                Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
+                        String pathStr = file.toString();
+                        if (pathStr.endsWith(".class")) {
+                            String s = entryNameToClassName(pathStr);
+                            if((acceptPackage == null || s.startsWith(acceptPackage)) &&isDeclarable(s)) {
+                                types.add(JavaType.ShallowClass.build(s));
+                            }
+                        }
+                        return java.nio.file.FileVisitResult.CONTINUE;
+                    }
+                });
             }
-            return types;
-        });
+        } catch (IOException e) {
+            // Partial results better than no results
+        }
+        return types;
     }
 
     @Nullable
