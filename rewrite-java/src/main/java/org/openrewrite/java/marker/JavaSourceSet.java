@@ -305,19 +305,15 @@ public class JavaSourceSet implements SourceSet {
         return types;
     }
 
-    @Nullable
-    private static List<JavaType.FullyQualified> javaStandardLibraryTypes;
     private static List<JavaType.FullyQualified> getJavaStandardLibraryTypes() {
-        if(javaStandardLibraryTypes == null) {
-            javaStandardLibraryTypes = new ArrayList<>();
-            Path toolsJar = Paths.get(System.getProperty("java.home")).resolve("../lib/tools.jar");
-            if(Files.exists(toolsJar)) {
-                javaStandardLibraryTypes.addAll(typesFromPath(toolsJar, "java"));
-            } else {
-                javaStandardLibraryTypes.addAll(typesFromPath(
-                        FileSystems.getFileSystem(URI.create("jrt:/")).getPath("modules", "java.base"),
-                        "java"));
-            }
+        List<JavaType.FullyQualified> javaStandardLibraryTypes = new ArrayList<>();
+        Path toolsJar = Paths.get(System.getProperty("java.home")).resolve("../lib/tools.jar");
+        if(Files.exists(toolsJar)) {
+            javaStandardLibraryTypes.addAll(typesFromPath(toolsJar, "java"));
+        } else {
+            javaStandardLibraryTypes.addAll(typesFromPath(
+                    FileSystems.getFileSystem(URI.create("jrt:/")).getPath("modules", "java.base"),
+                    "java"));
         }
         return javaStandardLibraryTypes;
     }
