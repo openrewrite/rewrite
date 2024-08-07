@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -99,14 +100,14 @@ class CommentOutPropertyTest implements RewriteTest {
                   java-cache: 'maven'
                   java-version: 11
                   test: 'bar'
-              """,
+                """,
             """
                 with:
                   java-cache: 'maven'
                   # Some comments
                   # java-version: 11
                   test: 'bar'
-              """
+                """
           )
         );
     }
@@ -121,13 +122,37 @@ class CommentOutPropertyTest implements RewriteTest {
                 with:
                   java-cache: 'maven'
                   java-version: 11
-              """,
+                """,
             """
                 with:
                   java-cache: 'maven'
                   # Some comments
                   # java-version: 11
-              """
+                """
+          )
+        );
+    }
+
+    @Test
+    @Disabled("Still needs to be fixed")
+    void commentLastPropertyOfFirstDocument() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("with.java-version",
+            "Some comments")),
+          yaml(
+            """
+                with:
+                  java-cache: 'maven'
+                  java-version: 11
+                ---
+                """,
+            """
+                with:
+                  java-cache: 'maven'
+                  # Some comments
+                  # java-version: 11
+                ---
+                """
           )
         );
     }
@@ -139,14 +164,13 @@ class CommentOutPropertyTest implements RewriteTest {
             "Some comments")),
           yaml(
             """
-                test: foo
+              test: foo
               """,
             """
-                # Some comments
-                # test: foo
+              # Some comments
+              # test: foo
               """
           )
         );
     }
-
 }
