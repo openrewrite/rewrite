@@ -36,6 +36,7 @@ import org.gradle.api.tasks.testing.junitplatform.JUnitPlatformOptions
 import org.gradle.api.tasks.testing.testng.TestNGOptions
 import org.gradle.process.JavaForkOptions
 import org.gradle.process.ProcessForkOptions
+import org.gradle.testing.base.TestingExtension
 
 interface DependencyHandlerSpec extends DependencyHandler {
     Dependency annotationProcessor(Object... dependencyNotation)
@@ -163,6 +164,18 @@ interface ScriptHandlerSpec extends ScriptHandler {
     void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
 }
 
+interface TestingSpec extends ScriptHandler {
+    void suites (@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=SuitesSpec) Closure cl)
+}
+
+interface SuitesSpec extends ScriptHandler {
+    void test (@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=SuiteTestSpec) Closure cl)
+}
+
+interface SuiteTestSpec extends ScriptHandler {
+    void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
+}
+
 abstract class RewriteGradleProject extends groovy.lang.Script implements Project {
     Map ext
 
@@ -195,4 +208,7 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract <T extends Task> T task(String name, Class<T> type, Action<? super T> configuration)
 
     abstract void apply(Map<String, String> args)
+
+    //this function doesn't actually exist in the Gradle API but is added by the jvm-test-suite plugin
+    abstract testing (@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=TestingSpec) Closure cl)
 }
