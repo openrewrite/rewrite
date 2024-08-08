@@ -48,7 +48,8 @@ import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
-import org.jetbrains.kotlin.fir.pipeline.*;
+import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
+import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.FirSessionConfigurator;
 import org.jetbrains.kotlin.fir.session.FirSessionFactoryHelper;
@@ -67,7 +68,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.kotlin.internal.*;
+import org.openrewrite.kotlin.internal.CompiledSource;
+import org.openrewrite.kotlin.internal.KotlinSource;
+import org.openrewrite.kotlin.internal.KotlinTreeParserVisitor;
+import org.openrewrite.kotlin.internal.PsiElementAssociations;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
@@ -222,7 +226,7 @@ public class KotlinParser implements Parser {
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
         if (sourceSetProvenance == null) {
             if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList());
+                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList(), Collections.emptyMap(), Collections.emptyMap());
             } else {
                 sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
                         typeCache, false);
