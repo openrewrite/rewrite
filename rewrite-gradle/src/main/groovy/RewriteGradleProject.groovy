@@ -163,15 +163,15 @@ interface ScriptHandlerSpec extends ScriptHandler {
     void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
 }
 
-interface TestingSpec extends ScriptHandler {
+interface TestingSpec {
     void suites (@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=SuitesSpec) Closure cl)
 }
 
-interface SuitesSpec extends ScriptHandler {
+interface SuitesSpec {
     void test (@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=SuiteTestSpec) Closure cl)
 }
 
-interface SuiteTestSpec extends ScriptHandler {
+interface SuiteTestSpec {
     void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
 }
 
