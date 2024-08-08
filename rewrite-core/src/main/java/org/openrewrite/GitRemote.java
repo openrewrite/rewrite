@@ -53,7 +53,6 @@ public class GitRemote {
             origins = new LinkedHashMap<>();
             origins.put("github.com", Service.GitHub);
             origins.put("gitlab.com", Service.GitLab);
-            origins.put("gitlab.com:22", Service.GitLab);
             origins.put("bitbucket.org", Service.BitbucketCloud);
             origins.put("dev.azure.com", Service.AzureDevOps);
             origins.put("ssh.dev.azure.com", Service.AzureDevOps);
