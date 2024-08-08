@@ -16,6 +16,8 @@
 package org.openrewrite.marker;
 
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.NonFinal;
 import org.openrewrite.GitRemote;
@@ -44,7 +46,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @AllArgsConstructor(access = AccessLevel.PACKAGE) // required for @With and tests
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @__({@JsonCreator}))
 @With
 public class GitProvenance implements Marker {
     UUID id;
@@ -75,7 +77,8 @@ public class GitProvenance implements Marker {
     @Incubating(since = "8.33.0")
     @NonFinal
     @Nullable
-    GitRemote gitRemote;
+    @JsonIgnore
+    transient GitRemote gitRemote;
 
     public @Nullable GitRemote getGitRemote() {
         if (gitRemote == null && origin != null) {
