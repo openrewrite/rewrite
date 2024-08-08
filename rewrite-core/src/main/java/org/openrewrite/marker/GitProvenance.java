@@ -45,7 +45,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @AllArgsConstructor(access = AccessLevel.PACKAGE) // required for @With and tests
-@RequiredArgsConstructor(onConstructor_ = @__({@JsonCreator}))
+@RequiredArgsConstructor(onConstructor_ = @JsonCreator)
 @With
 public class GitProvenance implements Marker {
     UUID id;
