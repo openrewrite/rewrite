@@ -142,10 +142,9 @@ public class GitRemote {
             public HostAndPath(String url) {
                 try {
                     URIish uri = new URIish(url);
-                    host = uri.getHost();
                     scheme = uri.getScheme();
+                    host = uri.getHost();
                     port = uri.getPort();
-
                     if (host == null && !"file".equals(scheme)) {
                         throw new IllegalStateException("No host in url: " + url);
                     }
