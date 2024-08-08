@@ -30,6 +30,7 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -57,20 +58,6 @@ public class FindPlugins extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
-        TreeVisitor<?, ExecutionContext> jv = Preconditions.check(
-                Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
-                new JavaVisitor<ExecutionContext>() {
-                    @Override
-                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        if (pluginMatcher.matches(method)) {
-                            if (method.getArguments().get(0) instanceof J.Literal &&
-                                pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
-                                return SearchResult.found(method);
-                            }
-                        }
-                        return super.visitMethodInvocation(method, ctx);
-                    }
-                });
 
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
@@ -80,20 +67,42 @@ public class FindPlugins extends Recipe {
                 }
                 SourceFile s = (SourceFile) tree;
 
+                AtomicBoolean found = new AtomicBoolean(false);
+                TreeVisitor<?, ExecutionContext> jv = Preconditions.check(
+                        Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
+                        new JavaVisitor<ExecutionContext>() {
+
+                            @Override
+                            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                if (pluginMatcher.matches(method)) {
+                                    if (method.getArguments().get(0) instanceof J.Literal &&
+                                        pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
+                                        found.set(true);
+                                        return SearchResult.found(method);
+                                    }
+                                }
+                                return super.visitMethodInvocation(method, ctx);
+                            }
+                        });
                 if (jv.isAcceptable(s, ctx)) {
                     s = (SourceFile) jv.visitNonNull(s, ctx);
                 }
 
                 // Even if we couldn't find a declaration the metadata might show the plugin is in use
                 GradleProject gp = s.getMarkers().findFirst(GradleProject.class).orElse(null);
-                if (s == tree && gp != null && gp.getPlugins().stream()
-                        .anyMatch(it -> pluginId.equals(it.getId()))) {
+                if (!found.get() && gp != null && gp.getPlugins().stream()
+                            .anyMatch(it -> pluginId.equals(it.getId()))) {
                     s = SearchResult.found(s);
                 }
 
                 return s;
             }
         };
+    }
+
+    @Override
+    public int maxCycles() {
+        return 1;
     }
 
     /**
