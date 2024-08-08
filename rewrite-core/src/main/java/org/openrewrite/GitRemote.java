@@ -142,9 +142,10 @@ public class GitRemote {
             public HostAndPath(String url) {
                 try {
                     URIish uri = new URIish(url);
-                    scheme = uri.getScheme();
                     host = uri.getHost();
+                    scheme = uri.getScheme();
                     port = uri.getPort();
+
                     if (host == null && !"file".equals(scheme)) {
                         throw new IllegalStateException("No host in url: " + url);
                     }
@@ -161,7 +162,7 @@ public class GitRemote {
                 if (host != null) {
                     builder.append(host);
                 }
-                if (port > 0) {
+                if (!isDefaultPort()) {
                     builder.append(':').append(port);
                 }
                 if (!path.isEmpty()) {
@@ -171,6 +172,13 @@ public class GitRemote {
                     builder.append(path);
                 }
                 return builder.toString();
+            }
+
+            private boolean isDefaultPort() {
+                return port < 1 ||
+                       ("https".equals(scheme) && port == 443) ||
+                       ("http".equals(scheme) && port == 80) ||
+                       ("ssh".equals(scheme) && port == 22);
             }
 
             private String repositoryPath(@Nullable String origin) {
