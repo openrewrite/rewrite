@@ -17,7 +17,6 @@ package org.openrewrite.marker;
 
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.NonFinal;
 import org.openrewrite.GitRemote;
