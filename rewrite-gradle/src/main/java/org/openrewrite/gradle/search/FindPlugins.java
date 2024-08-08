@@ -100,11 +100,6 @@ public class FindPlugins extends Recipe {
         };
     }
 
-    @Override
-    public int maxCycles() {
-        return 1;
-    }
-
     /**
      * @param j               The subtree to search.
      * @param pluginIdPattern A method pattern. See {@link MethodMatcher} for details about this syntax.
