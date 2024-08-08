@@ -15,6 +15,9 @@
  */
 package org.openrewrite.marker;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -45,6 +48,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static com.fasterxml.jackson.core.JsonParser.Feature.IGNORE_UNDEFINED;
+import static com.fasterxml.jackson.core.JsonParser.Feature.INCLUDE_SOURCE_IN_LOCATION;
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -394,6 +399,18 @@ class GitProvenanceTest {
             assertThat(git).isNotNull();
             assertThat(git.getBranch()).isEqualTo("main");
         }
+    }
+
+    @Test
+    void serialization() throws JsonProcessingException {
+        GitProvenance gitProvenance = new GitProvenance(randomId(), "https://github.com/octocat/Hello-World.git", "main", "123", null, null, List.of());
+        ObjectMapper mapper = new ObjectMapper()
+          .findAndRegisterModules()
+          .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+          .enable(INCLUDE_SOURCE_IN_LOCATION);
+        String json = mapper.writeValueAsString(gitProvenance);
+        GitProvenance read = mapper.readValue(json, GitProvenance.class);
+        assertThat(read).isEqualTo(gitProvenance);
     }
 
     void runCommand(Path workingDir, String command) {
