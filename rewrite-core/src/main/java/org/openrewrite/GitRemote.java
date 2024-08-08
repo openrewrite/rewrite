@@ -161,7 +161,7 @@ public class GitRemote {
                 if (host != null) {
                     builder.append(host);
                 }
-                if (port > 0) {
+                if (!isDefaultPort()) {
                     builder.append(':').append(port);
                 }
                 if (!path.isEmpty()) {
@@ -171,6 +171,13 @@ public class GitRemote {
                     builder.append(path);
                 }
                 return builder.toString();
+            }
+
+            private boolean isDefaultPort() {
+                return port < 1 ||
+                       ("https".equals(scheme) && port == 443) ||
+                       ("http".equals(scheme) && port == 80) ||
+                       ("ssh".equals(scheme) && port == 22);
             }
 
             private String repositoryPath(@Nullable String origin) {
