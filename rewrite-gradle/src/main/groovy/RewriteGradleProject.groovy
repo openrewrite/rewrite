@@ -210,4 +210,7 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract testing (@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=TestingSpec) Closure cl)
 
     abstract void apply(Map<String, String> args)
+
+    //this function doesn't actually exist in the Gradle API but is added by the jvm-test-suite plugin
+    abstract testing (@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=TestingSpec) Closure cl)
 }
