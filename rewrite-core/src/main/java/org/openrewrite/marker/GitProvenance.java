@@ -77,8 +77,7 @@ public class GitProvenance implements Marker {
     @Incubating(since = "8.33.0")
     @NonFinal
     @Nullable
-    @JsonIgnore
-    transient GitRemote gitRemote;
+    GitRemote gitRemote;
 
     public @Nullable GitRemote getGitRemote() {
         if (gitRemote == null && origin != null) {
