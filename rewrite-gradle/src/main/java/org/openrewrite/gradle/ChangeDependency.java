@@ -48,52 +48,52 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeDependency extends Recipe {
     @Option(displayName = "Old groupId",
-      description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
-      example = "org.openrewrite.recipe")
+            description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
+            example = "org.openrewrite.recipe")
     String oldGroupId;
 
     @Option(displayName = "Old artifactId",
-      description = "The old artifactId to replace. The artifactId is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
-      example = "rewrite-testing-frameworks")
+            description = "The old artifactId to replace. The artifactId is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
+            example = "rewrite-testing-frameworks")
     String oldArtifactId;
 
     @Option(displayName = "New groupId",
-      description = "The new groupId to use. Defaults to the existing group id.",
-      example = "corp.internal.openrewrite.recipe",
-      required = false)
+            description = "The new groupId to use. Defaults to the existing group id.",
+            example = "corp.internal.openrewrite.recipe",
+            required = false)
     @Nullable
     String newGroupId;
 
     @Option(displayName = "New artifactId",
-      description = "The new artifactId to use. Defaults to the existing artifact id.",
-      example = "rewrite-testing-frameworks",
-      required = false)
+            description = "The new artifactId to use. Defaults to the existing artifact id.",
+            example = "rewrite-testing-frameworks",
+            required = false)
     @Nullable
     String newArtifactId;
 
     @Option(displayName = "New version",
-      description = "An exact version number or node-style semver selector used to select the version number. " +
-        "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-        "the current version is a valid semantic version. For more details, you can look at the documentation " +
-        "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
-      example = "29.X",
-      required = false)
+            description = "An exact version number or node-style semver selector used to select the version number. " +
+                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
+            example = "29.X",
+            required = false)
     @Nullable
     String newVersion;
 
     @Option(displayName = "Version pattern",
-      description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-        "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
-      example = "-jre",
-      required = false)
+            description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+            example = "-jre",
+            required = false)
     @Nullable
     String versionPattern;
 
     @Option(displayName = "Override managed version",
-      description = "If the old dependency has a managed version, this flag can be used to explicitly set the version on the new dependency. " +
-        "WARNING: No check is done on the NEW dependency to verify if it is managed, it relies on whether the OLD dependency had a managed version. " +
-        "The default for this flag is `false`.",
-      required = false)
+            description = "If the old dependency has a managed version, this flag can be used to explicitly set the version on the new dependency. " +
+                          "WARNING: No check is done on the NEW dependency to verify if it is managed, it relies on whether the OLD dependency had a managed version. " +
+                          "The default for this flag is `false`.",
+            required = false)
     @Nullable
     Boolean overrideManagedVersion;
 
@@ -141,14 +141,14 @@ public class ChangeDependency extends Recipe {
         }
         validated = validated.and(Validated.required("newGroupId", newGroupId).or(Validated.required("newArtifactId", newArtifactId)));
         validated = validated.and(Validated.test(
-          "coordinates",
-          "newGroupId OR newArtifactId must be different from before",
-          this,
-          r -> {
-              boolean sameGroupId = StringUtils.isBlank(r.newGroupId) || Objects.equals(r.oldGroupId, r.newGroupId);
-              boolean sameArtifactId = StringUtils.isBlank(r.newArtifactId) || Objects.equals(r.oldArtifactId, r.newArtifactId);
-              return !(sameGroupId && sameArtifactId);
-          }
+                "coordinates",
+                "newGroupId OR newArtifactId must be different from before",
+                this,
+                r -> {
+                    boolean sameGroupId = StringUtils.isBlank(r.newGroupId) || Objects.equals(r.oldGroupId, r.newGroupId);
+                    boolean sameArtifactId = StringUtils.isBlank(r.newArtifactId) || Objects.equals(r.oldArtifactId, r.newArtifactId);
+                    return !(sameGroupId && sameArtifactId);
+                }
         ));
         return validated;
     }
@@ -188,8 +188,8 @@ public class ChangeDependency extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                  (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                    ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                           (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                            ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
 
@@ -214,7 +214,7 @@ public class ChangeDependency extends Recipe {
                                 String resolvedVersion;
                                 try {
                                     resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
-                                      .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                            .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
                                 }
@@ -232,7 +232,7 @@ public class ChangeDependency extends Recipe {
                     G.GString gstring = (G.GString) depArgs.get(0);
                     List<J> strings = gstring.getStrings();
                     if (strings.size() >= 2 && strings.get(0) instanceof J.Literal &&
-                      ((J.Literal) strings.get(0)).getValue() != null) {
+                        ((J.Literal) strings.get(0)).getValue() != null) {
 
                         J.Literal literal = (J.Literal) strings.get(0);
                         Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
@@ -248,7 +248,7 @@ public class ChangeDependency extends Recipe {
                                 String resolvedVersion;
                                 try {
                                     resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
-                                      .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                            .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
                                 }
@@ -259,7 +259,7 @@ public class ChangeDependency extends Recipe {
                             if (original != updated) {
                                 String replacement = updated.toStringNotation();
                                 J.Literal newLiteral = literal.withValue(replacement)
-                                  .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
+                                        .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
                                 m = m.withArguments(Collections.singletonList(newLiteral));
                             }
                         }
@@ -321,7 +321,7 @@ public class ChangeDependency extends Recipe {
                         String resolvedVersion;
                         try {
                             resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
-                              .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                    .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);
                         }
