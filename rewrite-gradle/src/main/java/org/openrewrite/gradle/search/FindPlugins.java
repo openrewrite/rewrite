@@ -20,7 +20,9 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.tree.GradlePlugin;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
@@ -55,18 +57,43 @@ public class FindPlugins extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
-        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaVisitor<ExecutionContext>() {
-            @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if (pluginMatcher.matches(method)) {
-                    if (method.getArguments().get(0) instanceof J.Literal &&
-                            pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
-                        return SearchResult.found(method);
+        TreeVisitor<?, ExecutionContext> jv = Preconditions.check(
+                Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
+                new JavaVisitor<ExecutionContext>() {
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                        if (pluginMatcher.matches(method)) {
+                            if (method.getArguments().get(0) instanceof J.Literal &&
+                                pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
+                                return SearchResult.found(method);
+                            }
+                        }
+                        return super.visitMethodInvocation(method, ctx);
                     }
+                });
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
                 }
-                return super.visitMethodInvocation(method, ctx);
+                SourceFile s = (SourceFile) tree;
+
+                if (jv.isAcceptable(s, ctx)) {
+                    s = (SourceFile) jv.visitNonNull(s, ctx);
+                }
+
+                // Even if we couldn't find a declaration the metadata might show the plugin is in use
+                GradleProject gp = s.getMarkers().findFirst(GradleProject.class).orElse(null);
+                if (s == tree && gp != null && gp.getPlugins().stream()
+                        .anyMatch(it -> pluginId.equals(it.getId()))) {
+                    s = SearchResult.found(s);
+                }
+
+                return s;
             }
-        });
+        };
     }
 
     /**
