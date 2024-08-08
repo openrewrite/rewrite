@@ -36,7 +36,6 @@ import org.gradle.api.tasks.testing.junitplatform.JUnitPlatformOptions
 import org.gradle.api.tasks.testing.testng.TestNGOptions
 import org.gradle.process.JavaForkOptions
 import org.gradle.process.ProcessForkOptions
-import org.gradle.testing.base.TestingExtension
 
 interface DependencyHandlerSpec extends DependencyHandler {
     Dependency annotationProcessor(Object... dependencyNotation)
