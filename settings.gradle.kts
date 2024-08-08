@@ -48,18 +48,12 @@ if(!file("IDE.properties").exists() || includedProjects.contains("tools")) {
 
 include(*allProjects.toTypedArray())
 
-allProjects.minus(includedProjects).forEach {
-    // sinkhole this project to a directory that intentionally doesn't exist, so that it
-    // can be efficiently substituted for a module dependency below
-    project(":$it").projectDir = file("sinkhole-$it")
-}
-
 gradle.allprojects {
     configurations.all {
         resolutionStrategy.dependencySubstitution {
             allProjects
                     .minus(includedProjects)
-                    .minus(arrayOf("rewrite-benchmarks", "rewrite-bom"))
+                    .minus(arrayOf("rewrite-bom"))
                     .forEach {
                         substitute(project(":$it"))
                                 .using(module("org.openrewrite:$it:latest.integration"))
@@ -79,7 +73,7 @@ if (System.getProperty("idea.active") == null &&
 }
 
 // ---------------------------------------------------------------
-// ------ Gradle Enterprise Configuration ------------------------
+// ------ Gradle Develocity Configuration ------------------------
 // ---------------------------------------------------------------
 
 plugins {
