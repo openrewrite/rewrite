@@ -55,10 +55,11 @@ public class JavaSourceSet implements SourceSet {
     Map<String, List<JavaType.FullyQualified>> gavToTypes;
 
     /**
-     * Mapping of a JavaType to the String "group:artifact:version" of the artifact that provides that type.
+     * Mapping of the name of a fully qualified JavaType to the String "group:artifact:version" of the artifact that
+     * provides that type.
      * Does not include java standard library types.
      */
-    Map<JavaType.FullyQualified, String> typeToGav;
+    Map<String, String> typeToGav;
 
     /**
      * Extract type information from the provided classpath.
@@ -205,7 +206,7 @@ public class JavaSourceSet implements SourceSet {
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath) {
         List<JavaType.FullyQualified> types = getJavaStandardLibraryTypes();
         Map<String, List<JavaType.FullyQualified>> gavToTypes = new LinkedHashMap<>();
-        Map<JavaType.FullyQualified, String> typeToGav = new LinkedHashMap<>();
+        Map<String, String> typeToGav = new LinkedHashMap<>();
         for (Path path : classpath) {
             List<JavaType.FullyQualified> typesFromPath = typesFromPath(path, null);
 
@@ -214,7 +215,7 @@ public class JavaSourceSet implements SourceSet {
             if(gav != null) {
                 gavToTypes.put(gav, typesFromPath);
                 for(JavaType.FullyQualified type : typesFromPath) {
-                    typeToGav.put(type, gav);
+                    typeToGav.put(type.getFullyQualifiedName(), gav);
                 }
             }
         }
