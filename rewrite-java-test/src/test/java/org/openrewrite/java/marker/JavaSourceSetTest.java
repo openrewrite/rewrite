@@ -74,6 +74,6 @@ class JavaSourceSetTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4401")
     void tolerateWeirdClassNames(){
-        JavaSourceSet.build("main", JavaParser.dependenciesFromClasspath("functionaljava"));
+        assertThat(JavaSourceSet.isDeclarable("fj.data.$")).isFalse();
     }
 }

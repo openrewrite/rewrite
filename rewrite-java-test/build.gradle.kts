@@ -19,7 +19,6 @@ dependencies {
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
     testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
-    testRuntimeOnly("org.functionaljava:functionaljava:5.0") // Contains `fj.data.$`
     testRuntimeOnly(project(":rewrite-yaml"))
     testImplementation(project(":rewrite-maven"))
 }

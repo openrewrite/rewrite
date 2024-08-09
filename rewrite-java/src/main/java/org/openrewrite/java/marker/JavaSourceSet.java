@@ -327,7 +327,7 @@ public class JavaSourceSet implements SourceSet {
                 .replace('/', '.');
     }
 
-    private static boolean isDeclarable(String className) {
+    static boolean isDeclarable(String className) {
         int dotIndex = Math.max(className.lastIndexOf("."), className.lastIndexOf('$'));
         className = className.substring(dotIndex + 1);
         return !className.isEmpty() &&
