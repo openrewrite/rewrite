@@ -50,7 +50,7 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 @Data
 @AllArgsConstructor
 @JacksonXmlRootElement(localName = "settings")
-public class MavenSettings {
+public class MavenSettings implements WithProfiles<MavenSettings.Profile> {
     @Nullable
     String localRepository;
 
@@ -81,6 +81,14 @@ public class MavenSettings {
         this.activeProfiles = activeProfiles;
         this.mirrors = mirrors;
         this.servers = servers;
+    }
+
+    @Override
+    public List<Profile> listProfiles() {
+        if (profiles == null) {
+            return Collections.emptyList();
+        }
+        return profiles.getProfiles();
     }
 
     public static @Nullable MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
@@ -153,17 +161,22 @@ public class MavenSettings {
     }
 
     public List<RawRepositories.Repository> getActiveRepositories(Iterable<String> activeProfiles) {
-        LinkedHashMap<String, RawRepositories.Repository> activeRepositories = new LinkedHashMap<>();
+        List<String> allProfiles = new ArrayList<>();
+        if (activeProfiles != null) {
+            for (String prof : activeProfiles) {
+                allProfiles.add(prof);
+            }
+        }
 
-        if (profiles != null) {
-            for (Profile profile : profiles.getProfiles()) {
-                if (profile.isActive(activeProfiles) || (this.activeProfiles != null &&
-                                                         profile.isActive(this.activeProfiles.getActiveProfiles()))) {
-                    if (profile.repositories != null) {
-                        for (RawRepositories.Repository repository : profile.repositories.getRepositories()) {
-                            activeRepositories.put(repository.getId(), repository);
-                        }
-                    }
+        if (this.activeProfiles != null && this.activeProfiles.getActiveProfiles() != null) {
+            allProfiles.addAll(this.activeProfiles.getActiveProfiles());
+        }
+
+        LinkedHashMap<String, RawRepositories.Repository> activeRepositories = new LinkedHashMap<>();
+        for (Profile activeProfile : activeProfiles(allProfiles)) {
+            if (activeProfile.repositories != null) {
+                for (RawRepositories.Repository repository : activeProfile.repositories.getRepositories()) {
+                    activeRepositories.put(repository.getId(), repository);
                 }
             }
         }
@@ -305,7 +318,7 @@ public class MavenSettings {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
-    public static class Profile {
+    public static class Profile implements WithProfiles.Profile {
         @Nullable
         String id;
 
@@ -314,10 +327,6 @@ public class MavenSettings {
 
         @Nullable
         RawRepositories repositories;
-
-        public boolean isActive(Iterable<String> activeProfiles) {
-            return ProfileActivation.isActive(id, activeProfiles, activation);
-        }
 
         @SuppressWarnings("unused")
         public boolean isActive(String... activeProfiles) {

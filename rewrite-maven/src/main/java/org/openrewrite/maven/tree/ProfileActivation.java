@@ -36,6 +36,13 @@ public class ProfileActivation {
     @Nullable
     Property property;
 
+    /**
+     * Determines the supplied profile `id` should be considered active
+     * given the other parameters.
+     *
+     * @deprecated use {@link Profile#isActive(Iterable)}
+     */
+    @Deprecated
     public static boolean isActive(@Nullable String id, Iterable<String> activeProfiles,
                                    @Nullable ProfileActivation activation) {
         if (id != null) {
