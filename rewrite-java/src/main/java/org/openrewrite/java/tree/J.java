@@ -6197,7 +6197,7 @@ public interface J extends Tree {
     @AllArgsConstructor
     @Data
     @With
-    final class Unknown implements J, Statement, Expression, TypeTree, TypedTree, NameTree {
+    final class Unknown implements J, Statement, Expression, TypeTree {
 
         @EqualsAndHashCode.Include
         UUID id;
