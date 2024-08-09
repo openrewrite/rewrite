@@ -190,7 +190,7 @@ class JavaParserTest implements RewriteTest {
       """
                 package com.example.demo;
                 class FooBar {
-                    public void test(int num string msg) {
+                    public void test(int num) {
                       String a; this.ownerR // comment
                       System.out.println();
                     }
@@ -213,33 +213,9 @@ class JavaParserTest implements RewriteTest {
                       // comment
                     }
                 }
-      """,
       """
-          package com.example.demo;
-          class FooBar {
-              pet
-              public void test() {
-              }
-          }
-      """,
-      """
-          package com.example.demo;
-          class FooBar {
-              public void test() {
-              }
-              pet
-          }
-      """,
-//      """
-//          package com.example.demo;
-//          class FooBar {
-//              public void test(int) {
-//              }
-//              pet
-//          }
-//      """
     })
-    void erroneousTest(@Language("java") String source) {
+    void testErroneousExpressionStatements(@Language("java") String source) {
         JavaParser javaParser = JavaParser.fromJavaVersion().build();
         List<SourceFile> list = javaParser.parse(source).map(sf -> {
             if (sf instanceof ParseError pe) {
@@ -250,4 +226,38 @@ class JavaParserTest implements RewriteTest {
         SourceFile beforeSource = list.get(0);
         assertThat(beforeSource.printAll()).isEqualTo(source);
     }
+
+    @Test
+    void testErroneousVariableDeclarations() {
+        @Language("java") String source = """
+            package com.example.demo;
+            class FooBar {
+                pet
+                public void test() {
+                }
+            }
+          """;
+
+        String expected = """
+            package com.example.demo;
+            class FooBar {
+                pet <error>
+                public void test() {
+                }
+            }
+          """;
+
+
+        JavaParser javaParser = JavaParser.fromJavaVersion().build();
+        List<SourceFile> list = javaParser.parse(source).map(sf -> {
+            if (sf instanceof ParseError pe) {
+                return pe.getErroneous();
+            }
+            return sf;
+        }).toList();
+        SourceFile beforeSource = list.get(0);
+        assertThat(beforeSource.printAll()).isEqualTo(expected);
+    }
+
+
 }
