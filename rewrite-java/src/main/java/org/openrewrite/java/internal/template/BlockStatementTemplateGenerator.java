@@ -67,9 +67,17 @@ public class BlockStatementTemplateGenerator {
                         after.append('}');
                     }
 
-                    template(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
+                    if (contextSensitive) {
+                        contextTemplate(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
+                    } else {
+                        contextFreeTemplate(next(cursor), cursor.getValue(), before, after);
+                    }
 
-                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after.toString().trim();
+                    return before.toString().trim() +
+                           "\n/*" + TEMPLATE_COMMENT + "*/" +
+                           template +
+                           "/*" + STOP_COMMENT + "*/\n" +
+                           after.toString().trim();
                 });
     }
 
@@ -84,7 +92,8 @@ public class BlockStatementTemplateGenerator {
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
-                if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile && (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile &&
+                    (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
                     // don't visit the __P__ and __M__ classes declaring stubs
                     return classDecl;
                 }
@@ -191,14 +200,6 @@ public class BlockStatementTemplateGenerator {
         }.visit(cu, 0);
 
         return js;
-    }
-
-    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
-        if (contextSensitive) {
-            contextTemplate(cursor, prior, before, after, insertionPoint, mode);
-        } else {
-            contextFreeTemplate(cursor, prior, before, after);
-        }
     }
 
     @SuppressWarnings("DataFlowIssue")
