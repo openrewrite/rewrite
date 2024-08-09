@@ -163,6 +163,18 @@ interface ScriptHandlerSpec extends ScriptHandler {
     void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
 }
 
+interface TestingSpec {
+    void suites (@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=SuitesSpec) Closure cl)
+}
+
+interface SuitesSpec {
+    void test (@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=SuiteTestSpec) Closure cl)
+}
+
+interface SuiteTestSpec {
+    void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
+}
+
 abstract class RewriteGradleProject extends groovy.lang.Script implements Project {
     Map ext
 
@@ -193,6 +205,9 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract <T extends Task> T task(String name, Class<T> type)
     abstract <T extends Task> T task(String name, Class<T> type, Object... constructorArgs)
     abstract <T extends Task> T task(String name, Class<T> type, Action<? super T> configuration)
+
+    //this function doesn't actually exist in the Gradle API but is added by the jvm-test-suite plugin
+    abstract testing (@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=TestingSpec) Closure cl)
 
     abstract void apply(Map<String, String> args)
 }

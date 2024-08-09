@@ -396,4 +396,53 @@ class ChangeDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void relocateDependencyInJvmTestSuite() {
+        rewriteRun(
+            spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+            buildGradle(
+                """
+                  plugins {
+                      id "java-library"
+                      id 'jvm-test-suite'
+                  }
+                  
+                  repositories {
+                      mavenCentral()
+                  }
+                  
+                  testing {
+                      suites {
+                          test {
+                              dependencies {
+                                  implementation "commons-lang:commons-lang:2.6"
+                              }
+                          }
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java-library"
+                      id 'jvm-test-suite'
+                  }
+                  
+                  repositories {
+                      mavenCentral()
+                  }
+                  
+                  testing {
+                      suites {
+                          test {
+                              dependencies {
+                                  implementation "org.apache.commons:commons-lang3:3.11"
+                              }
+                          }
+                      }
+                  }
+                  """
+            )
+        );
+    }
 }
