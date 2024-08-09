@@ -70,4 +70,10 @@ class JavaSourceSetTest {
         assertThat(gavFromPath(Paths.get("C:/Users/Sam/.m2/repository/org/openrewrite/rewrite-core/8.32.0/rewrite-core-8.32.0.jar")))
           .isEqualTo("org.openrewrite:rewrite-core:8.32.0");
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4401")
+    void tolerateWeirdClassNames(){
+        JavaSourceSet.build("main", JavaParser.dependenciesFromClasspath("functionaljava"));
+    }
 }
