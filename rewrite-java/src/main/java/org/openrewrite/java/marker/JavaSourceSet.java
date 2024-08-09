@@ -55,13 +55,6 @@ public class JavaSourceSet implements SourceSet {
     Map<String, List<JavaType.FullyQualified>> gavToTypes;
 
     /**
-     * Mapping of the name of a fully qualified JavaType to the String "group:artifact:version" of the artifact that
-     * provides that type.
-     * Does not include java standard library types.
-     */
-    Map<String, String> typeToGav;
-
-    /**
      * Extract type information from the provided classpath.
      * Uses ClassGraph to compute the classpath.
 
@@ -102,7 +95,7 @@ public class JavaSourceSet implements SourceSet {
 
         // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
         typeNames.add("java.lang.Object");
-        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), null, null);
+        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), null);
     }
 
 
@@ -206,20 +199,16 @@ public class JavaSourceSet implements SourceSet {
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath) {
         List<JavaType.FullyQualified> types = getJavaStandardLibraryTypes();
         Map<String, List<JavaType.FullyQualified>> gavToTypes = new LinkedHashMap<>();
-        Map<String, String> typeToGav = new LinkedHashMap<>();
         for (Path path : classpath) {
             List<JavaType.FullyQualified> typesFromPath = typesFromPath(path, null);
 
             types.addAll(typesFromPath);
             String gav = gavFromPath(path);
-            if(gav != null) {
+            if (gav != null) {
                 gavToTypes.put(gav, typesFromPath);
-                for(JavaType.FullyQualified type : typesFromPath) {
-                    typeToGav.put(type.getFullyQualifiedName(), gav);
-                }
             }
         }
-        return new JavaSourceSet(randomId(), sourceSetName, types, gavToTypes, typeToGav);
+        return new JavaSourceSet(randomId(), sourceSetName, types, gavToTypes);
     }
 
     /**
