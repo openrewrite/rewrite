@@ -1182,11 +1182,13 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               interface Test {
+
                   String a;
               }
               """,
             """
               interface Test {
+
                   String a();
               }
               """
