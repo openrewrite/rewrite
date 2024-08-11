@@ -298,7 +298,7 @@ class JavaTemplateTest implements RewriteTest {
                   void m() {
                       hashCode();
                   }
-                            
+
                   void m2() {
                       hashCode();
                   }
@@ -721,20 +721,20 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   public enum Type {
                       One;
-                            
+
                       public Type(String t) {
                       }
-                            
+
                       String t;
-                            
+
                       public static Type fromType(String type) {
                           return null;
                       }
                   }
-                            
+
                   public A(Type type) {}
                   public A() {}
-                            
+
                   public void method(Type type) {
                       new A(type);
                   }
@@ -744,20 +744,20 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   public enum Type {
                       One;
-                            
+
                       public Type(String t) {
                       }
-                            
+
                       String t;
-                            
+
                       public static Type fromType(String type) {
                           return null;
                       }
                   }
-                            
+
                   public A(Type type) {}
                   public A() {}
-                            
+
                   public void method(Type type) {
                       new A();
                   }
@@ -865,7 +865,7 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import java.util.Collection;
-                            
+
               class Test {
                   void doSomething(Collection<Object> c) {
                       assert c.size() > 0;
@@ -874,7 +874,7 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Collection;
-                            
+
               class Test {
                   void doSomething(Collection<Object> c) {
                       assert !c.isEmpty();
@@ -1084,7 +1084,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.util.Map;
               import org.junit.jupiter.api.Assertions;
-                            
+
               class T {
                   void m(String one, Map<String, ?> map) {
                       Assertions.assertEquals(one, map.get("one"));
@@ -1093,9 +1093,9 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Map;
-                            
+
               import static org.assertj.core.api.Assertions.assertThat;
-                            
+
               class T {
                   void m(String one, Map<String, ?> map) {
                       assertThat(map.get("one")).isEqualTo(one);
@@ -1140,7 +1140,7 @@ class JavaTemplateTest implements RewriteTest {
               import java.util.Objects;
               import java.util.Map;
               import java.util.HashMap;
-                            
+
               class T {
               	void m() {
               		Map<String, ?> map = new HashMap<>();
@@ -1151,10 +1151,10 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.util.Objects;
               import java.util.Map;
-                            
+
               import static java.util.Objects.requireNonNull;
               import java.util.HashMap;
-                            
+
               class T {
               	void m() {
               		Map<String, ?> map = new HashMap<>();
@@ -1182,13 +1182,11 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               interface Test {
-                            
                   String a;
               }
               """,
             """
               interface Test {
-                            
                   String a();
               }
               """
