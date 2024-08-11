@@ -1229,7 +1229,6 @@ class JavaTemplateTest implements RewriteTest {
                         return JavaTemplate.builder("new StepBuilder()")
                           //.doBeforeParseTemplate(System.out::println)
                           .contextSensitive()
-                          .imports("batch.StepBuilder")
                           .build()
                           .apply(getCursor(), method.getCoordinates().replace());
                     }
