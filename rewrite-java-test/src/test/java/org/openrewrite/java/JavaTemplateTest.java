@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
 
@@ -297,7 +298,7 @@ class JavaTemplateTest implements RewriteTest {
                   void m() {
                       hashCode();
                   }
-              
+                            
                   void m2() {
                       hashCode();
                   }
@@ -720,20 +721,20 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   public enum Type {
                       One;
-              
+                            
                       public Type(String t) {
                       }
-              
+                            
                       String t;
-              
+                            
                       public static Type fromType(String type) {
                           return null;
                       }
                   }
-              
+                            
                   public A(Type type) {}
                   public A() {}
-              
+                            
                   public void method(Type type) {
                       new A(type);
                   }
@@ -743,20 +744,20 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   public enum Type {
                       One;
-              
+                            
                       public Type(String t) {
                       }
-              
+                            
                       String t;
-              
+                            
                       public static Type fromType(String type) {
                           return null;
                       }
                   }
-              
+                            
                   public A(Type type) {}
                   public A() {}
-              
+                            
                   public void method(Type type) {
                       new A();
                   }
@@ -864,7 +865,7 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import java.util.Collection;
-              
+                            
               class Test {
                   void doSomething(Collection<Object> c) {
                       assert c.size() > 0;
@@ -873,7 +874,7 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Collection;
-              
+                            
               class Test {
                   void doSomething(Collection<Object> c) {
                       assert !c.isEmpty();
@@ -1083,7 +1084,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.util.Map;
               import org.junit.jupiter.api.Assertions;
-              
+                            
               class T {
                   void m(String one, Map<String, ?> map) {
                       Assertions.assertEquals(one, map.get("one"));
@@ -1092,9 +1093,9 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Map;
-              
+                            
               import static org.assertj.core.api.Assertions.assertThat;
-              
+                            
               class T {
                   void m(String one, Map<String, ?> map) {
                       assertThat(map.get("one")).isEqualTo(one);
@@ -1139,7 +1140,7 @@ class JavaTemplateTest implements RewriteTest {
               import java.util.Objects;
               import java.util.Map;
               import java.util.HashMap;
-              
+                            
               class T {
               	void m() {
               		Map<String, ?> map = new HashMap<>();
@@ -1150,10 +1151,10 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.util.Objects;
               import java.util.Map;
-              
+                            
               import static java.util.Objects.requireNonNull;
               import java.util.HashMap;
-              
+                            
               class T {
               	void m() {
               		Map<String, ?> map = new HashMap<>();
@@ -1181,13 +1182,13 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               interface Test {
-              
+                            
                   String a;
               }
               """,
             """
               interface Test {
-              
+                            
                   String a();
               }
               """
@@ -1202,13 +1203,13 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import org.jetbrains.annotations.NotNull;
-              
+
               class A {
                   String testMethod(@NotNull final String test) {}
               }
               """, """
               import lombok.NonNull;
-              
+
               class A {
                   String testMethod(@NonNull final String test) {}
               }
@@ -1220,19 +1221,22 @@ class JavaTemplateTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-spring/pull/284")
     void replaceMethodInChainFollowedByGenericTypeParameters() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if (new MethodMatcher("batch.StepBuilder create()").matches(method)) {
                         return JavaTemplate.builder("new StepBuilder()")
                           //.doBeforeParseTemplate(System.out::println)
                           .contextSensitive()
+                          .imports("batch.StepBuilder")
                           .build()
                           .apply(getCursor(), method.getCoordinates().replace());
                     }
                     return super.visitMethodInvocation(method, ctx);
                 }
             }))
+            .afterTypeValidationOptions(TypeValidation.builder().constructorInvocations(false).build()) // Unclear why
             .parser(JavaParser.fromJavaVersion().dependsOn(
                 """
                   package batch;

@@ -775,11 +775,13 @@ public class BlockStatementTemplateGenerator {
 
         private static class TemplatedTreeTrimmerVisitor extends JavaVisitor<Integer> {
             private boolean stopCommentExists(@Nullable J j) {
-                if (j != null) {
-                    for (Comment comment : j.getComments()) {
-                        if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
-                            return true;
-                        }
+                return j != null && stopCommentExists(j.getComments());
+            }
+
+            private static boolean stopCommentExists(List<Comment> comments) {
+                for (Comment comment : comments) {
+                    if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
+                        return true;
                     }
                 }
                 return false;
@@ -803,6 +805,13 @@ public class BlockStatementTemplateGenerator {
                 if (stopCommentExists(mi.getName())) {
                     //noinspection ConstantConditions
                     return mi.getSelect();
+                }
+                if (method.getTypeParameters() != null) {
+                    // For method chains return `select` if `STOP_COMMENT` is found before `typeParameters`
+                    if (stopCommentExists(mi.getPadding().getTypeParameters().getBefore().getComments())) {
+                        //noinspection ConstantConditions
+                        return mi.getSelect();
+                    }
                 }
                 return mi;
             }
