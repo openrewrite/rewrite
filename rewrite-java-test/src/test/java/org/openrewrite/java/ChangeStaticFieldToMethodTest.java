@@ -265,7 +265,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
           java(
             """
               package com.example;
-                            
+
               class Test {
                   public static Object EXAMPLE = null;
               }
@@ -304,7 +304,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   private HttpResponseStatus(int code) {
                       this.code = code;
                   }
-                  
+
                   String codeAsText() {
                       return String.valueOf(code);
                   }

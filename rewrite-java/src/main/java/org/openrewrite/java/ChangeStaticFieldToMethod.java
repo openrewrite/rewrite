@@ -116,10 +116,17 @@ public class ChangeStaticFieldToMethod extends Recipe {
 
                 Cursor statementCursor = getCursor().dropParentUntil(Statement.class::isInstance);
                 Statement statement = statementCursor.getValue();
-                J.Block block = makeNewMethod(newClass).apply(statementCursor, statement.getCoordinates().replace());
-                J.MethodInvocation method = block.getStatements().get(0).withPrefix(tree.getPrefix());
+                J applied = makeNewMethod(newClass).apply(statementCursor, statement.getCoordinates().replace());
 
-                if (method.getMethodType() == null) {
+                J.MethodInvocation method = null;
+                if (applied instanceof J.Block) {
+                    J.Block block = (J.Block) applied;
+                    method = block.getStatements().get(0).withPrefix(tree.getPrefix());
+                } else if (applied instanceof J.NewArray) {
+                    J.NewArray newArray = (J.NewArray) applied;
+                    method = (J.MethodInvocation) newArray.getInitializer().get(0);
+                }
+                if (method == null || method.getMethodType() == null) {
                     throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class ["
                                                        + newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
                 }
