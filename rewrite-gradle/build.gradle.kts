@@ -85,3 +85,10 @@ tasks.named<Copy>("processResources") {
         into("META-INF/rewrite/classpath")
     }
 }
+
+//Javadoc compiler will complain about the use of the internal types.
+tasks.withType<Javadoc> {
+    exclude(
+        "**/GradleProject**"
+    )
+}
