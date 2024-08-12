@@ -226,7 +226,7 @@ public class KotlinParser implements Parser {
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
         if (sourceSetProvenance == null) {
             if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList(), Collections.emptyMap(), Collections.emptyMap());
+                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList(), Collections.emptyMap());
             } else {
                 sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
                         typeCache, false);
