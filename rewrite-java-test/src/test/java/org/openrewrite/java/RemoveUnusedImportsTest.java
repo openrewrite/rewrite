@@ -1769,4 +1769,53 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4405")
+    @Test
+    void removeAllImportsInFileWithHeader() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+                  import java.util.List;
+                  
+                  public abstract class Foo1 {
+                      public abstract String m(String a);
+                  }
+              """, """
+                  public abstract class Foo1 {
+                      public abstract GenClass1 m(String a);
+                  }
+              """),
+          java(
+            """
+                  import java.util.GenClass1;
+                  
+                  public abstract class Foo2 {
+                      public abstract GenClass1 m(String a);
+                  }
+              """, """
+                  import java.util.GenClass1;
+                  
+                  public abstract class Foo2 {
+                      public abstract GenClass1 m(String a);
+                  }
+              """),
+          java(
+            """
+                  import java.util.List;
+                  import java.util.GenClass1;
+                  
+                  public abstract class Foo3 {
+                      public abstract GenClass1 m();
+                  }
+              """, """
+                  import java.util.GenClass1;
+                  
+                  public abstract class Foo3 {
+                      public abstract GenClass1 m();
+                  }
+              """)
+        );
+    }
 }
