@@ -1527,6 +1527,15 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitVariable(VariableTree node, Space fmt) {
+        JCTree.JCVariableDecl jcVariableDecl = (JCTree.JCVariableDecl) node;
+        if ("<error>".equals(jcVariableDecl.getName().toString())) {
+            return new J.Erroneous(
+                    randomId(),
+                    fmt,
+                    Markers.EMPTY,
+                    node.toString()
+            );
+        }
         return hasFlag(node.getModifiers(), Flags.ENUM) ?
                 visitEnumVariable(node, fmt) :
                 visitVariables(singletonList(node), fmt); // method arguments cannot be multi-declarations
@@ -1782,6 +1791,18 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                     return sourceBefore(";");
                 }
             case VARIABLE:
+                JCTree.JCVariableDecl varTree = (JCTree.JCVariableDecl) t;
+                if ("<error>".contentEquals(varTree.getName())) {
+                    int start = varTree.vartype.getEndPosition(endPosTable);
+                    int end = varTree.getEndPosition(endPosTable);
+                    String whitespace = source.substring(start, end);
+                    if (whitespace.contains("\n")) {
+                        return Space.build(whitespace, Collections.emptyList());
+                    } else {
+                        return Space.build(source.substring(start, end), Collections.emptyList());
+                    }
+                }
+                return sourceBefore(";");
             case YIELD:
                 return sourceBefore(";");
             case LABELED_STATEMENT:

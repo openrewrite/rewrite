@@ -1530,10 +1530,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     public J visitVariable(VariableTree node, Space fmt) {
         JCTree.JCVariableDecl jcVariableDecl = (JCTree.JCVariableDecl) node;
         if ("<error>".equals(jcVariableDecl.getName().toString())) {
-            String erroneousNode = source.substring(
-                    jcVariableDecl.getStartPosition(),
-                    jcVariableDecl.getEndPosition(endPosTable)
-            );
             return new J.Erroneous(
                     randomId(),
                     fmt,
