@@ -228,7 +228,7 @@ class JavaParserTest implements RewriteTest {
     }
 
     @Test
-    void testErroneousVariableDeclarations() {
+    void erroneousVariableDeclarations() {
         @Language("java") String source = """
             package com.example.demo;
             class FooBar {
