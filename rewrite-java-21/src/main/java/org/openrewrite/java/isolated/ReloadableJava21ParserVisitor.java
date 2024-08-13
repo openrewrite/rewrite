@@ -199,7 +199,6 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitErroneous(ErroneousTree node, Space fmt) {
-        System.out.println("Reloadable java 21");
         String erroneousNode = source.substring(((JCTree) node).getStartPosition(), ((JCTree) node).getEndPosition(endPosTable));
         return new J.Erroneous(
                 randomId(),
