@@ -18,6 +18,8 @@ package org.openrewrite;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.net.URI;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class GitRemoteTest {
@@ -101,5 +103,29 @@ public class GitRemoteTest {
         assertThat(remote.getPath()).isEqualTo(expectedPath);
         assertThat(remote.getOrganization()).isEqualTo(expectedOrganization);
         assertThat(remote.getRepositoryName()).isEqualTo(expectedRepositoryName);
+    }
+
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      GitHub, false, github.com, org/repo, https://github.com/org/repo
+      GitHub, true, github.com, org/repo, ssh://git@github.com/org/repo.git
+      GitHub, false, https://github.com, org/repo, https://github.com/org/repo
+      GitHub, true, https://github.com, org/repo, ssh://git@github.com/org/repo.git
+      GitHub, false, scm.company.com/context/path, org/repo, https://scm.company.com/context/path/org/repo
+      GitHub, true, scm.company.com/context/path, org/repo, ssh://git@scm.company.com/context/path/org/repo.git
+      GitLab, false, gitlab.com, group/subgroup/repo, https://gitlab.com/group/subgroup/repo.git
+      GitLab, true, gitlab.com, group/subgroup/repo, ssh://git@gitlab.com/group/subgroup/repo.git
+      GitLab, false, scm.company.com/context/path, group/subgroup/repo, https://scm.company.com/context/path/group/subgroup/repo.git
+      GitLab, true, scm.company.com/context/path, group/subgroup/repo, ssh://git@scm.company.com/context/path/group/subgroup/repo.git
+      BitbucketCloud, false, bitbucket.org, org/repo, https://bitbucket.org/org/repo
+      BitbucketCloud, true, bitbucket.org, org/repo, ssh://git@bitbucket.org/org/repo.git
+      Bitbucket, false, scm.company.com/context/path, org/repo, https://scm.company.com/context/path/scm/org/repo
+      Bitbucket, true, scm.company.com/context/path, org/repo, ssh://git@scm.company.com/context/path/org/repo.git
+      AzureDevOps, false, dev.azure.com, org/repo, https://dev.azure.com/org/repo
+      AzureDevOps, true, dev.azure.com, org/repo, ssh://git@ssh.dev.azure.com/org/repo
+      """)
+    void buildRemoteUrl(GitRemote.Service service, boolean ssh, String origin, String path, String expectedUrl) {
+        URI url = GitRemote.buildRemoteUrl(service, ssh, origin, path);
+        assertThat(url.toString()).isEqualTo(expectedUrl);
     }
 }

@@ -19,6 +19,7 @@ import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.transport.URIish;
 
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -44,6 +45,34 @@ public class GitRemote {
         BitbucketCloud,
         AzureDevOps,
         Unknown
+    }
+
+    public static URI buildRemoteUrl(Service service, boolean ssh, String origin, String path) {
+        StringBuilder url = new StringBuilder();
+        path = path.replaceFirst("^/", "").replaceFirst("/$", "");
+        origin = origin.replaceFirst("/$", "");
+        if (service == Service.Bitbucket && !ssh) {
+            path = "scm/" + path;
+        }
+        if (service == Service.AzureDevOps) {
+            if (ssh) {
+                origin = "ssh." + origin;
+            } else {
+                path = path.replaceFirst("([^/]+)/([^/]+)/(.*)", "$1/$2/_git/$3");
+            }
+        } else if (service == Service.GitLab || ssh) {
+            path += ".git";
+        }
+        if (origin.startsWith("https://") || origin.startsWith("http://") || origin.startsWith("ssh://")) {
+            origin = origin.substring(origin.indexOf("://") + 3);
+        }
+        if (ssh) {
+            url.append("ssh://git@");
+        } else {
+            url.append("https://");
+        }
+        url.append(origin).append("/").append(path);
+        return URI.create(url.toString());
     }
 
     public static class Parser {
