@@ -215,7 +215,7 @@ class JavaParserTest implements RewriteTest {
                 }
       """
     })
-    void testErroneousExpressionStatements(@Language("java") String source) {
+    void erroneousExpressionStatements(@Language("java") String source) {
         JavaParser javaParser = JavaParser.fromJavaVersion().build();
         List<SourceFile> list = javaParser.parse(source).map(sf -> {
             if (sf instanceof ParseError pe) {
