@@ -122,7 +122,7 @@ public class GitRemoteTest {
       Bitbucket, false, scm.company.com/context/path, org/repo, https://scm.company.com/context/path/scm/org/repo
       Bitbucket, true, scm.company.com/context/path, org/repo, ssh://git@scm.company.com/context/path/org/repo.git
       AzureDevOps, false, dev.azure.com, org/repo, https://dev.azure.com/org/repo
-      AzureDevOps, true, dev.azure.com, org/repo, ssh://git@ssh.dev.azure.com/org/repo
+      AzureDevOps, true, dev.azure.com, org/repo, ssh://git@ssh.dev.azure.com/v3/org/repo
       """)
     void buildRemoteUrl(GitRemote.Service service, boolean ssh, String origin, String path, String expectedUrl) {
         URI url = GitRemote.buildRemoteUrl(service, ssh, origin, path);
