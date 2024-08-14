@@ -47,6 +47,10 @@ public class GitRemote {
         Unknown
     }
 
+    public URI toUri(boolean ssh) {
+        return buildRemoteUrl(service, ssh, origin, path);
+    }
+
     public static URI buildRemoteUrl(Service service, boolean ssh, String origin, String path) {
         StringBuilder url = new StringBuilder();
         path = path.replaceFirst("^/", "").replaceFirst("/$", "");
