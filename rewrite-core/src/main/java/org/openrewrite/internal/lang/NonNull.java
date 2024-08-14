@@ -32,11 +32,13 @@ import java.lang.annotation.*;
  * @see NonNullApi
  * @see NonNullFields
  * @see Nullable
+ * @deprecated Use {@link org.jspecify.annotations.NonNull} instead.
  */
 @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE, ElementType.TYPE_USE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Nonnull
 @TypeQualifierNickname
+@Deprecated
 public @interface NonNull {
 }
