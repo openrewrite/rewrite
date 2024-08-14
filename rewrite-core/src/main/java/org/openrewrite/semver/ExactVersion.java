@@ -15,8 +15,8 @@
  */
 package org.openrewrite.semver;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
 
 /**
  * Version selector for matching exact version: either explicitly prefixed with "=",

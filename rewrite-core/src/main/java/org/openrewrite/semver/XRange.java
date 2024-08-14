@@ -15,8 +15,8 @@
  */
 package org.openrewrite.semver;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

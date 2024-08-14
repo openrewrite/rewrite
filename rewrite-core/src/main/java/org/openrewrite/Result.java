@@ -16,9 +16,9 @@
 package org.openrewrite;
 
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.lib.FileMode;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;

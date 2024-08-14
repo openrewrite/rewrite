@@ -15,11 +15,11 @@
  */
 package org.openrewrite.hcl.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.tree.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 

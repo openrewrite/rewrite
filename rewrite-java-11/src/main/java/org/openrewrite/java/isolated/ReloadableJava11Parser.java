@@ -24,6 +24,8 @@ import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
@@ -32,8 +34,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.NonNullApi;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -62,7 +62,7 @@ import static java.util.stream.Collectors.toList;
 /**
  * This parser is NOT thread-safe, as the OpenJDK parser maintains in-memory caches in static state.
  */
-@NonNullApi
+@NullMarked
 public class ReloadableJava11Parser implements JavaParser {
     private final JavaTypeCache typeCache;
 

@@ -15,13 +15,13 @@
  */
 package org.openrewrite.hcl;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.format.AutoFormatVisitor;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 

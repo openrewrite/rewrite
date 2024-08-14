@@ -16,9 +16,9 @@
 package org.openrewrite.java;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
 import java.text.Normalizer;

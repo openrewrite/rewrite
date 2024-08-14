@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.internal.template;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;

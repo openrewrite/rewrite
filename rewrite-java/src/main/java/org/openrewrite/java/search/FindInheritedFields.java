@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;

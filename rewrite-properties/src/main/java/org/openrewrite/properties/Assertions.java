@@ -16,7 +16,7 @@
 package org.openrewrite.properties;
 
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
