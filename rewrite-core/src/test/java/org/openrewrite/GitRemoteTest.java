@@ -79,6 +79,8 @@ public class GitRemoteTest {
       git@scm.company.com:stash/org/repo.git, scm.company.com/stash, Bitbucket, org/repo, org, repo
       ssh://scm.company.com/stash/org/repo, scm.company.com/stash, Bitbucket, org/repo, org, repo
       ssh://scm.company.com:22/stash/org/repo, scm.company.com/stash, Bitbucket, org/repo, org, repo
+      ssh://scm.company.com:22/stash/org/repo, scm.company.com:22/stash, Bitbucket, org/repo, org, repo
+      ssh://scm.company.com:7999/stash/org/repo, scm.company.com/stash, Bitbucket, org/repo, org, repo
       ssh://scm.company.com:7999/stash/org/repo, scm.company.com:7999/stash, Bitbucket, org/repo, org, repo
 
       https://scm.company.com/very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, Bitbucket, org/repo, org, repo

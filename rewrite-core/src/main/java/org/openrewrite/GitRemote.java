@@ -60,10 +60,10 @@ public class GitRemote {
 
         public Parser registerRemote(Service service, String origin) {
             if (origin.startsWith("https://") || origin.startsWith("http://") || origin.startsWith("ssh://")) {
-                origin = new Parser.HostAndPath(origin).concat();
+                origin = new UrlCleaner(origin).build(service);
             }
             if (origin.contains("@")) {
-                origin = new Parser.HostAndPath("https://" + origin).concat();
+                origin = new UrlCleaner("https://" + origin).build(service);
             }
             if (service == Service.Unknown) {
                 // Do not override a known with an unknown service
@@ -75,17 +75,18 @@ public class GitRemote {
         }
 
         public GitRemote parse(String url) {
-            Parser.HostAndPath hostAndPath = new Parser.HostAndPath(url);
+            UrlCleaner urlCleaner = new UrlCleaner(url);
 
-            String origin = hostAndPath.host;
-            if (hostAndPath.port > 0) {
-                origin = origin + ':' + hostAndPath.port;
+            String origin = urlCleaner.host;
+            if (urlCleaner.port > 0) {
+                origin = origin + ':' + urlCleaner.port;
             }
             Service service = origins.get(origin);
             if (service == null) {
                 for (String maybeOrigin : origins.keySet()) {
-                    if (hostAndPath.concat().startsWith(maybeOrigin)) {
-                        service = origins.get(maybeOrigin);
+                    Service maybeService = origins.get(maybeOrigin);
+                    if (urlCleaner.build(maybeService).startsWith(maybeOrigin)) {
+                        service = maybeService;
                         origin = maybeOrigin;
                         break;
                     }
@@ -95,7 +96,7 @@ public class GitRemote {
             if (service == null) {
                 // If we cannot find a service, we assume the last 2 path segments are the organization and repository name
                 service = Service.Unknown;
-                String hostPath = hostAndPath.concat();
+                String hostPath = urlCleaner.build(service);
                 String[] segments = hostPath.split("/");
                 if (segments.length <= 2) {
                     origin = null;
@@ -104,7 +105,7 @@ public class GitRemote {
                 }
             }
 
-            String repositoryPath = hostAndPath.repositoryPath(origin);
+            String repositoryPath = urlCleaner.repositoryPath(origin, service);
 
             switch (service) {
                 case AzureDevOps:
@@ -132,13 +133,13 @@ public class GitRemote {
             return new GitRemote(service, url, origin, repositoryPath, organization, repositoryName);
         }
 
-        private static class HostAndPath {
+        private static class UrlCleaner {
             String scheme;
             String host;
             int port;
             String path;
 
-            public HostAndPath(String url) {
+            public UrlCleaner(String url) {
                 try {
                     URIish uri = new URIish(url);
                     scheme = uri.getScheme();
@@ -155,12 +156,12 @@ public class GitRemote {
                 }
             }
 
-            private String concat() {
+            private String build(Service service) {
                 StringBuilder builder = new StringBuilder(64);
                 if (host != null) {
                     builder.append(host);
                 }
-                if (!isDefaultPort()) {
+                if (!isDefaultPort(service)) {
                     builder.append(':').append(port);
                 }
                 if (!path.isEmpty()) {
@@ -172,18 +173,19 @@ public class GitRemote {
                 return builder.toString();
             }
 
-            private boolean isDefaultPort() {
+            private boolean isDefaultPort(Service service) {
                 return port < 1 ||
                        ("https".equals(scheme) && port == 443) ||
                        ("http".equals(scheme) && port == 80) ||
-                       ("ssh".equals(scheme) && port == 22);
+                       ("ssh".equals(scheme) && port == 22  && service != Service.Bitbucket) ||
+                       ("ssh".equals(scheme) && port == 7999 && service == Service.Bitbucket);
             }
 
-            private String repositoryPath(@Nullable String origin) {
+            private String repositoryPath(@Nullable String origin, Service service) {
                 if (origin == null) {
                     origin = "";
                 }
-                String hostAndPath = concat();
+                String hostAndPath = build(service);
                 if (!hostAndPath.startsWith(origin)) {
                     throw new IllegalArgumentException("Unable to find origin '" + origin + "' in '" + hostAndPath + "'");
                 }
