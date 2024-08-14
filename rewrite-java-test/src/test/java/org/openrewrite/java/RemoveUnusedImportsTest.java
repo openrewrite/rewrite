@@ -1776,6 +1776,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     void missingTypeReturnValueOfMethodWithArguments() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()),
+          // method with argument should still remove unused import
           java(
             """
               import java.util.List;
@@ -1790,29 +1791,24 @@ class RemoveUnusedImportsTest implements RewriteTest {
               }
               """
           ),
+          // case with missing type should not remove the import
+          java(
+            """
+              import java.util.List;
+              import java.util.GenClass1;
+
+              public abstract class Foo3 {
+                  public abstract GenClass1 m();
+              }
+              """
+          ),
+          // case with missing type and method argument should not remove the import
           java(
             """
               import java.util.GenClass1;
 
               public abstract class Foo2 {
                   public abstract GenClass1 m(String a);
-              }
-              """
-          ),
-          java(
-            """
-              import java.util.List;
-              import java.util.GenClass1;
-
-              public abstract class Foo3 {
-                  public abstract GenClass1 m();
-              }
-              """,
-            """
-              import java.util.GenClass1;
-
-              public abstract class Foo3 {
-                  public abstract GenClass1 m();
               }
               """
           )
