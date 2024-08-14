@@ -61,6 +61,7 @@ public class GitRemote {
         if (service == Service.AzureDevOps) {
             if (ssh) {
                 origin = "ssh." + origin;
+                path = "v3/" + path;
             } else {
                 path = path.replaceFirst("([^/]+)/([^/]+)/(.*)", "$1/$2/_git/$3");
             }
