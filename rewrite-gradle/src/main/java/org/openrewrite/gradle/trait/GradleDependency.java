@@ -119,7 +119,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return null;
         }
 
-        private @Nullable org.openrewrite.gradle.util.Dependency parseDependency(List<Expression> arguments) {
+        private org.openrewrite.gradle.util.@Nullable Dependency parseDependency(List<Expression> arguments) {
             Expression argument = arguments.get(0);
             if (argument instanceof J.Literal) {
                 return DependencyStringNotationConverter.parse((String) ((J.Literal) argument).getValue());
