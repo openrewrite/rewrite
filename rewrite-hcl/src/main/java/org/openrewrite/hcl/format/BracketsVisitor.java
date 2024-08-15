@@ -15,12 +15,12 @@
  */
 package org.openrewrite.hcl.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.BracketsStyle;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;

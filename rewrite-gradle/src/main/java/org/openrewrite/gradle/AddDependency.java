@@ -17,13 +17,13 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;

@@ -19,12 +19,12 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
 import org.openrewrite.hcl.internal.grammar.HCLParserBaseVisitor;
 import org.openrewrite.hcl.tree.*;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
@@ -660,8 +660,8 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         });
     }
 
-    @NonNull
-    private Hcl.Identifier visitIdentifier(TerminalNode identifier) {
+
+    private Hcl.@NonNull Identifier visitIdentifier(TerminalNode identifier) {
         Hcl.Identifier ident = new Hcl.Identifier(randomId(), Space.format(prefix(identifier)),
                 Markers.EMPTY, identifier.getText());
         skip(identifier);

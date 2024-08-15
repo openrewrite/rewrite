@@ -16,11 +16,11 @@
 package org.openrewrite.yaml;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.remote.RemoteArtifactCache;
 import org.openrewrite.remote.RemoteExecutionContextView;
 import org.openrewrite.test.MockHttpSender;

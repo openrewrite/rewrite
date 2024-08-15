@@ -15,8 +15,8 @@
  */
 package org.openrewrite.yaml.style;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.search.FindIndentYamlVisitor;

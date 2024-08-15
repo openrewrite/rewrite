@@ -17,10 +17,10 @@ package org.openrewrite.marker;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Objects;
 import java.util.UUID;

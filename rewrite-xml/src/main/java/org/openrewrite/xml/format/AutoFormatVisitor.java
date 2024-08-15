@@ -15,9 +15,9 @@
  */
 package org.openrewrite.xml.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.xml.XmlVisitor;

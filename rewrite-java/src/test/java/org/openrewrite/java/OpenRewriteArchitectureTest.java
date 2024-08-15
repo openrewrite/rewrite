@@ -21,7 +21,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.*;
-import org.openrewrite.internal.lang.NonNullApi;
+import org.jspecify.annotations.NullMarked;
 
 import static com.tngtech.archunit.base.DescribedPredicate.doNot;
 import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
@@ -65,7 +65,7 @@ public class OpenRewriteArchitectureTest {
             @Override
             public void check(JavaPackage javaPackage, ConditionEvents events) {
                 javaPackage.tryGetPackageInfo()
-                        .filter(packageInfo -> !packageInfo.isAnnotatedWith(NonNullApi.class))
+                        .filter(packageInfo -> !packageInfo.isAnnotatedWith(NullMarked.class))
                         .ifPresent(packageInfo -> events.add(SimpleConditionEvent.violated(javaPackage,
                                 String.format("Package '%s' is not annotated as @NonNullApi", javaPackage.getName()))));
             }

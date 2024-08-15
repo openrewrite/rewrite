@@ -17,9 +17,9 @@ package org.openrewrite.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.table.CommitsByDay;
 import org.openrewrite.table.DistinctCommitters;

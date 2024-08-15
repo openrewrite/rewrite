@@ -15,10 +15,10 @@
  */
 package org.openrewrite.gradle.trait;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 

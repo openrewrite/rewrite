@@ -15,10 +15,10 @@
  */
 package org.openrewrite.properties;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {

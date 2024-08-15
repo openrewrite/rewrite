@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
@@ -44,7 +44,7 @@ public class FindInheritedFields {
             this.fullyQualifiedName = fullyQualifiedName;
         }
 
-        private Set<JavaType.Variable> superFields(@Nullable JavaType.FullyQualified type) {
+        private Set<JavaType.Variable> superFields(JavaType.@Nullable FullyQualified type) {
             if (type == null || type.getSupertype() == null) {
                 return emptySet();
             }

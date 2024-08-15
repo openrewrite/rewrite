@@ -22,11 +22,11 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -456,7 +456,7 @@ public class MavenPomDownloader {
         return new ArrayList<>(merged);
     }
 
-    private @Nullable MavenMetadata.Snapshot maxSnapshot(@Nullable MavenMetadata.Snapshot s1, @Nullable MavenMetadata.Snapshot s2) {
+    private @Nullable MavenMetadata.Snapshot maxSnapshot(MavenMetadata.@Nullable Snapshot s1, MavenMetadata.@Nullable Snapshot s2) {
         // apparently the snapshot timestamp is not always present in the metadata
         if (s1 == null || s1.getTimestamp() == null) {
             return s2;

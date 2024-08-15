@@ -17,9 +17,9 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -100,8 +100,8 @@ public class ChangeType extends Recipe {
         private final JavaType.Class originalType;
         private final JavaType targetType;
 
-        @Nullable
-        private J.Identifier importAlias;
+
+        private J.@Nullable Identifier importAlias;
 
         @Nullable
         private final Boolean ignoreDefinition;
@@ -484,7 +484,7 @@ public class ChangeType extends Recipe {
             return oldType;
         }
 
-        private @Nullable JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
+        private @Nullable JavaType.Method updateType(JavaType.@Nullable Method oldMethodType) {
             if (oldMethodType != null) {
                 JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
                 if (method != null) {
@@ -502,7 +502,7 @@ public class ChangeType extends Recipe {
             return null;
         }
 
-        private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
+        private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified;
         }
     }
@@ -632,7 +632,7 @@ public class ChangeType extends Recipe {
             return oldType;
         }
 
-        private @Nullable JavaType.Method updateType(@Nullable JavaType.Method mt) {
+        private @Nullable JavaType.Method updateType(JavaType.@Nullable Method mt) {
             if (mt != null) {
                 return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
                         .withReturnType(updateType(mt.getReturnType()))
@@ -641,7 +641,7 @@ public class ChangeType extends Recipe {
             return null;
         }
 
-        private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
+        private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName());
         }
     }

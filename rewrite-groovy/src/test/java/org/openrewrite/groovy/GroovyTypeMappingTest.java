@@ -15,12 +15,12 @@
  */
 package org.openrewrite.groovy;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMappingTest;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.tree.JavaType;

@@ -21,10 +21,10 @@ import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
@@ -87,8 +87,7 @@ public class BlockStatementTemplateGenerator {
         new JavaIsoVisitor<Integer>() {
             boolean done = false;
 
-            @Nullable
-            J.Block blockEnclosingTemplateComment;
+            J.@Nullable Block blockEnclosingTemplateComment;
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {

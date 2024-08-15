@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.SemanticallyEqual;

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigInteger;
 import java.util.*;
@@ -149,7 +149,7 @@ public class Version implements Comparable<Version> {
             return (this.kind & 2) == 0;
         }
 
-        public int compareTo(@Nullable Version.Item that) {
+        public int compareTo(Version.@Nullable Item that) {
             int rel;
             if (that == null) {
                 switch (this.kind) {

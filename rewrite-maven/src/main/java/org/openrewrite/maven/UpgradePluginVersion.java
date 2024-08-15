@@ -17,8 +17,8 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.ci.GithubActionsBuildEnvironment;
 import org.openrewrite.maven.search.FindPlugin;
 import org.openrewrite.maven.table.MavenMetadataFailures;

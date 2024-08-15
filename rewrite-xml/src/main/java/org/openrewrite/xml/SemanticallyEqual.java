@@ -15,7 +15,7 @@
  */
 package org.openrewrite.xml;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 

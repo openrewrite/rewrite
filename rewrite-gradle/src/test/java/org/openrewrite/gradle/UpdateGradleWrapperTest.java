@@ -15,10 +15,10 @@
  */
 package org.openrewrite.gradle;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;

@@ -19,7 +19,7 @@ import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.JCTree;
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
@@ -401,7 +401,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private @Nullable JavaType.Variable variableType(@Nullable Symbol symbol,
-                                           @Nullable JavaType.FullyQualified owner) {
+            JavaType.@Nullable FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
         }
@@ -547,7 +547,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
      * @param declaringType The method's declaring type.
      * @return Method type attribution.
      */
-    public @Nullable JavaType.Method methodDeclarationType(@Nullable Symbol symbol, @Nullable JavaType.FullyQualified declaringType) {
+    public @Nullable JavaType.Method methodDeclarationType(@Nullable Symbol symbol, JavaType.@Nullable FullyQualified declaringType) {
         // if the symbol is not a method symbol, there is a parser error in play
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
