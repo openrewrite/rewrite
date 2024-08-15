@@ -35,7 +35,8 @@ class RecipeValidationTest {
     public static class JSpecifyAnnotatedRecipeOptions extends Recipe {
 
         @Option(displayName = "An optional field",
-                description = "Something that can be null.")
+                description = "Something that can be null.",
+                example = "Anything")
         @Nullable
         String optionalField;
 
