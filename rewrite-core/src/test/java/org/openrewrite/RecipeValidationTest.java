@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RecipeValidationTest {
+class RecipeValidationTest {
 
     @Test
     void validate() {
@@ -33,8 +33,9 @@ public class RecipeValidationTest {
     @Value
     @EqualsAndHashCode(callSuper = false)
     public static class JSpecifyAnnotatedRecipeOptions extends Recipe {
+
         @Option(displayName = "An optional field",
-          description = "Something that can be null.")
+                description = "Something that can be null.")
         @Nullable
         String optionalField;
 
