@@ -15,10 +15,12 @@
 #
 
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.jspecify.MigrateFromOpenRewriteAnnotations
-displayName: Migrate OpenRewrite nullable annotations to JSpecify
+name: org.openrewrite.java.jspecify.MigrateFromOpenRewriteAnnotations
+displayName: Migrate to JSpecify
 description: Migrate from OpenRewrite's JSR-305 meta-annotations to JSpecify.
 recipeList:
+  - org.openrewrite.staticanalysis.java.MoveFieldAnnotationToType:
+      annotationType: org.openrewrite.internal.lang.*
   - org.openrewrite.java.ChangeType:
       oldFullyQualifiedTypeName: org.openrewrite.internal.lang.Nullable
       newFullyQualifiedTypeName: org.jspecify.annotations.Nullable
@@ -35,7 +37,9 @@ recipeList:
       groupId: org.jspecify
       artifactId: jspecify
       version: latest.release
-      onlyIfUsing: org.jspecify.annotations..*
+      onlyIfUsing: org.openrewrite.internal.lang.*Null*
       configuration: implementation
       scope: compile
       acceptTransitive: true
+
+
