@@ -49,7 +49,6 @@ import static org.openrewrite.java.tree.Space.format;
 public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private final Attr attr;
 
-
     private final Symbol.@Nullable TypeSymbol symbol;
 
     @Nullable
