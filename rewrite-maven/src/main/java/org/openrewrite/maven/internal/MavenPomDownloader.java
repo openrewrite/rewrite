@@ -22,11 +22,11 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -382,7 +382,7 @@ public class MavenPomDownloader {
         }
     }
 
-    private @Nullable MavenMetadata.Versioning directoryToVersioning(String uri, GroupArtifactVersion gav) throws MavenDownloadingException {
+    private MavenMetadata.@Nullable Versioning directoryToVersioning(String uri, GroupArtifactVersion gav) throws MavenDownloadingException {
         Path dir = Paths.get(URI.create(uri));
         if (Files.exists(dir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
@@ -400,7 +400,7 @@ public class MavenPomDownloader {
         return null;
     }
 
-    private @Nullable MavenMetadata.Versioning htmlIndexToVersioning(String responseBody, String uri) {
+    private MavenMetadata.@Nullable Versioning htmlIndexToVersioning(String responseBody, String uri) {
         // A very primitive approach, this just finds hrefs with trailing "/",
         List<String> versions = new ArrayList<>();
         int start = responseBody.indexOf("<a href=\"");
@@ -456,7 +456,7 @@ public class MavenPomDownloader {
         return new ArrayList<>(merged);
     }
 
-    private @Nullable MavenMetadata.Snapshot maxSnapshot(@Nullable MavenMetadata.Snapshot s1, @Nullable MavenMetadata.Snapshot s2) {
+    private MavenMetadata.@Nullable Snapshot maxSnapshot(MavenMetadata.@Nullable Snapshot s1, MavenMetadata.@Nullable Snapshot s2) {
         // apparently the snapshot timestamp is not always present in the metadata
         if (s1 == null || s1.getTimestamp() == null) {
             return s2;

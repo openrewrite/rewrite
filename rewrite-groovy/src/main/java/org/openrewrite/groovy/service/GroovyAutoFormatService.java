@@ -15,9 +15,9 @@
  */
 package org.openrewrite.groovy.service;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.groovy.format.AutoFormatVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.AutoFormatService;
 

@@ -17,8 +17,8 @@ package org.openrewrite.xml.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
@@ -81,7 +81,7 @@ public class FindTags extends Recipe {
      */
     @SuppressWarnings("unused")
     @Incubating(since = "7.33.0")
-    public static @Nullable Xml.Tag findSingle(Xml x, String xPath) {
+    public static Xml.@Nullable Tag findSingle(Xml x, String xPath) {
         final Set<Xml.Tag> tags = find(x, xPath);
         if (tags.size() != 1) {
             return null;

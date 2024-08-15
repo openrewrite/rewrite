@@ -15,8 +15,8 @@
  */
 package org.openrewrite.test;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.quark.QuarkParser;
 import org.openrewrite.text.PlainText;

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -33,10 +33,9 @@ public interface MethodCall extends Expression {
     @Override
     MethodCall withType(@Nullable JavaType type);
 
-    @Nullable
-    JavaType.Method getMethodType();
+    JavaType.@Nullable Method getMethodType();
 
-    MethodCall withMethodType(@Nullable JavaType.Method methodType);
+    MethodCall withMethodType(JavaType.@Nullable Method methodType);
 
     List<Expression> getArguments();
 

@@ -15,10 +15,10 @@
  */
 package org.openrewrite.properties;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
@@ -50,7 +50,7 @@ public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
     }
 
     //Note: Properties.Value does not currently implement Properties, so this is a bit of an outlier.
-    public @Nullable Properties.Value visitValue(Properties.Value value, P p) {
+    public Properties.@Nullable Value visitValue(Properties.Value value, P p) {
         return value.withMarkers(visitMarkers(value.getMarkers(), p));
     }
 

@@ -15,13 +15,13 @@
  */
 package org.openrewrite.gradle;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -118,7 +118,7 @@ public class DependencyUseStringNotation extends Recipe {
                 return m;
             }
 
-            private @Nullable J.Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
+            private J.@Nullable Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
                 if (mapNotation.containsKey("group") && mapNotation.containsKey("name")) {
                     String stringNotation = "";
 

@@ -23,9 +23,9 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.tree.*;
 
 import javax.xml.bind.annotation.XmlRootElement;
