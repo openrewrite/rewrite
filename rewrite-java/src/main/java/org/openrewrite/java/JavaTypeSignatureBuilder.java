@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * In addition to the signature formats described below, implementations should provide a way of retrieving method

@@ -15,9 +15,9 @@
  */
 package org.openrewrite.tree;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.charset.Charset;
 

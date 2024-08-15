@@ -22,9 +22,9 @@ import com.sun.jna.platform.win32.Kernel32Util;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.With;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
 
 import java.io.File;
 import java.nio.file.Files;

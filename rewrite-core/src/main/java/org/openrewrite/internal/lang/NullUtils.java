@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal.lang;
 
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.Option;
 
 import java.lang.annotation.Annotation;
@@ -119,6 +120,12 @@ public class NullUtils {
 
     private static boolean fieldHasNonNullableAnnotation(Field field) {
         for (Annotation a : field.getDeclaredAnnotations()) {
+            String simpleName = a.annotationType().getSimpleName();
+            if (FIELD_LEVEL_NON_NULL_ANNOTATIONS.contains(simpleName)) {
+                return true;
+            }
+        }
+        for (Annotation a : field.getAnnotatedType().getDeclaredAnnotations()) {
             String simpleName = a.annotationType().getSimpleName();
             if (FIELD_LEVEL_NON_NULL_ANNOTATIONS.contains(simpleName)) {
                 return true;

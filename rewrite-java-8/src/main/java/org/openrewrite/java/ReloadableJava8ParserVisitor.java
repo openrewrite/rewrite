@@ -25,12 +25,12 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
@@ -2055,7 +2055,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return annotations;
     }
 
-    Space formatWithCommentTree(String prefix, JCTree tree, @Nullable DCTree.DCDocComment commentTree) {
+    Space formatWithCommentTree(String prefix, JCTree tree, DCTree.@Nullable DCDocComment commentTree) {
         Space fmt = format(prefix);
         if (commentTree != null) {
             List<Comment> comments = fmt.getComments();

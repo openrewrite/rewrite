@@ -16,7 +16,7 @@
 package org.openrewrite.maven.cache;
 
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.*;
 

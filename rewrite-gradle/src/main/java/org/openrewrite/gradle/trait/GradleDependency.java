@@ -17,12 +17,12 @@ package org.openrewrite.gradle.trait;
 
 import lombok.Getter;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.Dependency;
@@ -119,7 +119,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return null;
         }
 
-        private @Nullable org.openrewrite.gradle.util.Dependency parseDependency(List<Expression> arguments) {
+        private org.openrewrite.gradle.util.@Nullable Dependency parseDependency(List<Expression> arguments) {
             Expression argument = arguments.get(0);
             if (argument instanceof J.Literal) {
                 return DependencyStringNotationConverter.parse((String) ((J.Literal) argument).getValue());

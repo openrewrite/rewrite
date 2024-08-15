@@ -16,8 +16,8 @@
 package org.openrewrite.maven;
 
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.xml.XmlIsoVisitor;

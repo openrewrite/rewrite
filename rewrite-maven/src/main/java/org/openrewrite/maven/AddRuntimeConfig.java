@@ -17,9 +17,9 @@ package org.openrewrite.maven;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 

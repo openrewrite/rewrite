@@ -15,10 +15,10 @@
  */
 package org.openrewrite.maven;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.XPathMatcher;
@@ -44,8 +44,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
 
-    @Nullable
-    private transient Xml.Document document;
+
+    private transient Xml.@Nullable Document document;
 
     @Nullable
     private transient MavenResolutionResult resolutionResult;

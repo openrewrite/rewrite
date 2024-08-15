@@ -15,7 +15,7 @@
  */
 package org.openrewrite.semver;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Comparator;

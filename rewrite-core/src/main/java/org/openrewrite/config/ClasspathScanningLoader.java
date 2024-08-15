@@ -20,12 +20,12 @@ import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 
 import java.lang.reflect.Constructor;

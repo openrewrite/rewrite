@@ -17,9 +17,9 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -245,7 +245,7 @@ public class ChangeParentPom extends Recipe {
                 return t;
             }
 
-            private boolean mismatches(@Nullable Xml.Tag relativePath, @Nullable String targetRelativePath) {
+            private boolean mismatches(Xml.@Nullable Tag relativePath, @Nullable String targetRelativePath) {
                 if (relativePath == null) {
                     return targetRelativePath != null;
                 }
