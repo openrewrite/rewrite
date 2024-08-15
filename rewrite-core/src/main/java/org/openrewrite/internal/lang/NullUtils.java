@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal.lang;
 
-import org.jspecify.annotations.NonNull;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.Option;
 
 import java.lang.annotation.Annotation;

@@ -17,7 +17,7 @@ package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
-import org.jspecify.annotations.NonNull;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.NullFields;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;

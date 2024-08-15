@@ -18,7 +18,7 @@ package org.openrewrite.test;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.Delegate;
 import org.assertj.core.api.SoftAssertions;
-import org.jspecify.annotations.NonNull;
+import org.openrewrite.internal.lang.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;

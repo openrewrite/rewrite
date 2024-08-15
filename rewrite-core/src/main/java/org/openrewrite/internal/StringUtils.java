@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import org.jspecify.annotations.NonNull;
+import org.openrewrite.internal.lang.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
