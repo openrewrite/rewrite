@@ -45,7 +45,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
 
     private final JavaTypeCache typeCache;
 
-    public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
+    public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
                 type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
@@ -464,7 +464,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    public JavaType.@Nullable Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
+    public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
