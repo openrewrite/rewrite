@@ -15,10 +15,10 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
@@ -645,7 +645,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             return visitClassDeclaration0(classDecl, null, p);
         }
 
-        private J.ClassDeclaration visitClassDeclaration0(J.ClassDeclaration classDecl, @Nullable K.TypeConstraints typeConstraints, PrintOutputCapture<P> p) {
+        private J.ClassDeclaration visitClassDeclaration0(J.ClassDeclaration classDecl, K.@Nullable TypeConstraints typeConstraints, PrintOutputCapture<P> p) {
             beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
             visit(classDecl.getLeadingAnnotations(), p);
             for (J.Modifier m : classDecl.getModifiers()) {
@@ -884,7 +884,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             return visitMethodDeclaration0(method, null, p);
         }
 
-        private J.MethodDeclaration visitMethodDeclaration0(J.MethodDeclaration method, @Nullable K.TypeConstraints typeConstraints, PrintOutputCapture<P> p) {
+        private J.MethodDeclaration visitMethodDeclaration0(J.MethodDeclaration method, K.@Nullable TypeConstraints typeConstraints, PrintOutputCapture<P> p) {
             // Do not print generated methods.
             for (Marker marker : method.getMarkers().getMarkers()) {
                 if (marker instanceof Implicit || marker instanceof PrimaryConstructor) {
@@ -1404,7 +1404,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
     }
 
-    private void beforeSyntax(Space prefix, Markers markers, @Nullable KSpace.Location loc, PrintOutputCapture<P> p) {
+    private void beforeSyntax(Space prefix, Markers markers, KSpace.@Nullable Location loc, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
@@ -1421,7 +1421,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         beforeSyntax(k.getPrefix(), k.getMarkers(), loc, p);
     }
 
-    private void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
+    private void beforeSyntax(Space prefix, Markers markers, Space.@Nullable Location loc, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }

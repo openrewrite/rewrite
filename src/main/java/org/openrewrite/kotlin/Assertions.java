@@ -17,9 +17,9 @@ package org.openrewrite.kotlin;
 
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ThrowingConsumer;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.marker.Extension;

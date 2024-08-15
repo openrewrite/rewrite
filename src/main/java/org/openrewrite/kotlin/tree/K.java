@@ -20,9 +20,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
@@ -1552,9 +1552,9 @@ public interface K extends J {
                         JContainer<TypeParameter> typeParameters,
                         @Nullable JRightPadded<J.VariableDeclarations> paddedVariableDeclarations,
                         @Nullable VariableDeclarations variableDeclarations,
-                        @Nullable K.TypeConstraints typeConstraints,
-                        @Nullable @JsonProperty("getter") J.MethodDeclaration getter,
-                        @Nullable @JsonProperty("setter") J.MethodDeclaration setter,
+                K.@Nullable TypeConstraints typeConstraints,
+                @JsonProperty("getter") J.@Nullable MethodDeclaration getter,
+                @JsonProperty("setter") J.@Nullable MethodDeclaration setter,
                         @Nullable @JsonProperty("isSetterFirst") Boolean isSetterFirst,
                         JContainer<J.MethodDeclaration> accessors,
                         @Nullable JRightPadded<Expression> receiver
@@ -1687,10 +1687,9 @@ public interface K extends J {
 
         J.Return expression;
 
-        @Nullable
-        J.Identifier label;
+        J.@Nullable Identifier label;
 
-        public Return(UUID id, J.Return expression, @Nullable J.Identifier label) {
+        public Return(UUID id, J.Return expression, J.@Nullable Identifier label) {
             this(id, Collections.emptyList(), expression, label);
         }
 
@@ -1923,8 +1922,7 @@ public interface K extends J {
         Space prefix;
         Markers markers;
 
-        @Nullable
-        J.Identifier label;
+        J.@Nullable Identifier label;
 
         @Nullable
         JavaType type;

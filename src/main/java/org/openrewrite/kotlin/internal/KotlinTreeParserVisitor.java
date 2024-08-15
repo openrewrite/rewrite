@@ -38,14 +38,14 @@ import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.ParseUtilsKt;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Quoted;
@@ -1923,7 +1923,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return mapFunctionCall(expression, data);
     }
 
-    private @Nullable J.AssignmentOperation.Type mapAssignmentOperationType(KtOperationReferenceExpression operationReference) {
+    private J.AssignmentOperation.@Nullable Type mapAssignmentOperationType(KtOperationReferenceExpression operationReference) {
         IElementType elementType = operationReference.getOperationSignTokenType();
 
         if (elementType == KtTokens.PLUSEQ) {
@@ -3301,7 +3301,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     /*====================================================================
      * Mapping methods
      * ====================================================================*/
-    private @Nullable K.Binary.Type mapKBinaryType(KtOperationReferenceExpression operationReference) {
+    private K.Binary.@Nullable Type mapKBinaryType(KtOperationReferenceExpression operationReference) {
         IElementType elementType = operationReference.getOperationSignTokenType();
         if (elementType == null) {
             return null;
@@ -3328,7 +3328,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
     }
 
-    private @Nullable J.Binary.Type mapJBinaryType(KtOperationReferenceExpression operationReference) {
+    private J.Binary.@Nullable Type mapJBinaryType(KtOperationReferenceExpression operationReference) {
         IElementType elementType = operationReference.getOperationSignTokenType();
 
         if (elementType == null) {
@@ -3378,7 +3378,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return null;
     }
 
-    private @Nullable J.Unary.Type mapJUnaryType(KtSimpleNameExpression operationReference) {
+    private J.Unary.@Nullable Type mapJUnaryType(KtSimpleNameExpression operationReference) {
         IElementType elementType = operationReference.getReferencedNameElementType();
 
         if (elementType == KtTokens.EXCL) {
@@ -3444,7 +3444,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 Space.EMPTY);
     }
 
-    private @Nullable J.If.Else buildIfElsePart(KtIfExpression expression) {
+    private J.If.@Nullable Else buildIfElsePart(KtIfExpression expression) {
         if (expression.getElse() == null) {
             return null;
         }
@@ -3637,15 +3637,15 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return psiElementAssociations.primitiveType(psi);
     }
 
-    private @Nullable JavaType.Variable variableType(PsiElement psi, @Nullable FirElement parent) {
+    private JavaType.@Nullable Variable variableType(PsiElement psi, @Nullable FirElement parent) {
         return psiElementAssociations.variableType(psi, parent);
     }
 
-    private @Nullable JavaType.Method methodDeclarationType(PsiElement psi) {
+    private JavaType.@Nullable Method methodDeclarationType(PsiElement psi) {
         return psiElementAssociations.methodDeclarationType(psi);
     }
 
-    private @Nullable JavaType.Method methodInvocationType(PsiElement psi) {
+    private JavaType.@Nullable Method methodInvocationType(PsiElement psi) {
         return psiElementAssociations.methodInvocationType(psi);
     }
 
@@ -3669,7 +3669,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private J.Identifier createIdentifier(String name, Space prefix,
                                           @Nullable JavaType type,
-                                          @Nullable JavaType.Variable fieldType) {
+            JavaType.@Nullable Variable fieldType) {
         Markers markers = Markers.EMPTY;
         String updated = name;
         if (name.startsWith("`")) {

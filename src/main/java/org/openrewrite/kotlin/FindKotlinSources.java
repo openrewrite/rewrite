@@ -17,8 +17,8 @@ package org.openrewrite.kotlin;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.kotlin.table.KotlinSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.SearchResult;
@@ -65,7 +65,7 @@ public class FindKotlinSources extends Recipe {
                 return tree;
             }
 
-            private @Nullable KotlinSourceFile.SourceFileType getSourceFileType(SourceFile sourceFile) {
+            private KotlinSourceFile.@Nullable SourceFileType getSourceFileType(SourceFile sourceFile) {
                 KotlinSourceFile.SourceFileType sourceFileType = null;
                 if (sourceFile instanceof K.CompilationUnit) {
                     sourceFileType = KotlinSourceFile.SourceFileType.Kotlin;

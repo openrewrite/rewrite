@@ -16,9 +16,9 @@
 package org.openrewrite.kotlin;
 
 import lombok.EqualsAndHashCode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindMethods;

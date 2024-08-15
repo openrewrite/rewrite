@@ -17,8 +17,8 @@ package org.openrewrite.kotlin.cleanup;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
@@ -37,8 +37,8 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class EqualsMethodUsage extends Recipe {
-    @Nullable
-    private static J.Binary equalsBinaryTemplate;
+
+    private static J.@Nullable Binary equalsBinaryTemplate;
 
     @Override
     public String getDisplayName() {
