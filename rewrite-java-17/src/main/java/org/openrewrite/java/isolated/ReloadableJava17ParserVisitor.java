@@ -2139,7 +2139,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return annotations;
     }
 
-    Space formatWithCommentTree(String prefix, JCTree tree, @Nullable DCTree.DCDocComment commentTree) {
+    Space formatWithCommentTree(String prefix, JCTree tree, DCTree.@Nullable DCDocComment commentTree) {
         Space fmt = format(prefix);
         if (commentTree != null) {
             List<Comment> comments = fmt.getComments();
