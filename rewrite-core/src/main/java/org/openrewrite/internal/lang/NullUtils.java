@@ -125,6 +125,12 @@ public class NullUtils {
                 return true;
             }
         }
+        for (Annotation a : field.getAnnotatedType().getDeclaredAnnotations()) {
+            String simpleName = a.annotationType().getSimpleName();
+            if (FIELD_LEVEL_NON_NULL_ANNOTATIONS.contains(simpleName)) {
+                return true;
+            }
+        }
         return false;
     }
 
