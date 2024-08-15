@@ -15,11 +15,11 @@
  */
 package org.openrewrite.test;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;
 import java.util.*;

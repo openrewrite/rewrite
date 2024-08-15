@@ -15,6 +15,9 @@
  */
 package org.openrewrite.internal.lang;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
+
 import javax.annotation.meta.TypeQualifierNickname;
 import java.lang.annotation.*;
 
@@ -27,7 +30,7 @@ import java.lang.annotation.*;
  * <p>Can be used in association with {@code NonNullApi} or {@code @NonNullFields} to
  * override the default non-nullable semantic to nullable.
  *
- * @see NonNullApi
+ * @see NullMarked
  * @see NonNullFields
  * @see NonNull
  * @deprecated Use {@link org.jspecify.annotations.Nullable} instead.

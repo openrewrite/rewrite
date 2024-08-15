@@ -21,8 +21,8 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
@@ -184,7 +184,7 @@ public class MethodMatcher {
                this.targetTypePattern != null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
     }
 
-    boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
+    boolean matchesTargetType(JavaType.@Nullable FullyQualified type) {
         return TypeUtils.isOfTypeWithName(
                 type,
                 matchOverrides,
@@ -215,7 +215,7 @@ public class MethodMatcher {
         return argumentPattern.matcher(joiner.toString()).matches();
     }
 
-    public boolean matches(@Nullable JavaType.Method type) {
+    public boolean matches(JavaType.@Nullable Method type) {
         if (type == null) {
             return false;
         }
@@ -316,7 +316,7 @@ public class MethodMatcher {
      * Using matchUnknownTypes can improve Visitor resiliency for an AST with missing type information, but
      * also increases the risk of false-positive matches on unrelated MethodInvocation instances.
      */
-    public boolean matches(@Nullable J.MethodInvocation method, boolean matchUnknownTypes) {
+    public boolean matches(J.@Nullable MethodInvocation method, boolean matchUnknownTypes) {
         if (method == null) {
             return false;
         }

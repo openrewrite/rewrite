@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.TerminalNode;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.grammar.VersionRangeLexer;
 import org.openrewrite.maven.internal.grammar.VersionRangeParser;

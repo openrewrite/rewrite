@@ -19,7 +19,7 @@ import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.JCTree;
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Flag;
@@ -396,12 +396,12 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
-    public @Nullable JavaType.Variable variableType(@Nullable Symbol symbol) {
+    public JavaType.@Nullable Variable variableType(@Nullable Symbol symbol) {
         return variableType(symbol, null);
     }
 
-    private @Nullable JavaType.Variable variableType(@Nullable Symbol symbol,
-                                           @Nullable JavaType.FullyQualified owner) {
+    private JavaType.@Nullable Variable variableType(@Nullable Symbol symbol,
+            JavaType.@Nullable FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
         }
@@ -447,7 +447,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    public @Nullable JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
+    public JavaType.@Nullable Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
@@ -547,7 +547,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
      * @param declaringType The method's declaring type.
      * @return Method type attribution.
      */
-    public @Nullable JavaType.Method methodDeclarationType(@Nullable Symbol symbol, @Nullable JavaType.FullyQualified declaringType) {
+    public JavaType.@Nullable Method methodDeclarationType(@Nullable Symbol symbol, JavaType.@Nullable FullyQualified declaringType) {
         // if the symbol is not a method symbol, there is a parser error in play
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 

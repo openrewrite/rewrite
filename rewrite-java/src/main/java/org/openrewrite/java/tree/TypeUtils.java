@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.tree;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 
@@ -155,7 +155,7 @@ public class TypeUtils {
      */
     @Incubating(since = "8.1.4")
     public static boolean isOfTypeWithName(
-            @Nullable JavaType.FullyQualified type,
+            JavaType.@Nullable FullyQualified type,
             boolean matchOverride,
             Predicate<String> matcher
     ) {
@@ -407,27 +407,27 @@ public class TypeUtils {
         return false;
     }
 
-    public static @Nullable JavaType.Class asClass(@Nullable JavaType type) {
+    public static JavaType.@Nullable Class asClass(@Nullable JavaType type) {
         return type instanceof JavaType.Class ? (JavaType.Class) type : null;
     }
 
-    public static @Nullable JavaType.Parameterized asParameterized(@Nullable JavaType type) {
+    public static JavaType.@Nullable Parameterized asParameterized(@Nullable JavaType type) {
         return type instanceof JavaType.Parameterized ? (JavaType.Parameterized) type : null;
     }
 
-    public static @Nullable JavaType.Array asArray(@Nullable JavaType type) {
+    public static JavaType.@Nullable Array asArray(@Nullable JavaType type) {
         return type instanceof JavaType.Array ? (JavaType.Array) type : null;
     }
 
-    public static @Nullable JavaType.GenericTypeVariable asGeneric(@Nullable JavaType type) {
+    public static JavaType.@Nullable GenericTypeVariable asGeneric(@Nullable JavaType type) {
         return type instanceof JavaType.GenericTypeVariable ? (JavaType.GenericTypeVariable) type : null;
     }
 
-    public static @Nullable JavaType.Primitive asPrimitive(@Nullable JavaType type) {
+    public static JavaType.@Nullable Primitive asPrimitive(@Nullable JavaType type) {
         return type instanceof JavaType.Primitive ? (JavaType.Primitive) type : null;
     }
 
-    public static @Nullable JavaType.FullyQualified asFullyQualified(@Nullable JavaType type) {
+    public static JavaType.@Nullable FullyQualified asFullyQualified(@Nullable JavaType type) {
         if (type instanceof JavaType.FullyQualified && !(type instanceof JavaType.Unknown)) {
             return (JavaType.FullyQualified) type;
         }
@@ -440,7 +440,7 @@ public class TypeUtils {
      * @return `true` if a superclass or implemented interface declares a non-private method with matching signature.
      * `false` if a match is not found or the method, declaring type, or generic signature is null.
      */
-    public static boolean isOverride(@Nullable JavaType.Method method) {
+    public static boolean isOverride(JavaType.@Nullable Method method) {
         return findOverriddenMethod(method).isPresent();
     }
 
@@ -453,7 +453,7 @@ public class TypeUtils {
      *
      * @return An optional overridden method type declared in the parent.
      */
-    public static Optional<JavaType.Method> findOverriddenMethod(@Nullable JavaType.Method method) {
+    public static Optional<JavaType.Method> findOverriddenMethod(JavaType.@Nullable Method method) {
         if (method == null) {
             return Optional.empty();
         }
@@ -476,7 +476,7 @@ public class TypeUtils {
                 .filter(m -> m.getFlags().contains(Flag.Public) || m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
     }
 
-    public static Optional<JavaType.Method> findDeclaredMethod(@Nullable JavaType.FullyQualified clazz, String name, List<JavaType> argumentTypes) {
+    public static Optional<JavaType.Method> findDeclaredMethod(JavaType.@Nullable FullyQualified clazz, String name, List<JavaType> argumentTypes) {
         if (clazz == null) {
             return Optional.empty();
         }
@@ -578,7 +578,7 @@ public class TypeUtils {
         return true;
     }
 
-    public static JavaType.FullyQualified unknownIfNull(@Nullable JavaType.FullyQualified t) {
+    public static JavaType.FullyQualified unknownIfNull(JavaType.@Nullable FullyQualified t) {
         if (t == null) {
             return JavaType.Unknown.getInstance();
         }

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.internal;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 
 import java.lang.reflect.*;

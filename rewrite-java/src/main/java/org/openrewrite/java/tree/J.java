@@ -19,13 +19,13 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.SelfLoathing;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -961,8 +961,7 @@ public interface J extends Tree {
         Markers markers;
 
         @With
-        @Nullable
-        J.Identifier label;
+        J.@Nullable Identifier label;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -1258,8 +1257,7 @@ public interface J extends Tree {
         Block body;
 
         @Getter
-        @Nullable
-        JavaType.FullyQualified type;
+        JavaType.@Nullable FullyQualified type;
 
         @SuppressWarnings("unchecked")
         @Override
@@ -1634,8 +1632,7 @@ public interface J extends Tree {
         Markers markers;
 
         @With
-        @Nullable
-        J.Identifier label;
+        J.@Nullable Identifier label;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2451,14 +2448,13 @@ public interface J extends Tree {
         @Nullable
         JavaType type;
 
-        @Nullable
-        JavaType.Variable fieldType;
+        JavaType.@Nullable Variable fieldType;
 
         /**
          * @deprecated Use {@link #Identifier(UUID, Space, Markers, List, String, JavaType, JavaType.Variable)} instead.
          */
         @Deprecated
-        public Identifier(UUID id, Space prefix, Markers markers, String simpleName, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {
+        public Identifier(UUID id, Space prefix, Markers markers, String simpleName, @Nullable JavaType type, JavaType.@Nullable Variable fieldType) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
@@ -2673,14 +2669,14 @@ public interface J extends Tree {
             return getPadding().withStatic(this.statik.withElement(statik));
         }
 
-        public @Nullable J.Identifier getAlias() {
+        public J.@Nullable Identifier getAlias() {
             if (alias == null) {
                 return null;
             }
             return alias.getElement();
         }
 
-        public J.Import withAlias(@Nullable J.Identifier alias) {
+        public J.Import withAlias(J.@Nullable Identifier alias) {
             if (this.alias == null) {
                 if (alias == null) {
                     return this;
@@ -3443,17 +3439,15 @@ public interface J extends Tree {
          * In the case of a method reference, this is the method type pointed to by {@link #reference}.
          */
         @With
-        @Nullable
         @Getter
-        JavaType.Method methodType;
+        JavaType.@Nullable Method methodType;
 
         /**
          * In the case of a field reference, this is the field pointed to by {@link #reference}.
          */
         @With
-        @Nullable
         @Getter
-        JavaType.Variable variableType;
+        JavaType.@Nullable Variable variableType;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -3632,10 +3626,9 @@ public interface J extends Tree {
         }
 
         @Getter
-        @Nullable
-        JavaType.Method methodType;
+        JavaType.@Nullable Method methodType;
 
-        public MethodDeclaration withMethodType(@Nullable JavaType.Method type) {
+        public MethodDeclaration withMethodType(JavaType.@Nullable Method type) {
             if (type == this.methodType) {
                 return this;
             }
@@ -3881,12 +3874,12 @@ public interface J extends Tree {
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
 
-        @Nullable
+
         @Getter
-        JavaType.Method methodType;
+        JavaType.@Nullable Method methodType;
 
         @Override
-        public MethodInvocation withMethodType(@Nullable JavaType.Method type) {
+        public MethodInvocation withMethodType(JavaType.@Nullable Method type) {
             if (type == this.methodType) {
                 return this;
             }
@@ -4387,9 +4380,8 @@ public interface J extends Tree {
         Block body;
 
         @With
-        @Nullable
         @Getter
-        JavaType.Method constructorType;
+        JavaType.@Nullable Method constructorType;
 
         @Override
         public @Nullable JavaType getType() {
@@ -4402,7 +4394,7 @@ public interface J extends Tree {
          * @return The constructor type.
          */
         @Override
-        public @Nullable JavaType.Method getMethodType() {
+        public JavaType.@Nullable Method getMethodType() {
             return getConstructorType();
         }
 
@@ -4413,7 +4405,7 @@ public interface J extends Tree {
          * @return An instance with the new constructor type.
          */
         @Override
-        public NewClass withMethodType(@Nullable JavaType.Method methodType) {
+        public NewClass withMethodType(JavaType.@Nullable Method methodType) {
             return withConstructorType(methodType);
         }
 
@@ -4932,8 +4924,7 @@ public interface J extends Tree {
         }
 
         @Override
-        @NonNull
-        public JavaType.Primitive getType() {
+        public JavaType.@NonNull Primitive getType() {
             return type;
         }
 
@@ -5816,7 +5807,7 @@ public interface J extends Tree {
             return allAnnotations;
         }
 
-        public @Nullable JavaType.FullyQualified getTypeAsFullyQualified() {
+        public JavaType.@Nullable FullyQualified getTypeAsFullyQualified() {
             return typeExpression == null ? null : TypeUtils.asFullyQualified(typeExpression.getType());
         }
 
@@ -5882,9 +5873,8 @@ public interface J extends Tree {
             }
 
             @With
-            @Nullable
             @Getter
-            JavaType.Variable variableType;
+            JavaType.@Nullable Variable variableType;
 
             @Override
             public JavaType getType() {

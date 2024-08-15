@@ -32,9 +32,9 @@ import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -681,7 +681,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return qualifier;
     }
 
-    private @Nullable JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         if (type instanceof JavaType.Class) {
             JavaType.Class classType = (JavaType.Class) type;
 
@@ -737,7 +737,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return false;
     }
 
-    private @Nullable JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;

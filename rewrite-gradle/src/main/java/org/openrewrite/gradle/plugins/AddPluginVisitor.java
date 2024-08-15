@@ -17,6 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.gradle.DependencyVersionSelector;
@@ -27,7 +28,6 @@ import org.openrewrite.gradle.search.FindPlugins;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.tree.*;

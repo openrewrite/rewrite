@@ -17,6 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.GradleParser;
@@ -25,7 +26,6 @@ import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
@@ -101,7 +101,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
 
     private static class MigrateConfigurationVisitor extends GroovyIsoVisitor<ExecutionContext> {
         @Override
-        public @Nullable J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+        public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (m.getSimpleName().equals("gradleEnterprise") && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
                 return m.withName(m.getName().withSimpleName("develocity"));
@@ -236,7 +236,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
             return null;
         }
 
-        private @Nullable J.MethodInvocation develocityPublishAlwaysIfDsl(String indent, ExecutionContext ctx) {
+        private J.@Nullable MethodInvocation develocityPublishAlwaysIfDsl(String indent, ExecutionContext ctx) {
             StringBuilder ge = new StringBuilder("\ndevelocity {\n");
             ge.append(indent).append("buildScan {\n");
             ge.append(indent).append(indent).append("publishing.onlyIf { true }\n");
@@ -255,7 +255,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
             return (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) buildScan.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
         }
 
-        private @Nullable J.MethodInvocation develocityPublishOnFailureIfDsl(String indent, ExecutionContext ctx) {
+        private J.@Nullable MethodInvocation develocityPublishOnFailureIfDsl(String indent, ExecutionContext ctx) {
             StringBuilder ge = new StringBuilder("\ndevelocity {\n");
             ge.append(indent).append("buildScan {\n");
             ge.append(indent).append(indent).append("publishing.onlyIf { !it.buildResult.failures.empty }\n");

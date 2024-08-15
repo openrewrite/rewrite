@@ -16,10 +16,10 @@
 package org.openrewrite.test.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import org.jspecify.annotations.NullMarked;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.test.RewriteTest;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -62,7 +62,7 @@ class RewriteTestTest implements RewriteTest {
 }
 
 @SuppressWarnings("FieldCanBeLocal")
-@NonNullApi
+@NullMarked
 class RecipeWithNameOption extends Recipe {
     @Option
     private final String name;
@@ -83,7 +83,7 @@ class RecipeWithNameOption extends Recipe {
     }
 }
 
-@NonNullApi
+@NullMarked
 class RecipeWithDescriptionListOfLinks extends Recipe {
 
     @Override
@@ -100,7 +100,7 @@ class RecipeWithDescriptionListOfLinks extends Recipe {
     }
 }
 
-@NonNullApi
+@NullMarked
 class RecipeWithDescriptionListOfDescribedLinks extends Recipe {
 
     @Override
@@ -117,7 +117,7 @@ class RecipeWithDescriptionListOfDescribedLinks extends Recipe {
     }
 }
 
-@NonNullApi
+@NullMarked
 class RecipeWithDescriptionNotEndingWithPeriod extends Recipe {
 
     @Override

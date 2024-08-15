@@ -17,10 +17,10 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Iterator;
@@ -108,7 +108,7 @@ public class ChangePropertyValue extends Recipe {
     }
 
     // returns null if value should not change
-    private @Nullable Yaml.Scalar updateValue(Yaml.Block value) {
+    private Yaml.@Nullable Scalar updateValue(Yaml.Block value) {
         if (!(value instanceof Yaml.Scalar)) {
             return null;
         }

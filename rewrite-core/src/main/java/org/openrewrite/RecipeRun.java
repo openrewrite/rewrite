@@ -17,9 +17,9 @@ package org.openrewrite;
 
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.ColumnDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.*;
 import java.lang.reflect.Field;
