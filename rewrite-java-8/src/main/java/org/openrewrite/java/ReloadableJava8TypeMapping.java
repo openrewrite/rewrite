@@ -153,7 +153,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         );
     }
 
-    private @Nullable JavaType.FullyQualified[] mapAnnotations(List<JCTree.JCAnnotation> annotations) {
+    private JavaType.@Nullable FullyQualified[] mapAnnotations(List<JCTree.JCAnnotation> annotations) {
         List<JavaType.FullyQualified> types = new ArrayList<>(annotations.size());
         for (JCTree.JCAnnotation annotation : annotations) {
             JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(annotation));
