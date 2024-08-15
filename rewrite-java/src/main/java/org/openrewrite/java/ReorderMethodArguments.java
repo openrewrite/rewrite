@@ -63,7 +63,7 @@ public class ReorderMethodArguments extends Recipe {
             description = "If the original method signature is not type-attributed, this is an optional list that indicates the original order in which the arguments were arranged.",
             required = false,
             example = "[baz, bar, foo]")
-    String @Nullable[] oldParameterNames;
+    String @Nullable [] oldParameterNames;
 
     @Option(displayName = "Ignore type definition",
             description = "When set to `true` the definition of the old type will be left untouched. " +
