@@ -36,7 +36,7 @@ public class RecipeValidationTest {
         @Option(displayName = "An optional field",
           description = "Something that can be null.")
         @Nullable
-        String name;
+        String optionalField;
 
         @Override
         public String getDisplayName() {
