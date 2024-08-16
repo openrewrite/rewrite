@@ -541,7 +541,7 @@ public class TypeUtils {
      * @return true when a type has no null, unknown, or invalid parts
      */
     public static boolean isWellFormedType(@Nullable JavaType type) {
-        return isWellFormedType(type, new HashSet<>(2));
+        return isWellFormedType(type, new HashSet<>());
     }
 
     public static boolean isWellFormedType(@Nullable JavaType type, Set<JavaType> seen) {
@@ -557,25 +557,25 @@ public class TypeUtils {
         }
         if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-            return isWellFormedType(parameterized.getType()) &&
-                   parameterized.getTypeParameters().stream().allMatch(type1 -> isWellFormedType(type1, seen));
+            return isWellFormedType(parameterized.getType(), seen) &&
+                   parameterized.getTypeParameters().stream().allMatch(it -> isWellFormedType(it, seen));
         } else if (type instanceof JavaType.Array) {
             JavaType.Array arr = (JavaType.Array) type;
-            return isWellFormedType(arr.getElemType());
+            return isWellFormedType(arr.getElemType(), seen);
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable gen = (JavaType.GenericTypeVariable) type;
-            return gen.getBounds().stream().allMatch(type1 -> isWellFormedType(type1, seen));
+            return gen.getBounds().stream().allMatch(it -> isWellFormedType(it, seen));
         } else if (type instanceof JavaType.Variable) {
             JavaType.Variable var = (JavaType.Variable) type;
-            return isWellFormedType(var.getType()) && isWellFormedType(var.getOwner());
+            return isWellFormedType(var.getType(), seen) && isWellFormedType(var.getOwner(), seen);
         } else if (type instanceof JavaType.MultiCatch) {
             JavaType.MultiCatch mc = (JavaType.MultiCatch) type;
-            return mc.getThrowableTypes().stream().allMatch(type1 -> isWellFormedType(type1, seen));
+            return mc.getThrowableTypes().stream().allMatch(it -> isWellFormedType(it, seen));
         } else if (type instanceof JavaType.Method) {
             JavaType.Method m = (JavaType.Method) type;
-            return isWellFormedType(m.getReturnType()) &&
-                   isWellFormedType(m.getDeclaringType()) &&
-                   m.getParameterTypes().stream().allMatch(type1 -> isWellFormedType(type1, seen));
+            return isWellFormedType(m.getReturnType(), seen) &&
+                   isWellFormedType(m.getDeclaringType(), seen) &&
+                   m.getParameterTypes().stream().allMatch(it -> isWellFormedType(it, seen));
         }
         return true;
     }
