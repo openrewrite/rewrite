@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -27,6 +28,7 @@ import java.util.function.Consumer;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
 class TypeUtilsTest implements RewriteTest {
@@ -114,7 +116,7 @@ class TypeUtilsTest implements RewriteTest {
           java(
             """
               import java.util.Comparator;
-                            
+
               class TestComparator implements Comparator<String> {
                   @Override public int compare(String o1, String o2) {
                       return 0;
@@ -162,7 +164,7 @@ class TypeUtilsTest implements RewriteTest {
             """
               class Clazz implements Interface<Integer, String> {
                   void foo(Integer t, String y) { }
-                  
+
                   @Override
                   void foo(String y, Integer t) { }
               }
@@ -305,7 +307,7 @@ class TypeUtilsTest implements RewriteTest {
             """
               import java.util.Map;
               import java.util.function.Supplier;
-                            
+
               class Test {
                   <K, V> void m(Supplier<? extends Map<K, ? extends V>> map) {
                   }
@@ -337,7 +339,7 @@ class TypeUtilsTest implements RewriteTest {
           java(
             """
               import java.io.Serializable;
-                            
+
               class Test {
                   Object o1 = (Serializable & Runnable) null;
               }
@@ -369,6 +371,35 @@ class TypeUtilsTest implements RewriteTest {
                     return variable;
                 }
             }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    void isWellFormedType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  assertThat(cu.getTypesInUse().getTypesInUse()).allMatch(TypeUtils::isWellFormedType);
+                  return cu;
+              }
+          })),
+          java(
+            """
+              import java.io.Serializable;
+
+              class Test {
+                  static <T extends Serializable &
+                          Comparable<T>> T method0() {
+                      return null;
+                  }
+
+                  static <T extends Serializable> T method1() {
+                      return null;
+                  }
+              }
+              """
           )
         );
     }

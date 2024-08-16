@@ -558,26 +558,25 @@ public class TypeUtils {
         if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
             return isWellFormedType(parameterized.getType()) &&
-                   parameterized.getTypeParameters().stream().allMatch(TypeUtils::isWellFormedType);
+                   parameterized.getTypeParameters().stream().allMatch(type1 -> isWellFormedType(type1, seen));
         } else if (type instanceof JavaType.Array) {
             JavaType.Array arr = (JavaType.Array) type;
             return isWellFormedType(arr.getElemType());
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable gen = (JavaType.GenericTypeVariable) type;
-            return gen.getBounds().stream().allMatch(TypeUtils::isWellFormedType);
+            return gen.getBounds().stream().allMatch(type1 -> isWellFormedType(type1, seen));
         } else if (type instanceof JavaType.Variable) {
             JavaType.Variable var = (JavaType.Variable) type;
             return isWellFormedType(var.getType()) && isWellFormedType(var.getOwner());
         } else if (type instanceof JavaType.MultiCatch) {
             JavaType.MultiCatch mc = (JavaType.MultiCatch) type;
-            return mc.getThrowableTypes().stream().allMatch(TypeUtils::isWellFormedType);
+            return mc.getThrowableTypes().stream().allMatch(type1 -> isWellFormedType(type1, seen));
         } else if (type instanceof JavaType.Method) {
             JavaType.Method m = (JavaType.Method) type;
             return isWellFormedType(m.getReturnType()) &&
                    isWellFormedType(m.getDeclaringType()) &&
-                   m.getParameterTypes().stream().allMatch(TypeUtils::isWellFormedType);
+                   m.getParameterTypes().stream().allMatch(type1 -> isWellFormedType(type1, seen));
         }
-
         return true;
     }
 
