@@ -376,6 +376,7 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4405")
     void isWellFormedType() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
