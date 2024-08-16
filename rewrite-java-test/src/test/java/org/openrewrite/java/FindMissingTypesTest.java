@@ -172,15 +172,7 @@ class FindMissingTypesTest implements RewriteTest {
                   /*~~(MethodDeclaration type is missing or malformed)~~>*/public abstract GenClass1 noArg();
               }
               """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/4405")
-    @Test
-    void missingMethodReturnTypeWithMethodArguments() {
-        rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          ),
           java(
             """
               import java.util.GenClass1;
