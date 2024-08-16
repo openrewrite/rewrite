@@ -19,10 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Javadoc;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
@@ -173,7 +170,7 @@ public class FindMissingTypes extends Recipe {
 
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-            J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
+            J.MethodDeclaration md = method;
             JavaType.Method type = md.getMethodType();
             if (!isWellFormedType(type, seenTypes)) {
                 md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
@@ -185,7 +182,7 @@ public class FindMissingTypes extends Recipe {
                 // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
                 md = SearchResult.found(md, "MethodDeclaration#name#type is not the same instance as the MethodType of MethodDeclaration.");
             }
-            return md;
+            return super.visitMethodDeclaration(md, ctx);
         }
 
         @Override

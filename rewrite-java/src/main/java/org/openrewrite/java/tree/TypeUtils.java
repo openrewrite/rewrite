@@ -557,7 +557,8 @@ public class TypeUtils {
         }
         if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-            return isWellFormedType(parameterized.getType(), seen) && parameterized.getTypeParameters().stream().allMatch(it -> isWellFormedType(it, seen));
+            return isWellFormedType(parameterized.getType(), seen) &&
+                   parameterized.getTypeParameters().stream().allMatch(it -> isWellFormedType(it, seen));
         } else if (type instanceof JavaType.Array) {
             JavaType.Array arr = (JavaType.Array) type;
             return isWellFormedType(arr.getElemType(), seen);
@@ -572,9 +573,10 @@ public class TypeUtils {
             return mc.getThrowableTypes().stream().allMatch(it -> isWellFormedType(it, seen));
         } else if (type instanceof JavaType.Method) {
             JavaType.Method m = (JavaType.Method) type;
-            return isWellFormedType(m.getReturnType(), seen) && isWellFormedType(m.getDeclaringType(), seen) && m.getParameterTypes().stream().allMatch(it -> isWellFormedType(it, seen));
+            return isWellFormedType(m.getReturnType(), seen) &&
+                   isWellFormedType(m.getDeclaringType(), seen) &&
+                   m.getParameterTypes().stream().allMatch(it -> isWellFormedType(it, seen));
         }
-
         return true;
     }
 
