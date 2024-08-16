@@ -15,14 +15,13 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -30,46 +29,55 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePluginGroupIdAndArtifactId extends Recipe {
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
-    @Option(displayName = "Old groupId",
-            description = "The old groupId to replace. The groupId is the first part of a plugin coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
+    @Option(displayName = "Old group ID",
+            description = "The old group ID to replace. The group ID is the first part of a plugin coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
             example = "org.openrewrite.recipe")
     String oldGroupId;
 
-    @Option(displayName = "Old artifactId",
-            description = "The old artifactId to replace. The artifactId is the second part of a plugin coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
+    @Option(displayName = "Old artifact ID",
+            description = "The old artifactId to replace. The artifact ID is the second part of a plugin coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
             example = "my-deprecated-maven-plugin")
     String oldArtifactId;
 
-    @Option(displayName = "New groupId",
-            description = "The new groupId to use. Defaults to the existing group id.",
+    @Option(displayName = "New group ID",
+            description = "The new group ID to use. Defaults to the existing group ID.",
             example = "corp.internal.openrewrite.recipe",
             required = false)
     @Nullable
     String newGroupId;
 
-    @Option(displayName = "New artifactId",
-            description = "The new artifactId to use. Defaults to the existing artifact id.",
+    @Option(displayName = "New artifact ID",
+            description = "The new artifact ID to use. Defaults to the existing artifact ID.",
             example = "my-new-maven-plugin",
             required = false)
     @Nullable
     String newArtifactId;
 
-    @JsonCreator
-    public ChangePluginGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId) {
-        this.oldGroupId = oldGroupId;
-        this.oldArtifactId = oldArtifactId;
-        this.newGroupId = newGroupId;
-        this.newArtifactId = newArtifactId;
-    }
+    /**
+     * Mistakenly introduced, we restored newArtifactId but let's not break recipes abruptly.
+     */
+    @Option(displayName = "New artifact ID",
+        description = "The new artifact ID to use. Defaults to the existing artifact ID. This property is deprecated, use newArtifactId instead.",
+        example = "my-new-maven-plugin",
+        required = false)
+    @Nullable
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    String newArtifact;
 
     @Override
     public String getDisplayName() {
-        return "Change Maven plugin groupId and artifactId";
+        return "Change Maven plugin group and artifact ID";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", newGroupId, newArtifactId);
     }
 
     @Override
@@ -90,6 +98,8 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                     }
                     if (newArtifactId != null) {
                         t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
+                    } else if (newArtifact != null) {
+                        t = changeChildTagValue(t, "artifactId", newArtifact, ctx);
                     }
                     if (t != tag) {
                         maybeUpdateModel();

@@ -65,6 +65,45 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4176")
+    void listsAndListsOfLists() {
+        rewriteRun(
+          yaml(
+            """
+              root:
+                normalListOfScalars:
+                - a
+                -  b
+                normalListOfScalarsWithIndentation:
+                  -  a
+                  - b
+                normalListOfMappings:
+                  - a: b
+                    c:  d
+                  - e:  f
+                normalListOfSquareBracketLists:
+                  -   [ mno, pqr]
+                  -  [stu , vwx]
+                squareList: [x, y, z]
+                listOfListsOfScalars:
+                - - a
+                  -  b
+                listOfListsOfScalarsWithIndentation:
+                  - - a
+                    -  b
+                listOfListsOfMappings:
+                  - - a:  b
+                      c: d
+                    - e:  f
+                listOfListsOfSquareBracketLists:
+                  - - [mno, pqr ]
+                    -  [stu , vwx]
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     @ParameterizedTest
     @ValueSource(strings = {
@@ -144,5 +183,53 @@ class YamlParserTest implements RewriteTest {
     })
     void projectBasedir(String yaml) {
         rewriteRun(yaml(yaml));
+    }
+
+    @Test
+    void troublesomeYaml() {
+        rewriteRun(
+          yaml(
+            """
+              configDefinitions:
+                appConfig:
+                  description: "App config for consumer."
+                  resolutionPaths:
+                    - default: "/envProfile"
+                  properties:
+                    container:
+                      description: "Container to use to the cosmos client."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      defaultValue: "UUIDItem"
+                      rules:
+                        possibleValues: []
+                    database:
+                      description: "Database to connect and use."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      defaultValue: "ForkliftPocDB"
+                      rules:
+                        possibleValues: []
+                appConfig2:
+                  description: "App config for consumer."
+                  resolutionPaths:
+                    - default: "/envProfile"
+                  properties:
+                    container:
+                      description: "Container to use to the cosmos client."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      defaultValue: "CosmosSDKTest"
+                      rules:
+                        possibleValues: []
+                    database:
+                      description: "Database to connect and use."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      rules:
+                        possibleValues: []
+              """
+          )
+        );
     }
 }

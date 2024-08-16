@@ -15,17 +15,17 @@
  */
 package org.openrewrite.test;
 
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Recipe;
 import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
-import org.openrewrite.quark.Quark;
 
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -33,30 +33,57 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private final int expectedCyclesThatMakeChanges;
     private int cyclesThatResultedInChanges = 0;
 
-    private Map<Path, SourceFile> lastCycleChanges = emptyMap();
+    private Map<SourceFile, SourceFile> lastCycleEdits = emptyMap();
+    private Map<Path, SourceFile> lastCycleGenerated = emptyMap();
+    private Set<SourceFile> lastCycleDeleted = emptySet();
 
     LargeSourceSetCheckingExpectedCycles(int expectedCyclesThatMakeChanges, List<SourceFile> ls) {
         super(ls);
         this.expectedCyclesThatMakeChanges = expectedCyclesThatMakeChanges;
     }
 
+    private LargeSourceSetCheckingExpectedCycles(LargeSourceSetCheckingExpectedCycles from, @Nullable Map<SourceFile, List<Recipe>> deletions, List<SourceFile> mapped) {
+        super(from.getInitialState(), deletions, mapped);
+        this.expectedCyclesThatMakeChanges = from.expectedCyclesThatMakeChanges;
+        this.cyclesThatResultedInChanges = from.cyclesThatResultedInChanges;
+        this.lastCycleEdits = from.lastCycleEdits;
+        this.lastCycleGenerated = from.lastCycleGenerated;
+        this.lastCycleDeleted = from.lastCycleDeleted;
+    }
+
+    @Override
+    protected InMemoryLargeSourceSet withChanges(@Nullable Map<SourceFile, List<Recipe>> deletions, List<SourceFile> mapped) {
+        return new LargeSourceSetCheckingExpectedCycles(this, deletions, mapped);
+    }
+
     @Override
     public void afterCycle(boolean lastCycle) {
         boolean detectedChangeInThisCycle = false;
-        Map<Path, SourceFile> thisCycleChanges = new HashMap<>();
+        Map<SourceFile, SourceFile> thisCycleEdits = new HashMap<>();
+        Map<Path, SourceFile> thisCycleGenerated = new HashMap<>();
+        Set<SourceFile> thisCycleDeleted = new HashSet<>();
 
         for (Result result : getChangeset().getAllResults()) {
-            SourceFile before; // this source file as it existed after the last cycle
+            SourceFile before = null; // this source file as it existed after the last cycle
+            SourceFile after = result.getAfter();
+            Path sourcePath = result.getAfter() != null ? after.getSourcePath() : result.getBefore().getSourcePath();
+
             if (result.getBefore() == null) {
                 // a source file generated on a prior cycle
-                before = result.getAfter() == null ? null : lastCycleChanges.get(result.getAfter().getSourcePath());
+                before = after == null ? null : lastCycleGenerated.get(sourcePath);
             } else {
-                before = lastCycleChanges.getOrDefault(result.getBefore().getSourcePath(), result.getBefore());
+                if (after == null && lastCycleDeleted.contains(result.getBefore())) {
+                    before = result.getBefore();
+                    after = before;
+                }
+                if (before == null) {
+                    before = lastCycleEdits.getOrDefault(result.getBefore(), result.getBefore());
+                }
             }
 
-            SourceFile after = result.getAfter();
-            if (before != null && after != null && !(after instanceof Quark)) {
-                if (!detectedChangeInThisCycle) {
+            if (before != null && after != null) {
+                thisCycleEdits.put(before, after);
+                if (!detectedChangeInThisCycle && before != after) {
                     detectedChangeInThisCycle = true;
                     cyclesThatResultedInChanges++;
                 }
@@ -68,17 +95,28 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
                             )
                             .isEqualTo(before.printAllTrimmed());
                 }
-            }
-
-            if (result.getAfter() != null) {
-                thisCycleChanges.put(result.getAfter().getSourcePath(), result.getAfter());
+            } else if (before == null && after != null) {
+                thisCycleGenerated.put(sourcePath, after);
+                if (!detectedChangeInThisCycle) {
+                    detectedChangeInThisCycle = true;
+                    cyclesThatResultedInChanges++;
+                }
+            } else if (before != null) {
+                thisCycleDeleted.add(before);
+                if (!detectedChangeInThisCycle) {
+                    detectedChangeInThisCycle = true;
+                    cyclesThatResultedInChanges++;
+                }
             }
         }
-        lastCycleChanges = thisCycleChanges;
-        if(lastCycle) {
-            if(cyclesThatResultedInChanges == 0 && expectedCyclesThatMakeChanges > 0) {
+
+        lastCycleEdits = thisCycleEdits;
+        lastCycleGenerated = thisCycleGenerated;
+        lastCycleDeleted = thisCycleDeleted;
+        if (lastCycle) {
+            if (cyclesThatResultedInChanges == 0 && expectedCyclesThatMakeChanges > 0) {
                 fail("Recipe was expected to make a change but made no changes.");
-            } else if(cyclesThatResultedInChanges != expectedCyclesThatMakeChanges) {
+            } else if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges) {
                 fail("Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges > 1 ? "s" : "") + ", " +
                      "but took " + cyclesThatResultedInChanges + " cycle" + (cyclesThatResultedInChanges > 1 ? "s" : "") + ". " +
                      "This usually indicates the recipe is making changes after it should have stabilized.");

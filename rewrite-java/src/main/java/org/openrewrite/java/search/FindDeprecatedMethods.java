@@ -17,24 +17,28 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.service.AnnotationService;
+import org.openrewrite.java.table.MethodCalls;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Iterator;
-import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindDeprecatedMethods extends Recipe {
+    private static final AnnotationMatcher DEPRECATED_MATCHER = new AnnotationMatcher("@java.lang.Deprecated");
+
+    transient MethodCalls deprecatedMethodCalls = new MethodCalls(this);
+
     @Option(displayName = "Method pattern",
             description = "A method pattern that is used to find matching method invocations.",
             example = "java.util.List add(..)",
@@ -51,6 +55,14 @@ public class FindDeprecatedMethods extends Recipe {
     @Override
     public String getDisplayName() {
         return "Find uses of deprecated methods";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        if (methodPattern != null) {
+            return "matching `" + methodPattern + "`";
+        }
+        return super.getInstanceNameSuffix();
     }
 
     @Override
@@ -86,20 +98,31 @@ public class FindDeprecatedMethods extends Recipe {
                     for (JavaType.FullyQualified annotation : method.getMethodType().getAnnotations()) {
                         if ((methodMatcher == null || methodMatcher.matches(method)) && TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
                             if (Boolean.TRUE.equals(ignoreDeprecatedScopes)) {
-                                Iterator<Object> cursorPath = getCursor().getPath();
+                                Iterator<Cursor> cursorPath = getCursor().getPathAsCursors();
                                 while (cursorPath.hasNext()) {
-                                    Object ancestor = cursorPath.next();
-                                    if (ancestor instanceof J.MethodDeclaration &&
-                                        isDeprecated(((J.MethodDeclaration) ancestor).getAllAnnotations())) {
+                                    Cursor ancestor = cursorPath.next();
+                                    if (ancestor.getValue() instanceof J.MethodDeclaration && isDeprecated(ancestor)) {
                                         return m;
                                     }
-                                    if (ancestor instanceof J.ClassDeclaration &&
-                                        isDeprecated(((J.ClassDeclaration) ancestor).getAllAnnotations())) {
+                                    if (ancestor.getValue() instanceof J.ClassDeclaration && isDeprecated(ancestor)) {
                                         return m;
                                     }
                                 }
                             }
 
+                            JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                            if (javaSourceFile != null) {
+                                deprecatedMethodCalls.insertRow(ctx, new MethodCalls.Row(
+                                        javaSourceFile.getSourcePath().toString(),
+                                        method.printTrimmed(getCursor()),
+                                        method.getMethodType().getDeclaringType().getFullyQualifiedName(),
+                                        method.getSimpleName(),
+                                        method.getArguments().stream()
+                                                .map(Expression::getType)
+                                                .map(String::valueOf)
+                                                .collect(Collectors.joining(", "))
+                                ));
+                            }
                             m = SearchResult.found(m);
                         }
                     }
@@ -107,13 +130,8 @@ public class FindDeprecatedMethods extends Recipe {
                 return m;
             }
 
-            private boolean isDeprecated(List<J.Annotation> annotations) {
-                for (J.Annotation annotation : annotations) {
-                    if (TypeUtils.isOfClassType(annotation.getType(), "java.lang.Deprecated")) {
-                        return true;
-                    }
-                }
-                return false;
+            private boolean isDeprecated(Cursor cursor) {
+                return service(AnnotationService.class).matches(cursor, DEPRECATED_MATCHER);
             }
         });
     }

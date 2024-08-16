@@ -15,14 +15,14 @@
  */
 package org.openrewrite.java.isolated;
 
+import com.sun.source.doctree.*;
 import com.sun.source.doctree.ErroneousTree;
 import com.sun.source.doctree.LiteralTree;
 import com.sun.source.doctree.ProvidesTree;
 import com.sun.source.doctree.ReturnTree;
 import com.sun.source.doctree.UsesTree;
-import com.sun.source.doctree.*;
-import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.*;
+import com.sun.source.tree.IdentifierTree;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
@@ -32,9 +32,10 @@ import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -44,12 +45,14 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
+import static org.openrewrite.java.tree.Space.EMPTY;
+import static org.openrewrite.java.tree.Space.format;
 
 public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private final Attr attr;
 
-    @Nullable
-    private final Symbol.TypeSymbol symbol;
+    private final Symbol.@Nullable TypeSymbol symbol;
 
     @Nullable
     private final Type enclosingClassType;
@@ -637,7 +640,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     for (int i = 0; i < paramTypes.size(); i++) {
                         JCTree param = paramTypes.get(i);
                         Expression paramExpr = (Expression) javaVisitor.scan(param, Space.build(whitespaceBeforeAsString(), emptyList()));
-                        Space rightFmt = Space.format(i == paramTypes.size() - 1 ?
+                        Space rightFmt = format(i == paramTypes.size() - 1 ?
                                 sourceBeforeAsString(")") : sourceBeforeAsString(","));
                         parameters.add(new JRightPadded<>(paramExpr, rightFmt, Markers.EMPTY));
                     }
@@ -677,8 +680,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return qualifier;
     }
 
-    @Nullable
-    private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         if (type instanceof JavaType.Class) {
             JavaType.Class classType = (JavaType.Class) type;
 
@@ -734,8 +736,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return false;
     }
 
-    @Nullable
-    private JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;
@@ -753,8 +754,16 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     @Override
     public Tree visitReturn(ReturnTree node, List<Javadoc> body) {
-        body.addAll(sourceBefore("@return"));
-        return new Javadoc.Return(randomId(), Markers.EMPTY, convertMultiline(node.getDescription()));
+        List<Javadoc> before;
+        Markers markers = Markers.EMPTY;
+        if (source.startsWith("{", cursor)) {
+            markers = markers.addIfAbsent(new LeadingBrace(Tree.randomId()));
+            before = sourceBefore("{@return");
+        } else {
+            before = sourceBefore("@return");
+        }
+        body.addAll(before);
+        return new Javadoc.Return(randomId(), markers, convertMultiline(node.getDescription()));
     }
 
     @Override
@@ -978,6 +987,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         if (endIndex < 0) {
             throw new IllegalStateException("Expected to be able to find " + delim);
         }
+
         List<Javadoc> before = whitespaceBefore();
         cursor += delim.length();
         return before;
@@ -1141,26 +1151,17 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
         @Override
         public J visitArrayType(ArrayTypeTree node, Space fmt) {
-            com.sun.source.tree.Tree typeIdent = node.getType();
-            int dimCount = 1;
+            TypeTree elemType = (TypeTree) scan(node.getType(), Space.EMPTY);
 
-            while (typeIdent instanceof ArrayTypeTree) {
-                dimCount++;
-                typeIdent = ((ArrayTypeTree) typeIdent).getType();
-            }
-
-            TypeTree elemType = (TypeTree) scan(typeIdent, Space.EMPTY);
-
-            List<JRightPadded<Space>> dimensions = emptyList();
-            if (dimCount > 0) {
-                dimensions = new ArrayList<>(dimCount);
-                for (int n = 0; n < dimCount; n++) {
-                    if (!source.substring(cursor).startsWith("...")) {
-                        dimensions.add(padRight(
-                                Space.build(sourceBeforeAsString("["), emptyList()),
-                                Space.build(sourceBeforeAsString("]"), emptyList())));
-                    }
-                }
+            int saveCursor = cursor;
+            Space before = whitespace();
+            JLeftPadded<Space> dimension;
+            if (source.startsWith("[", cursor)) {
+                cursor++;
+                dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
+            } else {
+                cursor = saveCursor;
+                return elemType.withPrefix(fmt);
             }
 
             return new J.ArrayType(
@@ -1168,12 +1169,20 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     fmt,
                     Markers.EMPTY,
                     elemType,
-                    dimensions
+                    null,
+                    dimension,
+                    typeMapping.type(node)
             );
         }
 
-        private <T> JRightPadded<T> padRight(T tree, Space right) {
-            return new JRightPadded<>(tree, right, Markers.EMPTY);
+        private Space whitespace() {
+            int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
+            if (nextNonWhitespace == cursor) {
+                return EMPTY;
+            }
+            Space space = format(source, cursor, nextNonWhitespace);
+            cursor = nextNonWhitespace;
+            return space;
         }
 
         @Override

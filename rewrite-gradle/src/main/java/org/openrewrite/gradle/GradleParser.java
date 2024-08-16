@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
@@ -23,7 +24,6 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 
 import java.nio.file.Path;
@@ -147,6 +147,7 @@ public class GradleParser implements Parser {
             return this;
         }
 
+        @Override
         public GradleParser build() {
             return new GradleParser(this);
         }
@@ -155,7 +156,6 @@ public class GradleParser implements Parser {
         public String getDslName() {
             return "gradle";
         }
-
     }
 
     private static List<Path> loadDefaultClasspath() {

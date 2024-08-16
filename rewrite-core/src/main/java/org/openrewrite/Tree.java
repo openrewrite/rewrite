@@ -19,9 +19,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import org.openrewrite.internal.MetricsHelper;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.UUID;
@@ -65,15 +64,14 @@ public interface Tree {
      * @param <P> visit context type
      * @return visitor result
      */
-    @Nullable
-    default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+    default <R extends Tree, P> @Nullable R accept(TreeVisitor<R, P> v, P p) {
         return v.defaultValue(this, p);
     }
 
     /**
      * Checks the supplied argument to see if the supplied visitor and its context would be valid arguments
      * to accept().
-     * Typically this involves checking that the visitor is of a type that operates on this kind of tree.
+     * Typically, this involves checking that the visitor is of a type that operates on this kind of tree.
      * e.g.: A Java Tree implementation would return true for JavaVisitors and false for MavenVisitors
      *
      * @param <P> the visitor's context argument
@@ -82,7 +80,6 @@ public interface Tree {
     <P> boolean isAcceptable(TreeVisitor<?, P> v, P p);
 
     default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-
         return cursor.firstEnclosingOrThrow(SourceFile.class).printer(cursor);
     }
 
@@ -95,7 +92,7 @@ public interface Tree {
         return out.getOut();
     }
 
-    default <P> String print(TreeVisitor<?, PrintOutputCapture<Integer>> printer) {
+    default String print(TreeVisitor<?, PrintOutputCapture<Integer>> printer) {
         PrintOutputCapture<Integer> outputCapture = new PrintOutputCapture<>(0);
         printer.visit(this, outputCapture);
         return outputCapture.getOut();
@@ -121,14 +118,5 @@ public interface Tree {
     default <T2 extends Tree> T2 cast() {
         //noinspection unchecked
         return (T2) this;
-    }
-
-    @Nullable
-    default <T2 extends Tree> T2 safeCast() {
-        try {
-            return cast();
-        } catch (ClassCastException ignored) {
-            return null;
-        }
     }
 }

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.internal.template;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Loop;
@@ -34,8 +34,7 @@ final class PatternVariables {
         boolean instanceOfFound;
     }
 
-    @Nullable
-    static String simplifiedPatternVariableCondition(Expression condition, @Nullable J toReplace) {
+    static @Nullable String simplifiedPatternVariableCondition(Expression condition, @Nullable J toReplace) {
         ResultCollector resultCollector = new ResultCollector();
         simplifiedPatternVariableCondition0(condition, toReplace, resultCollector);
         return resultCollector.instanceOfFound ? resultCollector.builder.toString() : null;
@@ -277,8 +276,7 @@ final class PatternVariables {
         }
     }
 
-    @Nullable
-    private static Statement getLastStatement(Statement statement) {
+    private static @Nullable Statement getLastStatement(Statement statement) {
         if (statement instanceof J.Block) {
             List<Statement> statements = ((J.Block) statement).getStatements();
             return statements.isEmpty() ? null : getLastStatement(statements.get(statements.size() - 1));

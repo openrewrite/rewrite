@@ -19,13 +19,13 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.java.search.UsesField;
 import org.openrewrite.java.tree.*;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class ChangeStaticFieldToMethod extends Recipe {
 
@@ -57,6 +57,13 @@ public class ChangeStaticFieldToMethod extends Recipe {
             description = "The simple name of the method to use. The method must be static and have no arguments.",
             example = "of")
     String newMethodName;
+
+    @Override
+    public String getInstanceNameSuffix() {
+        String shortType = oldClassName.substring(oldClassName.lastIndexOf('.') + 1);
+        return String.format("`%s#%s` to `%s`",
+                shortType, oldFieldName, newMethodName);
+    }
 
     @Override
     public String getDisplayName() {
@@ -109,10 +116,17 @@ public class ChangeStaticFieldToMethod extends Recipe {
 
                 Cursor statementCursor = getCursor().dropParentUntil(Statement.class::isInstance);
                 Statement statement = statementCursor.getValue();
-                J.Block block = makeNewMethod(newClass).apply(statementCursor, statement.getCoordinates().replace());
-                J.MethodInvocation method = block.getStatements().get(0).withPrefix(tree.getPrefix());
+                J applied = makeNewMethod(newClass).apply(statementCursor, statement.getCoordinates().replace());
 
-                if (method.getMethodType() == null) {
+                J.MethodInvocation method = null;
+                if (applied instanceof J.Block) {
+                    J.Block block = (J.Block) applied;
+                    method = block.getStatements().get(0).withPrefix(tree.getPrefix());
+                } else if (applied instanceof J.NewArray) {
+                    J.NewArray newArray = (J.NewArray) applied;
+                    method = (J.MethodInvocation) newArray.getInitializer().get(0);
+                }
+                if (method == null || method.getMethodType() == null) {
                     throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class ["
                                                        + newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
                 }

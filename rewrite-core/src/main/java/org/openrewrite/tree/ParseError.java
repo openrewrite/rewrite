@@ -15,10 +15,13 @@
  */
 package org.openrewrite.tree;
 
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
@@ -103,5 +106,15 @@ public class ParseError implements SourceFile {
                 is.readFully(),
                 null
         );
+    }
+
+    public IllegalStateException toException() {
+        if (getErroneous() != null) {
+            return new IllegalStateException("Failed to parse " + getSourcePath() + " because of parse-to-print idempotence on: " + getText());
+        } else {
+            ParseExceptionResult ex = getMarkers().findFirst(ParseExceptionResult.class)
+                    .orElseThrow(() -> new IllegalStateException("No ParseExceptionResult marker on parser failure"));
+            return new IllegalStateException(ex.getExceptionType() + ": " + ex.getMessage());
+        }
     }
 }

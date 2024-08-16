@@ -41,8 +41,6 @@ class TreeObserverTest implements RewriteTest {
                     return text.withText("hello jonathan");
                 }
             }))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .executionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
                 @Override
                 public Tree propertyChanged(String property, Cursor cursor, Tree newTree, Object oldValue, Object newValue) {
@@ -51,7 +49,7 @@ class TreeObserverTest implements RewriteTest {
                     }
                     return newTree;
                 }
-            }).subscribeToType(PlainText.class))),
+            }, true).subscribeToType(PlainText.class))),
           text(
             "hello jon",
             "hello jonathan"

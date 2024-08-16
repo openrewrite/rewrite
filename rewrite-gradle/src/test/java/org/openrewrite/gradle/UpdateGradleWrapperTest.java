@@ -15,10 +15,11 @@
  */
 package org.openrewrite.gradle;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.properties.tree.Properties;
@@ -40,9 +41,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.util.GradleWrapper.*;
+import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
 import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.SourceSpecs.*;
+import static org.openrewrite.test.SourceSpecs.dir;
+import static org.openrewrite.test.SourceSpecs.other;
+import static org.openrewrite.test.SourceSpecs.text;
 
 @SuppressWarnings("UnusedProperty")
 class UpdateGradleWrapperTest implements RewriteTest {
@@ -52,8 +60,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
     };
 
     // Gradle wrapper script text for 7.4.2
-    private static final String GRADLEW_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("/gradlew"));
-    private static final String GRADLEW_BAT_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("/gradlew.bat"));
+    private static final String GRADLEW_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-7.4.2"));
+    private static final String GRADLEW_BAT_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-7.4.2.bat"));
 
     private final SourceSpecs gradlew = text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty));
     private final SourceSpecs gradlewBat = text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty));
@@ -61,14 +69,15 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UpdateGradleWrapper("7.4.2", null, null));
+        spec.recipe(new UpdateGradleWrapper("7.4.2", null, null, null))
+          .beforeRecipe(withToolingApi());
     }
 
     @Test
     @DocumentExample("Add a new Gradle wrapper")
     void addGradleWrapper() {
         rewriteRun(
-          spec -> spec.afterRecipe(run -> {
+          spec -> spec.expectedCyclesThatMakeChanges(1).afterRecipe(run -> {
               assertThat(run.getChangeset().getAllResults()).hasSize(4);
 
               var gradleSh = result(run, PlainText.class, "gradlew");
@@ -89,7 +98,14 @@ class UpdateGradleWrapperTest implements RewriteTest {
               assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
               assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
               assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
-          })
+          }),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              """
+          )
         );
     }
 
@@ -212,14 +228,17 @@ class UpdateGradleWrapperTest implements RewriteTest {
               zipStorePath=wrapper/dists
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          )
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
         );
     }
 
     @Test
     void dontAddMissingWrapper() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateGradleWrapper("7.x", null, Boolean.FALSE))
+          spec -> spec.recipe(new UpdateGradleWrapper("7.x", null, Boolean.FALSE, null))
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
             .afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).isEmpty())
         );
@@ -229,7 +248,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void updateMultipleWrappers() {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
-            .recipe(new UpdateGradleWrapper("7.4.2", null, Boolean.FALSE)),
+            .recipe(new UpdateGradleWrapper("7.4.2", null, Boolean.FALSE, null)),
           dir("example1",
             properties(
               """
@@ -288,7 +307,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Test
     void olderThan6_6() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateGradleWrapper("5.6.4", null, null))
+          spec -> spec.recipe(new UpdateGradleWrapper("5.6.4", null, null, null))
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "4.0")))
             .afterRecipe(run -> {
                 var gradleSh = result(run, PlainText.class, "gradlew");
@@ -319,7 +338,10 @@ class UpdateGradleWrapperTest implements RewriteTest {
               distributionSha256Sum=1f3067073041bc44554d0efe5d402a33bc3d3c93cc39ab684f308586d732a80d
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          )
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
         );
     }
 
@@ -346,7 +368,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Test
     void allowUpdatingDistributionTypeWhenSameVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateGradleWrapper("5.6.x", "bin", null))
+          spec -> spec.recipe(new UpdateGradleWrapper("5.6.x", "bin", null, null))
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "5.6.4")))
             .afterRecipe(run -> {
                 var gradleSh = result(run, PlainText.class, "gradlew");
@@ -377,14 +399,17 @@ class UpdateGradleWrapperTest implements RewriteTest {
               distributionSha256Sum=1f3067073041bc44554d0efe5d402a33bc3d3c93cc39ab684f308586d732a80d
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          )
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
         );
     }
 
     @Test
     void defaultsToLatestRelease() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateGradleWrapper(null, null, null))
+          spec -> spec.recipe(new UpdateGradleWrapper(null, null, null, null))
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
             .afterRecipe(run -> {
                 var gradleSh = result(run, PlainText.class, "gradlew");
@@ -461,6 +486,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
             """,
               "org.openrewrite.gradle.MultipleWrapperUpdates")
             .cycles(1)
+            .expectedCyclesThatMakeChanges(1)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "5.6.4")))
             .afterRecipe(run -> {
                 var gradleSh = result(run, PlainText.class, "gradlew");
@@ -510,7 +536,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Test
     void preferExistingDistributionSource() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateGradleWrapper("8.0.x", null, null))
+          spec -> spec.recipe(new UpdateGradleWrapper("8.0.x", null, null, null))
+            .expectedCyclesThatMakeChanges(2)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
           properties(
             """
@@ -541,6 +568,135 @@ class UpdateGradleWrapperTest implements RewriteTest {
           gradlew,
           gradlewBat,
           gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void customDistributionUri() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.0.x", null, null, "https://company.com/repo/gradle-${version}-${distribution}.zip"))
+            .expectedCyclesThatMakeChanges(2)
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-5.6.4-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+              .after(after -> {
+                  Matcher checksumMatcher = Pattern.compile("distributionSha256Sum=(.*)").matcher(after);
+                  assertThat(checksumMatcher.find()).isTrue();
+                  String checksum = checksumMatcher.group(1);
+                  assertThat(checksum).isNotBlank();
+
+                  // language=properties
+                  return """
+                    distributionBase=GRADLE_USER_HOME
+                    distributionPath=wrapper/dists
+                    distributionUrl=https\\://company.com/repo/gradle-8.0.2-bin.zip
+                    zipStoreBase=GRADLE_USER_HOME
+                    zipStorePath=wrapper/dists
+                    distributionSha256Sum=%s
+                    """.formatted(checksum);
+              })
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void servicesGradleOrgUnavailable() {
+        HttpSender unhelpfulSender = request -> {
+            if(request.getUrl().toString().contains("services.gradle.org")) {
+                throw new RuntimeException("I'm sorry Dave, I'm afraid I can't do that.");
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(unhelpfulSender)
+          .setLargeFileHttpSender(unhelpfulSender);
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.6", null, null, "https://artifactory.moderne.ninja/artifactory/gradle-distributions/gradle-${version}-bin.zip"))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-5.6.4-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://artifactory.moderne.ninja/artifactory/gradle-distributions/gradle-8.6-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void updateWrapperInSubDirectory() {
+        rewriteRun(
+          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .afterRecipe(run -> {
+                Path subdir = Paths.get("subdir");
+                var gradleSh = result(run, PlainText.class, "gradlew");
+                assertThat(gradleSh.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_SCRIPT_LOCATION));
+                assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+                assertThat(gradleSh.getFileAttributes()).isNotNull();
+                assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
+                assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
+
+                var gradleBat = result(run, PlainText.class, "gradlew.bat");
+                assertThat(gradleBat.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_BATCH_LOCATION));
+                assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
+
+                var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+                assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_JAR_LOCATION));
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
+                assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          dir("subdir",
+            properties(
+              """
+                distributionBase=GRADLE_USER_HOME
+                distributionPath=wrapper/dists
+                distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
+                zipStoreBase=GRADLE_USER_HOME
+                zipStorePath=wrapper/dists
+                """,
+              """
+                distributionBase=GRADLE_USER_HOME
+                distributionPath=wrapper/dists
+                distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+                zipStoreBase=GRADLE_USER_HOME
+                zipStorePath=wrapper/dists
+                distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+                """,
+              spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+                .afterRecipe(gradleWrapperProperties ->
+                  assertThat(gradleWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
+                      assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Gradle);
+                      assertThat(buildTool.getVersion()).isEqualTo("7.4.2");
+                  }))
+            ),
+            gradlew,
+            gradlewBat,
+            gradleWrapperJarQuark
+          )
         );
     }
 

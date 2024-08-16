@@ -19,10 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Javadoc;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
@@ -35,6 +32,7 @@ import java.util.stream.Collectors;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 public class FindMissingTypes extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Find missing type information on Java ASTs";
@@ -140,8 +138,10 @@ public class FindMissingTypes extends Recipe {
                 } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
                     mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
                 }
-                if (mi.getName().getType() != null && type != mi.getName().getType()) {
-                    mi = SearchResult.found(mi, "MethodInvocation#name type is not the MethodType of MethodInvocation.");
+                if (mi.getName().getType() != null && type != null && type != mi.getName().getType()) {
+                    // The MethodDeclaration#name#type and the methodType field should be the same object.
+                    // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
+                    mi = SearchResult.found(mi, "MethodInvocation#name#type is not the same instance as the MethodType of MethodInvocation.");
                 }
             }
             return mi;
@@ -170,17 +170,19 @@ public class FindMissingTypes extends Recipe {
 
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-            J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
+            J.MethodDeclaration md = method;
             JavaType.Method type = md.getMethodType();
             if (!isWellFormedType(type, seenTypes)) {
                 md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
                 md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
             }
-            if (md.getName().getType() != null && type != md.getName().getType()) {
-                md = SearchResult.found(md, "MethodDeclaration#name type is not the MethodType of MethodDeclaration.");
+            if (md.getName().getType() != null && type != null && type != md.getName().getType()) {
+                // The MethodDeclaration#name#type and the methodType field should be the same object.
+                // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
+                md = SearchResult.found(md, "MethodDeclaration#name#type is not the same instance as the MethodType of MethodDeclaration.");
             }
-            return md;
+            return super.visitMethodDeclaration(md, ctx);
         }
 
         @Override

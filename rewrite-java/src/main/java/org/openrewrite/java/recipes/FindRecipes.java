@@ -19,11 +19,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.ValueNode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -36,7 +36,6 @@ import org.openrewrite.table.RewriteRecipeSource;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
@@ -153,7 +152,7 @@ public class FindRecipes extends Recipe {
                 } else if (value == null) {
                     return JsonNodeFactory.instance.nullNode();
                 }
-                throw new IllegalArgumentException(Objects.toString(value));
+                throw new IllegalArgumentException(String.valueOf(value));
             }
         });
     }

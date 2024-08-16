@@ -20,7 +20,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Value;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.xml.XmlParser;
 
@@ -80,9 +80,9 @@ public class MavenMetadata {
         }
     }
 
-    public static MavenMetadata parse(byte[] document) throws IOException {
+    public static @Nullable MavenMetadata parse(byte[] document) throws IOException {
         MavenMetadata metadata = MavenXmlMapper.readMapper().readValue(document, MavenMetadata.class);
-        if (metadata.getVersioning() != null && metadata.getVersioning().getVersions() == null) {
+        if (metadata != null && metadata.getVersioning() != null && metadata.getVersioning().getVersions() == null) {
             return new MavenMetadata(new Versioning(emptyList(), metadata.getVersioning().getSnapshotVersions(), metadata.getVersioning().getSnapshot()));
         }
         return metadata;

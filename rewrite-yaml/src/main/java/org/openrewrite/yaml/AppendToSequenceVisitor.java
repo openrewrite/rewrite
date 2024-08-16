@@ -16,9 +16,9 @@
 
 package org.openrewrite.yaml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -65,7 +65,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                     .sorted()
                     .collect(Collectors.toList());
             if (this.matchExistingSequenceValuesInAnyOrder) {
-                List<String> sorted = new ArrayList<String>(this.existingSequenceValues);
+                List<String> sorted = new ArrayList<>(this.existingSequenceValues);
                 Collections.sort(sorted);
                 return values.equals(sorted);
             } else {

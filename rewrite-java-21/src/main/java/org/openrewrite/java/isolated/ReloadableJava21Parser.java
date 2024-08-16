@@ -25,6 +25,8 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
@@ -32,8 +34,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.NonNullApi;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -62,7 +62,7 @@ import static java.util.stream.Collectors.toList;
 /**
  * This parser is NOT thread-safe, as the OpenJDK parser maintains in-memory caches in static state.
  */
-@NonNullApi
+@NullMarked
 public class ReloadableJava21Parser implements JavaParser {
     private final JavaTypeCache typeCache;
 
@@ -250,6 +250,7 @@ public class ReloadableJava21Parser implements JavaParser {
         return this;
     }
 
+    @Override
     public void setClasspath(Collection<Path> classpath) {
         this.classpath = classpath;
     }

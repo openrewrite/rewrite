@@ -17,7 +17,7 @@ package org.openrewrite;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -46,8 +46,7 @@ public class FileAttributes {
 
     long size;
 
-    @Nullable
-    public static FileAttributes fromPath(Path path) {
+    public static @Nullable FileAttributes fromPath(Path path) {
         if (Files.exists(path)) {
             try {
                 BasicFileAttributes basicFileAttributes = Files.readAttributes(path, BasicFileAttributes.class);

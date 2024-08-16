@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -27,6 +28,7 @@ import java.util.function.Consumer;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
 class TypeUtilsTest implements RewriteTest {
@@ -114,7 +116,7 @@ class TypeUtilsTest implements RewriteTest {
           java(
             """
               import java.util.Comparator;
-                            
+
               class TestComparator implements Comparator<String> {
                   @Override public int compare(String o1, String o2) {
                       return 0;
@@ -162,7 +164,7 @@ class TypeUtilsTest implements RewriteTest {
             """
               class Clazz implements Interface<Integer, String> {
                   void foo(Integer t, String y) { }
-                  
+
                   @Override
                   void foo(String y, Integer t) { }
               }
@@ -172,6 +174,34 @@ class TypeUtilsTest implements RewriteTest {
                 assertThat(TypeUtils.findOverriddenMethod(((J.MethodDeclaration) methods.get(0)).getMethodType())).isEmpty();
                 assertThat(TypeUtils.findOverriddenMethod(((J.MethodDeclaration) methods.get(1)).getMethodType())).isPresent();
             })
+          )
+        );
+    }
+
+    @Test
+    void arrayIsFullyQualifiedOfType() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  Integer[][] integer1;
+                  Integer[] integer2;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
+                    assertThat(multiVariable.getTypeExpression().getType()).isInstanceOf(JavaType.Array.class);
+                    assertThat(TypeUtils.isOfClassType(multiVariable.getTypeExpression().getType(), "java.lang.Integer")).isTrue();
+                    return super.visitVariableDeclarations(multiVariable, o);
+                }
+
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                    assertThat(variable.getVariableType().getType()).isInstanceOf(JavaType.Array.class);
+                    return super.visitVariable(variable, o);
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
           )
         );
     }
@@ -221,6 +251,30 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void isAssignableToWildcard() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  java.util.List<?> l = new java.util.ArrayList<String>();
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                    JavaType type = variable.getVariableType().getType();
+                    JavaType exprType = variable.getInitializer().getType();
+                    assertThat(type).isInstanceOf(JavaType.Parameterized.class);
+                    assertThat(exprType).isInstanceOf(JavaType.Parameterized.class);
+                    assertThat(TypeUtils.isAssignableTo(type, exprType)).isTrue();
+                    return super.visitVariable(variable, o);
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1857")
     @Test
     void isParameterizedTypeWithShallowClassesOfType() {
@@ -253,7 +307,7 @@ class TypeUtilsTest implements RewriteTest {
             """
               import java.util.Map;
               import java.util.function.Supplier;
-                            
+
               class Test {
                   <K, V> void m(Supplier<? extends Map<K, ? extends V>> map) {
                   }
@@ -285,7 +339,7 @@ class TypeUtilsTest implements RewriteTest {
           java(
             """
               import java.io.Serializable;
-                            
+
               class Test {
                   Object o1 = (Serializable & Runnable) null;
               }
@@ -317,6 +371,36 @@ class TypeUtilsTest implements RewriteTest {
                     return variable;
                 }
             }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4405")
+    void isWellFormedType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  assertThat(cu.getTypesInUse().getTypesInUse()).allMatch(TypeUtils::isWellFormedType);
+                  return cu;
+              }
+          })),
+          java(
+            """
+              import java.io.Serializable;
+
+              class Test {
+                  static <T extends Serializable &
+                          Comparable<T>> T method0() {
+                      return null;
+                  }
+
+                  static <T extends Serializable> T method1() {
+                      return null;
+                  }
+              }
+              """
           )
         );
     }

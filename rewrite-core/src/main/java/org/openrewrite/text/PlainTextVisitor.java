@@ -27,6 +27,7 @@ public class PlainTextVisitor<P> extends TreeVisitor<Tree, P> {
         return sourceFile instanceof PlainText;
     }
 
+    @Override
     public boolean isAdaptableTo(@SuppressWarnings("rawtypes") Class<? extends TreeVisitor> adaptTo) {
         if (adaptTo.isAssignableFrom(getClass())) {
             return true;

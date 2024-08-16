@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.internal;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 
@@ -58,6 +58,14 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
     @Override
     public String arraySignature(Object type) {
         return signature(((JavaType.Array) type).getElemType()) + "[]";
+    }
+
+    private String mapAnnotations(List<JavaType.FullyQualified> annotations) {
+        StringJoiner annos = new StringJoiner(",", "{annotations=[", "]}");
+        for (JavaType.FullyQualified annotation : annotations) {
+            annos.add(signature(annotation));
+        }
+        return annos.toString();
     }
 
     @Override

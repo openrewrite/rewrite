@@ -18,9 +18,9 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
@@ -40,7 +40,7 @@ import static java.util.Objects.requireNonNull;
  * is defined on the super class.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePackage extends Recipe {
     @Option(displayName = "Old package name",
             description = "The package name to replace.",
@@ -58,6 +58,11 @@ public class ChangePackage extends Recipe {
             required = false)
     @Nullable
     Boolean recursive;
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldPackageName, newPackageName);
+    }
 
     @Override
     public String getDisplayName() {
@@ -141,9 +146,11 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+        public J visitPackage(J.Package pkg, ExecutionContext ctx) {
             String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_FROM_KEY, original);
+
+            pkg = pkg.withAnnotations(ListUtils.map(pkg.getAnnotations(), a -> visitAndCast(a, ctx)));
 
             if (original.equals(oldPackageName)) {
                 getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_TO_KEY, newPackageName);
@@ -235,8 +242,7 @@ public class ChangePackage extends Recipe {
             return j;
         }
 
-        @Nullable
-        private JavaType updateType(@Nullable JavaType oldType) {
+        private @Nullable JavaType updateType(@Nullable JavaType oldType) {
             if (oldType == null || oldType instanceof JavaType.Unknown) {
                 return oldType;
             }
@@ -301,8 +307,7 @@ public class ChangePackage extends Recipe {
             return oldType;
         }
 
-        @Nullable
-        private JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
+        private JavaType.@Nullable Method updateType(JavaType.@Nullable Method oldMethodType) {
             if (oldMethodType != null) {
                 JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
                 if (method != null) {
@@ -325,14 +330,17 @@ public class ChangePackage extends Recipe {
                     newPackageName + packageName.substring(oldPackageName.length()) : newPackageName;
         }
 
-        private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
+        private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
             return fq != null &&
                    (fq.getPackageName().equals(oldPackageName) && !fq.getClassName().isEmpty() ||
                     isTargetRecursivePackageName(fq.getPackageName()));
         }
 
         private boolean isTargetRecursivePackageName(String packageName) {
-            return (recursive == null || recursive) && packageName.startsWith(oldPackageName) && !packageName.startsWith(newPackageName);
+            return (recursive == null || recursive)
+                   && packageName.startsWith(oldPackageName + ".")
+                   && !packageName.startsWith(newPackageName);
         }
+
     }
 }

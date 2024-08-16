@@ -18,11 +18,11 @@ package org.openrewrite.test;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ThrowingConsumer;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.internal.ThrowingUnaryOperator;
@@ -106,7 +106,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     protected boolean noTrim = false;
 
     /**
-     * @param sourcePath The source path after the recipe is run.
+     * @param sourcePath The source path before the recipe is run.
      * @return This source spec.
      */
     public SourceSpec<T> path(Path sourcePath) {
@@ -115,7 +115,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     }
 
     /**
-     * @param sourcePath The source path after the recipe is run.
+     * @param sourcePath The source path before the recipe is run.
      * @return This source spec.
      */
     public SourceSpec<T> path(String sourcePath) {

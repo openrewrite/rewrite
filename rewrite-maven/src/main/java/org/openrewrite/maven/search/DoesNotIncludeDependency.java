@@ -17,13 +17,13 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Scope;
 
 import static org.openrewrite.Validated.notBlank;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class DoesNotIncludeDependency extends Recipe {
 
@@ -58,9 +58,14 @@ public class DoesNotIncludeDependency extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
-        return "An applicability test which returns false if visiting a Maven pom which includes the specified dependency in the classpath of some scope. "
-                + "For compatibility with multimodule projects, this should most often be applied as a single-source applicability test.";
+        return "A precondition which returns false if visiting a Maven pom which includes the specified dependency in the classpath of some scope. "
+                + "For compatibility with multimodule projects, this should most often be applied as a precondition.";
     }
 
     @Override

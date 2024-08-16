@@ -41,7 +41,7 @@ class FindAnnotationsTest implements RewriteTest {
     @Test
     void matchMetaAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@javax.annotation.Nonnull", true))
+          spec -> spec.recipe(new FindAnnotations("@org.jspecify.annotations.Nullable", true))
             .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
           java(
             """

@@ -18,9 +18,8 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 
 import java.nio.file.Path;
@@ -43,26 +42,22 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
     @Option(displayName = "Source root",
             description = "The source root of the new class file.",
             example = "src/main/java")
-    @NonNull
     String sourceRoot;
 
     @Option(displayName = "Package name",
             description = "The package of the new class.",
             example = "org.openrewrite.example")
-    @NonNull
     String packageName;
 
     @Option(displayName = "Modifier",
             description = "The class modifier.",
             valid = {"public", "private", "protected", "package-private"},
             example = "public")
-    @NonNull
     String modifier;
 
     @Option(displayName = "Class name",
             description = "File path of new file.",
             example = "ExampleClass")
-    @NonNull
     String className;
 
     @Option(displayName = "Overwrite existing file",

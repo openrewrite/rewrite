@@ -17,8 +17,8 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -86,7 +86,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
             @Override
             public SourceFile visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(sourceFile.getSourcePath())) {
+                if (Boolean.TRUE.equals(overwriteExisting) && path.equals(sourceFile.getSourcePath())) {
                     if (sourceFile instanceof PlainText) {
                         return ((PlainText) sourceFile).withText(fileContents);
                     }

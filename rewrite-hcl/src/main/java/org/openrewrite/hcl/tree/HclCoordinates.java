@@ -18,7 +18,7 @@ package org.openrewrite.hcl.tree;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.template.Coordinates;
 
 import java.util.Comparator;
@@ -43,8 +43,7 @@ public class HclCoordinates implements Coordinates {
         REPLACEMENT
     }
 
-    @Nullable
-    public <H extends Hcl> Comparator<H> getComparator() {
+    public <H extends Hcl> @Nullable Comparator<H> getComparator() {
         //noinspection unchecked
         return (Comparator<H>) comparator;
     }

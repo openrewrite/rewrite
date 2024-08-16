@@ -28,7 +28,6 @@ import org.openrewrite.java.tree.*;
 
 import java.util.List;
 import java.util.StringJoiner;
-import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -38,11 +37,16 @@ public class WriteVisitorMethods extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Write the boilerplate for `TomlVisitor` and `TomlIsoVisitor`";
+        return "Write TOML boilerplate";
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public String getDescription() {
+        return "Write the boilerplate for `TomlVisitor` and `TomlIsoVisitor`.";
+    }
+
+    @Override
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<>() {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
@@ -58,19 +62,20 @@ public class WriteVisitorMethods extends Recipe {
         };
     }
 
-    Supplier<JavaParser> parser = () -> JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).build();
+    JavaParser.Builder<? extends JavaParser, ?> parser = JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath());
 
     private final JavaVisitor<ExecutionContext> writeVisitorMethods = new JavaIsoVisitor<>() {
-        final JavaTemplate visitMethod = JavaTemplate.builder(this::getCursor,
+
+        final JavaTemplate visitMethod = JavaTemplate.builder(
                 """
-                        public Toml visit#{}(Toml.#{} #{}, P p) {
-                            Toml.#{} #{} = #{};
-                            #{} = #{}.withPrefix(visitSpace(#{}.getPrefix(), p));
-                            #{} = #{}.withMarkers(visitMarkers(#{}.getMarkers(), p));
-                            #{}
-                            return #{};
-                        }
-                        """
+                public Toml visit#{}(Toml.#{} #{}, P p) {
+                    Toml.#{} #{} = #{};
+                    #{} = #{}.withPrefix(visitSpace(#{}.getPrefix(), p));
+                    #{} = #{}.withMarkers(visitMarkers(#{}.getMarkers(), p));
+                    #{}
+                    return #{};
+                }
+                """
         ).javaParser(parser).build();
 
         @Override
@@ -133,8 +138,7 @@ public class WriteVisitorMethods extends Recipe {
                         }
                     }
                 }
-
-                c = c.withTemplate(visitMethod, c.getBody().getCoordinates().lastStatement(),
+                c = visitMethod.apply(updateCursor(c), c.getBody().getCoordinates().lastStatement(),
                         modelTypeName, modelTypeName, paramName,
                         modelTypeName, varName, paramName,
                         varName, varName, varName,
@@ -148,13 +152,13 @@ public class WriteVisitorMethods extends Recipe {
     };
 
     private final JavaVisitor<ExecutionContext> writeIsoVisitorMethods = new JavaIsoVisitor<>() {
-        final JavaTemplate isoVisitMethod = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate isoVisitMethod = JavaTemplate.builder(
                 """
-                        @Override
-                        public Toml.#{} visit#{}(Toml.#{} #{}, P p) {
-                            return (Toml.#{}) super.visit#{}(#{}, p);
-                        }
-                        """
+                @Override
+                public Toml.#{} visit#{}(Toml.#{} #{}, P p) {
+                    return (Toml.#{}) super.visit#{}(#{}, p);
+                }
+                """
         ).javaParser(parser).build();
 
         @Override
@@ -164,8 +168,7 @@ public class WriteVisitorMethods extends Recipe {
             for (J.ClassDeclaration modelClass : missingVisitorMethods(c)) {
                 String modelTypeName = modelClass.getSimpleName();
                 String paramName = modelTypeName.substring(0, 1).toLowerCase() + modelTypeName.substring(1);
-
-                c = c.withTemplate(isoVisitMethod, c.getBody().getCoordinates().lastStatement(),
+                c = isoVisitMethod.apply(updateCursor(c), c.getBody().getCoordinates().lastStatement(),
                         modelTypeName, modelTypeName, modelTypeName, paramName,
                         modelTypeName, modelTypeName, paramName);
             }

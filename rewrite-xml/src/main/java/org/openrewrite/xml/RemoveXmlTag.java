@@ -17,22 +17,13 @@ package org.openrewrite.xml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveXmlTag extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Remove XML Tag";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Removes XML tags matching the provided expression.";
-    }
 
     @Option(displayName = "XPath",
             description = "An XPath expression used to find matching tags.",
@@ -47,8 +38,18 @@ public class RemoveXmlTag extends Recipe {
     String fileMatcher;
 
     @Override
+    public String getDisplayName() {
+        return "Remove XML tag";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Removes XML tags matching the provided expression.";
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(fileMatcher != null ? new FindSourceFiles(fileMatcher) : new FindSourceFiles("**"), new XmlIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindSourceFiles(fileMatcher), new XmlIsoVisitor<ExecutionContext>() {
             private final XPathMatcher xPathMatcher = new XPathMatcher(xPath);
 
             @Override
@@ -60,5 +61,4 @@ public class RemoveXmlTag extends Recipe {
             }
         });
     }
-
 }

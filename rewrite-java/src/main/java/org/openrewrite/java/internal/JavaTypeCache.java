@@ -16,7 +16,7 @@
 package org.openrewrite.java.internal;
 
 import lombok.Value;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
@@ -39,8 +39,7 @@ public class JavaTypeCache implements Cloneable {
 
     Map<Object, Object> typeCache = new HashMap<>();
 
-    @Nullable
-    public <T> T get(String signature) {
+    public <T> @Nullable T get(String signature) {
         //noinspection unchecked
         return (T) typeCache.get(key(signature));
     }

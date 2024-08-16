@@ -16,9 +16,9 @@
 package org.openrewrite.properties;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.tree.ParseError;
@@ -27,6 +27,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -103,7 +104,7 @@ public class PropertiesParser implements Parser {
                 "",
                 Markers.EMPTY,
                 sourceFile,
-                contents,
+                Collections.unmodifiableList(contents),
                 prefix.toString(),
                 source.getCharset().name(),
                 source.isCharsetBomMarked(),
@@ -112,8 +113,7 @@ public class PropertiesParser implements Parser {
         );
     }
 
-    @Nullable
-    private Properties.Content extractContent(String line, StringBuilder prefix) {
+    private Properties.@Nullable Content extractContent(String line, StringBuilder prefix) {
         Properties.Content content = null;
         if (line.trim().startsWith("#") || line.trim().startsWith("!")) {
             Properties.Comment.Delimiter delimiter = line.trim().startsWith("#") ?
@@ -179,48 +179,58 @@ public class PropertiesParser implements Parser {
         );
     }
 
+    static enum State {
+        WHITESPACE_BEFORE_KEY,
+        KEY,
+        KEY_OR_WHITESPACE,
+        WHITESPACE_OR_DELIMITER,
+        WHITESPACE_OR_VALUE,
+        VALUE,
+        VALUE_OR_TRAILING
+    }
+
     private Properties.Entry entryFromLine(String line, String prefix, StringBuilder trailingWhitespaceBuffer) {
         StringBuilder prefixBuilder = new StringBuilder(prefix),
                 key = new StringBuilder(),
                 equalsPrefix = new StringBuilder(),
                 valuePrefix = new StringBuilder(),
                 value = new StringBuilder();
-
+        
         Properties.Entry.Delimiter delimiter = Properties.Entry.Delimiter.NONE;
         char prev = '$';
-        int state = 0;
+        State state = State.WHITESPACE_BEFORE_KEY;
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
             switch (state) {
-                case 0:
+                case WHITESPACE_BEFORE_KEY:
                     if (Character.isWhitespace(c)) {
                         prefixBuilder.append(c);
                         break;
                     }
-                    state++;
-                case 1:
+                    state = State.KEY;
+                case KEY:
                     if (c == '=' || c == ':') {
                         if (prev == '\\') {
                             key.append(c);
                             break;
                         } else {
                             delimiter = Properties.Entry.Delimiter.getDelimiter(String.valueOf(c));
-                            state += 3;
+                            state = State.WHITESPACE_OR_VALUE;
                             break;
                         }
                     } else if (c == '\\') {
                         key.append(c);
-                        state++;
+                        state = State.KEY_OR_WHITESPACE;
                         break;
                     } else if (!Character.isWhitespace(c)) {
                         key.append(c);
                         break;
                     } else {
                         equalsPrefix.append(c);
-                        state += 2;
+                        state = State.WHITESPACE_OR_DELIMITER;
                         break;
                     }
-                case 2:
+                case KEY_OR_WHITESPACE:
                     if (Character.isWhitespace(c)) {
                         trailingWhitespaceBuffer.append(c);
                         break;
@@ -229,32 +239,35 @@ public class PropertiesParser implements Parser {
                         key.append(trailingWhitespaceBuffer);
                         trailingWhitespaceBuffer.setLength(0);
                         key.append(c);
-                        state--;
+                        state = State.KEY;
                         break;
                     }
-                case 3:
+                case WHITESPACE_OR_DELIMITER:
                     if (Character.isWhitespace(c)) {
                         equalsPrefix.append(c);
                         break;
                     } else if (c == '=' || c == ':') {
                         delimiter = Properties.Entry.Delimiter.getDelimiter(String.valueOf(c));
+                        state = State.WHITESPACE_OR_VALUE;
+                        break;
                     }
-                    state++;
-                case 4:
-                    if (c == '=' || c == ':') {
-                        continue;
-                    } else if (Character.isWhitespace(c)) {
+                case WHITESPACE_OR_VALUE:
+                    if (Character.isWhitespace(c)) {
                         valuePrefix.append(c);
                         break;
                     }
-                    state++;
-                case 5:
+                    else {
+                        value.append(c);
+                        state = State.VALUE;
+                        break;
+                    }
+                case VALUE:
                     if (!Character.isWhitespace(c)) {
                         value.append(c);
                         break;
                     }
-                    state++;
-                case 6:
+                    state = State.VALUE_OR_TRAILING;
+                case VALUE_OR_TRAILING:
                     if (Character.isWhitespace(c)) {
                         trailingWhitespaceBuffer.append(c);
                     } else {
@@ -262,7 +275,7 @@ public class PropertiesParser implements Parser {
                         value.append(trailingWhitespaceBuffer);
                         trailingWhitespaceBuffer.setLength(0);
                         value.append(c);
-                        state--;
+                        state = State.VALUE;
                         break;
                     }
             }

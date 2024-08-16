@@ -17,8 +17,8 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.ChangePropertyValue;
 import org.openrewrite.properties.PropertiesParser;
 
@@ -39,19 +39,19 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
             example = "org.gradle.caching")
     String key;
 
-    @Option(displayName = "Property value",
+    @Option(example = "true", displayName = "Property value",
             description = "The value of the property to add.")
     String value;
 
     @Option(displayName = "Overwrite if exists",
             description = "If a property with the same key exists, overwrite.",
-            example = "Enable the Gradle build cache")
+            example = "true")
     @Nullable
     Boolean overwrite;
 
     @Option(displayName = "File pattern",
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
-                    "When not set, all source files are searched.",
+                          "When not set, all source files are searched.",
             example = "**/*.properties")
     @Nullable
     String filePattern;
@@ -59,6 +59,11 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
     @Override
     public String getDisplayName() {
         return "Add Gradle property";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s=%s`", key, value);
     }
 
     @Override
@@ -84,7 +89,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (filePattern != null) {
                     if (new FindSourceFiles(filePattern).getVisitor().visitNonNull(tree, ctx) != tree &&
-                            sourceFile.getSourcePath().endsWith("gradle.properties")) {
+                        sourceFile.getSourcePath().endsWith("gradle.properties")) {
                         acc.hasGradleProperties = true;
                     }
                 } else if (sourceFile.getSourcePath().endsWith("gradle.properties")) {
@@ -119,7 +124,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (filePattern != null) {
                     if (new FindSourceFiles(filePattern).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile &&
-                            sourceFile.getSourcePath().endsWith("gradle.properties")) {
+                        sourceFile.getSourcePath().endsWith("gradle.properties")) {
                         Tree t = !Boolean.TRUE.equals(overwrite) ?
                                 sourceFile :
                                 new ChangePropertyValue(key, value, null, false, null)

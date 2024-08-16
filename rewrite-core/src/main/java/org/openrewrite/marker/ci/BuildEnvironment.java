@@ -15,15 +15,15 @@
  */
 package org.openrewrite.marker.ci;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.marker.Marker;
 
 import java.util.function.UnaryOperator;
 
 public interface BuildEnvironment extends Marker {
-    @Nullable
-    static BuildEnvironment build(UnaryOperator<String> environment) {
+
+    static @Nullable BuildEnvironment build(UnaryOperator<String> environment) {
         if (environment.apply("BITBUCKET_COMMIT") != null) {
             return BitbucketBuildEnvironment.build(environment);
         }

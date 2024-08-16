@@ -57,8 +57,12 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitTag(Xml.Tag tag, PrintOutputCapture<P> p) {
         beforeSyntax(tag, p);
-        p.append('<')
-                .append(tag.getName());
+        p.append('<');
+        boolean isJspDirective = getCursor().getParentOrThrow().getValue() instanceof Xml.Prolog;
+        if (isJspDirective) {
+            p.append("%@");
+        }
+        p.append(tag.getName());
         visit(tag.getAttributes(), p);
         p.append(tag.getBeforeTagDelimiterPrefix());
         if (tag.getClosing() == null) {
@@ -66,38 +70,49 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         } else {
             p.append('>');
             visit(tag.getContent(), p);
-            p.append(tag.getClosing().getPrefix())
-                    .append("</")
-                    .append(tag.getClosing().getName())
-                    .append(tag.getClosing().getBeforeTagDelimiterPrefix())
-                    .append(">");
-
+            visit(tag.getClosing(), p);
         }
         afterSyntax(tag, p);
         return tag;
     }
 
     @Override
+    public Xml visitTagClosing(Xml.Tag.Closing closing, PrintOutputCapture<P> p) {
+        beforeSyntax(closing, p);
+        p.append("</")
+                .append(closing.getName())
+                .append(closing.getBeforeTagDelimiterPrefix())
+                .append(">");
+        afterSyntax(closing, p);
+        return closing;
+    }
+
+    @Override
     public Xml visitAttribute(Xml.Attribute attribute, PrintOutputCapture<P> p) {
-        char valueDelim;
-        if (Xml.Attribute.Value.Quote.Double.equals(attribute.getValue().getQuote())) {
-            valueDelim = '"';
-        } else {
-            valueDelim = '\'';
-        }
         beforeSyntax(attribute, p);
         p.append(attribute.getKey().getPrefix())
                 .append(attribute.getKeyAsString())
                 .append(attribute.getBeforeEquals())
-                .append('=')
-                .append(attribute.getValue().getPrefix())
-                .append(valueDelim)
-                .append(attribute.getValueAsString())
-                .append(valueDelim);
-
-
+                .append('=');
+        visit(attribute.getValue(), p);
         afterSyntax(attribute, p);
         return attribute;
+    }
+
+    @Override
+    public Xml visitAttributeValue(Xml.Attribute.Value value, PrintOutputCapture<P> p) {
+        beforeSyntax(value, p);
+        char valueDelim;
+        if (Xml.Attribute.Value.Quote.Double.equals(value.getQuote())) {
+            valueDelim = '"';
+        } else {
+            valueDelim = '\'';
+        }
+        p.append(valueDelim)
+                .append(value.getValue())
+                .append(valueDelim);
+        afterSyntax(value, p);
+        return value;
     }
 
     @Override
@@ -144,16 +159,21 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         visit(docTypeDecl.getName(), p);
         visit(docTypeDecl.getExternalId(), p);
         visit(docTypeDecl.getInternalSubset(), p);
-        if (docTypeDecl.getExternalSubsets() != null) {
-            p.append(docTypeDecl.getExternalSubsets().getPrefix())
-                    .append('[');
-            visit(docTypeDecl.getExternalSubsets().getElements(), p);
-            p.append(']');
-        }
+        visit(docTypeDecl.getExternalSubsets(), p);
         p.append(docTypeDecl.getBeforeTagDelimiterPrefix());
         p.append('>');
         afterSyntax(docTypeDecl, p);
         return docTypeDecl;
+    }
+
+    @Override
+    public Xml visitDocTypeDeclExternalSubsets(Xml.DocTypeDecl.ExternalSubsets externalSubsets, PrintOutputCapture<P> p) {
+        beforeSyntax(externalSubsets, p);
+        p.append('[');
+        visit(externalSubsets.getElements(), p);
+        p.append(']');
+        afterSyntax(externalSubsets, p);
+        return externalSubsets;
     }
 
     @Override
@@ -171,6 +191,19 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         p.append(ident.getName());
         afterSyntax(ident, p);
         return ident;
+    }
+
+    @Override
+    public Xml visitJspDirective(Xml.JspDirective jsp, PrintOutputCapture<P> p) {
+        beforeSyntax(jsp, p);
+        p.append("<%@");
+        p.append(jsp.getBeforeTypePrefix());
+        p.append(jsp.getType());
+        visit(jsp.getAttributes(), p);
+        p.append(jsp.getBeforeDirectiveEndPrefix());
+        p.append("%>");
+        afterSyntax(jsp, p);
+        return jsp;
     }
 
     private static final UnaryOperator<String> XML_MARKER_WRAPPER =

@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import io.micrometer.core.instrument.util.StringUtils;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -26,7 +27,6 @@ import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -39,7 +39,7 @@ import java.util.Optional;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveDependency extends Recipe {
 
     @Option(displayName = "Group",
@@ -62,6 +62,11 @@ public class RemoveDependency extends Recipe {
     @Override
     public String getDisplayName() {
         return "Remove a Gradle dependency";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
     }
 
     @Override
@@ -92,12 +97,12 @@ public class RemoveDependency extends Recipe {
                 boolean anyChanged = false;
                 for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
                     GradleDependencyConfiguration newGdc = gdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        if (dependencyMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
+                        if (requested.getGroupId() != null && dependencyMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
                             return null;
                         }
                         return requested;
                     }));
-                    newGdc = newGdc.withResolved(ListUtils.map(newGdc.getResolved(), resolved -> {
+                    newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), resolved -> {
                         if (dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                             return null;
                         }
@@ -108,35 +113,39 @@ public class RemoveDependency extends Recipe {
                 }
 
                 if (!anyChanged) {
-                    return cu;
+                    // instance was changed, but no marker update is needed
+                    return g;
                 }
 
                 return g.withMarkers(g.getMarkers().setByType(gp.withNameToConfiguration(nameToConfiguration)));
             }
 
             @Override
-            public @Nullable J visitReturn(J.Return return_, ExecutionContext ctx) {
+            public J visitReturn(J.Return return_, ExecutionContext ctx) {
                 boolean dependencyInvocation = return_.getExpression() instanceof J.MethodInvocation && dependencyDsl.matches((J.MethodInvocation) return_.getExpression());
                 J.Return r = (J.Return) super.visitReturn(return_, ctx);
                 if (dependencyInvocation && r.getExpression() == null) {
+                    //noinspection DataFlowIssue
                     return null;
                 }
                 return r;
             }
 
             @Override
-            public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 if (dependencyDsl.matches(m) && (StringUtils.isEmpty(configuration) || configuration.equals(m.getSimpleName()))) {
                     Expression firstArgument = m.getArguments().get(0);
                     if (firstArgument instanceof J.Literal || firstArgument instanceof G.GString || firstArgument instanceof G.MapEntry) {
+                        //noinspection DataFlowIssue
                         return maybeRemoveDependency(m);
                     } else if (firstArgument instanceof J.MethodInvocation &&
                             (((J.MethodInvocation) firstArgument).getSimpleName().equals("platform")
                                     || ((J.MethodInvocation) firstArgument).getSimpleName().equals("enforcedPlatform"))) {
                         J after = maybeRemoveDependency((J.MethodInvocation) firstArgument);
                         if (after == null) {
+                            //noinspection DataFlowIssue
                             return null;
                         }
                     }
@@ -156,13 +165,17 @@ public class RemoveDependency extends Recipe {
                     if (!(groupArtifact.getValue() instanceof String)) {
                         return m;
                     }
-                    Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                    if (dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
+                    Dependency dependency = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                    if (dependency != null && dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return null;
                     }
                 } else if (m.getArguments().get(0) instanceof J.Literal) {
-                    Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) m.getArguments().get(0)).getValue());
-                    if (dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    Object value = ((J.Literal) m.getArguments().get(0)).getValue();
+                    if(!(value instanceof String)) {
+                        return null;
+                    }
+                    Dependency dependency = DependencyStringNotationConverter.parse((String) value);
+                    if (dependency != null && dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return null;
                     }
                 } else if (m.getArguments().get(0) instanceof G.MapEntry) {

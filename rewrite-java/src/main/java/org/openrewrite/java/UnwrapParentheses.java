@@ -58,9 +58,11 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
             return !(parensScope.getValue() == ((J.DoWhileLoop) parent).getWhileCondition());
         } else if (parent instanceof J.Unary) {
             J innerJ = ((J.Parentheses<?>) parensScope.getValue()).getTree();
-            return !(innerJ instanceof J.Binary);
+            return !(innerJ instanceof J.Assignment) &&
+                   !(innerJ instanceof J.Binary) &&
+                   !(innerJ instanceof J.Ternary) &&
+                   !(innerJ instanceof J.InstanceOf);
         }
         return true;
     }
 }
-

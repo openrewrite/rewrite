@@ -15,7 +15,7 @@
  */
 package org.openrewrite.remote;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -39,15 +39,13 @@ public class LocalRemoteArtifactCache implements RemoteArtifactCache {
     }
 
     @Override
-    @Nullable
-    public Path get(URI uri) {
+    public @Nullable Path get(URI uri) {
         Path resolved = cacheDir.resolve(hashUri(uri));
         return Files.exists(resolved) ? resolved : null;
     }
 
     @Override
-    @Nullable
-    public Path put(URI uri, InputStream artifactInputStream, Consumer<Throwable> onError) {
+    public @Nullable Path put(URI uri, InputStream artifactInputStream, Consumer<Throwable> onError) {
         try {
             Path artifact = cacheDir.resolve(UUID.randomUUID() + ".tmp");
             try (InputStream is = artifactInputStream) {

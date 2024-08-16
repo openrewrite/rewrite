@@ -25,7 +25,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.HashSet;
 import java.util.Set;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class FindPlugin extends Recipe {
 
@@ -56,6 +56,11 @@ public class FindPlugin extends Recipe {
     @Override
     public String getDisplayName() {
         return "Find Maven plugin";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
     }
 
     @Override

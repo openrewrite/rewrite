@@ -17,7 +17,8 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.SourcesFiles;
 
@@ -25,13 +26,15 @@ import java.nio.file.Path;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindSourceFiles extends Recipe {
     transient SourcesFiles results = new SourcesFiles(this);
 
     @Option(displayName = "File pattern",
-            description = "A glob expression representing a file path to search for (relative to the project root).",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
             example = ".github/workflows/*.yml")
+    @Nullable
     String filePattern;
 
     @Override
@@ -47,13 +50,13 @@ public class FindSourceFiles extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
-            @Nullable
+
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     Path sourcePath = sourceFile.getSourcePath();
-                    if (PathUtils.matchesGlob(sourcePath, normalize(filePattern))) {
+                    if (StringUtils.isBlank(filePattern) || PathUtils.matchesGlob(sourcePath, normalize(filePattern))) {
                         results.insertRow(ctx, new SourcesFiles.Row(sourcePath.toString(),
                                 tree.getClass().getSimpleName()));
                         return SearchResult.found(sourceFile);

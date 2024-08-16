@@ -17,8 +17,8 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.XPathMatcher;
@@ -38,7 +38,7 @@ import java.util.Map;
  * version if none is provided).
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion, Collection<ResolvedDependency>>> {
     private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
 
@@ -56,8 +56,8 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
     @Nullable
     String artifactPattern;
 
-    @Option(displayName = "Add to the root pom",
-            description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
+    @Option(displayName = "Add to the root POM",
+            description = "Add to the root POM where root is the eldest parent of the pom within the source set.",
             required = false)
     @Nullable
     Boolean addToRootPom;
@@ -74,6 +74,11 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
     @Override
     public String getDisplayName() {
         return "Manage dependencies";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupPattern, artifactPattern);
     }
 
     @Override

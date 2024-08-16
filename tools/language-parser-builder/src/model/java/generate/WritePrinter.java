@@ -27,7 +27,6 @@ import org.openrewrite.java.tree.*;
 
 import java.util.List;
 import java.util.StringJoiner;
-import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -43,14 +42,14 @@ public class WritePrinter extends Recipe {
     @Override
     public String getDescription() {
         return "Every print method starts with `visitSpace` then `visitMarkers`. " +
-                "Every model element is visited. An engineer must fill in the places " +
-                "where keywords are grammatically required.";
+               "Every model element is visited. An engineer must fill in the places " +
+               "where keywords are grammatically required.";
     }
 
-    Supplier<JavaParser> parser = () -> JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).build();
+    JavaParser.Builder<? extends JavaParser, ?> parser = JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath());
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
@@ -65,7 +64,6 @@ public class WritePrinter extends Recipe {
                         if (statement instanceof J.VariableDeclarations varDec) {
                             J.VariableDeclarations.NamedVariable namedVariable = varDec.getVariables().get(0);
                             String name = namedVariable.getSimpleName();
-                            String elemTypeName = requireNonNull(varDec.getTypeExpression()).printTrimmed(getCursor());
                             String capitalizedName = name.substring(0, 1).toUpperCase() + name.substring(1);
 
                             JavaType.FullyQualified elemType = requireNonNull(TypeUtils.asFullyQualified(varDec.getType()));
@@ -105,13 +103,13 @@ public class WritePrinter extends Recipe {
 
                     StringBuilder template = new StringBuilder();
 
-                    JavaTemplate visitMethod = JavaTemplate.builder(this::getCursor, "" +
-                                                                                     "public Toml visit#{}(Toml.#{} #{}, PrintOutputCapture<P> p) {" +
-                                                                                     "    visitSpace(#{}.getPrefix(), p);" +
-                                                                                     "    visitMarkers(#{}.getMarkers(), p);" +
-                                                                                     "    #{}" +
-                                                                                     "    return #{};" +
-                                                                                     "}"
+                    JavaTemplate visitMethod = JavaTemplate.builder(
+                                    "public Toml visit#{}(Toml.#{} #{}, PrintOutputCapture<P> p) {" +
+                                    "    visitSpace(#{}.getPrefix(), p);" +
+                                    "    visitMarkers(#{}.getMarkers(), p);" +
+                                    "    #{}" +
+                                    "    return #{};" +
+                                    "}"
                             )
                             .javaParser(parser)
 //                            .doAfterVariableSubstitution(System.out::println)
@@ -119,7 +117,7 @@ public class WritePrinter extends Recipe {
                             .build();
 
                     try {
-                        c = c.withTemplate(visitMethod, c.getBody().getCoordinates().lastStatement(),
+                        c = visitMethod.apply(updateCursor(c), c.getBody().getCoordinates().lastStatement(),
                                 modelTypeName, modelTypeName, paramName,
                                 paramName,
                                 paramName,

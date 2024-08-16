@@ -18,7 +18,6 @@ package org.openrewrite.yaml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayDeque;
@@ -28,23 +27,27 @@ import java.util.stream.Collectors;
 import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.stream.StreamSupport.stream;
 
-
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class CommentOutProperty extends Recipe {
     @Option(displayName = "Property key",
-        description = "The key to be commented out.",
-        example = "applicability.singleSource")
+            description = "The key to be commented out.",
+            example = "applicability.singleSource")
     String propertyKey;
 
-    @Option(displayName = "comment text",
-        description = "The comment text to be added before the specified key.",
-        example = "The `foo` property is deprecated, please migrate")
+    @Option(displayName = "Comment text",
+            description = "The comment text to be added before the specified key.",
+            example = "The `foo` property is deprecated, please migrate")
     String commentText;
 
     @Override
     public String getDisplayName() {
         return "Comment out property";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s`", propertyKey);
     }
 
     @Override
@@ -55,8 +58,32 @@ public class CommentOutProperty extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new YamlIsoVisitor<ExecutionContext>() {
+            private boolean nextDocNeedsNewline;
             private String comment = "";
             private String indentation = "";
+
+            @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                Yaml.Document doc = super.visitDocument(document, ctx);
+
+                if (nextDocNeedsNewline) {
+                    nextDocNeedsNewline = false;
+                    doc = doc.withPrefix("\n" + doc.getPrefix());
+                }
+
+                // Add any leftover comment to the end of document
+                if (!comment.isEmpty()) {
+                    String newPrefix = String.format("%s# %s%s%s",
+                            indentation,
+                            commentText,
+                            indentation.contains("\n") ? "" : "\n",
+                            indentation.contains("\n") ? comment : comment.replace("#", "# "));
+                    nextDocNeedsNewline = !newPrefix.endsWith("\n");
+                    comment = "";
+                    return document.withEnd(doc.getEnd().withPrefix(newPrefix));
+                }
+                return doc;
+            }
 
             @Override
             public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry,
@@ -83,13 +110,13 @@ public class CommentOutProperty extends Recipe {
                 }
 
                 Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
-                    .filter(Yaml.Mapping.Entry.class::isInstance)
-                    .map(Yaml.Mapping.Entry.class::cast)
-                    .collect(Collectors.toCollection(ArrayDeque::new));
+                        .filter(Yaml.Mapping.Entry.class::isInstance)
+                        .map(Yaml.Mapping.Entry.class::cast)
+                        .collect(Collectors.toCollection(ArrayDeque::new));
 
                 String prop = stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
-                    .map(e2 -> e2.getKey().getValue())
-                    .collect(Collectors.joining("."));
+                        .map(e2 -> e2.getKey().getValue())
+                        .collect(Collectors.joining("."));
 
                 if (prop.equals(propertyKey)) {
                     String prefix = entry.getPrefix();
@@ -101,7 +128,7 @@ public class CommentOutProperty extends Recipe {
                         comment = lastIndentation + "#" + entry.print(getCursor());
                     }
 
-                    doAfterVisit(new DeleteProperty(propertyKey, null, null).getVisitor());
+                    doAfterVisit(new DeleteProperty(propertyKey, null, null, null).getVisitor());
                     return entry;
                 }
 

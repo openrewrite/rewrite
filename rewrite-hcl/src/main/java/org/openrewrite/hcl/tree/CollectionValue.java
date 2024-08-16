@@ -16,5 +16,6 @@
 package org.openrewrite.hcl.tree;
 
 public interface CollectionValue extends Expression {
+    @Override
     CollectionValue withPrefix(Space prefix);
 }

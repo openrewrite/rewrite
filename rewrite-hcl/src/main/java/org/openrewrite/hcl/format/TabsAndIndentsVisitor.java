@@ -15,6 +15,7 @@
  */
 package org.openrewrite.hcl.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
@@ -22,7 +23,6 @@ import org.openrewrite.hcl.style.TabsAndIndentsStyle;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Iterator;
 import java.util.List;
@@ -50,8 +50,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
     }
 
     @Override
-    @Nullable
-    public Hcl visit(@Nullable Tree tree, P p, Cursor parent) {
+    public @Nullable Hcl visit(@Nullable Tree tree, P p, Cursor parent) {
         setCursor(parent);
         for (Cursor c = parent; c != null; c = c.getParent()) {
             Object v = c.getValue();
@@ -81,8 +80,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
     }
 
     @Override
-    @Nullable
-    public Hcl preVisit(Hcl tree, P p) {
+    public @Nullable Hcl preVisit(Hcl tree, P p) {
         if (tree instanceof Hcl.Block || tree instanceof Hcl.ObjectValue) {
             getCursor().putMessage("indentType", IndentType.INDENT);
         } else {
@@ -595,18 +593,16 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         return size;
     }
 
-    @Nullable
     @Override
-    public Hcl postVisit(Hcl tree, P p) {
+    public @Nullable Hcl postVisit(Hcl tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Hcl.ConfigFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Hcl visit(@Nullable Tree tree, P p) {
+    public @Nullable Hcl visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Hcl) tree;
         }

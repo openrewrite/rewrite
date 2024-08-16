@@ -31,7 +31,7 @@ import static java.util.Collections.emptyList;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeText extends Recipe {
     @Option(displayName = "Text after change",
-            description = "The text file will have only this text after the change.",
+            description = "The text file will have only this text after the change. The snippet provided here can be multiline.",
             example = "Some text.")
     String toText;
 
@@ -43,6 +43,11 @@ public class ChangeText extends Recipe {
     @Override
     public String getDisplayName() {
         return "Change text";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return "to `" + toText + "`";
     }
 
     @Override

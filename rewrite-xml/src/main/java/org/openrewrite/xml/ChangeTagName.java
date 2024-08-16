@@ -24,20 +24,10 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeTagName extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Change XML Tag Name";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Alters the name of XML tags matching the provided expression.";
-    }
-
     @Option(displayName = "Element name",
-            description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath Expression.",
+            description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath expression.",
             example = "/settings/servers/server/username")
     String elementName;
 
@@ -45,6 +35,21 @@ public class ChangeTagName extends Recipe {
             description = "The new name for the tag.",
             example = "user")
     String newName;
+
+    @Override
+    public String getDisplayName() {
+        return "Change XML tag name";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", elementName, newName);
+    }
+
+    @Override
+    public String getDescription() {
+        return "Alters the name of XML tags matching the provided expression.";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

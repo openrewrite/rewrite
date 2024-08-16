@@ -18,9 +18,9 @@ package org.openrewrite.properties;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 import java.nio.file.Path;
@@ -44,7 +44,7 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
     @Language("properties")
     @Option(displayName = "File contents",
             description = "Multiline text content for the file.",
-            example = "a.property=value\nanother.property=value",
+            example = "a.property=value",
             required = false)
     @Nullable
     String fileContents;
@@ -78,7 +78,7 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            return PropertiesParser.builder().build().parse(!StringUtils.isBlank(fileContents) ? fileContents : "")
+            return PropertiesParser.builder().build().parse(fileContents == null ? "" : fileContents)
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
         }
@@ -90,8 +90,8 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
         Path path = Paths.get(relativeFileName);
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
-            public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(file.getSourcePath())) {
+            public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+                if (Boolean.TRUE.equals(overwriteExisting) &&path.equals(file.getSourcePath())) {
                     if (StringUtils.isBlank(fileContents)) {
                         return file.withContent(emptyList());
                     }

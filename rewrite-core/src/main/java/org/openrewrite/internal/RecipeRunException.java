@@ -16,8 +16,8 @@
 package org.openrewrite.internal;
 
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.internal.lang.Nullable;
 
 /**
  * This provides a way for us to capture the cursor position where an unexpected exception was thrown so that

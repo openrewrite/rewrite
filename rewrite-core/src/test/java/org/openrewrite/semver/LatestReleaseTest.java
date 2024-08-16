@@ -50,6 +50,12 @@ class LatestReleaseTest {
     }
 
     @Test
+    void datetimeVersion() {
+        assertThat(latestRelease.compare(null, "20230504141934.0.0", "20241212141934.0.0")).isNegative();
+        assertThat(latestRelease.compare(null, "20230504141934", "20241212141934")).isNegative();
+    }
+
+    @Test
     void others() {
         assertThat(latestRelease.compare(null, "2.5.6.SEC03", "6.0.4")).isLessThan(0);
     }
@@ -99,6 +105,25 @@ class LatestReleaseTest {
     }
 
     @Test
+    void releaseOrLatestKeyword_beatsEverything() {
+        assertThat(latestRelease.compare(null, "RELEASE", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "RELEASE", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "RELEASE", "RELEASE")).isZero();
+
+        assertThat(latestRelease.compare(null, "LATEST", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "LATEST", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "LATEST", "LATEST")).isZero();
+
+        assertThat(latestRelease.compare(null, "reLeaSE", "1.2.3")).isPositive();
+    }
+
+    @Test
+    void latestKeywordIsNewerThanReleaseKeyword() {
+        assertThat(latestRelease.compare(null, "RELEASE", "LATEST")).isNegative();
+        assertThat(latestRelease.compare(null, "LATEST", "RELEASE")).isPositive();
+    }
+
+    @Test
     void guavaVariants() {
         assertThat(latestRelease.compare("1.0", "25.0-jre", "29.0-jre")).isLessThan(0);
     }
@@ -140,5 +165,10 @@ class LatestReleaseTest {
     void datedSnapshotVersions() {
         assertThat(latestRelease.compare(null, "7.17.0-20211102.000501-28",
           "7.17.0-20211102.012229-29")).isLessThan(0);
+    }
+
+    @Test
+    void matchCustomMetadata() {
+        assertThat(new LatestRelease(".Final-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
     }
 }

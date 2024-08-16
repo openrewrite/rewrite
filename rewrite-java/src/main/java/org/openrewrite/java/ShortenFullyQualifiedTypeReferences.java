@@ -15,9 +15,10 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
@@ -170,12 +171,20 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                     String simpleName = fieldAccess.getSimpleName();
                     JavaType usedType = usedTypes.get(simpleName);
                     if (type == usedType || signatureBuilder.signature(type).equals(signatureBuilder.signature(usedType))) {
-                        return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+                        return !fieldAccess.getPrefix().isEmpty() ? fieldAccess.getName().withPrefix(fieldAccess.getPrefix()) : fieldAccess.getName();
                     } else if (!usedTypes.containsKey(simpleName)) {
                         String fullyQualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();
                         if (!fullyQualifiedName.startsWith("java.lang.")) {
                             maybeAddImport(fullyQualifiedName);
                             usedTypes.put(simpleName, type);
+                            if (!fieldAccess.getName().getAnnotations().isEmpty()) {
+                                return fieldAccess.getName().withAnnotations(ListUtils.map(fieldAccess.getName().getAnnotations(), (i, a) -> {
+                                    if (i == 0) {
+                                        return a.withPrefix(fieldAccess.getPrefix());
+                                    }
+                                    return a;
+                                }));
+                            }
                             return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
                         }
                     }

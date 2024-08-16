@@ -18,33 +18,38 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveRepository extends Recipe {
-
     private static final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/repositories/repository");
-
     private static final XPathMatcher PLUGIN_REPOS_MATCHER = new XPathMatcher("/project/pluginRepositories/pluginRepository");
 
-    @Option(required = false, description = "Repository id")
+    @Option(example = "repo-id", displayName = "Repository ID",
+            description = "A unique repository ID.",
+            required = false)
     @Nullable
     String id;
 
-    @Option(description = "Repository URL")
-    @Nullable
+    @Option(example = "http://myrepo.maven.com/repo", displayName = "Repository URL",
+            description = "The URL of the repository.")
     String url;
 
     @Override
     public String getDisplayName() {
         return "Remove repository";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s`", url);
     }
 
     @Override
@@ -70,11 +75,9 @@ public class RemoveRepository extends Recipe {
     }
 
     private boolean isSameUrlAndID(Xml.Tag repo) {
-        boolean sameURL = StringUtils.isBlank(this.url) || StringUtils.equals(this.url,repo.getChildValue("url").orElse(null));
-        boolean sameID = StringUtils.isBlank(this.id) || StringUtils.equals(this.id,repo.getChildValue("id").orElse(null));
+        boolean sameURL = StringUtils.isBlank(this.url) || StringUtils.equals(this.url, repo.getChildValue("url").orElse(null));
+        boolean sameID = StringUtils.isBlank(this.id) || StringUtils.equals(this.id, repo.getChildValue("id").orElse(null));
 
         return sameURL && sameID;
     }
-
-
 }

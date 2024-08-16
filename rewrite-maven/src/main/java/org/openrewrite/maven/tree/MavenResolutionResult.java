@@ -17,8 +17,8 @@ package org.openrewrite.maven.tree;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
@@ -32,6 +32,7 @@ import java.util.function.Predicate;
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
+@SuppressWarnings("unused")
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -75,8 +76,7 @@ public class MavenResolutionResult implements Marker {
         return this;
     }
 
-    @Nullable
-    public ResolvedDependency getResolvedDependency(Dependency dependency) {
+    public @Nullable ResolvedDependency getResolvedDependency(Dependency dependency) {
         for (int i = Scope.values().length - 1; i >= 0; i--) {
             Scope scope = Scope.values()[i];
             if (dependencies.containsKey(scope)) {
@@ -152,8 +152,7 @@ public class MavenResolutionResult implements Marker {
         this.modules = modules == null ? emptyList() : new ArrayList<>(modules);
     }
 
-    @Nullable
-    public ResolvedManagedDependency getResolvedManagedDependency(ManagedDependency dependency) {
+    public @Nullable ResolvedManagedDependency getResolvedManagedDependency(ManagedDependency dependency) {
         for (ResolvedManagedDependency dm : pom.getDependencyManagement()) {
             if (dm.getRequested() == dependency || dm.getRequestedBom() == dependency) {
                 return dm;

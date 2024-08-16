@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -319,8 +319,7 @@ public final class ListUtils {
         return newLs;
     }
 
-    @Nullable
-    public static <T> List<T> nullIfEmpty(@Nullable List<T> ls) {
+    public static <T> @Nullable List<T> nullIfEmpty(@Nullable List<T> ls) {
         return ls == null || ls.isEmpty() ? null : ls;
     }
 

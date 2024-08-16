@@ -38,7 +38,7 @@ public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
 
     @Override
     public JavaType visitArray(JavaType.Array array, P p) {
-        return array.unsafeSet(visit(array.getElemType(), p));
+        return array.unsafeSet(visit(array.getElemType(), p), mapInPlace(array.getAnnotations().toArray(EMPTY_FULLY_QUALIFIED_ARRAY), a -> (JavaType.FullyQualified) visit(a, p)));
     }
 
     @Override

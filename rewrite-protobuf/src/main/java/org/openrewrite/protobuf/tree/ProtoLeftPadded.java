@@ -18,7 +18,7 @@ package org.openrewrite.protobuf.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.function.UnaryOperator;
@@ -35,8 +35,7 @@ public class ProtoLeftPadded<T> {
         return withElement(map.apply(element));
     }
 
-    @Nullable
-    public static <T> ProtoLeftPadded<T> withElement(@Nullable ProtoLeftPadded<T> before, @Nullable T elements) {
+    public static <T> @Nullable ProtoLeftPadded<T> withElement(@Nullable ProtoLeftPadded<T> before, @Nullable T elements) {
         if (before == null) {
             if (elements == null) {
                 return null;

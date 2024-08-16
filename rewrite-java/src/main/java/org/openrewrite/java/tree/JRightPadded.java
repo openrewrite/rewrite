@@ -18,13 +18,11 @@ package org.openrewrite.java.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 
 /**
  * A Java element that could have trailing space.
@@ -76,6 +74,7 @@ public class JRightPadded<T> {
         NEW_ARRAY_INITIALIZER(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX),
         NEW_CLASS_ARGUMENTS(Space.Location.NEW_CLASS_ARGUMENTS_SUFFIX),
         NEW_CLASS_ENCLOSING(Space.Location.NEW_CLASS_ENCLOSING_SUFFIX),
+        NULLABLE(Space.Location.NULLABLE_TYPE_SUFFIX),
         PACKAGE(Space.Location.PACKAGE_SUFFIX),
         PARENTHESES(Space.Location.PARENTHESES_SUFFIX),
         RECORD_STATE_VECTOR(Space.Location.RECORD_STATE_VECTOR_SUFFIX),
@@ -112,16 +111,12 @@ public class JRightPadded<T> {
         return list;
     }
 
-    @Nullable
-    public static <T> JRightPadded<T> withElement(@Nullable JRightPadded<T> before, @Nullable T element) {
-        if (before == null) {
-            if (element == null) {
-                return null;
-            }
-            return new JRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
-        }
+    public static <T> @Nullable JRightPadded<T> withElement(@Nullable JRightPadded<T> before, @Nullable T element) {
         if (element == null) {
             return null;
+        }
+        if (before == null) {
+            return new JRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
         }
         return before.withElement(element);
     }
@@ -144,8 +139,12 @@ public class JRightPadded<T> {
         }
 
         List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
-        Map<UUID, JRightPadded<J2>> beforeById = before.stream().collect(Collectors
-                .toMap(j -> j.getElement().getId(), Function.identity()));
+        Map<UUID, JRightPadded<J2>> beforeById = new HashMap<>((int) Math.ceil(elements.size() / 0.75));
+        for (JRightPadded<J2> j : before) {
+            if (beforeById.put(j.getElement().getId(), j) != null) {
+                throw new IllegalStateException("Duplicate key");
+            }
+        }
 
         for (J2 t : elements) {
             JRightPadded<J2> found;

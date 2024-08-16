@@ -15,7 +15,7 @@
  */
 package org.openrewrite;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.Collection;
@@ -35,8 +35,23 @@ public interface LargeSourceSet {
 
     /**
      * Called by {@link RecipeScheduler} at the beginning of a scan/generate/edit cycle.
+     *
+     * @deprecated Override {@link #beforeCycle(boolean)} instead
      */
+    @Deprecated
     default void beforeCycle() {
+    }
+
+    /**
+     * Called by {@link RecipeScheduler} at the beginning of a scan/generate/edit cycle.
+     *
+     * @param definitelyLastCycle {@code true} if this is definitely the last cycle of a recipe; when called with a
+     *                            value of {@code false} the next call to {@link #afterCycle(boolean)} could still be
+     *                            called with {@code true}. This depends on whether any of the recipes requested an
+     *                            additional cycle.
+     */
+    default void beforeCycle(boolean definitelyLastCycle) {
+        beforeCycle();
     }
 
     /**
@@ -78,6 +93,7 @@ public interface LargeSourceSet {
 
     /**
      * Get the original source file, before any edits. Returns null if it is not present.
+     *
      * @param sourcePath The path of the source file to retrieve.
      * @return The original source file. Null if not present.
      */

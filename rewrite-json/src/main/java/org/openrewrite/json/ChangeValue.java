@@ -27,10 +27,10 @@ import org.openrewrite.marker.Markers;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeValue extends Recipe {
     @Option(displayName = "Key path",
-            description = "A JsonPath expression to locate a JSON entry.",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a JSON entry.",
             example = "$.subjects.kind")
     String oldKeyPath;
 
@@ -42,6 +42,11 @@ public class ChangeValue extends Recipe {
     @Override
     public String getDisplayName() {
         return "Change value";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKeyPath, value);
     }
 
     @Override

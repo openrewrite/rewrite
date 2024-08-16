@@ -21,6 +21,8 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.regex.Pattern;
+
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ExplicitPluginVersionTest implements RewriteTest {
@@ -29,52 +31,55 @@ class ExplicitPluginVersionTest implements RewriteTest {
         spec.recipe(new ExplicitPluginVersion());
     }
 
-    private static final String BEFORE = """
-      <project>
-        <groupId>com.mycompany.app</groupId>
-        <artifactId>my-app</artifactId>
-        <version>1</version>
-        <build>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-compiler-plugin</artifactId>
-              <configuration>
-                <source>1.8</source>
-                <target>1.8</target>
-              </configuration>
-            </plugin>
-          </plugins>
-        </build>
-      </project>
-      """;
-
-    private static final String AFTER = """
-      <project>
-        <groupId>com.mycompany.app</groupId>
-        <artifactId>my-app</artifactId>
-        <version>1</version>
-        <build>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-compiler-plugin</artifactId>
-              <version>3.11.0</version>
-              <configuration>
-                <source>1.8</source>
-                <target>1.8</target>
-              </configuration>
-            </plugin>
-          </plugins>
-        </build>
-      </project>
-      """;
-
     @Test
     @DocumentExample
     @Issue("https://github.com/openrewrite/rewrite/issues/2735")
     void shouldAddLatest() {
-        rewriteRun(pomXml(BEFORE, AFTER));
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.after(actual -> """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>%s</version>
+                      <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """.formatted(
+              Pattern.compile("<version>(3\\.\\d+\\.\\d+)</version>")
+                .matcher(actual).results().reduce((a, b) -> b).map(m -> m.group(1)).get()))
+          )
+        );
     }
 
     @Test

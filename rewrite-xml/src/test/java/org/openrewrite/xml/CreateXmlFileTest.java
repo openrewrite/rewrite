@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
@@ -26,6 +27,7 @@ class CreateXmlFileTest implements RewriteTest {
     @DocumentExample
     @Test
     void hasCreatedFile() {
+        @Language("xml")
         String fileContents = """
           <?xml version="1.0" encoding="UTF-8"?>
           <library>
@@ -67,7 +69,7 @@ class CreateXmlFileTest implements RewriteTest {
             "test/test.xml",
             fileContents,
             true
-          )),
+          )).cycles(1).expectedCyclesThatMakeChanges(1),
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>

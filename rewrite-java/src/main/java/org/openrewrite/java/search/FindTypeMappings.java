@@ -15,24 +15,26 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.table.TypeMappings;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypedTree;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+
+import static java.util.Collections.emptyList;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
-public class FindTypeMappings extends ScanningRecipe<FindTypeMappings.Accumulator> {
+@EqualsAndHashCode(callSuper = false)
+public class FindTypeMappings extends ScanningRecipe<Map<FindTypeMappings.TypeAssociation, Integer>> {
     transient TypeMappings typeMappingsPerSource = new TypeMappings(this);
 
     @Override
@@ -42,95 +44,68 @@ public class FindTypeMappings extends ScanningRecipe<FindTypeMappings.Accumulato
 
     @Override
     public String getDescription() {
-        return "Find types mapped to J trees.";
-    }
-
-    @Data
-    public static class Accumulator {
-        Map<String, Map<String, Map<String, AtomicInteger>>> sourceToMappedTypeCount = new HashMap<>();
+        return "Study the frequency of `J` types and their `JavaType` type attribution.";
     }
 
     @Override
-    public Accumulator getInitialValue(ExecutionContext ctx) {
-        return new Accumulator();
+    public Map<TypeAssociation, Integer> getInitialValue(ExecutionContext ctx) {
+        return new HashMap<>();
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<TypeAssociation, Integer> acc) {
         return new JavaIsoVisitor<ExecutionContext>() {
-            String sourcePath = "";
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                sourcePath = cu.getSourcePath().toString();
-                return super.visitCompilationUnit(cu, ctx);
-            }
-
-            @Override
-            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof TypedTree) {
-                    Map<String, AtomicInteger> counts = acc.getSourceToMappedTypeCount()
-                            .computeIfAbsent(sourcePath, k -> new HashMap<>())
-                            .computeIfAbsent(tree.getClass().getName(), k -> new HashMap<>());
-                    if (tree instanceof J.Identifier) {
-                        J.Identifier i = (J.Identifier) tree;
-                        if (i.getFieldType() != null) {
-                            counts.computeIfAbsent(i.getFieldType().getClass().getName(), k -> new AtomicInteger(0))
-                                    .incrementAndGet();
-                        }
-                    } else if (tree instanceof J.MemberReference) {
-                        J.MemberReference m = (J.MemberReference) tree;
-                        if (m.getVariableType() != null) {
-                            counts.computeIfAbsent(m.getVariableType().getClass().getName(), k -> new AtomicInteger(0))
-                                    .incrementAndGet();
-                        } else if (m.getMethodType() != null) {
-                            counts.computeIfAbsent(m.getMethodType().getClass().getName(), k -> new AtomicInteger(0))
-                                    .incrementAndGet();
-                        }
-                    } else if (tree instanceof J.MethodDeclaration) {
-                        J.MethodDeclaration m = (J.MethodDeclaration) tree;
-                        if (m.getMethodType() != null) {
-                            counts.computeIfAbsent(m.getMethodType().getClass().getName(), k -> new AtomicInteger(0))
-                                    .incrementAndGet();
-                        }
-                    } else if (tree instanceof J.MethodInvocation) {
-                        J.MethodInvocation m = (J.MethodInvocation) tree;
-                        if (m.getMethodType() != null) {
-                            counts.computeIfAbsent(m.getMethodType().getClass().getName(), k -> new AtomicInteger(0))
-                                    .incrementAndGet();
-                        }
-                    } else if (tree instanceof J.NewClass) {
-                        J.NewClass m = (J.NewClass) tree;
-                        if (m.getMethodType() != null) {
-                            counts.computeIfAbsent(m.getMethodType().getClass().getName(), k -> new AtomicInteger(0))
-                                    .incrementAndGet();
-                        }
-                    } else if (tree instanceof J.VariableDeclarations.NamedVariable) {
-                        J.VariableDeclarations.NamedVariable n = (J.VariableDeclarations.NamedVariable) tree;
-                        if (n.getVariableType() != null) {
-                            counts.computeIfAbsent(n.getVariableType().getClass().getName(), k -> new AtomicInteger(0))
-                                    .incrementAndGet();
-                        }
-                    }
-                    counts.computeIfAbsent(((TypedTree) tree).getType() == null ?
-                                    "null" :
-                                    ((TypedTree) tree).getType().getClass().getName(), k -> new AtomicInteger(0))
-                            .incrementAndGet();
-                }
-                return super.visit(tree, ctx);
+            public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
+                Cursor cursor = getCursor();
+                acc.compute(new TypeAssociation(
+                                cursor.firstEnclosingOrThrow(JavaSourceFile.class).getClass(),
+                                cursor.getValue().getClass(),
+                                javaType == null ? null : javaType.getClass(),
+                                javaType == null ?
+                                        cursor.getPathAsStream()
+                                                .filter(t -> t instanceof TypedTree &&
+                                                             ((TypedTree) t).getType() != null)
+                                                .findFirst()
+                                                .map(Object::getClass)
+                                                .orElse(null) :
+                                        null),
+                        (k, v) -> v == null ? 1 : v + 1);
+                return javaType;
             }
         };
     }
 
     @Override
-    public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
-        for (Map.Entry<String, Map<String, Map<String, AtomicInteger>>> sources : acc.getSourceToMappedTypeCount().entrySet()) {
-            for (Map.Entry<String, Map<String, AtomicInteger>> trees : sources.getValue().entrySet()) {
-                for (Map.Entry<String, AtomicInteger> types : trees.getValue().entrySet()) {
-                    typeMappingsPerSource.insertRow(ctx, new TypeMappings.Row(sources.getKey(), trees.getKey(), types.getKey(), types.getValue().get()));
-                }
-            }
-        }
+    public Collection<? extends SourceFile> generate(Map<TypeAssociation, Integer> acc, ExecutionContext ctx) {
+        acc.forEach((assoc, count) -> {
+            String j = assoc.getJ().getName();
+            Class<?> nearJ = assoc.getNearestNonNullJ();
+            typeMappingsPerSource.insertRow(ctx, new TypeMappings.Row(
+                    assoc.getCompilationUnit().getEnclosingClass().getSimpleName(),
+                    j.substring(j.lastIndexOf('.') + 1),
+                    assoc.getJavaType() == null ? "null" : assoc.getJavaType().getSimpleName(),
+                    count,
+                    nearJ == null ? null : nearJ.getName().substring(nearJ.getName().lastIndexOf('.') + 1)
+            ));
+        });
+        return emptyList();
+    }
 
-        return Collections.emptyList();
+    @Value
+    public static class TypeAssociation {
+        Class<? extends JavaSourceFile> compilationUnit;
+
+        Class<?> j;
+
+        @Nullable
+        Class<? extends JavaType> javaType;
+
+        /**
+         * When {@link #j} is null, this is the nearest non-null {@link J} type
+         * in the cursor stack.
+         */
+        @Nullable
+        Class<?> nearestNonNullJ;
     }
 }

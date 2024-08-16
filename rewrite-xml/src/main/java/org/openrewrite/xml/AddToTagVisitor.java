@@ -15,9 +15,9 @@
  */
 package org.openrewrite.xml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
@@ -46,13 +46,11 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
     @Override
     public Xml visitTag(Xml.Tag t, P p) {
         if (scope.isScope(t)) {
-            boolean formatParent = false;
             assert getCursor().getParent() != null;
             if (t.getClosing() == null) {
-                t = t.withClosing(new Xml.Tag.Closing(Tree.randomId(), "\n",
-                                Markers.EMPTY, t.getName(), ""))
+                t = t.withClosing(autoFormat(new Xml.Tag.Closing(Tree.randomId(), "\n",
+                                Markers.EMPTY, t.getName(), ""), null, p, getCursor()))
                         .withBeforeTagDelimiterPrefix("");
-                formatParent = true;
             }
 
             //noinspection ConstantConditions
@@ -64,6 +62,7 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
             if (!formattedTagToAdd.getPrefix().contains("\n")) {
                 formattedTagToAdd = formattedTagToAdd.withPrefix("\n");
             }
+            formattedTagToAdd = autoFormat(formattedTagToAdd, null, p, getCursor());
 
             List<Content> content = t.getContent() == null ? new ArrayList<>() : new ArrayList<>(t.getContent());
             if (tagComparator != null) {
@@ -82,7 +81,6 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
             }
 
             t = t.withContent(content);
-            t = autoFormat(t, formatParent ? null : formattedTagToAdd, p, getCursor().getParent());
         }
 
         return super.visitTag(t, p);
@@ -117,4 +115,3 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
                 .visitNonNull(parentScope, null, parentCursor);
     }
 }
-

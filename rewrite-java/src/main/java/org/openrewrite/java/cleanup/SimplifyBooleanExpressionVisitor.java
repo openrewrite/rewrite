@@ -15,15 +15,14 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.SemanticallyEqual;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import java.util.Collections;
 
@@ -42,7 +41,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
@@ -54,7 +54,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
@@ -65,6 +66,14 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             } else if (isLiteralTrue(asBinary.getRight())) {
                 if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
                     j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
+                }
+            } else if (isLiteralFalse(asBinary.getLeft())) {
+                if (shouldSimplifyEqualsOn(asBinary.getRight())) {
+                    j = not(asBinary.getRight());
+                }
+            } else if (isLiteralFalse(asBinary.getRight())) {
+                if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
+                    j = not(asBinary.getLeft());
                 }
             } else {
                 j = maybeReplaceCompareWithNull(asBinary, true);
@@ -78,6 +87,14 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
                     j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
                 }
+            } else if (isLiteralTrue(asBinary.getLeft())) {
+                if (shouldSimplifyEqualsOn(asBinary.getRight())) {
+                    j = not(asBinary.getRight());
+                }
+            } else if (isLiteralTrue(asBinary.getRight())) {
+                if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
+                    j = not(asBinary.getLeft());
+                }
             } else {
                 j = maybeReplaceCompareWithNull(asBinary, false);
             }
@@ -89,9 +106,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     @Override
-    public J postVisit(J tree, ExecutionContext ctx) {
-        J j = tree;
-        if (j instanceof J.Parentheses) {
+    public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+        J j = super.visitParentheses(parens, ctx);
+        if (j != parens && j instanceof J.Parentheses) {
             j = new UnnecessaryParenthesesVisitor<>().visit(j, ctx, getCursor().getParentOrThrow());
         }
         return j;
@@ -100,37 +117,101 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     @Override
     public J visitUnary(J.Unary unary, ExecutionContext ctx) {
         J j = super.visitUnary(unary, ctx);
-        J.Unary asUnary = (J.Unary) j;
+        if (j instanceof J.Unary) {
+            J.Unary asUnary = (J.Unary) j;
 
-        if (asUnary.getOperator() == J.Unary.Type.Not) {
-            Expression expr = asUnary.getExpression();
-            if (isLiteralTrue(expr)) {
-                j = ((J.Literal) expr).withValue(false).withValueSource("false");
-            } else if (isLiteralFalse(expr)) {
-                j = ((J.Literal) expr).withValue(true).withValueSource("true");
-            } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
-                j = ((J.Unary) expr).getExpression();
-            } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof J.Binary) {
-                J.Binary binary = (J.Binary) ((J.Parentheses<?>) expr).getTree();
-                J.Binary.Type negated = negate(binary.getOperator());
-                if (negated != binary.getOperator()) {
-                    j = binary.withOperator(negated).withPrefix(j.getPrefix());
-                }
-            } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof J.Unary) {
-                J.Unary unary1 = (J.Unary) ((J.Parentheses<?>) expr).getTree();
-                J.Unary.Type operator = unary1.getOperator();
-                if (operator == J.Unary.Type.Not) {
-                    j = unary1.getExpression().withPrefix(j.getPrefix());
-                }
+            if (asUnary.getOperator() == J.Unary.Type.Not) {
+                j = unpackExpression(asUnary.getExpression(), asUnary);
             }
-        }
-        if (asUnary != j) {
-            j = j.withPrefix(asUnary.getPrefix());
+            if (asUnary != j) {
+                j = j.withPrefix(asUnary.getPrefix());
+            }
         }
         return j;
     }
 
-    private J.Binary.Type negate(J.Binary.Type operator) {
+    @Override
+    public J visitTernary(J.Ternary ternary, ExecutionContext executionContext) {
+        J j = super.visitTernary(ternary, executionContext);
+        if (j instanceof J.Ternary) {
+            J.Ternary asTernary = (J.Ternary) j;
+            if (asTernary.getCondition() instanceof J.Unary) {
+                Expression negated = maybeNegate(asTernary.getCondition());
+                if (negated != asTernary.getCondition()) {
+                    j = asTernary
+                            .withCondition(negated)
+                            .withTruePart(asTernary.getFalsePart())
+                            .withFalsePart(asTernary.getTruePart());
+                }
+            }
+        }
+        return j;
+    }
+
+    private Expression unpackExpression(Expression expr, Expression j) {
+        if (isLiteralTrue(expr)) {
+            j = ((J.Literal) expr).withValue(false).withValueSource("false");
+        } else if (isLiteralFalse(expr)) {
+            j = ((J.Literal) expr).withValue(true).withValueSource("true");
+        } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
+            j = ((J.Unary) expr).getExpression();
+        } else if (expr instanceof J.Parentheses) {
+            J parenthesized = ((J.Parentheses<?>) expr).getTree();
+            if (parenthesized instanceof J.Binary) {
+                J.Binary binary = (J.Binary) parenthesized;
+                J.Binary.Type negated = maybeNegate(binary.getOperator());
+                if (negated != binary.getOperator()) {
+                    j = binary.withOperator(negated).withPrefix(j.getPrefix());
+                }
+            } else if (parenthesized instanceof J.Unary) {
+                J.Unary unary1 = (J.Unary) parenthesized;
+                J.Unary.Type operator = unary1.getOperator();
+                if (operator == J.Unary.Type.Not) {
+                    j = unary1.getExpression().withPrefix(j.getPrefix());
+                }
+            } else if (parenthesized instanceof J.Ternary) {
+                J.Ternary ternary = (J.Ternary) parenthesized;
+                Expression negatedCondition = maybeNegate(ternary.getCondition());
+                if (negatedCondition != ternary.getCondition()) {
+                    j = ternary
+                            .withCondition(negatedCondition)
+                            .withPrefix(j.getPrefix());
+                } else {
+                    j = ternary
+                            .withTruePart(ternary.getFalsePart())
+                            .withFalsePart(ternary.getTruePart())
+                            .withPrefix(j.getPrefix());
+                }
+            } else if (parenthesized instanceof Expression) {
+                j = unpackExpression((Expression) parenthesized, j);
+            }
+        }
+        return j;
+    }
+
+    private Expression maybeNegate(Expression expr) {
+        if (expr instanceof J.Binary) {
+            J.Binary.Type negated = maybeNegate(((J.Binary) expr).getOperator());
+            if (negated != ((J.Binary) expr).getOperator()) {
+                expr = ((J.Binary) expr).withOperator(negated).withPrefix(expr.getPrefix());
+            }
+        } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
+            expr = ((J.Unary) expr).getExpression().withPrefix(expr.getPrefix());
+        } else if (expr instanceof J.Ternary) {
+            J.Ternary ternary = (J.Ternary) expr;
+            Expression negatedCondition = maybeNegate(ternary.getCondition());
+            if (negatedCondition != ternary.getCondition()) {
+                expr = ternary
+                        .withCondition(negatedCondition)
+                        .withTruePart(ternary.getFalsePart())
+                        .withFalsePart(ternary.getTruePart())
+                        .withPrefix(expr.getPrefix());
+            }
+        }
+        return expr;
+    }
+
+    private J.Binary.Type maybeNegate(J.Binary.Type operator) {
         switch (operator) {
             case LessThan:
                 return J.Binary.Type.GreaterThanOrEqual;
@@ -157,8 +238,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J.MethodInvocation asMethod = (J.MethodInvocation) j;
         Expression select = asMethod.getSelect();
         if (isEmpty.matches(asMethod)
-                && select instanceof J.Literal
-                && select.getType() == JavaType.Primitive.String) {
+            && select instanceof J.Literal
+            && select.getType() == JavaType.Primitive.String) {
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
         }
         return j;
@@ -198,13 +279,35 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         return asBinary;
     }
 
-    private J.Literal booleanLiteral(J j, boolean value) {
+    private static J.Literal booleanLiteral(J j, boolean value) {
         return new J.Literal(Tree.randomId(),
                 j.getPrefix(),
                 j.getMarkers(),
                 value,
                 String.valueOf(value),
                 Collections.emptyList(),
+                JavaType.Primitive.Boolean);
+    }
+
+    private static J.Unary not(Expression sideRetained) {
+        if (!(sideRetained instanceof J.FieldAccess) &&
+            !(sideRetained instanceof J.Identifier) &&
+            !(sideRetained instanceof J.Literal) &&
+            !(sideRetained instanceof J.MethodInvocation) &&
+            !(sideRetained instanceof J.Parentheses) &&
+            !(sideRetained instanceof J.Unary)) {
+            sideRetained = new J.Parentheses<>(Tree.randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    JRightPadded.build(sideRetained));
+        }
+        return new J.Unary(Tree.randomId(),
+                sideRetained.getPrefix(),
+                sideRetained.getMarkers(),
+                JLeftPadded.build(J.Unary.Type.Not),
+                sideRetained
+                        .withPrefix(Space.EMPTY)
+                        .withMarkers(Markers.EMPTY),
                 JavaType.Primitive.Boolean);
     }
 

@@ -1,8 +1,0 @@
----
-type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.self.Rewrite
-displayName: The rewrite recipes that rewrite rewrite recipes
-description: >
-  The set of recipes that run against the rewrite codebase itself.
-recipeList:
-  - org.openrewrite.text.EndOfLineAtEndOfFile

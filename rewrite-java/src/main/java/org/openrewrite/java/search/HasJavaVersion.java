@@ -17,8 +17,8 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.semver.Semver;
@@ -38,7 +38,8 @@ public class HasJavaVersion extends Recipe {
     @Option(displayName = "Version check against target compatibility",
             description = "The source and target compatibility versions can be different. This option allows you to " +
                           "check against the target compatibility version instead of the source compatibility version.",
-            example = "17.X")
+            example = "17.X",
+            required = false)
     @Nullable
     Boolean checkTargetCompatibility;
 
@@ -49,8 +50,8 @@ public class HasJavaVersion extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds Java source files matching a particular language level. This is useful especially as an " +
-               "applicable test for other recipes.";
+        return "Finds Java source files matching a particular language level. " +
+               "This is useful especially as a precondition for other recipes.";
     }
 
     @SuppressWarnings("ConstantConditions")

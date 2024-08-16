@@ -26,20 +26,15 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.PathUtils;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.LatestRelease;
+import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -50,20 +45,18 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMavenExtension.Accumulator> {
     private static final String GRADLE_ENTERPRISE_MAVEN_EXTENSION_ARTIFACT_ID = "gradle-enterprise-maven-extension";
+    private static final String DEVELOCITY_MAVEN_EXTENSION_ARTIFACT_ID = "develocity-maven-extension";
     private static final String EXTENSIONS_XML_PATH = ".mvn/extensions.xml";
     private static final String GRADLE_ENTERPRISE_XML_PATH = ".mvn/gradle-enterprise.xml";
+    private static final String DEVELOCITY_XML_PATH = ".mvn/develocity.xml";
 
     @Language("xml")
     private static final String EXTENSIONS_XML_FORMAT = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
@@ -71,9 +64,9 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                                                         "</extensions>";
 
     @Language("xml")
-    private static final String ENTERPRISE_TAG_FORMAT = "<extension>\n" +
+    private static final String EXTENSION_TAG_FORMAT = "<extension>\n" +
                                                         "  <groupId>com.gradle</groupId>\n" +
-                                                        "  <artifactId>gradle-enterprise-maven-extension</artifactId>\n" +
+                                                        "  <artifactId>%s</artifactId>\n" +
                                                         "  <version>%s</version>\n" +
                                                         "</extension>";
 
@@ -97,13 +90,13 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     @Nullable
     Boolean allowUntrustedServer;
 
-    @Option(displayName = "Capture goal input files",
+    @Option(displayName = "Capture file fingerprints",
             description = "When set to `true` the extension will capture additional information about the inputs to Maven goals. " +
                           "This increases the size of build scans, but is useful for diagnosing issues with goal caching. ",
             required = false,
             example = "true")
     @Nullable
-    Boolean captureGoalInputFiles;
+    Boolean fileFingerprints;
 
     @Option(displayName = "Upload in background",
             description = "When set to `false` the extension will not upload build scan in the background. " +
@@ -144,12 +137,12 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     @Override
     public String getDescription() {
         return "To integrate the Develocity Maven extension into Maven projects, ensure that the " +
-               "`gradle-enterprise-maven-extension` is added to the `.mvn/extensions.xml` file if not already present. " +
-               "Additionally, configure the extension by adding the `.mvn/gradle-enterprise.xml` configuration file.";
+               "`develocity-maven-extension` is added to the `.mvn/extensions.xml` file if not already present. " +
+               "Additionally, configure the extension by adding the `.mvn/develocity.xml` configuration file.";
     }
 
     @Data
-    static class Accumulator {
+    public static class Accumulator {
         boolean mavenProject;
         boolean useCRLFNewLines;
         Path matchingExtensionsXmlFile;
@@ -185,6 +178,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                         acc.setMatchingExtensionsXmlFile(sourceFile.getSourcePath());
                         break;
                     case GRADLE_ENTERPRISE_XML_PATH:
+                    case DEVELOCITY_XML_PATH:
                         acc.setMatchingGradleEnterpriseXmlFile(sourceFile.getSourcePath());
                         break;
                     default:
@@ -202,12 +196,29 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
             return Collections.emptyList();
         }
 
+        VersionComparator versionComparator = Semver.validate("(,1.21)", null).getValue();
+        if (versionComparator == null) {
+            return Collections.emptyList();
+        }
+
+        String newVersion = version != null ? version : getLatestVersion(ctx);
         List<SourceFile> sources = new ArrayList<>();
-        sources.add(createNewXml(GRADLE_ENTERPRISE_XML_PATH, gradleEnterpriseConfiguration(acc.isUseCRLFNewLines())));
+
+        if (versionComparator.compare(null, newVersion, "1.21") >= 0) {
+            BuildScanConfiguration buildScanConfiguration = buildScanConfiguration(true);
+            ServerConfiguration serverConfiguration = new ServerConfiguration(server, allowUntrustedServer);
+            DevelocityConfiguration develocityConfiguration = new DevelocityConfiguration(serverConfiguration, buildScanConfiguration);
+            sources.add(createNewXml(DEVELOCITY_XML_PATH, writeConfiguration(develocityConfiguration, acc.isUseCRLFNewLines())));
+        } else {
+            BuildScanConfiguration buildScanConfiguration = buildScanConfiguration(false);
+            ServerConfiguration serverConfiguration = new ServerConfiguration(server, allowUntrustedServer);
+            GradleEnterpriseConfiguration gradleEnterpriseConfiguration = new GradleEnterpriseConfiguration(serverConfiguration, buildScanConfiguration);
+            sources.add(createNewXml(GRADLE_ENTERPRISE_XML_PATH, writeConfiguration(gradleEnterpriseConfiguration, acc.isUseCRLFNewLines())));
+        }
 
         if (acc.getMatchingExtensionsXmlFile() == null) {
             Xml.Document extensionsXml = createNewXml(EXTENSIONS_XML_PATH, EXTENSIONS_XML_FORMAT);
-            extensionsXml = addEnterpriseExtension(extensionsXml, ctx);
+            extensionsXml = addExtension(extensionsXml, ctx);
             sources.add(extensionsXml);
         }
 
@@ -231,13 +242,13 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                 if (sourceFile.getSourcePath().equals(acc.getMatchingExtensionsXmlFile())) {
                     Xml.Document extensionsXml = (Xml.Document) sourceFile;
 
-                    // find `gradle-enterprise-maven-extension` extension, do nothing if it already exists,
-                    boolean hasEnterpriseExtension = findExistingEnterpriseExtension(extensionsXml);
+                    // find extension, do nothing if it already exists,
+                    boolean hasEnterpriseExtension = findExistingExtension(extensionsXml);
                     if (hasEnterpriseExtension) {
                         return sourceFile;
                     }
 
-                    return addEnterpriseExtension(extensionsXml, ctx);
+                    return addExtension(extensionsXml, ctx);
                 }
                 return tree;
             }
@@ -248,6 +259,16 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     @Value
     private static class GradleEnterpriseConfiguration {
         ServerConfiguration server;
+
+        @Nullable
+        BuildScanConfiguration buildScan;
+    }
+
+    @JacksonXmlRootElement(localName = "develocity")
+    @Value
+    private static class DevelocityConfiguration {
+        ServerConfiguration server;
+
         @Nullable
         BuildScanConfiguration buildScan;
     }
@@ -255,6 +276,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     @Value
     private static class ServerConfiguration {
         String url;
+
         @Nullable
         Boolean allowUntrusted;
     }
@@ -263,38 +285,75 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     private static class BuildScanConfiguration {
         @Nullable
         Boolean backgroundBuildScanUpload;
+
         @Nullable
         String publish;
+
+        @Nullable
+        PublishingConfiguration publishing;
+
         @Nullable
         Capture capture;
     }
 
     @Value
-    private static class Capture {
-        Boolean goalInputFiles;
+    private static class PublishingConfiguration {
+        @Nullable
+        String onlyIf;
     }
 
-    private String gradleEnterpriseConfiguration(boolean useCRLFNewLines) {
-        BuildScanConfiguration buildScanConfiguration = buildScanConfiguration();
-        ServerConfiguration serverConfiguration = new ServerConfiguration(server, allowUntrustedServer);
+    @Value
+    private static class Capture {
+        Boolean goalInputFiles;
+        Boolean fileFingerprints;
+    }
+
+    private String writeConfiguration(Object config, boolean useCRLFNewLines) {
         try {
             ObjectMapper objectMapper = MavenXmlMapper.writeMapper();
             objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
             objectMapper.setSerializationInclusion(JsonInclude.Include.NON_ABSENT);
             PrettyPrinter pp = new DefaultXmlPrettyPrinter().withCustomNewLine(useCRLFNewLines ? "\r\n" : "\n");
-            return objectMapper.writer(pp)
-                    .writeValueAsString(new GradleEnterpriseConfiguration(serverConfiguration, buildScanConfiguration));
+            return objectMapper.writer(pp).writeValueAsString(config);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
     }
 
-    @Nullable
-    private BuildScanConfiguration buildScanConfiguration() {
-        if (uploadInBackground != null || publishCriteria != null || captureGoalInputFiles != null) {
-            return new BuildScanConfiguration(uploadInBackground,
-                    publishCriteria != null ? publishCriteria.xmlName : null,
-                    captureGoalInputFiles != null ? new Capture(captureGoalInputFiles) : null);
+    private @Nullable BuildScanConfiguration buildScanConfiguration(boolean develocity) {
+        if (uploadInBackground != null || publishCriteria != null || fileFingerprints != null) {
+            if (develocity) {
+                PublishingConfiguration publishing = null;
+                if (publishCriteria != null) {
+                    String onlyIf;
+                    switch (publishCriteria) {
+                        case Always:
+                            onlyIf = "true";
+                            break;
+                        case Failure:
+                            onlyIf = "!buildResult.failures.empty";
+                            break;
+                        case Demand:
+                            onlyIf = "false";
+                            break;
+                        default:
+                            throw new IllegalStateException("All options exhausted");
+                    }
+                    publishing = new PublishingConfiguration(onlyIf);
+                }
+
+                return new BuildScanConfiguration(
+                        uploadInBackground,
+                        null,
+                        publishing,
+                        fileFingerprints != null ? new Capture(null, fileFingerprints) : null
+                );
+            } else {
+                return new BuildScanConfiguration(uploadInBackground,
+                        publishCriteria != null ? publishCriteria.xmlName : null,
+                        null,
+                        fileFingerprints != null ? new Capture(fileFingerprints, null) : null);
+            }
         }
         return null;
     }
@@ -310,7 +369,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     /**
      * Return true if the `.mvn/extensions.xml` already includes `gradle-enterprise-maven-extension`
      */
-    private boolean findExistingEnterpriseExtension(Xml.Document extensionsXml) {
+    private boolean findExistingExtension(Xml.Document extensionsXml) {
         XPathMatcher xPathMatcher = new XPathMatcher("/extensions/extension/artifactId");
         return new XmlIsoVisitor<AtomicBoolean>() {
             @Override
@@ -321,7 +380,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                 tag = super.visitTag(tag, found);
                 if (xPathMatcher.matches(getCursor())) {
                     Optional<String> maybeArtifactId = tag.getValue();
-                    if (maybeArtifactId.isPresent() && maybeArtifactId.get().equals(GRADLE_ENTERPRISE_MAVEN_EXTENSION_ARTIFACT_ID)) {
+                    if (maybeArtifactId.isPresent() && (maybeArtifactId.get().equals(GRADLE_ENTERPRISE_MAVEN_EXTENSION_ARTIFACT_ID) || maybeArtifactId.get().equals(DEVELOCITY_MAVEN_EXTENSION_ARTIFACT_ID))) {
                         found.set(true);
                     }
                 }
@@ -331,12 +390,25 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     }
 
     /**
-     * Add `gradle-enterprise-maven-extension` to the file `.mvn/extensions.xml`,
-     * this method assumes that `gradle-enterprise-maven-extension` does not exist yet, and it should have been checked.
+     * Add `develocity-maven-extension` to the file `.mvn/extensions.xml`,
+     * this method assumes that `develocity-maven-extension` does not exist yet, and it should have been checked.
      */
-    private Xml.Document addEnterpriseExtension(Xml.Document extensionsXml, ExecutionContext ctx) {
+    private Xml.Document addExtension(Xml.Document extensionsXml, ExecutionContext ctx) {
+        VersionComparator versionComparator = Semver.validate("(,1.21)", null).getValue();
+        if (versionComparator == null) {
+            return extensionsXml;
+        }
+
+        String newVersion = version != null ? version : getLatestVersion(ctx);
+
+        String extension;
+        if (versionComparator.compare(null, newVersion, "1.21") >= 0) {
+            extension = "develocity-maven-extension";
+        } else {
+            extension = "gradle-enterprise-maven-extension";
+        }
         @Language("xml")
-        String tagSource = version != null ? String.format(ENTERPRISE_TAG_FORMAT, version) : String.format(ENTERPRISE_TAG_FORMAT, getLatestVersion(ctx));
+        String tagSource = String.format(EXTENSION_TAG_FORMAT, extension, newVersion);
         AddToTagVisitor<ExecutionContext> addToTagVisitor = new AddToTagVisitor<>(
                 extensionsXml.getRoot(),
                 Xml.Tag.build(tagSource));
@@ -344,17 +416,18 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     }
 
     private String getLatestVersion(ExecutionContext ctx) {
-        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, null, null);
+        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, mctx.getSettings(), mctx.getActiveProfiles());
         VersionComparator versionComparator = new LatestRelease(null);
-        GroupArtifact gradleEnterpriseExtension = new GroupArtifact("com.gradle", "gradle-enterprise-maven-extension");
+        GroupArtifact develocityExtension = new GroupArtifact("com.gradle", DEVELOCITY_MAVEN_EXTENSION_ARTIFACT_ID);
         try {
-            MavenMetadata extensionMetadata = pomDownloader.downloadMetadata(gradleEnterpriseExtension, null, Collections.singletonList(MavenRepository.MAVEN_CENTRAL));
-        return extensionMetadata.getVersioning()
-            .getVersions()
-            .stream()
-            .filter(v -> versionComparator.isValid(null, v))
-            .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-            .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle Enterprise Maven extension version to select from."));
+            MavenMetadata extensionMetadata = pomDownloader.downloadMetadata(develocityExtension, null, Collections.singletonList(MavenRepository.MAVEN_CENTRAL));
+            return extensionMetadata.getVersioning()
+                    .getVersions()
+                    .stream()
+                    .filter(v -> versionComparator.isValid(null, v))
+                    .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                    .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle Enterprise Maven extension version to select from."));
         } catch (MavenDownloadingException e) {
             throw new IllegalStateException("Could not download Maven metadata", e);
         }

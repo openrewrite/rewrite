@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -46,7 +46,7 @@ public class BlankLines extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                BlankLinesStyle style = ((SourceFile) cu).getStyle(BlankLinesStyle.class);
+                BlankLinesStyle style = cu.getStyle(BlankLinesStyle.class);
                 if (style == null) {
                     style = IntelliJ.blankLines();
                 }

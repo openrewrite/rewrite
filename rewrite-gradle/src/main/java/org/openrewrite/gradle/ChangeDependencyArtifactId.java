@@ -17,7 +17,10 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
@@ -25,17 +28,21 @@ import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.DependencyMatcher;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class ChangeDependencyArtifactId extends Recipe {
     @Option(displayName = "Group",
@@ -66,6 +73,11 @@ public class ChangeDependencyArtifactId extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "Change the artifact of a specified Gradle dependency.";
     }
@@ -81,6 +93,22 @@ public class ChangeDependencyArtifactId extends Recipe {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
+            final Map<GroupArtifact, GroupArtifact> updatedDependencies = new HashMap<>();
+
+            @Override
+            public G visitCompilationUnit(G.CompilationUnit compilationUnit, ExecutionContext ctx) {
+                G.CompilationUnit cu = (G.CompilationUnit) super.visitCompilationUnit(compilationUnit, ctx);
+                if(cu != compilationUnit) {
+                    cu = cu.withMarkers(cu.getMarkers().withMarkers(ListUtils.map(cu.getMarkers().getMarkers(), m -> {
+                        if (m instanceof GradleProject) {
+                            return updateModel((GradleProject) m, updatedDependencies);
+                        }
+                        return m;
+                    })));
+                }
+                return cu;
+            }
+
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
@@ -92,8 +120,8 @@ public class ChangeDependencyArtifactId extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                        (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                                ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                           (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                            ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
                     m = m.withArguments(ListUtils.map(depArgs, platform -> updateDependency((J.MethodInvocation) platform)));
                 }
 
@@ -106,22 +134,24 @@ public class ChangeDependencyArtifactId extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
-                        if (!newArtifactId.equals(dependency.getArtifactId()) &&
-                                ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
-                                        (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
+                        if (dependency != null && !newArtifactId.equals(dependency.getArtifactId()) &&
+                            ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
+                             (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
                             Dependency newDependency = dependency.withArtifactId(newArtifactId);
+                            updatedDependencies.put(dependency.getGav().asGroupArtifact(), newDependency.getGav().asGroupArtifact());
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
                         }
                     }
                 } else if (depArgs.get(0) instanceof G.GString) {
                     List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
                     if (strings.size() >= 2 &&
-                            strings.get(0) instanceof J.Literal) {
-                        Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
-                        if (!newArtifactId.equals(dependency.getArtifactId())
-                                && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
-                            dependency = dependency.withArtifactId(newArtifactId);
-                            String replacement = dependency.toStringNotation();
+                        strings.get(0) instanceof J.Literal) {
+                        Dependency dependency = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) strings.get(0)).getValue()));
+                        if (dependency != null && !newArtifactId.equals(dependency.getArtifactId())
+                            && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                            Dependency newDependency = dependency.withArtifactId(newArtifactId);
+                            updatedDependencies.put(dependency.getGav().asGroupArtifact(), newDependency.getGav().asGroupArtifact());
+                            String replacement = newDependency.toStringNotation();
                             m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
                                 G.GString gString = (G.GString) arg;
                                 return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
@@ -163,8 +193,8 @@ public class ChangeDependencyArtifactId extends Recipe {
                         }
                     }
                     if (groupId == null || artifactId == null
-                            || (version == null && !depMatcher.matches(groupId, artifactId))
-                            || (version != null && !depMatcher.matches(groupId, artifactId, version))) {
+                        || (version == null && !depMatcher.matches(groupId, artifactId))
+                        || (version != null && !depMatcher.matches(groupId, artifactId, version))) {
                         return m;
                     }
                     String delimiter = versionStringDelimiter;
@@ -182,5 +212,30 @@ public class ChangeDependencyArtifactId extends Recipe {
                 return m;
             }
         });
+    }
+
+    private GradleProject updateModel(GradleProject gp, Map<GroupArtifact, GroupArtifact> updatedDependencies) {
+        Map<String, GradleDependencyConfiguration> nameToConfigurations = gp.getNameToConfiguration();
+        Map<String, GradleDependencyConfiguration> updatedNameToConfigurations = new HashMap<>();
+        for (Map.Entry<String, GradleDependencyConfiguration> nameToConfiguration : nameToConfigurations.entrySet()) {
+            String configurationName = nameToConfiguration.getKey();
+            GradleDependencyConfiguration configuration = nameToConfiguration.getValue();
+
+            List<org.openrewrite.maven.tree.Dependency> newRequested = configuration.getRequested()
+                    .stream()
+                    .map(requested -> requested.withGav(requested.getGav()
+                            .withGroupArtifact(updatedDependencies.getOrDefault(requested.getGav().asGroupArtifact(), requested.getGav().asGroupArtifact()))))
+                    .collect(Collectors.toList());
+
+            List<ResolvedDependency> newResolved = configuration.getResolved().stream()
+                    .map(resolved ->
+                        resolved.withGav(resolved.getGav()
+                                .withGroupArtifact(updatedDependencies.getOrDefault(resolved.getGav().asGroupArtifact(), resolved.getGav().asGroupArtifact()))))
+                    .collect(Collectors.toList());
+
+            updatedNameToConfigurations.put(configurationName, configuration.withRequested(newRequested).withDirectResolved(newResolved));
+        }
+
+        return gp.withNameToConfiguration(updatedNameToConfigurations);
     }
 }

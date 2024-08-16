@@ -15,8 +15,8 @@
  */
 package org.openrewrite;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -206,6 +206,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
      */
     class Valid<T> implements Validated<T> {
         protected final String property;
+
         @Nullable
         private final T value;
 
@@ -229,8 +230,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         @Override
-        @Nullable
-        public T getValue() {
+        public @Nullable T getValue() {
             return value;
         }
 
@@ -284,13 +284,11 @@ public interface Validated<T> extends Iterable<Validated<T>> {
             return property;
         }
 
-        @Nullable
-        public Object getInvalidValue() {
+        public @Nullable Object getInvalidValue() {
             return value;
         }
 
-        @Nullable
-        public Throwable getException() {
+        public @Nullable Throwable getException() {
             return exception;
         }
 

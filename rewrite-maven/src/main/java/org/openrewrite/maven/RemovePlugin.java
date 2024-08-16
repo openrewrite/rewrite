@@ -26,7 +26,7 @@ import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemovePlugin extends Recipe {
 
     @Option(displayName = "Group",
@@ -45,8 +45,13 @@ public class RemovePlugin extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
-        return "Remove the specified Maven plugin from the pom.xml.";
+        return "Remove the specified Maven plugin from the POM.";
     }
 
     @Override

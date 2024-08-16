@@ -17,13 +17,13 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -33,7 +33,7 @@ import java.time.Duration;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyConfiguration extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -60,6 +60,11 @@ public class ChangeDependencyConfiguration extends Recipe {
     @Override
     public String getDisplayName() {
         return "Change a Gradle dependency configuration";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s` to `%s`", groupId, artifactId, newConfiguration);
     }
 
     @Override
@@ -99,7 +104,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
 
                     Dependency dependency = DependencyStringNotationConverter.parse((String) arg.getValue());
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else if (args.get(0) instanceof G.GString) {
@@ -114,7 +119,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
 
                     Dependency dependency = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else if (args.get(0) instanceof G.MapEntry && args.size() >= 2) {
@@ -153,7 +158,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                         dependency = DependencyStringNotationConverter.parse((String) value.getValue());
                     }
 
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else {

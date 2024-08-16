@@ -16,10 +16,10 @@
 package org.openrewrite.test.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import org.jspecify.annotations.NullMarked;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.test.RewriteTest;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -38,13 +38,31 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void acceptsRecipeWithDescriptionListOfLinks() {
+        validateRecipeNameAndDescription(new RecipeWithDescriptionListOfLinks());
+    }
+
+    @Test
+    void acceptsRecipeWithDescriptionListOfDescribedLinks() {
+        validateRecipeNameAndDescription(new RecipeWithDescriptionListOfDescribedLinks());
+    }
+
+    @Test
+    void rejectsRecipeWithDescriptionNotEndingWithPeriod() {
+        assertThrows(
+          AssertionError.class,
+          () -> validateRecipeNameAndDescription(new RecipeWithDescriptionNotEndingWithPeriod())
+        );
+    }
+
+    @Test
     void verifyAll() {
         assertThrows(AssertionError.class, this::assertRecipesConfigure);
     }
 }
 
 @SuppressWarnings("FieldCanBeLocal")
-@NonNullApi
+@NullMarked
 class RecipeWithNameOption extends Recipe {
     @Option
     private final String name;
@@ -62,5 +80,53 @@ class RecipeWithNameOption extends Recipe {
     @Override
     public String getDescription() {
         return "A fancy description.";
+    }
+}
+
+@NullMarked
+class RecipeWithDescriptionListOfLinks extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Recipe with name option";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A fancy description.\n" +
+                "For more information, see:\n" +
+                "  - [link 1](https://example.com/link1)\n" +
+                "  - [link 2](https://example.com/link2)";
+    }
+}
+
+@NullMarked
+class RecipeWithDescriptionListOfDescribedLinks extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Recipe with name option";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A fancy description.\n" +
+               "For more information, see:\n" +
+               "  - First Resource [link 1](https://example.com/link1).\n" +
+               "  - Second Resource [link 2](https://example.com/link2).";
+    }
+}
+
+@NullMarked
+class RecipeWithDescriptionNotEndingWithPeriod extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Recipe with name option";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A fancy description";
     }
 }

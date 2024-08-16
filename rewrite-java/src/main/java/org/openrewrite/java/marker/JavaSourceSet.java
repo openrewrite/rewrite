@@ -22,19 +22,18 @@ import io.github.classgraph.ScanResult;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaParser;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.PathUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SourceSet;
 
-import java.nio.file.Path;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.*;
 import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -50,51 +49,68 @@ public class JavaSourceSet implements SourceSet {
     List<JavaType.FullyQualified> classpath;
 
     /**
-     * Extract type information from the provided classpath.
-     *
-     * @param fullTypeInformation when false classpath will be filled with shallow types (effectively just fully-qualified names).
-     *                            when true a much more memory-intensive, time-consuming approach will extract full type information
+     * Mapping of a String taking the form "group:artifact:version" to the types provided by that artifact.
+     * Does not include java standard library types.
      */
+    Map<String, List<JavaType.FullyQualified>> gavToTypes;
+
+    /**
+     * Extract type information from the provided classpath.
+     * Uses ClassGraph to compute the classpath.
+
+     * Does not support gavToTypes or typeToGav mapping
+     *
+     * @param fullTypeInformation Not used, does not do anything, to be deleted
+     * @param ignore Not used, does not do anything, to be deleted
+     */
+    @Deprecated
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath,
-                                      JavaTypeCache typeCache, boolean fullTypeInformation) {
-        List<JavaType.FullyQualified> types;
-        // Load JRE-provided types
-        try (ScanResult scanResult = new ClassGraph()
-                .enableClassInfo()
-                .enableSystemJarsAndModules()
-                .acceptPackages("java")
-                .ignoreClassVisibility()
-                .scan()) {
-            Map<String, List<String>> packagesToTypes = packagesToTypeDeclarations(scanResult);
-            // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
-            packagesToTypes.computeIfAbsent("java.lang", p -> new ArrayList<>())
-                    .add("java.lang.Object");
-            types = typesFrom(packagesToTypes, typeCache, Collections.emptyList(), fullTypeInformation);
+                                      JavaTypeCache ignore, boolean fullTypeInformation) {
+        if (fullTypeInformation) {
+            throw new UnsupportedOperationException();
         }
-        if (classpath.iterator().hasNext()) {
+
+        List<String> typeNames;
+        if (!classpath.iterator().hasNext()) {
+            // Only load JRE-provided types
+            try (ScanResult scanResult = new ClassGraph()
+                    .enableClassInfo()
+                    .enableSystemJarsAndModules()
+                    .acceptPackages("java")
+                    .ignoreClassVisibility()
+                    .scan()) {
+                typeNames = packagesToTypeDeclarations(scanResult);
+            }
+        } else {
             // Load types from the classpath
             try (ScanResult scanResult = new ClassGraph()
                     .overrideClasspath(classpath)
-                    .enableMemoryMapping()
+                    .enableSystemJarsAndModules()
                     .enableClassInfo()
                     .ignoreClassVisibility()
                     .scan()) {
-                types.addAll(typesFrom(packagesToTypeDeclarations(scanResult), typeCache, classpath, fullTypeInformation));
+                typeNames = packagesToTypeDeclarations(scanResult);
             }
         }
 
-        return new JavaSourceSet(randomId(), sourceSetName, types);
+        // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
+        typeNames.add("java.lang.Object");
+        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), null);
     }
+
 
     /*
      * Create a map of package names to types contained within that package. Type names are not fully qualified, except for type parameter bounds.
      * e.g.: "java.util" -> [List, Date]
      */
-    private static Map<String, List<String>> packagesToTypeDeclarations(ScanResult scanResult) {
-        Map<String, List<String>> result = new HashMap<>();
+    private static List<String> packagesToTypeDeclarations(ScanResult scanResult) {
+        List<String> result = new ArrayList<>();
         for (ClassInfo classInfo : scanResult.getAllClasses()) {
             // Skip private classes, allowing package-private
             if (classInfo.isAnonymousInnerClass() || classInfo.isPrivate() || classInfo.isSynthetic() || classInfo.getName().contains(".enum.")) {
+                continue;
+            }
+            if (classInfo.isStandardClass() && !classInfo.getName().startsWith("java.")) {
                 continue;
             }
             // Although the classfile says its bytecode version is 50 (within the range Java 8 supports),
@@ -107,83 +123,17 @@ public class JavaSourceSet implements SourceSet {
             if (typeDeclaration == null) {
                 continue;
             }
-            result.computeIfAbsent(classInfo.getPackageName(), p -> new ArrayList<>())
-                    .add(typeDeclaration);
+            result.add(typeDeclaration);
         }
         return result;
     }
 
-    private static List<JavaType.FullyQualified> typesFrom(
-            Map<String, List<String>> packagesToTypes,
-            JavaTypeCache typeCache,
-            Collection<Path> classpath,
-            boolean fullTypeInformation
-    ) {
-        List<JavaType.FullyQualified> types = new ArrayList<>();
-        if (fullTypeInformation) {
-            @Language("java")
-            String[] typeStubs = typeStubsFor(packagesToTypes);
-
-            ExecutionContext noRecursiveJavaSourceSet = new InMemoryExecutionContext();
-            noRecursiveJavaSourceSet.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
-
-            JavaParser jp = JavaParser.fromJavaVersion()
-                    .typeCache(typeCache)
-                    .classpath(classpath)
-                    .build();
-
-            jp.parse(noRecursiveJavaSourceSet, typeStubs).forEach(sourceFile -> {
-                J.CompilationUnit cu = (J.CompilationUnit) sourceFile;
-                if (!cu.getClasses().isEmpty()) {
-                    J.Block body = cu.getClasses().get(0).getBody();
-                    for (Statement s : body.getStatements()) {
-                        JavaType type = ((J.MethodDeclaration) s).getType();
-                        if (type instanceof JavaType.FullyQualified) {
-                            types.add((JavaType.FullyQualified) type);
-                        }
-                    }
-                }
-            });
-        } else {
-            for (Map.Entry<String, List<String>> packageToTypes : packagesToTypes.entrySet()) {
-                for (String className : packageToTypes.getValue()) {
-                    types.add(JavaType.ShallowClass.build(className));
-                }
-            }
+    private static List<JavaType.FullyQualified> typesFrom(List<String> typeNames) {
+        List<JavaType.FullyQualified> types = new ArrayList<>(typeNames.size());
+        for (String typeName : typeNames) {
+            types.add(JavaType.ShallowClass.build(typeName));
         }
         return types;
-    }
-
-    /**
-     * Produce Java source code that, when compiled, contains all the types represented in packagesToTypeNames.
-     */
-    private static String[] typeStubsFor(Map<String, List<String>> packagesToTypeNames) {
-        String[] result = new String[packagesToTypeNames.size()];
-        int i = 0;
-        for (Map.Entry<String, List<String>> packageToTypes : packagesToTypeNames.entrySet()) {
-            boolean isJreType = packageToTypes.getKey().startsWith("java.");
-            StringBuilder sb = new StringBuilder("package ");
-            if (isJreType) {
-                // Avoid java compiler complaints that we're redefining java.lang, etc.
-                // Only apply to java provided types because this limits our ability to get type information from package-private classes
-                sb.append("rewrite.");
-            }
-            sb.append(packageToTypes.getKey()).append(";\n")
-                    .append("abstract class $RewriteTypeStub {\n");
-
-            List<String> value = packageToTypes.getValue();
-            for (int j = 0; j < value.size(); j++) {
-                String type = value.get(j);
-                if (type == null) {
-                    continue;
-                }
-                sb.append("    abstract ").append(type).append(" t").append(j).append("();\n");
-            }
-            sb.append("}");
-            result[i] = sb.toString();
-            i++;
-        }
-        return result;
     }
 
     /**
@@ -196,8 +146,7 @@ public class JavaSourceSet implements SourceSet {
      * This method takes all of these considerations into account and returns a fully qualified name which replaces
      * inner-class signifying "$" with ".", while preserving
      */
-    @Nullable
-    private static String declarableFullyQualifiedName(ClassInfo classInfo) {
+    private static @Nullable String declarableFullyQualifiedName(ClassInfo classInfo) {
         String name;
         if (classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
             // Because we put java-supplied types into another package, we cannot access package-private types
@@ -227,7 +176,7 @@ public class JavaSourceSet implements SourceSet {
             }
             String nameFragment = classInfo.getName().substring(sb.length());
 
-            if (isUndeclarable(nameFragment)) {
+            if (!isDeclarable(nameFragment)) {
                 return null;
             }
             sb.append(nameFragment);
@@ -235,15 +184,144 @@ public class JavaSourceSet implements SourceSet {
         } else {
             name = classInfo.getName();
         }
-        if (isUndeclarable(name)) {
+        if (!isDeclarable(name)) {
             return null;
         }
         return name;
     }
 
-    @SuppressWarnings("SpellCheckingInspection")
-    private static boolean isUndeclarable(String className) {
-        char firstChar = className.charAt(0);
-        return !Character.isJavaIdentifierPart(firstChar) || Character.isDigit(firstChar);
+
+    // Purely IO-based classpath scanning below this point
+    /**
+     * Extract type information from the provided classpath.
+     * Uses file I/O to compute the classpath.
+     */
+    public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath) {
+        List<JavaType.FullyQualified> types = getJavaStandardLibraryTypes();
+        Map<String, List<JavaType.FullyQualified>> gavToTypes = new LinkedHashMap<>();
+        for (Path path : classpath) {
+            List<JavaType.FullyQualified> typesFromPath = typesFromPath(path, null);
+
+            types.addAll(typesFromPath);
+            String gav = gavFromPath(path);
+            if (gav != null) {
+                gavToTypes.put(gav, typesFromPath);
+            }
+        }
+        return new JavaSourceSet(randomId(), sourceSetName, types, gavToTypes);
+    }
+
+    /**
+     * Assuming the provided path is to a jar file in a local maven repository or Gradle cache, derive the GAV coordinate from it.
+     * If no GAV can be determined returns null.
+     *
+     */
+    @Nullable
+    static String gavFromPath(Path path) {
+        String pathStr = PathUtils.separatorsToUnix(path.toString());
+        List<String> pathParts = Arrays.asList(pathStr.split("/"));
+        // Example maven path: ~/.m2/repository/org/openrewrite/rewrite-core/8.32.0/rewrite-core-8.32.0.jar
+        // Example gradle path: ~/.gradle/caches/modules-2/files-2.1/org.openrewrite/rewrite-core/8.32.0/64ddcc371f1bf29593b4b27e907757d5554d1a83/rewrite-core-8.32.0.jar
+
+        // Either of these directories may be relocated, so a fixed index is unreliable
+        String groupId = null;
+        String artifactId = null;
+        String version = null;
+        if (pathStr.contains("modules-2/files-2.1") && pathParts.size() >= 5) {
+            groupId = pathParts.get(pathParts.size() - 5);
+            artifactId = pathParts.get(pathParts.size() - 4);
+            version = pathParts.get(pathParts.size() - 3);
+        } else if (pathParts.size() >= 4) {
+            version = pathParts.get(pathParts.size() - 2);
+            artifactId = pathParts.get(pathParts.size() - 3);
+            // Unknown how many of the next several path parts will together comprise the groupId
+            // Maven repository root will have a "repository.xml" file
+            StringBuilder groupIdBuilder = new StringBuilder();
+            int i = pathParts.size() - 3;
+            while(i > 0) {
+                Path maybeRepositoryRoot = Paths.get(String.join("/", pathParts.subList(0, i)));
+                if(maybeRepositoryRoot.endsWith("repository") || Files.exists(maybeRepositoryRoot.resolve("repository.xml"))) {
+                    groupId = groupIdBuilder.substring(1); // Trim off the preceding "."
+                    break;
+                }
+                groupIdBuilder.insert(0, "." + pathParts.get(i - 1));
+                i--;
+            }
+        }
+        if(groupId == null || artifactId == null || version == null) {
+            return null;
+        }
+        return groupId + ":" + artifactId + ":" + version;
+    }
+
+
+    // Worth caching as there is typically substantial overlap in dependencies in use within the same repository
+    // Even a single module project will typically have at least two source sets, main and test
+    private static List<JavaType.FullyQualified> typesFromPath(Path path, @Nullable String acceptPackage) {
+        List<JavaType.FullyQualified> types = new ArrayList<>();
+        try {
+            // Paths will be to either directories of class files or jar files
+            if (Files.isRegularFile(path)) {
+                try (JarFile jarFile = new JarFile(path.toFile())) {
+                    Enumeration<JarEntry> entries = jarFile.entries();
+                    while(entries.hasMoreElements()) {
+                        String entryName = entries.nextElement().getName();
+                        if(entryName.endsWith(".class")) {
+                            String s = entryNameToClassName(entryName);
+                            if(isDeclarable(s)) {
+                                types.add(JavaType.ShallowClass.build(s));
+                            }
+                        }
+                    }
+                }
+            } else {
+                Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
+                        String pathStr = file.toString();
+                        if (pathStr.endsWith(".class")) {
+                            String s = entryNameToClassName(pathStr);
+                            if((acceptPackage == null || s.startsWith(acceptPackage)) &&isDeclarable(s)) {
+                                types.add(JavaType.ShallowClass.build(s));
+                            }
+                        }
+                        return java.nio.file.FileVisitResult.CONTINUE;
+                    }
+                });
+            }
+        } catch (IOException e) {
+            // Partial results better than no results
+        }
+        return types;
+    }
+
+    private static List<JavaType.FullyQualified> getJavaStandardLibraryTypes() {
+        List<JavaType.FullyQualified> javaStandardLibraryTypes = new ArrayList<>();
+        Path toolsJar = Paths.get(System.getProperty("java.home")).resolve("../lib/tools.jar");
+        if(Files.exists(toolsJar)) {
+            javaStandardLibraryTypes.addAll(typesFromPath(toolsJar, "java"));
+        } else {
+            javaStandardLibraryTypes.addAll(typesFromPath(
+                    FileSystems.getFileSystem(URI.create("jrt:/")).getPath("modules", "java.base"),
+                    "java"));
+        }
+        return javaStandardLibraryTypes;
+    }
+
+    private static String entryNameToClassName(String entryName) {
+        String result = entryName;
+        if(entryName.startsWith("modules/java.base/")) {
+            result = entryName.substring("modules/java.base/".length());
+        }
+        return result.substring(0, result.length() - ".class".length())
+                .replace('/', '.');
+    }
+
+    static boolean isDeclarable(String className) {
+        int dotIndex = Math.max(className.lastIndexOf("."), className.lastIndexOf('$'));
+        className = className.substring(dotIndex + 1);
+        return !className.isEmpty() &&
+               Character.isJavaIdentifierPart(className.charAt(0)) &&
+               !Character.isDigit(className.charAt(0));
     }
 }

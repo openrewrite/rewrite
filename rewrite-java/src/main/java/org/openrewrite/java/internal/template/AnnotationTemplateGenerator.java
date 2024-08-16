@@ -18,9 +18,9 @@ package org.openrewrite.java.internal.template;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -93,8 +93,8 @@ public class AnnotationTemplateGenerator {
         List<J.Annotation> annotations = new ArrayList<>();
 
         new JavaIsoVisitor<Integer>() {
-            @Nullable
-            private Comment filterTemplateComment(Comment comment) {
+
+            private @Nullable Comment filterTemplateComment(Comment comment) {
                 return comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT) ?
                         null : comment;
             }
@@ -188,11 +188,6 @@ public class AnnotationTemplateGenerator {
                 }
                 after.append('}');
             }
-        } else if (j instanceof J.VariableDeclarations) {
-            J.VariableDeclarations v = (J.VariableDeclarations) j;
-            if (v.hasModifier(J.Modifier.Type.Final)) {
-                before.insert(0, variable((J.VariableDeclarations) j, cursor) + '=');
-            }
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
             n = n.withBody(null).withPrefix(Space.EMPTY);
@@ -223,8 +218,10 @@ public class AnnotationTemplateGenerator {
                 classDeclaration(before, (J.ClassDeclaration) statement, templated, cursor);
             }
         }
-        c = c.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
-        before.insert(0, c.printTrimmed(cursor).trim() + '{');
+        c = c.withBody(J.Block.createEmptyBlock()).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
+        String printed = c.printTrimmed(cursor);
+        int braceIndex = printed.lastIndexOf('{');
+        before.insert(0, braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));
     }
 
     private String variable(J.VariableDeclarations variable, Cursor cursor) {

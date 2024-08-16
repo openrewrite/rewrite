@@ -26,7 +26,7 @@ import java.util.Objects;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeExtraProperty extends Recipe {
 
     @Override
@@ -94,7 +94,11 @@ public class ChangeExtraProperty extends Recipe {
         if(Objects.equals(value, asVal.getValue())) {
             return as;
         }
+        String quote = "\"";
+        if(asVal.getValueSource() != null && asVal.getValueSource().trim().startsWith("'")) {
+            quote = "'";
+        }
         return as.withAssignment(asVal.withValue(value)
-                .withValueSource("\"" + value + "\""));
+                .withValueSource(quote + value + quote));
     }
 }

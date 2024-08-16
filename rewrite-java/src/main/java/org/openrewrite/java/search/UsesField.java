@@ -16,17 +16,15 @@
 package org.openrewrite.java.search;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
-
-import static java.util.Objects.requireNonNull;
 
 @RequiredArgsConstructor
 public class UsesField<P> extends JavaIsoVisitor<P> {
@@ -36,10 +34,15 @@ public class UsesField<P> extends JavaIsoVisitor<P> {
     @Override
     public J visit(@Nullable Tree tree, P p) {
         if (tree instanceof JavaSourceFile) {
-            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            JavaSourceFile cu = (JavaSourceFile) tree;
+            boolean isGlob = field.contains("*") || field.contains("?");
+            TypeMatcher typeMatcher = null;
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-                if (StringUtils.matchesGlob(variable.getName(), field) &&
-                    new TypeMatcher(owner, true).matches(variable.getOwner())) {
+                if (isGlob && (typeMatcher = typeMatcher == null ? new TypeMatcher(owner, true) : typeMatcher).matches(variable.getOwner()) &&
+                    StringUtils.matchesGlob(variable.getName(), field)) {
+                    return SearchResult.found(cu);
+                } else if (!isGlob && variable.getName().equals(field) &&
+                    (typeMatcher = typeMatcher == null ? new TypeMatcher(owner, true) : typeMatcher).matches(variable.getOwner())) {
                     return SearchResult.found(cu);
                 }
             }

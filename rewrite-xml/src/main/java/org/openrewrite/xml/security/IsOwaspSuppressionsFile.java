@@ -59,7 +59,6 @@ public class IsOwaspSuppressionsFile extends Recipe {
                     }
                 }
                 if (isOwaspSuppressionFile) {
-
                     return doc.withRoot(SearchResult.found(doc.getRoot()));
                 }
                 return doc;

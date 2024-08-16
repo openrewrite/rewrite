@@ -228,4 +228,81 @@ class AddPropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void orderedInsertionBeginning() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "com.sam",
+            "true",
+            "sam",
+            null
+          )),
+          properties(
+            """
+              com.zoe=true
+              """,
+            """
+              # sam
+              com.sam=true
+              com.zoe=true
+              """)
+        );
+    }
+
+    @Test
+    void orderedInsertionMiddle() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "com.sam",
+            "true",
+            "sam",
+            null
+          )),
+          properties(
+            """
+              # amy
+              com.amy=true
+              # bea
+              com.bea=true
+              # seb
+              com.seb=true
+              # zoe
+              com.zoe=true
+              """,
+            """
+              # amy
+              com.amy=true
+              # bea
+              com.bea=true
+              # sam
+              com.sam=true
+              # seb
+              com.seb=true
+              # zoe
+              com.zoe=true
+              """)
+        );
+    }
+
+    @Test
+    void orderedInsertionEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "com.sam",
+            "true",
+            "sam",
+            null
+          )),
+          properties(
+            """
+              com.amy=true
+              """,
+            """
+              com.amy=true
+              # sam
+              com.sam=true
+              """)
+        );
+    }
 }
