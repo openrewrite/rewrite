@@ -90,12 +90,11 @@ class RepeatTest implements RewriteTest {
 
     @Test
     void repeatValidatesCursorIsPassed() {
-        AssertionError assertionError = assertThrows(AssertionError.class, () -> {
+        AssertionError assertionError = assertThrows(AssertionError.class, () ->
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(VisitorThatFailsToSetCursor::new)),
               java("class A {}")
-            );
-        });
+            ));
         assertThat(assertionError).cause().isInstanceOf(RecipeRunException.class);
         RecipeRunException e = (RecipeRunException) assertionError.getCause();
         assertThat(e.getMessage())
