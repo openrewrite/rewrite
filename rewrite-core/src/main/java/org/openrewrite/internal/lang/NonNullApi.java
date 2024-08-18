@@ -15,7 +15,6 @@
  */
 package org.openrewrite.internal.lang;
 
-import org.openrewrite.internal.lang.NonNull;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

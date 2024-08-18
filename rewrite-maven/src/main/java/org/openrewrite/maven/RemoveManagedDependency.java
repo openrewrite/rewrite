@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
