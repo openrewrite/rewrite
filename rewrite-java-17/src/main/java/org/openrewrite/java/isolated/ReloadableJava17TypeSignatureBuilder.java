@@ -51,7 +51,7 @@ class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
             }
         } else if (type instanceof Type.CapturedType) { // CapturedType must be evaluated before TypeVar
-            return signature(((Type.CapturedType) type).wildcard);
+            return genericSignature(type);
         } else if (type instanceof Type.TypeVar) {
             return genericSignature(type);
         } else if (type instanceof Type.JCPrimitiveType) {
