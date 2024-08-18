@@ -29,7 +29,10 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.sourceSet;
+import static org.openrewrite.java.Assertions.srcMainJava;
+import static org.openrewrite.java.Assertions.srcTestJava;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.dir;
 import static org.openrewrite.test.SourceSpecs.text;

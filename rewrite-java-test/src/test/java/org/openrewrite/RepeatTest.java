@@ -24,7 +24,9 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.java;
 
 class RepeatTest implements RewriteTest {
