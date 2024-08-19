@@ -58,18 +58,19 @@ public class GitRemote {
         }
 
         // todo test
+
         /**
          * @param service       the type of SCM service
-         * @param uri           the (main) origin of the server
+         * @param remoteUri     the (main) origin of the server
          * @param alternateUris the alternate origins of the server
          * @return this
          */
-        public Parser registerRemote(Service service, URI uri, Collection<URI> alternateUris) {
-            URI normalizedUri = normalize(uri.toString());
-            String maybePort = maybePort(uri.getPort(), uri.getScheme());
+        public Parser registerRemote(Service service, URI remoteUri, Collection<URI> alternateUris) {
+            URI normalizedUri = normalize(remoteUri.toString());
+            String maybePort = maybePort(remoteUri.getPort(), remoteUri.getScheme());
             String origin = normalizedUri.getHost() + maybePort + normalizedUri.getPath();
             List<URI> allUris = new ArrayList<>();
-            allUris.add(uri);
+            allUris.add(remoteUri);
             allUris.addAll(alternateUris);
             add(new RemoteServer(service, origin, allUris));
             return this;
