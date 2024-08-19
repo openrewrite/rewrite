@@ -99,7 +99,7 @@ public class XmlParser implements Parser {
                p.endsWith(".pst") ||
                // C# project files
                p.endsWith(".csproj") ||
-               p.equals("packages.config");
+               path.endsWith("packages.config");
     }
 
     @Override
