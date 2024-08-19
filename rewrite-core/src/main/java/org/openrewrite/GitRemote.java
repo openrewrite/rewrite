@@ -57,9 +57,9 @@ public class GitRemote {
             servers.add(new RemoteServer(Service.AzureDevOps, "dev.azure.com", URI.create("https://dev.azure.com"), URI.create("ssh://ssh.dev.azure.com")));
         }
 
-        // todo test
-
         /**
+         * Register a remote git server with multiple protocols and ports all matching the same server/origin.
+         *
          * @param service       the type of SCM service
          * @param remoteUri     the (main) origin of the server
          * @param alternateUris the alternate origins of the server
@@ -77,12 +77,13 @@ public class GitRemote {
         }
 
         /**
+         * Register a remote git server with a single origin with a single (supplied or guessed) protocol.
+         * If multiple protocols and/or ports should be supported use {@link #registerRemote(Service, URI, Collection)}
+         *
          * @param service the type of SCM service
          * @param origin  the origin of the server
          * @return this
-         * @deprecated Use {@link #registerRemote(Service, URI, Collection)} instead to configure multiple uris for a single remote server
          */
-        @Deprecated
         public Parser registerRemote(Service service, String origin) {
             add(new RemoteServer(service, origin, normalize(origin)));
             return this;

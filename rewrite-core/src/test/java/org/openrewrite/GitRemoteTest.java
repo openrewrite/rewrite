@@ -101,8 +101,7 @@ public class GitRemoteTest {
       https://scm.company.com/very/long/context/path/group/subgroup/subergroup/subestgroup/repo, scm.company.com/very/long/context/path, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       """)
     void parseRegisteredRemote(String cloneUrl, String origin, GitRemote.Service service, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
-        GitRemote.Parser parser = new GitRemote.Parser();
-        parser.registerRemote(service, origin);
+        GitRemote.Parser parser = new GitRemote.Parser().registerRemote(service, origin);
         GitRemote remote = parser.parse(cloneUrl);
         assertThat(remote.getOrigin()).isEqualTo(origin);
         assertThat(remote.getPath()).isEqualTo(expectedPath);
@@ -112,23 +111,23 @@ public class GitRemoteTest {
 
     @ParameterizedTest
     @CsvSource(textBlock = """
-    https://scm.company.com/very/long/context/path/org/repo.git,
-    https://scm.company.com:8443/very/long/context/path/org/repo.git
-    http://scm.company.com/very/long/context/path/org/repo.git
-    ssh://scm.company.com:7999/very/long/context/path/org/repo.git
-    ssh://scm.company.com:222/very/long/context/path/org/repo.git
-    ssh://scm.company.com/very/long/context/path/org/repo.git
-    scm.company.com:very/long/context/path/org/repo.git
-    """)
+      https://scm.company.com/very/long/context/path/org/repo.git,
+      https://scm.company.com:8443/very/long/context/path/org/repo.git
+      http://scm.company.com/very/long/context/path/org/repo.git
+      ssh://scm.company.com:7999/very/long/context/path/org/repo.git
+      ssh://scm.company.com:222/very/long/context/path/org/repo.git
+      ssh://scm.company.com/very/long/context/path/org/repo.git
+      scm.company.com:very/long/context/path/org/repo.git
+      """)
     void parseRegisteredRemoteServer(String cloneUrl) {
-        GitRemote.Parser parser = new GitRemote.Parser();
-        parser.registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/very/long/context/path"), List.of(
-          URI.create("https://scm.company.com:8443/very/long/context/path"),
-          URI.create("http://scm.company.com/very/long/context/path"),
-          URI.create("ssh://scm.company.com:7999/very/long/context/path"),
-          URI.create("ssh://scm.company.com:222/very/long/context/path"),
-          URI.create("ssh://scm.company.com/very/long/context/path")
-        ));
+        GitRemote.Parser parser = new GitRemote.Parser()
+          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/very/long/context/path"), List.of(
+            URI.create("https://scm.company.com:8443/very/long/context/path"),
+            URI.create("http://scm.company.com/very/long/context/path"),
+            URI.create("ssh://scm.company.com:7999/very/long/context/path"),
+            URI.create("ssh://scm.company.com:222/very/long/context/path"),
+            URI.create("ssh://scm.company.com/very/long/context/path")
+          ));
         GitRemote remote = parser.parse(cloneUrl);
         String origin = "scm.company.com/very/long/context/path";
         String expectedPath = "org/repo";
