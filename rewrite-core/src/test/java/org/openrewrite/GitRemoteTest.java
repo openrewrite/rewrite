@@ -121,9 +121,9 @@ public class GitRemoteTest {
       """)
     void parseRegisteredRemoteServer(String cloneUrl) {
         GitRemote.Parser parser = new GitRemote.Parser()
-          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/very/long/context/path"), List.of(
-            URI.create("https://scm.company.com:8443/very/long/context/path"),
-            URI.create("http://scm.company.com/very/long/context/path"),
+          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/very/long/context/path/"), List.of(
+            URI.create("https://scm.company.com:8443/very/long/context/path/"),
+            URI.create("http://scm.company.com/very/long/context/path/"),
             URI.create("ssh://scm.company.com:7999/very/long/context/path"),
             URI.create("ssh://scm.company.com:222/very/long/context/path"),
             URI.create("ssh://scm.company.com/very/long/context/path")

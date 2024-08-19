@@ -71,7 +71,7 @@ public class GitRemote {
             String origin = normalizedUri.getHost() + maybePort + normalizedUri.getPath();
             List<URI> allUris = new ArrayList<>();
             allUris.add(remoteUri);
-            allUris.addAll(alternateUris);
+            alternateUris.stream().map(URI::toString).map(Parser::normalize).forEach(allUris::add);
             add(new RemoteServer(service, origin, allUris));
             return this;
         }
