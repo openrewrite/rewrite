@@ -61,7 +61,7 @@ public class GitRemote {
         private static final Set<String> ALLOWED_PROTOCOLS = new HashSet<>(Arrays.asList("ssh", "http", "https"));
 
         /**
-         * Transform a {@link GitRemote} into a clone url in the form of an{@link URI}
+         * Transform a {@link GitRemote} into a clone url in the form of an {@link URI}
          * @param remote the previously parsed GitRemote
          * @param protocol the protocol to use. Supported protocols: ssh, http, https
          * @return the clone url
