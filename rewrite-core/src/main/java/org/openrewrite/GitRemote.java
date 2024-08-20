@@ -59,18 +59,19 @@ public class GitRemote {
         }
 
         public URI toUri(GitRemote remote, boolean ssh) {
-            URI normalizedUri = Parser.normalize(remote.origin);
-            URI origin = servers.stream()
-                    .filter(server -> server.match(normalizedUri) != null)
-                    .filter(server -> server.service == remote.service)
+            URI selectedBaseUrl = servers.stream()
+                    .filter(server -> server.allOrigins().contains(stripProtocol(remote.origin)))
+                    .flatMap(server -> server.getUris().stream())
+                    .filter(uri -> !ssh || uri.getScheme().equals("ssh"))
                     .findFirst()
-                    .flatMap(server -> server.uris.stream().filter(uri -> !ssh || uri.getScheme().equals("ssh")).findFirst())
                     .orElseGet(() -> {
+                        URI normalizedUri = Parser.normalize(remote.origin);
                         if (ssh && !normalizedUri.getScheme().equals("ssh")) {
                             throw new IllegalStateException("No matching server found that supports ssh for origin: " + remote.origin);
                         }
                         return normalizedUri;
                     });
+
             String path = remote.path.replaceFirst("^/", "");
             switch (remote.service) {
                 case Bitbucket:
@@ -89,7 +90,16 @@ public class GitRemote {
             if (remote.service != Service.AzureDevOps) {
                 path += ".git";
             }
-            return URI.create(origin + "/" + path);
+            String maybeSlash = selectedBaseUrl.toString().endsWith("/") ? "" : "/";
+            return URI.create(selectedBaseUrl + maybeSlash + path);
+        }
+
+        private static String stripProtocol(String origin) {
+            int idx = origin.indexOf("://");
+            if (idx < 0) {
+                return origin;
+            }
+            return origin.substring(idx + 3);
         }
 
         /**
@@ -226,7 +236,7 @@ public class GitRemote {
                 String path = uri.getPath().replaceFirst("/$", "")
                         .replaceFirst(".git$", "")
                         .replaceFirst("^/", "");
-                return URI.create(scheme + "://" + host + maybePort + "/" + path);
+                return URI.create((scheme + "://" + host + maybePort + "/" + path).replaceFirst("/$", ""));
             } catch (URISyntaxException e) {
                 throw new IllegalStateException("Unable to parse origin from: " + url, e);
             }
@@ -256,6 +266,16 @@ public class GitRemote {
                     }
                 }
                 return null;
+            }
+
+            public Set<String> allOrigins() {
+                Set<String> origins = new LinkedHashSet<>();
+                origins.add(origin);
+                for (URI uri : uris) {
+                    URI normalized = normalize(uri.toString());
+                    origins.add(stripProtocol(normalized.toString()));
+                }
+                return origins;
             }
         }
 

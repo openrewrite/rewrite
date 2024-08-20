@@ -190,14 +190,20 @@ public class GitRemoteTest {
       GitHub, scm.company.com/context/github, org/repo, false, https://scm.company.com/context/github/org/repo.git
       GitHub, scm.company.com/context/github, org/repo, true, ssh://git@scm.company.com/context/github/org/repo.git
       GitLab, scm.company.com/context/gitlab, group/subgroup/repo, false, https://scm.company.com/context/gitlab/group/subgroup/repo.git
+      GitLab, scm.company.com:8443/context/gitlab, group/subgroup/repo, false, https://scm.company.com:8443/context/gitlab/group/subgroup/repo.git
       GitLab, scm.company.com/context/gitlab, group/subgroup/repo, true, ssh://git@scm.company.com:8022/context/gitlab/group/subgroup/repo.git
+      
+      Bitbucket, scm.company.com:12345/context/bitbucket, org/repo, false, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
+      Bitbucket, scm.company.com:12346/context/bitbucket, org/repo, false, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
       """)
     void buildUri(GitRemote.Service service, String origin, String path, boolean ssh, String expectedUri) {
         GitRemote remote = new GitRemote(service, null, origin, path, null, null);
         URI uri = new GitRemote.Parser()
-          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/context/bitbucket"), List.of(URI.create("ssh://git@scm.company.com:7999/context/bitbucket")))
-          .registerRemote(GitRemote.Service.GitHub, URI.create("https://scm.company.com/context/github"), List.of(URI.create("ssh://git@scm.company.com/context/github")))
-          .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com/context/gitlab"), List.of(URI.create("ssh://git@scm.company.com:8022/context/gitlab")))
+          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/context/bitbucket/"), List.of(URI.create("ssh://git@scm.company.com:7999/context/bitbucket")))
+          .registerRemote(GitRemote.Service.GitHub, URI.create("https://scm.company.com/context/github"), List.of(URI.create("ssh://git@scm.company.com/context/github/")))
+          .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com/context/gitlab/"), List.of(URI.create("ssh://git@scm.company.com:8022/context/gitlab")))
+          .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com:8443/context/gitlab"), List.of(URI.create("https://scm.company.com/context/gitlab/")))
+          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com:12345/context/bitbucket"), List.of(URI.create("https://scm.company.com:12346/context/bitbucket/")))
           .toUri(remote, ssh);
         assertThat(uri).isEqualTo(URI.create(expectedUri));
     }
