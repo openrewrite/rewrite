@@ -62,6 +62,9 @@ public class GitRemote {
             URI selectedBaseUrl;
 
             if (remote.service == Service.Unknown) {
+                if (PORT_PATTERN.matcher(remote.origin).find()) {
+                    throw new IllegalArgumentException("Unable to guess protocol port combination for an unregistered origin with a port: " + remote.origin);
+                }
                 selectedBaseUrl = URI.create((ssh ? "ssh://" : "https://") + stripProtocol(remote.origin));
             } else {
                 selectedBaseUrl = servers.stream()
