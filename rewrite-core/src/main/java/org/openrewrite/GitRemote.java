@@ -63,7 +63,7 @@ public class GitRemote {
 
             if (remote.service == Service.Unknown) {
                 if (PORT_PATTERN.matcher(remote.origin).find()) {
-                    throw new IllegalArgumentException("Unable to guess protocol port combination for an unregistered origin with a port: " + remote.origin);
+                    throw new IllegalArgumentException("Unable to determine protocol/port combination for an unregistered origin with a port: " + remote.origin);
                 }
                 selectedBaseUrl = URI.create((ssh ? "ssh://" : "https://") + stripProtocol(remote.origin));
             } else {
@@ -104,11 +104,7 @@ public class GitRemote {
         }
 
         private static String stripProtocol(String origin) {
-            int idx = origin.indexOf("://");
-            if (idx < 0) {
-                return origin;
-            }
-            return origin.substring(idx + 3);
+            return origin.replaceFirst("^\\w+://", "");
         }
 
         /**
@@ -230,7 +226,7 @@ public class GitRemote {
                 }
                 if (scheme == null) {
                     if (PORT_PATTERN.matcher(url).find()) {
-                        throw new IllegalArgumentException("Unable to normalize URI. Port without a scheme is not supported: " + url);
+                        throw new IllegalArgumentException("Unable to normalize URL: Specifying a port without a scheme is not supported for URL : " + url);
                     }
                     if (url.contains(":")) {
                         // Looks like SCP style url

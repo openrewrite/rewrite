@@ -215,6 +215,6 @@ public class GitRemoteTest {
     void buildUriUnregisteredOriginWithPortNotSupported() {
         GitRemote remote = new GitRemote(GitRemote.Service.Unknown, null, "scm.unregistered.com:8443/context/path", "org/repo", null, null);
         IllegalArgumentException ex = catchThrowableOfType(IllegalArgumentException.class, () -> new GitRemote.Parser().toUri(remote, true));
-        assertThat(ex).isNotNull().hasMessageContaining("Unable to guess protocol port combination for an unregistered origin with a port");
+        assertThat(ex).isNotNull().hasMessageContaining("Unable to determine protocol/port combination for an unregistered origin with a port");
     }
 }
