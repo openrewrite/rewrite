@@ -1457,7 +1457,7 @@ public class GroovyParserVisitor {
                     // The sub-strings within a GString have no delimiters of their own, confusing visitConstantExpression()
                     // ConstantExpression.getValue() cannot be trusted for strings as its values don't match source code because sequences like "\\" have already been replaced with a single "\"
                     // Use the AST element's line/column positions to figure out its extent, but those numbers need tweaks to be correct
-                    int length = sourceLengthOfString(cs);
+                    int length = lengthAccordingToAst(cs);
                     if (i == 0 || i == rawExprs.size() - 1) {
                         // The first and last constants within a GString have line/column position which incorrectly include the GString's delimiters
                         length -= delimiter.length();
