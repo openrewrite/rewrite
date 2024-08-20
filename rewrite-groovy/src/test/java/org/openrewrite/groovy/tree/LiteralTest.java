@@ -309,6 +309,11 @@ class LiteralTest implements RewriteTest {
             """
               def a = ("-")
               """
+          ),
+          groovy(
+            """
+              def a = (("-"))
+              """
           )
         );
     }
