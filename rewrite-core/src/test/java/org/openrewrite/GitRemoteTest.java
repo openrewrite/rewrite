@@ -184,7 +184,7 @@ public class GitRemoteTest {
       AzureDevOps, dev.azure.com, org/project/repo, true, ssh://git@ssh.dev.azure.com/v3/org/project/repo
       BitbucketCloud, bitbucket.org, org/repo, false, https://bitbucket.org/org/repo.git
       BitbucketCloud, bitbucket.org, org/repo, true, ssh://git@bitbucket.org/org/repo.git
-     
+      
       Bitbucket, scm.company.com/context/bitbucket, org/repo, false, https://scm.company.com/context/bitbucket/scm/org/repo.git
       Bitbucket, scm.company.com/context/bitbucket, org/repo, true, ssh://git@scm.company.com:7999/context/bitbucket/org/repo.git
       GitHub, scm.company.com/context/github, org/repo, false, https://scm.company.com/context/github/org/repo.git
@@ -195,6 +195,9 @@ public class GitRemoteTest {
       
       Bitbucket, scm.company.com:12345/context/bitbucket, org/repo, false, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
       Bitbucket, scm.company.com:12346/context/bitbucket, org/repo, false, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
+      
+      Unknown, scm.unregistered.com/context/path/, org/repo, false, https://scm.unregistered.com/context/path/org/repo.git
+      Unknown, scm.unregistered.com/context/path/, org/repo, true, ssh://scm.unregistered.com/context/path/org/repo.git
       """)
     void buildUri(GitRemote.Service service, String origin, String path, boolean ssh, String expectedUri) {
         GitRemote remote = new GitRemote(service, null, origin, path, null, null);

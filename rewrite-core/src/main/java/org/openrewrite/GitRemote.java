@@ -59,18 +59,24 @@ public class GitRemote {
         }
 
         public URI toUri(GitRemote remote, boolean ssh) {
-            URI selectedBaseUrl = servers.stream()
-                    .filter(server -> server.allOrigins().contains(stripProtocol(remote.origin)))
-                    .flatMap(server -> server.getUris().stream())
-                    .filter(uri -> !ssh || uri.getScheme().equals("ssh"))
-                    .findFirst()
-                    .orElseGet(() -> {
-                        URI normalizedUri = Parser.normalize(remote.origin);
-                        if (ssh && !normalizedUri.getScheme().equals("ssh")) {
-                            throw new IllegalStateException("No matching server found that supports ssh for origin: " + remote.origin);
-                        }
-                        return normalizedUri;
-                    });
+            URI selectedBaseUrl;
+
+            if (remote.service == Service.Unknown) {
+                selectedBaseUrl = URI.create((ssh ? "ssh://" : "https://") + stripProtocol(remote.origin));
+            } else {
+                selectedBaseUrl = servers.stream()
+                        .filter(server -> server.allOrigins().contains(stripProtocol(remote.origin)))
+                        .flatMap(server -> server.getUris().stream())
+                        .filter(uri -> !ssh || uri.getScheme().equals("ssh"))
+                        .findFirst()
+                        .orElseGet(() -> {
+                            URI normalizedUri = Parser.normalize(remote.origin);
+                            if (ssh && !normalizedUri.getScheme().equals("ssh")) {
+                                throw new IllegalStateException("No matching server found that supports ssh for origin: " + remote.origin);
+                            }
+                            return normalizedUri;
+                        });
+            }
 
             String path = remote.path.replaceFirst("^/", "");
             switch (remote.service) {
