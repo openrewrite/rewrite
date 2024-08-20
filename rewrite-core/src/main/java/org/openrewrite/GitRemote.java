@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.Value;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.jgit.transport.URIish;
 
@@ -51,10 +52,44 @@ public class GitRemote {
 
         public Parser() {
             servers = new ArrayList<>();
-            servers.add(new RemoteServer(Service.GitHub, "github.com", URI.create("https://github.com"), URI.create("ssh://github.com")));
-            servers.add(new RemoteServer(Service.GitLab, "gitlab.com", URI.create("https://gitlab.com"), URI.create("ssh://gitlab.com")));
-            servers.add(new RemoteServer(Service.BitbucketCloud, "bitbucket.org", URI.create("https://bitbucket.org"), URI.create("ssh://bitbucket.org")));
-            servers.add(new RemoteServer(Service.AzureDevOps, "dev.azure.com", URI.create("https://dev.azure.com"), URI.create("ssh://ssh.dev.azure.com")));
+            servers.add(new RemoteServer(Service.GitHub, "github.com", URI.create("https://github.com"), URI.create("ssh://git@github.com")));
+            servers.add(new RemoteServer(Service.GitLab, "gitlab.com", URI.create("https://gitlab.com"), URI.create("ssh://git@gitlab.com")));
+            servers.add(new RemoteServer(Service.BitbucketCloud, "bitbucket.org", URI.create("https://bitbucket.org"), URI.create("ssh://git@bitbucket.org")));
+            servers.add(new RemoteServer(Service.AzureDevOps, "dev.azure.com", URI.create("https://dev.azure.com"), URI.create("ssh://git@ssh.dev.azure.com")));
+        }
+
+        public URI toUri(GitRemote remote, boolean ssh) {
+            URI normalizedUri = Parser.normalize(remote.origin);
+            URI origin = servers.stream()
+                    .filter(server -> server.match(normalizedUri) != null)
+                    .filter(server -> server.service == remote.service)
+                    .findFirst()
+                    .flatMap(server -> server.uris.stream().filter(uri -> !ssh || uri.getScheme().equals("ssh")).findFirst())
+                    .orElseGet(() -> {
+                        if (ssh && !normalizedUri.getScheme().equals("ssh")) {
+                            throw new IllegalStateException("No matching server found that supports ssh for origin: " + remote.origin);
+                        }
+                        return normalizedUri;
+                    });
+            String path = remote.path.replaceFirst("^/", "");
+            switch (remote.service) {
+                case Bitbucket:
+                    if (!ssh) {
+                        path = "scm/" + remote.path;
+                    }
+                    break;
+                case AzureDevOps:
+                    if (ssh) {
+                        path = "v3/" + remote.path;
+                    } else {
+                        path = remote.path.replaceFirst("([^/]+)/([^/]+)/(.*)", "$1/$2/_git/$3");
+                    }
+                    break;
+            }
+            if (remote.service != Service.AzureDevOps) {
+                path += ".git";
+            }
+            return URI.create(origin + "/" + path);
         }
 
         /**
@@ -71,7 +106,7 @@ public class GitRemote {
             String origin = normalizedUri.getHost() + maybePort + normalizedUri.getPath();
             List<URI> allUris = new ArrayList<>();
             allUris.add(remoteUri);
-            alternateUris.stream().map(URI::toString).map(Parser::normalize).forEach(allUris::add);
+            allUris.addAll(alternateUris);
             add(new RemoteServer(service, origin, allUris));
             return this;
         }
@@ -98,18 +133,7 @@ public class GitRemote {
         public GitRemote parse(String url) {
             URI normalizedUri = normalize(url);
 
-            RemoteServerMatch match = servers.stream()
-                    .map(server -> server.match(normalizedUri))
-                    .filter(Objects::nonNull)
-                    .findFirst()
-                    .orElseGet(() -> {
-                        String[] segments = normalizedUri.getPath().split("/");
-                        String origin = normalizedUri.getHost() + maybePort(normalizedUri.getPort(), normalizedUri.getScheme());
-                        if (segments.length > 2) {
-                            origin += Arrays.stream(segments, 0, segments.length - 2).collect(Collectors.joining("/"));
-                        }
-                        return new RemoteServerMatch(Service.Unknown, origin, URI.create(normalizedUri.getScheme() + "://" + origin));
-                    });
+            RemoteServerMatch match = matchRemoteServer(normalizedUri);
 
             String repositoryPath = repositoryPath(match, normalizedUri);
 
@@ -138,13 +162,31 @@ public class GitRemote {
             return new GitRemote(match.service, url, match.origin, repositoryPath, organization, repositoryName);
         }
 
+        private @NonNull RemoteServerMatch matchRemoteServer(URI normalizedUri) {
+            return servers.stream()
+                    .map(server -> server.match(normalizedUri))
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElseGet(() -> {
+                        String[] segments = normalizedUri.getPath().split("/");
+                        String origin1 = normalizedUri.getHost() + maybePort(normalizedUri.getPort(), normalizedUri.getScheme());
+                        if (segments.length > 2) {
+                            origin1 += Arrays.stream(segments, 0, segments.length - 2).collect(Collectors.joining("/"));
+                        }
+                        return new RemoteServerMatch(Service.Unknown, origin1, URI.create(normalizedUri.getScheme() + "://" + origin1));
+                    });
+        }
+
         private String repositoryPath(RemoteServerMatch match, URI normalizedUri) {
-            String origin = match.matchedUri.toString();
+            URI origin = match.matchedUri;
             String uri = normalizedUri.toString();
-            if (!uri.startsWith(origin)) {
-                throw new IllegalArgumentException("Unable to find origin '" + origin + "' in '" + uri + "'");
+            String contextPath = origin.getPath();
+            String path = normalizedUri.getPath();
+            if (!normalizedUri.getHost().equals(origin.getHost()) || normalizedUri.getPort() != origin.getPort() || !path.startsWith(contextPath)) {
+                throw new IllegalArgumentException("Origin: " + origin + " does not match the clone url: " + uri);
             }
-            return uri.substring(origin.length()).replaceFirst("^/", "");
+            return path.substring(contextPath.length())
+                    .replaceFirst("^/", "");
         }
 
         private static final Pattern PORT_PATTERN = Pattern.compile(":\\d+");
@@ -209,7 +251,7 @@ public class GitRemote {
             @Nullable
             private RemoteServerMatch match(URI normalizedUri) {
                 for (URI uri : uris) {
-                    if (normalizedUri.toString().startsWith(uri.toString())) {
+                    if (normalizedUri.toString().startsWith(normalize(uri.toString()).toString())) {
                         return new RemoteServerMatch(service, origin, uri);
                     }
                 }
