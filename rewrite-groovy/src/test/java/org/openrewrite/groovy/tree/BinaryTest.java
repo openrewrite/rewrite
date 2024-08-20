@@ -177,4 +177,26 @@ class BinaryTest implements RewriteTest {
               """)
         );
     }
+
+    @Test
+    void stringMultiplied() {
+        rewriteRun(
+          groovy(
+            """
+              def foo = "-" * 4
+              """
+          )
+        );
+    }
+
+    @Test
+    void stringMultipliedInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo = ("-" * 4)
+              """
+          )
+        );
+    }
 }
