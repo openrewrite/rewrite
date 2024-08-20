@@ -153,7 +153,6 @@ public class GitRemote {
             URI normalizedUri = normalize(url);
 
             RemoteServerMatch match = matchRemoteServer(normalizedUri);
-
             String repositoryPath = repositoryPath(match, normalizedUri);
 
             switch (match.service) {
