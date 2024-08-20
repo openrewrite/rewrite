@@ -168,53 +168,54 @@ public class GitRemoteTest {
     @Test
     void normalizePortWithoutSchemaNotSupported() {
         IllegalArgumentException ex = catchThrowableOfType(IllegalArgumentException.class, () -> GitRemote.Parser.normalize("github.com:443/org/repo.git"));
-        assertThat(ex).isNotNull().hasMessageContaining("Unable to normalize URI. Port without a scheme is not supported");
+        assertThat(ex).isNotNull().hasMessageContaining("Unable to normalize URL: Specifying a port without a scheme is not supported for URL");
     }
 
     @ParameterizedTest
     @CsvSource(textBlock = """
-      GitHub, github.com, org/repo, false, https://github.com/org/repo.git
-      GitHub, github.com, org/repo, true, ssh://git@github.com/org/repo.git
-      GitHub, https://github.com, org/repo, false, https://github.com/org/repo.git
-      GitHub, https://github.com, org/repo, true, ssh://git@github.com/org/repo.git
+      GitHub, github.com, org/repo, https, https://github.com/org/repo.git
+      GitHub, github.com, org/repo, ssh, ssh://git@github.com/org/repo.git
+      GitHub, https://github.com, org/repo, https, https://github.com/org/repo.git
+      GitHub, https://github.com, org/repo, ssh, ssh://git@github.com/org/repo.git
       
-      GitLab, gitlab.com, group/subgroup/repo, false, https://gitlab.com/group/subgroup/repo.git
-      GitLab, gitlab.com, group/subgroup/repo, true, ssh://git@gitlab.com/group/subgroup/repo.git
-      AzureDevOps, dev.azure.com, org/project/repo, false, https://dev.azure.com/org/project/_git/repo
-      AzureDevOps, dev.azure.com, org/project/repo, true, ssh://git@ssh.dev.azure.com/v3/org/project/repo
-      BitbucketCloud, bitbucket.org, org/repo, false, https://bitbucket.org/org/repo.git
-      BitbucketCloud, bitbucket.org, org/repo, true, ssh://git@bitbucket.org/org/repo.git
+      GitLab, gitlab.com, group/subgroup/repo, https, https://gitlab.com/group/subgroup/repo.git
+      GitLab, gitlab.com, group/subgroup/repo, ssh, ssh://git@gitlab.com/group/subgroup/repo.git
+      AzureDevOps, dev.azure.com, org/project/repo, https, https://dev.azure.com/org/project/_git/repo
+      AzureDevOps, dev.azure.com, org/project/repo, ssh, ssh://git@ssh.dev.azure.com/v3/org/project/repo
+      BitbucketCloud, bitbucket.org, org/repo, https, https://bitbucket.org/org/repo.git
+      BitbucketCloud, bitbucket.org, org/repo, ssh, ssh://git@bitbucket.org/org/repo.git
       
-      Bitbucket, scm.company.com/context/bitbucket, org/repo, false, https://scm.company.com/context/bitbucket/scm/org/repo.git
-      Bitbucket, scm.company.com/context/bitbucket, org/repo, true, ssh://git@scm.company.com:7999/context/bitbucket/org/repo.git
-      GitHub, scm.company.com/context/github, org/repo, false, https://scm.company.com/context/github/org/repo.git
-      GitHub, scm.company.com/context/github, org/repo, true, ssh://git@scm.company.com/context/github/org/repo.git
-      GitLab, scm.company.com/context/gitlab, group/subgroup/repo, false, https://scm.company.com/context/gitlab/group/subgroup/repo.git
-      GitLab, scm.company.com:8443/context/gitlab, group/subgroup/repo, false, https://scm.company.com:8443/context/gitlab/group/subgroup/repo.git
-      GitLab, scm.company.com/context/gitlab, group/subgroup/repo, true, ssh://git@scm.company.com:8022/context/gitlab/group/subgroup/repo.git
+      Bitbucket, scm.company.com/context/bitbucket, org/repo, https, https://scm.company.com/context/bitbucket/scm/org/repo.git
+      Bitbucket, scm.company.com/context/bitbucket, org/repo, http, http://scm.company.com/context/bitbucket/scm/org/repo.git
+      Bitbucket, scm.company.com/context/bitbucket, org/repo, ssh, ssh://git@scm.company.com:7999/context/bitbucket/org/repo.git
+      GitHub, scm.company.com/context/github, org/repo, https, https://scm.company.com/context/github/org/repo.git
+      GitHub, scm.company.com/context/github, org/repo, ssh, ssh://git@scm.company.com/context/github/org/repo.git
+      GitLab, scm.company.com/context/gitlab, group/subgroup/repo, https, https://scm.company.com/context/gitlab/group/subgroup/repo.git
+      GitLab, scm.company.com:8443/context/gitlab, group/subgroup/repo, https, https://scm.company.com:8443/context/gitlab/group/subgroup/repo.git
+      GitLab, scm.company.com/context/gitlab, group/subgroup/repo, ssh, ssh://git@scm.company.com:8022/context/gitlab/group/subgroup/repo.git
       
-      Bitbucket, scm.company.com:12345/context/bitbucket, org/repo, false, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
-      Bitbucket, scm.company.com:12346/context/bitbucket, org/repo, false, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
+      Bitbucket, scm.company.com:12345/context/bitbucket, org/repo, https, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
+      Bitbucket, scm.company.com:12346/context/bitbucket, org/repo, https, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
       
-      Unknown, scm.unregistered.com/context/path/, org/repo, false, https://scm.unregistered.com/context/path/org/repo.git
-      Unknown, scm.unregistered.com/context/path/, org/repo, true, ssh://scm.unregistered.com/context/path/org/repo.git
+      Unknown, scm.unregistered.com/context/path/, org/repo, https, https://scm.unregistered.com/context/path/org/repo.git
+      Unknown, scm.unregistered.com/context/path/, org/repo, ssh, ssh://scm.unregistered.com/context/path/org/repo.git
       """)
-    void buildUri(GitRemote.Service service, String origin, String path, boolean ssh, String expectedUri) {
+    void buildUri(GitRemote.Service service, String origin, String path, String protocol, String expectedUri) {
         GitRemote remote = new GitRemote(service, null, origin, path, null, null);
         URI uri = new GitRemote.Parser()
-          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/context/bitbucket/"), List.of(URI.create("ssh://git@scm.company.com:7999/context/bitbucket")))
+          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/context/bitbucket/"), List.of( URI.create("http://scm.company.com/context/bitbucket/"),URI.create("ssh://git@scm.company.com:7999/context/bitbucket")))
           .registerRemote(GitRemote.Service.GitHub, URI.create("https://scm.company.com/context/github"), List.of(URI.create("ssh://git@scm.company.com/context/github/")))
           .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com/context/gitlab/"), List.of(URI.create("ssh://git@scm.company.com:8022/context/gitlab")))
           .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com:8443/context/gitlab"), List.of(URI.create("https://scm.company.com/context/gitlab/")))
           .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com:12345/context/bitbucket"), List.of(URI.create("https://scm.company.com:12346/context/bitbucket/")))
-          .toUri(remote, ssh);
+          .toUri(remote, protocol);
         assertThat(uri).isEqualTo(URI.create(expectedUri));
     }
 
     @Test
     void buildUriUnregisteredOriginWithPortNotSupported() {
         GitRemote remote = new GitRemote(GitRemote.Service.Unknown, null, "scm.unregistered.com:8443/context/path", "org/repo", null, null);
-        IllegalArgumentException ex = catchThrowableOfType(IllegalArgumentException.class, () -> new GitRemote.Parser().toUri(remote, true));
+        IllegalArgumentException ex = catchThrowableOfType(IllegalArgumentException.class, () -> new GitRemote.Parser().toUri(remote, "ssh"));
         assertThat(ex).isNotNull().hasMessageContaining("Unable to determine protocol/port combination for an unregistered origin with a port");
     }
 }

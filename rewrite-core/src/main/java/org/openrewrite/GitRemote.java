@@ -58,23 +58,34 @@ public class GitRemote {
             servers.add(new RemoteServer(Service.AzureDevOps, "dev.azure.com", URI.create("https://dev.azure.com"), URI.create("ssh://git@ssh.dev.azure.com")));
         }
 
-        public URI toUri(GitRemote remote, boolean ssh) {
+        private static final Set<String> ALLOWED_PROTOCOLS = new HashSet<>(Arrays.asList("ssh", "http", "https"));
+
+        /**
+         * Transform a {@link GitRemote} into a clone url in the form of an{@link URI}
+         * @param remote the previously parsed GitRemote
+         * @param protocol the protocol to use. Supported protocols: ssh, http, https
+         * @return the clone url
+         */
+        public URI toUri(GitRemote remote, String protocol) {
+            if (!ALLOWED_PROTOCOLS.contains(protocol)) {
+                throw new IllegalArgumentException("Invalid protocol: " + protocol + ". Must be one of: " + ALLOWED_PROTOCOLS);
+            }
             URI selectedBaseUrl;
 
             if (remote.service == Service.Unknown) {
                 if (PORT_PATTERN.matcher(remote.origin).find()) {
                     throw new IllegalArgumentException("Unable to determine protocol/port combination for an unregistered origin with a port: " + remote.origin);
                 }
-                selectedBaseUrl = URI.create((ssh ? "ssh://" : "https://") + stripProtocol(remote.origin));
+                selectedBaseUrl = URI.create(protocol + "://" + stripProtocol(remote.origin));
             } else {
                 selectedBaseUrl = servers.stream()
                         .filter(server -> server.allOrigins().contains(stripProtocol(remote.origin)))
                         .flatMap(server -> server.getUris().stream())
-                        .filter(uri -> !ssh || uri.getScheme().equals("ssh"))
+                        .filter(uri -> uri.getScheme().equals(protocol))
                         .findFirst()
                         .orElseGet(() -> {
                             URI normalizedUri = Parser.normalize(remote.origin);
-                            if (ssh && !normalizedUri.getScheme().equals("ssh")) {
+                            if (!normalizedUri.getScheme().equals(protocol)) {
                                 throw new IllegalStateException("No matching server found that supports ssh for origin: " + remote.origin);
                             }
                             return normalizedUri;
@@ -82,6 +93,7 @@ public class GitRemote {
             }
 
             String path = remote.path.replaceFirst("^/", "");
+            boolean ssh = protocol.equals("ssh");
             switch (remote.service) {
                 case Bitbucket:
                     if (!ssh) {
@@ -226,7 +238,7 @@ public class GitRemote {
                 }
                 if (scheme == null) {
                     if (PORT_PATTERN.matcher(url).find()) {
-                        throw new IllegalArgumentException("Unable to normalize URL: Specifying a port without a scheme is not supported for URL : " + url);
+                        throw new IllegalArgumentException("Unable to normalize URL: Specifying a port without a scheme is not supported for URL " + url);
                     }
                     if (url.contains(":")) {
                         // Looks like SCP style url
