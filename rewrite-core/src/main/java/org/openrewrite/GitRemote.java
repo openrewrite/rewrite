@@ -221,7 +221,7 @@ public class GitRemote {
                         uri = new URIish(scheme + "://" + url);
                         host = uri.getHost();
                     } else if (!"file".equals(scheme)) {
-                        throw new IllegalStateException("No host in url: " + url);
+                        throw new IllegalStateException("No host found in URL " + url);
                     }
                 }
                 if (scheme == null) {
