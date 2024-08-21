@@ -1230,7 +1230,7 @@ public class GroovyParserVisitor {
         public void visitConstructorCallExpression(ConstructorCallExpression ctor) {
             queue.add(insideParentheses(ctor, fmt -> {
                 cursor += 3; // skip "new"
-                TypeTree clazz = visitTypeTree(ctor.getType());
+                TypeTree clazz = visitTypeTree(ctor.getType(), ctor.getMetaDataMap().containsKey(StaticTypesMarker.INFERRED_TYPE));
                 JContainer<Expression> args = visit(ctor.getArguments());
                 J.Block body = null;
                 if (ctor.isUsingAnonymousInnerClass() && ctor.getType() instanceof InnerClassNode) {
@@ -1983,7 +1983,7 @@ public class GroovyParserVisitor {
                     emptyList(),
                     expression.getOriginType().getUnresolvedName(),
                     type, null);
-            if (type instanceof JavaType.Parameterized) {
+            if (expression.getOriginType().getGenericsTypes() != null) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
                         staticType((org.codehaus.groovy.ast.expr.Expression) expression).getGenericsTypes()), type);
             }
@@ -2193,7 +2193,12 @@ public class GroovyParserVisitor {
         return token;
     }
 
+    @SuppressWarnings("SameParameterValue")
     private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode) {
+        return typeTree(classNode, false);
+    }
+
+    private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode, boolean inferredType) {
         if (classNode != null && classNode.isArray()) {
             //noinspection unchecked
             return (T) arrayType(classNode);
@@ -2236,7 +2241,10 @@ public class GroovyParserVisitor {
         assert expr != null;
         if (classNode != null) {
             if (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
-                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
+                JContainer<Expression> typeParameters = inferredType ?
+                        JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
+                        visitTypeParameterizations(classNode.getGenericsTypes());
+                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, typeParameters, typeMapping.type(classNode));
             }
         }
         return expr.withPrefix(prefix);
@@ -2373,6 +2381,10 @@ public class GroovyParserVisitor {
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
+        return visitTypeTree(classNode, false);
+    }
+
+    private TypeTree visitTypeTree(ClassNode classNode, boolean inferredType) {
         JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(classNode.getUnresolvedName());
         if (primitiveType != null) {
             return new J.Primitive(randomId(), sourceBefore(classNode.getUnresolvedName()), Markers.EMPTY, primitiveType);
@@ -2388,7 +2400,7 @@ public class GroovyParserVisitor {
             cursor = saveCursor;
         }
 
-        return typeTree(classNode);
+        return typeTree(classNode, inferredType);
     }
 
     private List<J.Modifier> visitModifiers(int modifiers) {
