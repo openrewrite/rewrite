@@ -17,8 +17,8 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.internal.lang.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.lang.NonNull;
 
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
