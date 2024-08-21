@@ -218,4 +218,11 @@ public class GitRemoteTest {
         IllegalArgumentException ex = catchThrowableOfType(IllegalArgumentException.class, () -> new GitRemote.Parser().toUri(remote, "ssh"));
         assertThat(ex).isNotNull().hasMessageContaining("Unable to determine protocol/port combination for an unregistered origin with a port");
     }
+
+    @Test
+    void shouldNotStripJgit(){
+        GitRemote.Parser parser = new GitRemote.Parser();
+        GitRemote remote = parser.parse("https://github.com/openrewrite/jgit");
+        assertThat(remote.getPath()).isEqualTo("openrewrite/jgit");
+    }
 }

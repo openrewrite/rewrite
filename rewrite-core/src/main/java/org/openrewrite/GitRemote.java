@@ -250,7 +250,7 @@ public class GitRemote {
                 String maybePort = maybePort(uri.getPort(), scheme);
 
                 String path = uri.getPath().replaceFirst("/$", "")
-                        .replaceFirst(".git$", "")
+                        .replaceFirst("\\.git$", "")
                         .replaceFirst("^/", "");
                 return URI.create((scheme + "://" + host + maybePort + "/" + path).replaceFirst("/$", ""));
             } catch (URISyntaxException e) {
