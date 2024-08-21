@@ -17,10 +17,10 @@ package org.openrewrite.config;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.internal.lang.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.ChangeText;
