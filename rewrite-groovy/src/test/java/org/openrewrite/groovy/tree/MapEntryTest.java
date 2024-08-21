@@ -31,12 +31,19 @@ class MapEntryTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/3853")
     @Test
     void multipleEntries() {
         rewriteRun(
-          groovy("Map<String, String> m =  new HashMap<String, String>()"),
-          groovy("Map<String, String> n =  new HashMap<>()")
+          groovy("exclude(group: 'g', module: 'm')")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3853")
+    @Test
+    void genericMaps() {
+        rewriteRun(
+          groovy("Map<String, String> m = new HashMap<String, String>()"),
+          groovy("Map<String, String> n = new HashMap<>()")
         );
     }
 
