@@ -16,8 +16,6 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -34,14 +32,11 @@ class MapEntryTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/3853")
-    @ParameterizedTest
-    @ValueSource(strings = {
-      "Map<String, String> m =  new HashMap<String, String>()",
-      "Map<String, String> m =  new HashMap<>()",
-    })
-    void multipleEntries(String input) {
+    @Test
+    void multipleEntries() {
         rewriteRun(
-          groovy(String.format("%s", input))
+          groovy("Map<String, String> m =  new HashMap<String, String>()"),
+          groovy("Map<String, String> n =  new HashMap<>()")
         );
     }
 
