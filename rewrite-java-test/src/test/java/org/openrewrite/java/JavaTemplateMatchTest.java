@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
@@ -27,6 +28,48 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavaTemplateMatchTest implements RewriteTest {
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-templating/pull/91")
+    void shouldMatchAbstractStringAssertIsEqualToEmptyString() {
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion().classpath("assertj-core"))
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                // Mimics what we saw in rewrite-templating
+                final JavaTemplate before = JavaTemplate
+                  .builder("#{stringAssert:any(org.assertj.core.api.AbstractStringAssert<?>)}.isEqualTo(\"\");")
+                  .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+                  .build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                    return before.matches(getCursor()) ? SearchResult.found(mi) : mi;
+                }
+            })),
+          //language=java
+          java(
+            """
+              import static org.assertj.core.api.Assertions.assertThat;
+              class Foo {
+                  void test() {
+                      assertThat("foo").isEqualTo("");
+                  }
+              }
+              """,
+            """
+              import static org.assertj.core.api.Assertions.assertThat;
+              class Foo {
+                  void test() {
+                      /*~~>*/assertThat("foo").isEqualTo("");
+                  }
+              }
+              """
+          )
+        );
+
+    }
 
     @DocumentExample
     @SuppressWarnings({"ConstantValue", "ConstantConditions"})

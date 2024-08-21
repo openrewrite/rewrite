@@ -197,7 +197,12 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType generic(Type.TypeVar type, String signature) {
-        String name = type.tsym.name.toString();
+        String name;
+        if (type instanceof Type.CapturedType && ((Type.CapturedType) type).wildcard.kind == BoundKind.UNBOUND) {
+            name = "?";
+        } else {
+            name = type.tsym.name.toString();
+        }
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
                 name, INVARIANT, null);
         typeCache.put(signature, gtv);
