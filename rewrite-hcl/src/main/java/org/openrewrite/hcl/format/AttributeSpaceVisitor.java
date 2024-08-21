@@ -15,6 +15,7 @@
  */
 package org.openrewrite.hcl.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.SpacesStyle;
@@ -23,7 +24,6 @@ import org.openrewrite.hcl.tree.Expression;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.hcl.tree.HclLeftPadded;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -132,18 +132,16 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         return (attribute.getPrefix().getIndent() + attribute.getName().print(getCursor())).length();
     }
 
-    @Nullable
     @Override
-    public Hcl postVisit(Hcl tree, P p) {
+    public @Nullable Hcl postVisit(Hcl tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Hcl.ConfigFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Hcl visit(@Nullable Tree tree, P p) {
+    public @Nullable Hcl visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Hcl) tree;
         }

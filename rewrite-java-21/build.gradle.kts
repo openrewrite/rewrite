@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 plugins {
     id("org.openrewrite.build.language-library")
     id("jvm-test-suite")
@@ -7,6 +9,9 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
+}
+val javaTck = configurations.create("javaTck") {
+    isTransitive = false
 }
 
 dependencies {
@@ -20,6 +25,7 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    "javaTck"(project(":rewrite-java-tck"))
 }
 
 tasks.withType<JavaCompile> {
@@ -61,13 +67,17 @@ testing {
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
                 implementation(project())
+                implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-java-tck"))
+                implementation(project(":rewrite-java-test"))
+                implementation("org.assertj:assertj-core:latest.release")
             }
 
             targets {
                 all {
                     testTask.configure {
                         useJUnitPlatform()
+                        testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
                     }

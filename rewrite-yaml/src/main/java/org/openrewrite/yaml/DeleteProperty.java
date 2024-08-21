@@ -18,13 +18,10 @@ package org.openrewrite.yaml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -36,7 +33,7 @@ import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class DeleteProperty extends Recipe {
     @Option(displayName = "Property key",
             description = "The key to be deleted.",
@@ -58,6 +55,14 @@ public class DeleteProperty extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
+            example = ".github/workflows/*.yml")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Delete property";
@@ -71,15 +76,15 @@ public class DeleteProperty extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new YamlIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
 
             @Override
-            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
+            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
                 // TODO: Update DeleteProperty to support documents having Anchor / Alias Pairs
-                if (documents != new ReplaceAliasWithAnchorValueVisitor<ExecutionContext>().visit(documents, executionContext)) {
+                if (documents != new ReplaceAliasWithAnchorValueVisitor<ExecutionContext>().visit(documents, ctx)) {
                     return documents;
                 }
-                return super.visitDocuments(documents, executionContext);
+                return super.visitDocuments(documents, ctx);
             }
 
             @Override
@@ -104,7 +109,7 @@ public class DeleteProperty extends Recipe {
 
                 return e;
             }
-        };
+        });
     }
 
     private static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
@@ -118,6 +123,10 @@ public class DeleteProperty extends Recipe {
         public Yaml visitSequence(Yaml.Sequence sequence, P p) {
             sequence = (Yaml.Sequence) super.visitSequence(sequence, p);
             List<Yaml.Sequence.Entry> entries = sequence.getEntries();
+            if (entries.isEmpty()) {
+                return sequence;
+            }
+
             entries = ListUtils.map(entries, entry -> ToBeRemoved.hasMarker(entry) ? null : entry);
             return entries.isEmpty() ? ToBeRemoved.withMarker(sequence) : sequence.withEntries(entries);
         }
@@ -181,7 +190,7 @@ public class DeleteProperty extends Recipe {
         }
     }
 
-    private static boolean containsOnlyWhitespace(String str) {
+    private static boolean containsOnlyWhitespace(@Nullable String str) {
         if (str == null || str.isEmpty()) {
             return false;
         }

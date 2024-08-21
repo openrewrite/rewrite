@@ -17,13 +17,13 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RenameFile extends Recipe {
     @Option(displayName = "File matcher",
             description = "Matching files will be renamed. This is a glob expression.",
@@ -48,9 +48,9 @@ public class RenameFile extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
-            @Nullable
+
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     Path sourcePath = sourceFile.getSourcePath();
@@ -59,7 +59,7 @@ public class RenameFile extends Recipe {
                         return ((SourceFile) tree).withSourcePath(sourcePath.resolveSibling(fileName).normalize());
                     }
                 }
-                return super.visit(tree, executionContext);
+                return super.visit(tree, ctx);
             }
         };
     }

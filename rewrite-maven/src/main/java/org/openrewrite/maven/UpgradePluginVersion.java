@@ -17,13 +17,16 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.ci.GithubActionsBuildEnvironment;
 import org.openrewrite.maven.search.FindPlugin;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -39,7 +42,7 @@ import static java.util.Objects.requireNonNull;
  * more precise control over version updates to patch or minor releases.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpgradePluginVersion extends Recipe {
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -80,6 +83,12 @@ public class UpgradePluginVersion extends Recipe {
     @Nullable
     Boolean trustParent;
 
+    @Option(displayName = "Add version if missing",
+            description = "If the plugin is missing a version, add the latest release. Defaults to false.",
+            required = false)
+    @Nullable
+    Boolean addVersionIfMissing;
+
     @SuppressWarnings("ConstantConditions")
     @Override
     public Validated<Object> validate() {
@@ -93,6 +102,11 @@ public class UpgradePluginVersion extends Recipe {
     @Override
     public String getDisplayName() {
         return "Upgrade Maven plugin version";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
     }
 
     @Override
@@ -110,29 +124,28 @@ public class UpgradePluginVersion extends Recipe {
                 if (isPluginTag(groupId, artifactId)) {
                     Optional<Xml.Tag> versionTag = tag.getChild("version");
                     Optional<String> maybeVersionValue = versionTag.flatMap(Xml.Tag::getValue);
-                    if (maybeVersionValue.isPresent()) {
-                        String versionValue = maybeVersionValue.get();
-                        String versionLookup = versionValue.startsWith("${")
-                                ? super.getResolutionResult().getPom().getValue(versionValue.trim())
-                                : versionValue;
+                    if (maybeVersionValue.isPresent() || Boolean.TRUE.equals(addVersionIfMissing)) {
+                        final String versionLookup;
+                        if (maybeVersionValue.isPresent()) {
+                            String versionValue = maybeVersionValue.get();
+                            versionLookup = versionValue.startsWith("${")
+                                    ? super.getResolutionResult().getPom().getValue(versionValue.trim())
+                                    : versionValue;
+                        } else {
+                            versionLookup = "0.0.0";
+                        }
 
-                        if (versionLookup != null) {
-                            try {
-                                String tagGroupId = getResolutionResult().getPom().getValue(
-                                        tag.getChildValue("groupId").orElse(groupId)
-                                );
-                                String tagArtifactId = getResolutionResult().getPom().getValue(
-                                        tag.getChildValue("artifactId").orElse(artifactId)
-                                );
-                                assert tagGroupId != null;
-                                assert tagArtifactId != null;
-                                findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer -> {
-                                    ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer);
-                                    doAfterVisit(changeDependencyVersion);
-                                });
-                            } catch (MavenDownloadingException e) {
-                                return e.warn(tag);
-                            }
+                        try {
+                            ResolvedPom resolvedPom = getResolutionResult().getPom();
+                            String tagGroupId = resolvedPom.getValue(tag.getChildValue("groupId").orElse(groupId));
+                            String tagArtifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse(artifactId));
+                            assert tagGroupId != null;
+                            assert tagArtifactId != null;
+                            findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer ->
+                                    doAfterVisit(new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer, Boolean.TRUE.equals(addVersionIfMissing)))
+                            );
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(tag);
                         }
                     }
                     return tag;
@@ -154,16 +167,13 @@ public class UpgradePluginVersion extends Recipe {
         });
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false)
     private static class ChangePluginVersionVisitor extends MavenVisitor<ExecutionContext> {
-        private final String groupId;
-        private final String artifactId;
-        private final String newVersion;
-
-        private ChangePluginVersionVisitor(String groupId, String artifactId, String newVersion) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.newVersion = newVersion;
-        }
+        String groupId;
+        String artifactId;
+        String newVersion;
+        boolean addVersionIfMissing;
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -178,9 +188,11 @@ public class UpgradePluginVersion extends Recipe {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
                         }
                     }
+                } else if (addVersionIfMissing) {
+                    Xml.Tag newTag = Xml.Tag.build("<version>" + newVersion + "</version>");
+                    doAfterVisit(new AddToTagVisitor<>(tag, newTag, new MavenTagInsertionComparator(tag.getChildren())));
                 }
             }
-
             return super.visitTag(tag, ctx);
         }
     }

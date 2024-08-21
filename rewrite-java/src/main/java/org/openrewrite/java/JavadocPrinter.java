@@ -15,9 +15,10 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -206,6 +207,9 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     @Override
     public Javadoc visitReturn(Javadoc.Return aReturn, PrintOutputCapture<P> p) {
         beforeSyntax(aReturn, p);
+        if (aReturn.getMarkers().findFirst(LeadingBrace.class).isPresent()) {
+            p.append("{");
+        }
         p.append("@return");
         visit(aReturn.getDescription(), p);
         afterSyntax(aReturn, p);
@@ -404,10 +408,11 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         public J visitArrayType(J.ArrayType arrayType, PrintOutputCapture<P> p) {
             beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
             visit(arrayType.getElementType(), p);
-            for (JRightPadded<Space> d : arrayType.getDimensions()) {
-                visitSpace(d.getElement(), Space.Location.DIMENSION, p);
+            visit(arrayType.getAnnotations(), p);
+            if (arrayType.getDimension() != null) {
+                visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
                 p.append('[');
-                visitSpace(d.getAfter(), Space.Location.DIMENSION_SUFFIX, p);
+                visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
                 p.append(']');
             }
             afterSyntax(arrayType, p);
@@ -513,7 +518,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
         }
 
-        private void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
+        private void beforeSyntax(Space prefix, Markers markers, Space.@Nullable Location loc, PrintOutputCapture<P> p) {
             for (Marker marker : markers.getMarkers()) {
                 p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
             }

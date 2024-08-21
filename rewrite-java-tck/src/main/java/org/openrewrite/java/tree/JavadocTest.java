@@ -15,9 +15,12 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -389,6 +392,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void exception() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               public class A {
@@ -721,6 +725,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void multipleReferenceParameters() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               class Test {
@@ -1064,6 +1069,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void methodNotFound() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()),
           java(
             """
               interface Test {
@@ -1082,6 +1088,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void typeNotFound() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               interface Test {
@@ -1650,6 +1657,7 @@ class JavadocTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3530")
+    @MinimumJava11
     void arrayTypeLiterals2() {
         rewriteRun(
           java("" +
@@ -1678,6 +1686,33 @@ class JavadocTest implements RewriteTest {
                       System.out.println("Hello, world! This is my original class' main method.");
                   }
                   public static void varargsMethod(String... args) {
+                      System.out.println("Hello, world! This is my original class' varargs method.");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    void varargsWithPrefix() {
+        rewriteRun(
+          // for some reason the compiler AST's type attribution is incomplete here
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              class A {
+                  /**
+                   * A dummy main method. This method is not actually called, but we'll use its Javadoc comment to test that
+                   * OpenRewrite can handle references like the following: {@link A#varargsMethod( Object, String...)} }.
+                   *
+                   * @param args The arguments to the method.
+                   */
+                  public static void main(String[] args) {
+                      System.out.println("Hello, world! This is my original class' main method.");
+                  }
+                  public static void varargsMethod(Object o, String... args) {
                       System.out.println("Hello, world! This is my original class' varargs method.");
                   }
               }
@@ -1736,6 +1771,56 @@ class JavadocTest implements RewriteTest {
                * See <a href="">here</a>\t
                */
               class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void returnOpeningAndClosingBrace() {
+        rewriteRun(
+          java(
+            """
+              interface Test {
+              	/**
+              	 * {@return 42}
+              	 */
+              	int foo();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void returnOpeningBraceOnly() {
+        rewriteRun(
+          java(
+            """
+              interface Test {
+              	/**
+              	 * {@return 42
+              	 */
+              	int foo();
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    void unicodeEscape() {
+        rewriteRun(
+          java(
+            """
+              interface Test {
+              	/**
+              	 * Return the {@code \\u0000} codepoint.
+              	 */
+              	int foo();
               }
               """
           )

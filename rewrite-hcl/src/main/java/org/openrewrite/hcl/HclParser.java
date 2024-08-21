@@ -16,8 +16,8 @@
 package org.openrewrite.hcl;
 
 import org.antlr.v4.runtime.*;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.tree.ParseError;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.hcl.internal.HclParserVisitor;
@@ -25,9 +25,9 @@ import org.openrewrite.hcl.internal.grammar.HCLLexer;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -124,6 +124,7 @@ public class HclParser implements Parser {
             return this;
         }
 
+        @Override
         public HclParser build() {
             return new HclParser(styles);
         }

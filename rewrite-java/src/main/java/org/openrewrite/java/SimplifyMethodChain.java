@@ -17,18 +17,19 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class SimplifyMethodChain extends Recipe {
     @Option(displayName = "Method pattern chain",
             description = "A list of method patterns that are called in sequence",
@@ -61,7 +62,7 @@ public class SimplifyMethodChain extends Recipe {
     public Validated<Object> validate() {
         return super.validate().and(Validated.test("methodPatternChain",
                 "Requires more than one pattern",
-                methodPatternChain, c -> c.size() > 1));
+                methodPatternChain, c -> c != null && c.size() > 1));
     }
 
     @Override
@@ -94,9 +95,10 @@ public class SimplifyMethodChain extends Recipe {
 
                 if (select instanceof J.MethodInvocation) {
                     assert m.getMethodType() != null;
+                    JavaType.Method mt = m.getMethodType().withName(newMethodName);
                     return m.withSelect(((J.MethodInvocation) select).getSelect())
-                            .withName(m.getName().withSimpleName(newMethodName))
-                            .withMethodType(m.getMethodType().withName(newMethodName));
+                            .withName(m.getName().withSimpleName(newMethodName).withType(mt))
+                            .withMethodType(mt);
                 }
 
                 return m;

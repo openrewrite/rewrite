@@ -21,6 +21,7 @@ rewrite-java
 rewrite-java-test
 rewrite-java-tck
 rewrite-java-17
+rewrite-java-21
 
 # Other language modules
 
@@ -42,4 +43,4 @@ rewrite-bom
 
 # Tools that are used less frequently to, for example, build new language parsers.
 
-tools
+#tools

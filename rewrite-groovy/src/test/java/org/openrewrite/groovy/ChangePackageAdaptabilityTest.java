@@ -29,7 +29,7 @@ import static org.openrewrite.groovy.Assertions.groovy;
 /**
  * Prove that {@link ChangePackage}, written for Java, can adapt to working on Groovy code.
  */
-public class ChangePackageAdaptabilityTest implements RewriteTest {
+class ChangePackageAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

@@ -16,9 +16,9 @@
 package org.openrewrite.maven;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
@@ -169,6 +169,8 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                                 "<version>" + versionToUse + "</version>\n") +
                         (classifier == null ? "" :
                                 "<classifier>" + classifier + "</classifier>\n") +
+                        (type == null || "jar".equals(type) ? "" :
+                                "<type>" + type + "</type>\n") +
                         (scope == null || "compile".equals(scope) ? "" :
                                 "<scope>" + scope + "</scope>\n") +
                         (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +

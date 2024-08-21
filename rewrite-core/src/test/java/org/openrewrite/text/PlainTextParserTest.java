@@ -24,15 +24,20 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class PlainTextParserTest {
+class PlainTextParserTest {
 
     @Test
     void plainTextMask() {
         PlainTextParser parser = PlainTextParser.builder()
           .plainTextMasks(Paths.get("."), List.of("**/*.png"))
           .build();
+
+        List<Parser.Input> inputs = List.of(Parser.Input.fromString(Paths.get("test.png"), "test"));
+        assertThat(inputs)
+          .allMatch(input -> parser.accept(input.getPath()));
+
         assertThat(parser
-          .parseInputs(List.of(Parser.Input.fromString(Paths.get("test.png"), "test")), null, new InMemoryExecutionContext())
+          .parseInputs(inputs, null, new InMemoryExecutionContext())
           .findFirst()
         ).containsInstanceOf(PlainText.class);
     }

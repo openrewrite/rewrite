@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 
 public class UnwrapParentheses<P> extends JavaVisitor<P> {
     private final J.Parentheses<?> scope;
@@ -33,7 +34,7 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
             if (tree.getPrefix().isEmpty()) {
                 Object parent = getCursor().getParentOrThrow().getValue();
                 if (parent instanceof J.Return || parent instanceof J.Throw) {
-                    tree = tree.withPrefix(tree.getPrefix().withWhitespace(" "));
+                    tree = tree.withPrefix(Space.SINGLE_SPACE);
                 }
             }
             return tree;
@@ -57,9 +58,11 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
             return !(parensScope.getValue() == ((J.DoWhileLoop) parent).getWhileCondition());
         } else if (parent instanceof J.Unary) {
             J innerJ = ((J.Parentheses<?>) parensScope.getValue()).getTree();
-            return !(innerJ instanceof J.Binary);
+            return !(innerJ instanceof J.Assignment) &&
+                   !(innerJ instanceof J.Binary) &&
+                   !(innerJ instanceof J.Ternary) &&
+                   !(innerJ instanceof J.InstanceOf);
         }
         return true;
     }
 }
-

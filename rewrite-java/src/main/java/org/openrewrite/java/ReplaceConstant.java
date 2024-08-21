@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -54,28 +54,27 @@ public class ReplaceConstant extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
-            @Nullable
-            J.Literal literal;
+            J.@Nullable Literal literal;
 
             @Override
-            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
+            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 if (isConstant(fieldAccess.getName().getFieldType())) {
                     maybeRemoveImport(owningType);
                     return buildLiteral().withPrefix(fieldAccess.getPrefix());
                 }
-                return super.visitFieldAccess(fieldAccess, executionContext);
+                return super.visitFieldAccess(fieldAccess, ctx);
             }
 
             @Override
-            public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
+            public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                 if (isConstant(ident.getFieldType()) && !isVariableDeclaration()) {
                     maybeRemoveImport(owningType);
                     return buildLiteral().withPrefix(ident.getPrefix());
                 }
-                return super.visitIdentifier(ident, executionContext);
+                return super.visitIdentifier(ident, ctx);
             }
 
-            private boolean isConstant(@Nullable JavaType.Variable varType) {
+            private boolean isConstant(JavaType.@Nullable Variable varType) {
                 return varType != null && TypeUtils.isOfClassType(varType.getOwner(), owningType) &&
                         varType.getName().equals(constantName);
             }

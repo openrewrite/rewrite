@@ -53,6 +53,9 @@
             "type": "boolean",
             "default": false
           },
+          "preconditions": {
+            "$ref": "#/$defs/recipeList"
+          },
           "recipeList": {
             "$ref": "#/$defs/recipeList"
           }

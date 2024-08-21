@@ -16,8 +16,11 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
+import org.openrewrite.java.marker.Quoted;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TypeTreeTest {
 
@@ -54,5 +57,25 @@ class TypeTreeTest {
 
         assertEquals("a.A.*", name.toString());
         assertEquals("*", name.getSimpleName());
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3845")
+    @Test
+    void buildEscapedName() {
+        J.FieldAccess name = TypeTree.build("foo.bar.`some escaped name`", '`');
+
+        assertTrue(name.getName().getMarkers().findFirst(Quoted.class).isPresent());
+        assertEquals("foo.bar.some escaped name", name.toString());
+        assertEquals("some escaped name", name.getSimpleName());
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/564")
+    @Test
+    void buildQuotedNameContainingDelimiter() {
+        J.FieldAccess name = TypeTree.build("foo.bar.`$`", '`');
+
+        assertTrue(name.getName().getMarkers().findFirst(Quoted.class).isPresent());
+        assertEquals("foo.bar.$", name.toString());
+        assertEquals("$", name.getSimpleName());
     }
 }

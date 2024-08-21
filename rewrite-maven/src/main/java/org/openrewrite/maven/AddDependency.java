@@ -18,24 +18,21 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
-
 
 /**
  * This recipe will detect the presence of Java types (in Java ASTs) to determine if a dependency should be added
@@ -46,7 +43,7 @@ import static java.util.Objects.requireNonNull;
  * NOTE: IF PROVENANCE INFORMATION IS NOT PRESENT, THIS RECIPE WILL DO NOTHING.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -91,7 +88,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Only if using",
             description = "Used to determine if the dependency will be added and in which scope it should be placed.",
-            example = "org.junit.jupiter.api.*")
+            example = "org.junit.jupiter.api.*",
+            required = false)
+    @Nullable
     String onlyIfUsing;
 
     @Option(displayName = "Type",
@@ -150,6 +149,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, version);
+    }
+
+    @Override
     public String getDescription() {
         return "Add a Maven dependency to a `pom.xml` file in the correct scope based on where it is used.";
     }
@@ -157,6 +161,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public static class Scanned {
         boolean usingType;
         Map<JavaProject, String> scopeByProject = new HashMap<>();
+        Set<ResolvedGroupArtifactVersion> pomsDefinedInCurrentRepository = new HashSet<>();
     }
 
     @Override
@@ -171,17 +176,24 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (tree instanceof JavaSourceFile) {
-                    boolean sourceFileUsesType = sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx);
-                    acc.usingType |= sourceFileUsesType;
-                    sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                            sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                                if (sourceFileUsesType) {
-                                    acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
-                                            scope /* a `compile` scope dependency will also be available in test source set */ :
-                                            "test".equals(sourceSet.getName()) ? "test" : "compile"
-                                    );
-                                }
-                            }));
+                    if (onlyIfUsing == null || sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
+                        acc.usingType = true;
+                        JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
+                        JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
+                        if(javaProject != null && javaSourceSet != null) {
+                            acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
+                                    scope /* a `compile` scope dependency will also be available in test source set */ :
+                                    "test".equals(javaSourceSet.getName()) ? "test" : "compile"
+                            );
+                        }
+                    }
+                } else if(tree instanceof Xml.Document) {
+                    Xml.Document doc = (Xml.Document) tree;
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
+                    if(mrr == null) {
+                        return sourceFile;
+                    }
+                    acc.pomsDefinedInCurrentRepository.add(mrr.getPom().getGav());
                 }
                 return sourceFile;
             }
@@ -190,7 +202,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        return Preconditions.check(acc.usingType && !acc.scopeByProject.isEmpty(), new MavenVisitor<ExecutionContext>() {
+        return Preconditions.check(onlyIfUsing == null || acc.usingType && !acc.scopeByProject.isEmpty(), new MavenVisitor<ExecutionContext>() {
             @Nullable
             final Pattern familyPatternCompiled = familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"));
 
@@ -200,13 +212,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                 JavaProject javaProject = document.getMarkers().findFirst(JavaProject.class).orElse(null);
                 String maybeScope = javaProject == null ? null : acc.scopeByProject.get(javaProject);
-                if (maybeScope == null) {
+                if (onlyIfUsing != null && maybeScope == null && !acc.scopeByProject.isEmpty()) {
                     return maven;
                 }
 
                 // If the dependency is already in compile scope it will be available everywhere, no need to continue
                 for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
-                    if (hasAcceptableTransitivity(d)
+                    if (hasAcceptableTransitivity(d, acc)
                         && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                         return maven;
                     }
@@ -216,11 +228,15 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
                 if (resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) {
                     for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScopeEnum)) {
-                        if (hasAcceptableTransitivity(d)
+                        if (hasAcceptableTransitivity(d, acc)
                             && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                             return maven;
                         }
                     }
+                }
+
+                if(onlyIfUsing == null && getResolutionResult().getParent() != null && acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav())) {
+                    return maven;
                 }
 
                 return new AddDependencyVisitor(
@@ -230,7 +246,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         });
     }
 
-    private boolean hasAcceptableTransitivity(ResolvedDependency d) {
-        return d.isDirect() || Boolean.TRUE.equals(acceptTransitive);
+    private boolean hasAcceptableTransitivity(ResolvedDependency d, Scanned acc) {
+        return d.isDirect() || Boolean.TRUE.equals(acceptTransitive) && !acc.scopeByProject.isEmpty();
     }
 }

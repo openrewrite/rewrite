@@ -19,8 +19,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
@@ -44,6 +45,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     @Nullable
     private final FileAttributes fileAttributes;
+
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
@@ -82,7 +84,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 prefix,
                 Markers.EMPTY,
                 visitXmldecl(ctx.xmldecl()),
-                ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()))
+                ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()),
+                ctx.jspdirective().stream().map(this::visit).map(Xml.JspDirective.class::cast).collect(toList()))
         );
     }
 
@@ -110,17 +113,19 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             return charData;
         } else if (ctx.reference() != null) {
             if (ctx.reference().EntityRef() != null) {
-                cursor += ctx.reference().EntityRef().getSymbol().getStopIndex() + 1;
+                String prefix = prefix(ctx);
+                cursor = ctx.reference().EntityRef().getSymbol().getStopIndex() + 1;
                 return new Xml.CharData(randomId(),
-                        "",
+                        prefix,
                         Markers.EMPTY,
                         false,
                         ctx.reference().EntityRef().getText(),
                         "");
             } else if (ctx.reference().CharRef() != null) {
-                cursor += ctx.reference().CharRef().getSymbol().getStopIndex() + 1;
+                String prefix = prefix(ctx);
+                cursor = ctx.reference().CharRef().getSymbol().getStopIndex() + 1;
                 return new Xml.CharData(randomId(),
-                        "",
+                        prefix,
                         Markers.EMPTY,
                         false,
                         ctx.reference().CharRef().getText(),
@@ -218,6 +223,26 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     );
                 }
         );
+    }
+
+    @Override
+    public Xml visitJspdirective(XMLParser.JspdirectiveContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            cursor = ctx.DIRECTIVE_OPEN().getSymbol().getStopIndex() + 1;
+            String beforeType = prefix(ctx.Name());
+            String type = convert(ctx.Name(), (n, p) -> n.getText());
+            List<Xml.Attribute> attributes = ctx.attribute().stream().map(this::visitAttribute).collect(toList());
+
+            return new Xml.JspDirective(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    beforeType,
+                    type,
+                    attributes,
+                    prefix(ctx.DIRECTIVE_CLOSE())
+            );
+        });
     }
 
     @Override
@@ -335,7 +360,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     Markers.EMPTY,
                     name,
                     externalId,
-                    internalSubset == null ? Collections.emptyList() : internalSubset,
+                    internalSubset == null ? emptyList() : internalSubset,
                     externalSubsets,
                     beforeTagDelimiterPrefix);
         });
@@ -359,8 +384,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return prefix;
     }
 
-    @Nullable
-    private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, String, T> conversion) {
+    private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, String, T> conversion) {
         if (ctx == null) {
             return null;
         }

@@ -19,9 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -30,7 +30,7 @@ import java.util.function.Supplier;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AdHocRecipe extends ScanningRecipe<Void> {
+public class AdHocRecipe extends Recipe {
     @With
     @Nullable
     @Language("markdown")
@@ -45,11 +45,7 @@ public class AdHocRecipe extends ScanningRecipe<Void> {
     Boolean causesAnotherCycle;
 
     @With
-    Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
-
-    @Nullable
-    @With
-    Supplier<Collection<SourceFile>> generator;
+    transient Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
 
     @With
     @Nullable
@@ -59,6 +55,11 @@ public class AdHocRecipe extends ScanningRecipe<Void> {
     @Nullable
     Integer maxCycles;
 
+    public AdHocScanningRecipe withGenerator(Supplier<Collection<SourceFile>> generator) {
+        return new AdHocScanningRecipe(displayName, name, causesAnotherCycle, getVisitor, generator, maintainers, maxCycles);
+    }
+
+    @Override
     public String getDisplayName() {
         return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
     }
@@ -68,6 +69,7 @@ public class AdHocRecipe extends ScanningRecipe<Void> {
         return "An ad hoc recipe used in RewriteTest.";
     }
 
+    @Override
     public String getName() {
         return StringUtils.isBlank(name) ? super.getName() : name;
     }
@@ -82,27 +84,13 @@ public class AdHocRecipe extends ScanningRecipe<Void> {
         return maxCycles == null ? super.maxCycles() : maxCycles;
     }
 
+    @Override
     public List<Maintainer> getMaintainers() {
         return maintainers == null ? Collections.emptyList() : maintainers;
     }
 
     @Override
-    public Void getInitialValue(ExecutionContext ctx) {
-        return null;
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Void acc) {
-        return TreeVisitor.noop();
-    }
-
-    @Override
-    public Collection<? extends SourceFile> generate(Void acc, ExecutionContext ctx) {
-        return generator == null ? Collections.emptyList() : generator.get();
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Void acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return getVisitor.get();
     }
 }

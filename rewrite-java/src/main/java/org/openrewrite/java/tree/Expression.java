@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -29,7 +29,7 @@ public interface Expression extends J {
     <T extends J> T withType(@Nullable JavaType type);
 
     /**
-     * @return A list of the side effects emitted by the statement, if the statement was decomposed.
+     * @return A list of the side effects emitted by the statement if the statement was decomposed.
      * So for a binary operation, there are up to two potential side effects (the left and right side) and as
      * few as zero if both sides of the expression are something like constants or variable references.
      */
@@ -48,8 +48,7 @@ public interface Expression extends J {
         return requireNonNull(unwrap(this));
     }
 
-    @Nullable
-    static Expression unwrap(@Nullable Expression expr) {
+    static @Nullable Expression unwrap(@Nullable Expression expr) {
         if (expr instanceof J.Parentheses<?> && ((J.Parentheses<?>) expr).getTree() instanceof Expression) {
             return ((Expression) ((J.Parentheses<?>) expr).getTree()).unwrap();
         } else {

@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
@@ -33,7 +33,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeMethodTargetToVariable extends Recipe {
 
     /**
@@ -114,7 +114,8 @@ public class ChangeMethodTargetToVariable extends Recipe {
                         variableName,
                         this.variableType,
                         null)
-                ).withMethodType(methodType);
+                ).withMethodType(methodType)
+                        .withName(m.getName().withType(methodType));
             }
             return m;
         }

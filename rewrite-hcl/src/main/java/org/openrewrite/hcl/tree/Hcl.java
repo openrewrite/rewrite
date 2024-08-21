@@ -19,12 +19,12 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
 
@@ -46,8 +46,7 @@ public interface Hcl extends Tree {
         return (R) acceptHcl(v.adapt(HclVisitor.class), p);
     }
 
-    @Nullable
-    default <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
+    default <P> @Nullable Hcl acceptHcl(HclVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -363,8 +362,7 @@ public interface Hcl extends Tree {
         List<BodyContent> body;
 
         @Incubating(since = "7.27.0")
-        @Nullable
-        public Attribute getAttribute(String attrName) {
+        public @Nullable Attribute getAttribute(String attrName) {
             for (BodyContent t : body) {
                 if (t instanceof Attribute) {
                     Attribute attribute = (Attribute) t;
@@ -410,8 +408,7 @@ public interface Hcl extends Tree {
          * @return The text value of the attribute matching the provided name, if any.
          */
         @Incubating(since = "7.27.0")
-        @Nullable
-        public <T> T getAttributeValue(String attrName) {
+        public <T> @Nullable T getAttributeValue(String attrName) {
             Attribute attr = getAttribute(attrName);
             if (attr == null) {
                 return null;
@@ -436,6 +433,7 @@ public interface Hcl extends Tree {
         @With
         Space end;
 
+        @Override
         public CoordinateBuilder.Block getCoordinates() {
             return new CoordinateBuilder.Block(this);
         }
@@ -768,8 +766,7 @@ public interface Hcl extends Tree {
         @Nullable
         HclLeftPadded<Expression> condition;
 
-        @Nullable
-        public Expression getCondition() {
+        public @Nullable Expression getCondition() {
             return condition == null ? null : condition.getElement();
         }
 
@@ -826,8 +823,7 @@ public interface Hcl extends Tree {
                 return t.updateValue == updateValue ? t : new ForObject(t.id, t.prefix, t.markers, t.intro, t.updateName, updateValue, t.ellipsis, t.condition, t.end);
             }
 
-            @Nullable
-            public HclLeftPadded<Expression> getCondition() {
+            public @Nullable HclLeftPadded<Expression> getCondition() {
                 return t.condition;
             }
 
@@ -876,8 +872,7 @@ public interface Hcl extends Tree {
         @Nullable
         HclLeftPadded<Expression> condition;
 
-        @Nullable
-        public Expression getCondition() {
+        public @Nullable Expression getCondition() {
             return condition == null ? null : condition.getElement();
         }
 
@@ -926,8 +921,7 @@ public interface Hcl extends Tree {
                 return t.update == update ? t : new ForTuple(t.id, t.prefix, t.markers, t.intro, update, t.condition, t.end);
             }
 
-            @Nullable
-            public HclLeftPadded<Expression> getCondition() {
+            public @Nullable HclLeftPadded<Expression> getCondition() {
                 return t.condition;
             }
 

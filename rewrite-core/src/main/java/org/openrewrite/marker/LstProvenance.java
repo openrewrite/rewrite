@@ -18,7 +18,7 @@ package org.openrewrite.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -44,6 +44,7 @@ public class LstProvenance implements Marker {
         Maven,
         Bazel,
         Cli,
-        CobolCli
+        CobolCli,
+        DotNet
     }
 }

@@ -17,10 +17,10 @@ package org.openrewrite.yaml.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.YamlVisitor;
@@ -31,7 +31,7 @@ import java.util.Iterator;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindProperty extends Recipe {
 
     @Option(displayName = "Property key",

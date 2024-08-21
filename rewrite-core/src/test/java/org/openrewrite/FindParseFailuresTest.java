@@ -25,10 +25,10 @@ import org.openrewrite.text.PlainTextParser;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class FindParseFailuresTest implements RewriteTest {
+class FindParseFailuresTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -37,7 +37,7 @@ public class FindParseFailuresTest implements RewriteTest {
 
     @Test
     void findParseFailures() {
-        ParseExceptionResult per = ParseExceptionResult.build(PlainTextParser.class, new RuntimeException("boom"));
+        ParseExceptionResult per = ParseExceptionResult.build(PlainTextParser.class, new RuntimeException("boom"), null);
         rewriteRun(
           spec -> spec.dataTable(ParseFailures.Row.class, rows -> {
               assertThat(rows).hasSize(1);

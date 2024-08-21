@@ -19,13 +19,13 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.SelfLoathing;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -64,8 +64,7 @@ public interface J extends Tree {
         return v.isAdaptableTo(JavaVisitor.class);
     }
 
-    @Nullable
-    default <P> J acceptJava(JavaVisitor<P> v, P p) {
+    default <P> @Nullable J acceptJava(JavaVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -134,6 +133,25 @@ public interface J extends Tree {
             return withTypeExpression(typeExpression.withType(type));
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
+        public List<Annotation> getAllAnnotations() {
+            List<J.Annotation> allAnnotations = annotations;
+            List<J.Annotation> moreAnnotations;
+            if (typeExpression instanceof FieldAccess &&
+                !(moreAnnotations = ((FieldAccess) typeExpression).getName().getAnnotations()).isEmpty()) {
+                if (allAnnotations.isEmpty()) {
+                    allAnnotations = moreAnnotations;
+                } else {
+                    allAnnotations = new ArrayList<>(annotations);
+                    allAnnotations.addAll(moreAnnotations);
+                }
+            }
+            return allAnnotations;
+        }
+
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotatedType(this, p);
@@ -178,16 +196,20 @@ public interface J extends Tree {
         NameTree annotationType;
 
         public String getSimpleName() {
-            return annotationType instanceof Identifier ?
-                    ((Identifier) annotationType).getSimpleName() :
-                    ((J.FieldAccess) annotationType).getSimpleName();
+            if (annotationType instanceof Identifier) {
+                return ((Identifier) annotationType).getSimpleName();
+            } else if (annotationType instanceof J.FieldAccess) {
+                return ((J.FieldAccess) annotationType).getSimpleName();
+            } else {
+                // allow for extending languages like Kotlin to supply a different representation
+                return annotationType.printTrimmed();
+            }
         }
 
         @Nullable
         JContainer<Expression> arguments;
 
-        @Nullable
-        public List<Expression> getArguments() {
+        public @Nullable List<Expression> getArguments() {
             return arguments == null ? null : arguments.getElements();
         }
 
@@ -211,6 +233,7 @@ public interface J extends Tree {
             return v.visitAnnotation(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Annotation getCoordinates() {
             return new CoordinateBuilder.Annotation(this);
@@ -240,8 +263,7 @@ public interface J extends Tree {
         public static class Padding {
             private final Annotation t;
 
-            @Nullable
-            public JContainer<Expression> getArguments() {
+            public @Nullable JContainer<Expression> getArguments() {
                 return t.arguments;
             }
 
@@ -280,6 +302,7 @@ public interface J extends Tree {
             return v.visitArrayAccess(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -293,33 +316,80 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @With
     @Data
     final class ArrayType implements J, TypeTree, Expression {
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Space prefix;
-
-        @With
         Markers markers;
-
-        @With
         TypeTree elementType;
 
-        @With
-        List<JRightPadded<Space>> dimensions;
+        @Nullable
+        List<J.Annotation> annotations;
 
-        @Override
-        public JavaType getType() {
-            return elementType.getType();
+        @Nullable // nullable for backwards compatibility only
+        JLeftPadded<Space> dimension;
+
+        JavaType type;
+
+        /**
+         * For backwards compatibility with older LSTs.
+         * Do not remove until we're confident older LSTs are no longer in use.
+         */
+        @Deprecated
+        @JsonCreator
+        static ArrayType create(
+                UUID id,
+                Space prefix,
+                Markers markers,
+                TypeTree elementType,
+                @Nullable List<JRightPadded<Space>> dimensions, // Do not remove or rename, required for backwards compatibility.
+                @Nullable List<J.Annotation> annotations,
+                @Nullable JLeftPadded<Space> dimension,
+                @Nullable JavaType type) {
+            if (dimensions != null) {
+                // To create a consistent JavaType$Array from old Groovy and Java LSTs, we need to map the element type.
+                // The JavaType from GroovyTypeMapping was a JavaType$Array, while the JavaType from JavaTypeMapping was a JavaType$Class.
+                JavaType updated = elementType.getType();
+                while (updated instanceof JavaType.Array) {
+                    updated = ((JavaType.Array) updated).getElemType();
+                }
+                elementType = elementType.withType(updated);
+
+                if (dimensions.isEmpty()) {
+                    // varargs in Javadoc
+                    type = new JavaType.Array(null, elementType.getType(), null);
+                } else {
+                    int dimensionCount = dimensions.size();
+                    elementType = mapOldFormat(elementType, dimensions.subList(0, dimensionCount - 1));
+                    type = new JavaType.Array(null, elementType.getType(), null);
+                    dimension = JLeftPadded.build(dimensions.get(dimensionCount - 1).getAfter()).withBefore(dimensions.get(dimensionCount - 1).getElement());
+                }
+            }
+
+            return new ArrayType(id, prefix, markers, elementType, annotations, dimension, type == null ? JavaType.Unknown.getInstance() : type);
         }
 
-        @SuppressWarnings("unchecked")
-        @Override
-        public ArrayType withType(@Nullable JavaType type) {
-            return type == getType() ? this : withElementType(elementType.withType(type));
+        private static TypeTree mapOldFormat(TypeTree elementType, List<JRightPadded<Space>> dimensions) {
+            int count = dimensions.size();
+            if (count == 0) {
+                return elementType;
+            }
+            return mapOldFormat(
+                    new ArrayType(
+                            Tree.randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            elementType,
+                            null,
+                            JLeftPadded.build(dimensions.get(0).getAfter()).withBefore(dimensions.get(0).getElement()),
+                            new JavaType.Array(null, elementType.getType(), null)
+                    ),
+                    dimensions.subList(1, count)
+            );
         }
 
         @Override
@@ -640,6 +710,7 @@ public interface J extends Tree {
             return v.visitBinary(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -767,6 +838,7 @@ public interface J extends Tree {
             return v.visitBlock(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Block getCoordinates() {
             return new CoordinateBuilder.Block(this);
@@ -851,6 +923,8 @@ public interface J extends Tree {
                 } else if (next instanceof J.NewClass) {
                     J.NewClass newClass = (J.NewClass) next;
                     return newClass.getBody() == parentBlock;
+                } else if (next instanceof J.Lambda) {
+                    return false;
                 }
             }
             return false;
@@ -887,8 +961,7 @@ public interface J extends Tree {
         Markers markers;
 
         @With
-        @Nullable
-        J.Identifier label;
+        J.@Nullable Identifier label;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -986,8 +1059,7 @@ public interface J extends Tree {
         @Nullable
         JRightPadded<J> body;
 
-        @Nullable
-        public J getBody() {
+        public @Nullable J getBody() {
             return body == null ? null : body.getElement();
         }
 
@@ -1050,8 +1122,7 @@ public interface J extends Tree {
         public static class Padding {
             private final Case t;
 
-            @Nullable
-            public JRightPadded<J> getBody() {
+            public @Nullable JRightPadded<J> getBody() {
                 return t.body;
             }
 
@@ -1086,10 +1157,6 @@ public interface J extends Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
-        @Nullable
-        @NonFinal
-        transient WeakReference<Annotations> annotations;
-
         @With
         @Getter
         @EqualsAndHashCode.Include
@@ -1118,11 +1185,11 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withKind(Kind.Type type) {
-            Kind k = getAnnotations().getKind();
+            Kind k = getPadding().getKind();
             if (k.type == type) {
                 return this;
             } else {
-                return getAnnotations().withKind(k.withType(type));
+                return getPadding().withKind(k.withType(type));
             }
         }
 
@@ -1133,8 +1200,7 @@ public interface J extends Tree {
         @Nullable
         JContainer<TypeParameter> typeParameters;
 
-        @Nullable
-        public List<TypeParameter> getTypeParameters() {
+        public @Nullable List<TypeParameter> getTypeParameters() {
             return typeParameters == null ? null : typeParameters.getElements();
         }
 
@@ -1145,8 +1211,7 @@ public interface J extends Tree {
         @Nullable
         JContainer<Statement> primaryConstructor;
 
-        @Nullable
-        public List<Statement> getPrimaryConstructor() {
+        public @Nullable List<Statement> getPrimaryConstructor() {
             return primaryConstructor == null ? null : primaryConstructor.getElements();
         }
 
@@ -1157,8 +1222,7 @@ public interface J extends Tree {
         @Nullable
         JLeftPadded<TypeTree> extendings;
 
-        @Nullable
-        public TypeTree getExtends() {
+        public @Nullable TypeTree getExtends() {
             return extendings == null ? null : extendings.getElement();
         }
 
@@ -1169,8 +1233,7 @@ public interface J extends Tree {
         @Nullable
         JContainer<TypeTree> implementings;
 
-        @Nullable
-        public List<TypeTree> getImplements() {
+        public @Nullable List<TypeTree> getImplements() {
             return implementings == null ? null : implementings.getElements();
         }
 
@@ -1181,8 +1244,7 @@ public interface J extends Tree {
         @Nullable
         JContainer<TypeTree> permitting;
 
-        @Nullable
-        public List<TypeTree> getPermits() {
+        public @Nullable List<TypeTree> getPermits() {
             return permitting == null ? null : permitting.getElements();
         }
 
@@ -1195,8 +1257,7 @@ public interface J extends Tree {
         Block body;
 
         @Getter
-        @Nullable
-        JavaType.FullyQualified type;
+        JavaType.@Nullable FullyQualified type;
 
         @SuppressWarnings("unchecked")
         @Override
@@ -1217,6 +1278,10 @@ public interface J extends Tree {
             return v.visitClassDeclaration(this, p);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
@@ -1243,24 +1308,19 @@ public interface J extends Tree {
         public static final class Kind implements J {
 
             @With
-            @Getter
             @EqualsAndHashCode.Include
             UUID id;
 
             @With
-            @Getter
             Space prefix;
 
             @With
-            @Getter
             Markers markers;
 
             @With
-            @Getter
             List<Annotation> annotations;
 
             @With
-            @Getter
             Type type;
 
             public enum Type {
@@ -1268,7 +1328,8 @@ public interface J extends Tree {
                 Enum,
                 Interface,
                 Annotation,
-                Record
+                Record,
+                Value
             }
         }
 
@@ -1295,8 +1356,7 @@ public interface J extends Tree {
         public static class Padding {
             private final ClassDeclaration t;
 
-            @Nullable
-            public JContainer<Statement> getPrimaryConstructor() {
+            public @Nullable JContainer<Statement> getPrimaryConstructor() {
                 return t.primaryConstructor;
             }
 
@@ -1304,8 +1364,7 @@ public interface J extends Tree {
                 return t.primaryConstructor == primaryConstructor ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
             }
 
-            @Nullable
-            public JLeftPadded<TypeTree> getExtends() {
+            public @Nullable JLeftPadded<TypeTree> getExtends() {
                 return t.extendings;
             }
 
@@ -1313,8 +1372,7 @@ public interface J extends Tree {
                 return t.extendings == extendings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, extendings, t.implementings, t.permitting, t.body, t.type);
             }
 
-            @Nullable
-            public JContainer<TypeTree> getImplements() {
+            public @Nullable JContainer<TypeTree> getImplements() {
                 return t.implementings;
             }
 
@@ -1322,8 +1380,7 @@ public interface J extends Tree {
                 return t.implementings == implementings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, implementings, t.permitting, t.body, t.type);
             }
 
-            @Nullable
-            public JContainer<TypeTree> getPermits() {
+            public @Nullable JContainer<TypeTree> getPermits() {
                 return t.permitting;
             }
 
@@ -1339,41 +1396,12 @@ public interface J extends Tree {
                 return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
             }
 
-            @Nullable
-            public JContainer<TypeParameter> getTypeParameters() {
+            public @Nullable JContainer<TypeParameter> getTypeParameters() {
                 return t.typeParameters;
             }
 
             public ClassDeclaration withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
                 return t.typeParameters == typeParameters ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
-            }
-        }
-
-        public Annotations getAnnotations() {
-            Annotations a;
-            if (this.annotations == null) {
-                a = new Annotations(this);
-                this.annotations = new WeakReference<>(a);
-            } else {
-                a = this.annotations.get();
-                if (a == null || a.t != this) {
-                    a = new Annotations(this);
-                    this.annotations = new WeakReference<>(a);
-                }
-            }
-            return a;
-        }
-
-        @RequiredArgsConstructor
-        public static class Annotations {
-            private final ClassDeclaration t;
-
-            public Kind getKind() {
-                return t.kind;
-            }
-
-            public ClassDeclaration withKind(Kind kind) {
-                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
             }
         }
     }
@@ -1440,21 +1468,24 @@ public interface J extends Tree {
         @Nullable
         JRightPadded<Package> packageDeclaration;
 
-        @Nullable
-        public Package getPackageDeclaration() {
+        @Override
+        public @Nullable Package getPackageDeclaration() {
             return packageDeclaration == null ? null : packageDeclaration.getElement();
         }
 
+        @Override
         public CompilationUnit withPackageDeclaration(Package packageDeclaration) {
             return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
         }
 
         List<JRightPadded<Import>> imports;
 
+        @Override
         public List<Import> getImports() {
             return JRightPadded.getElements(imports);
         }
 
+        @Override
         public CompilationUnit withImports(List<Import> imports) {
             return getPadding().withImports(JRightPadded.withElements(this.imports, imports));
         }
@@ -1495,11 +1526,9 @@ public interface J extends Tree {
                 };
 
                 @Override
-                public @Nullable J visit(@Nullable Tree tree, AtomicInteger n) {
-                    if (tree != null) {
-                        n.incrementAndGet();
-                    }
-                    return super.visit(tree, n);
+                public @Nullable J preVisit(J tree, AtomicInteger n) {
+                    n.incrementAndGet();
+                    return tree;
                 }
 
                 @Override
@@ -1529,6 +1558,7 @@ public interface J extends Tree {
             return new JavaPrinter<>();
         }
 
+        @Override
         @Transient
         public TypesInUse getTypesInUse() {
             TypesInUse cache;
@@ -1545,6 +1575,7 @@ public interface J extends Tree {
             return cache;
         }
 
+        @Override
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -1564,8 +1595,7 @@ public interface J extends Tree {
         public static class Padding implements JavaSourceFile.Padding {
             private final CompilationUnit t;
 
-            @Nullable
-            public JRightPadded<Package> getPackageDeclaration() {
+            public @Nullable JRightPadded<Package> getPackageDeclaration() {
                 return t.packageDeclaration;
             }
 
@@ -1602,8 +1632,7 @@ public interface J extends Tree {
         Markers markers;
 
         @With
-        @Nullable
-        J.Identifier label;
+        J.@Nullable Identifier label;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -1647,10 +1676,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public DoWhileLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
@@ -1923,8 +1954,7 @@ public interface J extends Tree {
          * @return For expressions like {@code String.class}, this casts target expression to a {@link NameTree}.
          * If the field access is not a reference to a class type, returns null.
          */
-        @Nullable
-        public NameTree asClassReference() {
+        public @Nullable NameTree asClassReference() {
             if (target instanceof NameTree) {
                 String fqn = null;
                 if (type instanceof JavaType.FullyQualified) {
@@ -2024,10 +2054,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public ForEachLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
@@ -2191,10 +2223,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public ForLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
@@ -2347,9 +2381,54 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Java does not allow for parenthesis around TypeTree in places like a type cast where a J.ControlParenthesis is
+     * used. But other languages, like Kotlin, do.
+     */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
+    @With
+    class ParenthesizedTypeTree implements J, TypeTree, Expression {
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Space prefix;
+
+        @Getter
+        Markers markers;
+
+        List<J.Annotation> annotations;
+
+        J.Parentheses<TypeTree> parenthesizedType;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return parenthesizedType.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ParenthesizedTypeTree withType(@Nullable JavaType type) {
+            return withParenthesizedType(parenthesizedType.withType(type));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitParenthesizedTypeTree(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @With
     class Identifier implements J, TypeTree, Expression {
         @Getter
@@ -2369,14 +2448,13 @@ public interface J extends Tree {
         @Nullable
         JavaType type;
 
-        @Nullable
-        JavaType.Variable fieldType;
+        JavaType.@Nullable Variable fieldType;
 
         /**
          * @deprecated Use {@link #Identifier(UUID, Space, Markers, List, String, JavaType, JavaType.Variable)} instead.
          */
         @Deprecated
-        public Identifier(UUID id, Space prefix, Markers markers, String simpleName, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {
+        public Identifier(UUID id, Space prefix, Markers markers, String simpleName, @Nullable JavaType type, JavaType.@Nullable Variable fieldType) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
@@ -2391,6 +2469,7 @@ public interface J extends Tree {
             return v.visitIdentifier(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Identifier getCoordinates() {
             return new CoordinateBuilder.Identifier(this);
@@ -2590,24 +2669,23 @@ public interface J extends Tree {
             return getPadding().withStatic(this.statik.withElement(statik));
         }
 
-        @Nullable
-        public J.Identifier getAlias() {
-            if(alias == null) {
+        public J.@Nullable Identifier getAlias() {
+            if (alias == null) {
                 return null;
             }
             return alias.getElement();
         }
 
-        public J.Import withAlias(@Nullable J.Identifier alias) {
-            if(this.alias == null) {
-                if(alias == null) {
+        public J.Import withAlias(J.@Nullable Identifier alias) {
+            if (this.alias == null) {
+                if (alias == null) {
                     return this;
                 }
                 return new J.Import(null, id, prefix, markers, statik, qualid, JLeftPadded
                         .build(alias)
                         .withBefore(Space.format(" ")));
             }
-            if(alias == null) {
+            if (alias == null) {
                 return new J.Import(null, id, prefix, markers, statik, qualid, null);
             }
             return getPadding().withAlias(this.alias.withElement(alias));
@@ -2626,6 +2704,7 @@ public interface J extends Tree {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
 
                 // the compiler doesn't type attribute static imports of classes
+                Expression target = qualid.getTarget();
                 if (fq == null) {
                     String possibleInnerClassFqn = getTypeName(qualid);
                     String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.lastIndexOf('$') + 1);
@@ -2636,8 +2715,8 @@ public interface J extends Tree {
                         possibleInnerClassName = possibleInnerClassName.substring(possibleInnerClassName.indexOf('$') + 1);
                     }
 
-                    JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
-                    if (owner != null && !(qualid.getTarget().getType() instanceof JavaType.ShallowClass)) {
+                    JavaType.Class owner = TypeUtils.asClass(target.getType());
+                    if (owner != null && !(target.getType() instanceof JavaType.ShallowClass)) {
                         Iterator<JavaType.Method> visibleMethods = owner.getVisibleMethods();
                         while (visibleMethods.hasNext()) {
                             JavaType.Method method = visibleMethods.next();
@@ -2658,7 +2737,7 @@ public interface J extends Tree {
                     }
                 }
 
-                return getTypeName((FieldAccess) qualid.getTarget());
+                return target instanceof Identifier ? ((Identifier) target).getSimpleName() : getTypeName((FieldAccess) target);
             }
 
             return getTypeName(qualid);
@@ -2674,10 +2753,12 @@ public interface J extends Tree {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
                                        "." + name);
                     break;
-                } else {
+                } else if (part.getTarget() instanceof J.FieldAccess) {
                     part = (FieldAccess) part.getTarget();
                     String delim = Character.isUpperCase(part.getSimpleName().charAt(0)) ? "$" : ".";
                     typeName.insert(0, delim + name);
+                } else {
+                    break;
                 }
             }
 
@@ -2762,8 +2843,7 @@ public interface J extends Tree {
                 return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.qualid, t.alias);
             }
 
-            @Nullable
-            public JLeftPadded<J.Identifier> getAlias() {
+            public @Nullable JLeftPadded<J.Identifier> getAlias() {
                 return t.alias;
             }
 
@@ -2813,7 +2893,7 @@ public interface J extends Tree {
         }
 
         public InstanceOf withExpression(Expression expression) {
-            return getPadding().withExpr(this.expression.withElement(expression));
+            return getPadding().withExpression(this.expression.withElement(expression));
         }
 
         @With
@@ -2871,12 +2951,108 @@ public interface J extends Tree {
         public static class Padding {
             private final InstanceOf t;
 
+            public JRightPadded<Expression> getExpression() {
+                return t.expression;
+            }
+
+            public InstanceOf withExpression(JRightPadded<Expression> expression) {
+                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+            }
+
+            @Deprecated
             public JRightPadded<Expression> getExpr() {
                 return t.expression;
             }
 
+            @Deprecated
             public InstanceOf withExpr(JRightPadded<Expression> expression) {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class IntersectionType implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JContainer<TypeTree> bounds;
+
+        public List<TypeTree> getBounds() {
+            return bounds.getElements();
+        }
+
+        public IntersectionType withBounds(List<TypeTree> bounds) {
+            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitIntersectionType(this, p);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public IntersectionType withType(@Nullable JavaType type) {
+            // cannot overwrite type directly, perform this operation on each bound separately
+            return this;
+        }
+
+        @Override
+        public JavaType getType() {
+            return new JavaType.Intersection(bounds.getPadding().getElements().stream()
+                    .filter(Objects::nonNull)
+                    .map(b -> b.getElement().getType())
+                    .collect(toList()));
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final IntersectionType t;
+
+            public @Nullable JContainer<TypeTree> getBounds() {
+                return t.bounds;
+            }
+
+            public IntersectionType withBounds(@Nullable JContainer<TypeTree> bounds) {
+                return t.bounds == bounds ? t : new IntersectionType(t.id, t.prefix, t.markers, bounds);
             }
         }
     }
@@ -3037,7 +3213,7 @@ public interface J extends Tree {
             }
 
             public Parameters withParameters(List<J> parameters) {
-                return getPadding().withParams(JRightPadded.withElements(this.parameters, parameters));
+                return getPadding().withParameters(JRightPadded.withElements(this.parameters, parameters));
             }
 
             @Transient
@@ -3064,10 +3240,20 @@ public interface J extends Tree {
             public static class Padding {
                 private final Parameters t;
 
+                public List<JRightPadded<J>> getParameters() {
+                    return t.parameters;
+                }
+
+                public Parameters withParameters(List<JRightPadded<J>> parameters) {
+                    return t.parameters == parameters ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, parameters);
+                }
+
+                @Deprecated
                 public List<JRightPadded<J>> getParams() {
                     return t.parameters;
                 }
 
+                @Deprecated
                 public Parameters withParams(List<JRightPadded<J>> parameters) {
                     return t.parameters == parameters ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, parameters);
                 }
@@ -3123,6 +3309,7 @@ public interface J extends Tree {
             return v.visitLiteral(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -3162,6 +3349,11 @@ public interface J extends Tree {
             }
             return false;
         }
+
+        @Override
+        public String toString() {
+            return String.valueOf(value);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3200,8 +3392,7 @@ public interface J extends Tree {
         @Nullable
         JContainer<Expression> typeParameters;
 
-        @Nullable
-        public List<Expression> getTypeParameters() {
+        public @Nullable List<Expression> getTypeParameters() {
             return typeParameters == null ? null : typeParameters.getElements();
         }
 
@@ -3248,17 +3439,15 @@ public interface J extends Tree {
          * In the case of a method reference, this is the method type pointed to by {@link #reference}.
          */
         @With
-        @Nullable
         @Getter
-        JavaType.Method methodType;
+        JavaType.@Nullable Method methodType;
 
         /**
          * In the case of a field reference, this is the field pointed to by {@link #reference}.
          */
         @With
-        @Nullable
         @Getter
-        JavaType.Variable variableType;
+        JavaType.@Nullable Variable variableType;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -3297,8 +3486,7 @@ public interface J extends Tree {
                 return t.containing == containing ? t : new MemberReference(t.id, t.prefix, t.markers, containing, t.typeParameters, t.reference, t.type, t.methodType, t.variableType);
             }
 
-            @Nullable
-            public JContainer<Expression> getTypeParameters() {
+            public @Nullable JContainer<Expression> getTypeParameters() {
                 return t.typeParameters;
             }
 
@@ -3353,25 +3541,25 @@ public interface J extends Tree {
         @Nullable
         TypeParameters typeParameters;
 
-        @Nullable
-        public List<TypeParameter> getTypeParameters() {
+        public @Nullable List<TypeParameter> getTypeParameters() {
             return typeParameters == null ? null : typeParameters.getTypeParameters();
         }
 
         public MethodDeclaration withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
+            Annotations annotations = getAnnotations();
             if (typeParameters == null) {
-                if (this.getAnnotations().getTypeParameters() == null) {
+                if (annotations.getTypeParameters() == null) {
                     return this;
                 } else {
-                    return this.getAnnotations().withTypeParameters(null);
+                    return annotations.withTypeParameters(null);
                 }
             } else {
-                TypeParameters currentTypeParameters = this.getAnnotations().getTypeParameters();
+                TypeParameters currentTypeParameters = annotations.getTypeParameters();
                 if (currentTypeParameters == null) {
-                    return getAnnotations().withTypeParameters(new TypeParameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                    return annotations.withTypeParameters(new TypeParameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
                             null, typeParameters.stream().map(JRightPadded::build).collect(toList())));
                 } else {
-                    return getAnnotations().withTypeParameters(currentTypeParameters.withTypeParameters(typeParameters));
+                    return annotations.withTypeParameters(currentTypeParameters.withTypeParameters(typeParameters));
                 }
             }
         }
@@ -3407,8 +3595,7 @@ public interface J extends Tree {
         @Nullable
         JContainer<NameTree> throwz;
 
-        @Nullable
-        public List<NameTree> getThrows() {
+        public @Nullable List<NameTree> getThrows() {
             return throwz == null ? null : throwz.getElements();
         }
 
@@ -3430,8 +3617,7 @@ public interface J extends Tree {
         @Nullable
         JLeftPadded<Expression> defaultValue;
 
-        @Nullable
-        public Expression getDefaultValue() {
+        public @Nullable Expression getDefaultValue() {
             return defaultValue == null ? null : defaultValue.getElement();
         }
 
@@ -3440,16 +3626,16 @@ public interface J extends Tree {
         }
 
         @Getter
-        @Nullable
-        JavaType.Method methodType;
+        JavaType.@Nullable Method methodType;
 
-        public MethodDeclaration withMethodType(@Nullable JavaType.Method type) {
+        public MethodDeclaration withMethodType(JavaType.@Nullable Method type) {
             if (type == this.methodType) {
                 return this;
             }
             return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, type);
         }
 
+        @Override
         public JavaType getType() {
             return methodType == null ? null : methodType.getReturnType();
         }
@@ -3487,6 +3673,10 @@ public interface J extends Tree {
             return new CoordinateBuilder.MethodDeclaration(this);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
@@ -3514,11 +3704,9 @@ public interface J extends Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static final class IdentifierWithAnnotations {
-            @Getter
             @With
             Identifier identifier;
 
-            @Getter
             @With
             List<Annotation> annotations;
         }
@@ -3550,8 +3738,7 @@ public interface J extends Tree {
                 return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throwz, t.body, t.defaultValue, t.methodType);
             }
 
-            @Nullable
-            public JContainer<NameTree> getThrows() {
+            public @Nullable JContainer<NameTree> getThrows() {
                 return t.throwz;
             }
 
@@ -3559,8 +3746,7 @@ public interface J extends Tree {
                 return t.throwz == throwz ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throwz, t.body, t.defaultValue, t.methodType);
             }
 
-            @Nullable
-            public JLeftPadded<Expression> getDefaultValue() {
+            public @Nullable JLeftPadded<Expression> getDefaultValue() {
                 return t.defaultValue;
             }
 
@@ -3568,8 +3754,7 @@ public interface J extends Tree {
                 return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.methodType);
             }
 
-            @Nullable
-            public TypeParameters getTypeParameters() {
+            public @Nullable TypeParameters getTypeParameters() {
                 return t.typeParameters;
             }
 
@@ -3597,8 +3782,7 @@ public interface J extends Tree {
         public static class Annotations {
             private final MethodDeclaration t;
 
-            @Nullable
-            public TypeParameters getTypeParameters() {
+            public @Nullable TypeParameters getTypeParameters() {
                 return t.typeParameters;
             }
 
@@ -3644,8 +3828,7 @@ public interface J extends Tree {
         @Nullable
         JRightPadded<Expression> select;
 
-        @Nullable
-        public Expression getSelect() {
+        public @Nullable Expression getSelect() {
             return select == null ? null : select.getElement();
         }
 
@@ -3657,8 +3840,7 @@ public interface J extends Tree {
         @With
         JContainer<Expression> typeParameters;
 
-        @Nullable
-        public List<Expression> getTypeParameters() {
+        public @Nullable List<Expression> getTypeParameters() {
             return typeParameters == null ? null : typeParameters.getElements();
         }
 
@@ -3692,12 +3874,12 @@ public interface J extends Tree {
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
 
-        @Nullable
+
         @Getter
-        JavaType.Method methodType;
+        JavaType.@Nullable Method methodType;
 
         @Override
-        public MethodInvocation withMethodType(@Nullable JavaType.Method type) {
+        public MethodInvocation withMethodType(JavaType.@Nullable Method type) {
             if (type == this.methodType) {
                 return this;
             }
@@ -3730,8 +3912,7 @@ public interface J extends Tree {
         }
 
         @Override
-        @Nullable
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return methodType == null ? null : methodType.getReturnType();
         }
 
@@ -3769,8 +3950,7 @@ public interface J extends Tree {
         public static class Padding {
             private final MethodInvocation t;
 
-            @Nullable
-            public JRightPadded<Expression> getSelect() {
+            public @Nullable JRightPadded<Expression> getSelect() {
                 return t.select;
             }
 
@@ -3778,8 +3958,7 @@ public interface J extends Tree {
                 return t.select == select ? t : new MethodInvocation(t.id, t.prefix, t.markers, select, t.typeParameters, t.name, t.arguments, t.methodType);
             }
 
-            @Nullable
-            public JContainer<Expression> getTypeParameters() {
+            public @Nullable JContainer<Expression> getTypeParameters() {
                 return t.typeParameters;
             }
 
@@ -3799,11 +3978,16 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @Data
     final class Modifier implements J {
         public static boolean hasModifier(Collection<Modifier> modifiers, Modifier.Type modifier) {
-            return modifiers.stream().anyMatch(m -> m.getType() == modifier);
+            for (Modifier m : modifiers) {
+                if (m.getType() == modifier) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @With
@@ -3851,7 +4035,7 @@ public interface J extends Tree {
 
         /**
          * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
-         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-1124">JLS</a>.
+         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-S1124">JLS</a>.
          */
         public enum Type {
             Default,
@@ -3999,8 +4183,7 @@ public interface J extends Tree {
         @Nullable
         JContainer<Expression> initializer;
 
-        @Nullable
-        public List<Expression> getInitializer() {
+        public @Nullable List<Expression> getInitializer() {
             return initializer == null ? null : initializer.getElements();
         }
 
@@ -4018,6 +4201,7 @@ public interface J extends Tree {
             return v.visitNewArray(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -4042,8 +4226,7 @@ public interface J extends Tree {
         public static class Padding {
             private final NewArray t;
 
-            @Nullable
-            public JContainer<Expression> getInitializer() {
+            public @Nullable JContainer<Expression> getInitializer() {
                 return t.initializer;
             }
 
@@ -4153,8 +4336,7 @@ public interface J extends Tree {
         @Nullable
         JRightPadded<Expression> enclosing;
 
-        @Nullable
-        public Expression getEnclosing() {
+        public @Nullable Expression getEnclosing() {
             return enclosing == null ? null : enclosing.getElement();
         }
 
@@ -4198,14 +4380,12 @@ public interface J extends Tree {
         Block body;
 
         @With
-        @Nullable
         @Getter
-        JavaType.Method constructorType;
+        JavaType.@Nullable Method constructorType;
 
-        @Nullable
         @Override
-        public JavaType getType() {
-            return constructorType == null ? null : constructorType.getDeclaringType();
+        public @Nullable JavaType getType() {
+            return constructorType == null ? null : constructorType.getReturnType();
         }
 
         /**
@@ -4213,8 +4393,8 @@ public interface J extends Tree {
          *
          * @return The constructor type.
          */
-        @Nullable
-        public JavaType.Method getMethodType() {
+        @Override
+        public JavaType.@Nullable Method getMethodType() {
             return getConstructorType();
         }
 
@@ -4225,7 +4405,7 @@ public interface J extends Tree {
          * @return An instance with the new constructor type.
          */
         @Override
-        public NewClass withMethodType(@Nullable JavaType.Method methodType) {
+        public NewClass withMethodType(JavaType.@Nullable Method methodType) {
             return withConstructorType(methodType);
         }
 
@@ -4276,8 +4456,7 @@ public interface J extends Tree {
         public static class Padding {
             private final NewClass t;
 
-            @Nullable
-            public JRightPadded<Expression> getEnclosing() {
+            public @Nullable JRightPadded<Expression> getEnclosing() {
                 return t.enclosing;
             }
 
@@ -4291,6 +4470,94 @@ public interface J extends Tree {
 
             public NewClass withArguments(JContainer<Expression> arguments) {
                 return t.arguments == arguments ? t : new NewClass(t.id, t.prefix, t.markers, t.enclosing, t.nooh, t.clazz, arguments, t.body, t.constructorType);
+            }
+        }
+    }
+
+    @Incubating(since = "8.12.0")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
+    class NullableType implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<J.NullableType.Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Space prefix;
+
+        @Getter
+        Markers markers;
+
+        @Getter
+        List<J.Annotation> annotations;
+
+        JRightPadded<TypeTree> typeTree;
+
+        public TypeTree getTypeTree() {
+            return typeTree.getElement();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            // TODO also support `nullable` in type attribution
+            return typeTree.getElement().getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public NullableType withType(@Nullable JavaType type) {
+            JRightPadded<TypeTree> rp = getPadding().getTypeTree();
+            TypeTree tt = rp.getElement();
+            tt = tt.withType(type);
+            return getPadding().withTypeTree(rp.withElement(tt));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitNullableType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public J.NullableType.Padding getPadding() {
+            J.NullableType.Padding p;
+            if (this.padding == null) {
+                p = new J.NullableType.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new J.NullableType.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final J.NullableType t;
+
+            public JRightPadded<TypeTree> getTypeTree() {
+                return t.typeTree;
+            }
+
+            public J.NullableType withTypeTree(JRightPadded<TypeTree> typeTree) {
+                return t.typeTree == typeTree ? t : new J.NullableType(t.id,
+                        t.prefix,
+                        t.markers,
+                        t.annotations,
+                        typeTree);
             }
         }
     }
@@ -4327,6 +4594,7 @@ public interface J extends Tree {
             return v.visitPackage(this, p);
         }
 
+        @Override
         @Transient
         public CoordinateBuilder.Package getCoordinates() {
             return new CoordinateBuilder.Package(this);
@@ -4367,8 +4635,7 @@ public interface J extends Tree {
         @Nullable
         JavaType type;
 
-        @Nullable
-        public List<Expression> getTypeParameters() {
+        public @Nullable List<Expression> getTypeParameters() {
             return typeParameters == null ? null : typeParameters.getElements();
         }
 
@@ -4411,8 +4678,7 @@ public interface J extends Tree {
         public static class Padding {
             private final ParameterizedType t;
 
-            @Nullable
-            public JContainer<Expression> getTypeParameters() {
+            public @Nullable JContainer<Expression> getTypeParameters() {
                 return t.typeParameters;
             }
 
@@ -4658,8 +4924,7 @@ public interface J extends Tree {
         }
 
         @Override
-        @NonNull
-        public JavaType.Primitive getType() {
+        public JavaType.@NonNull Primitive getType() {
             return type;
         }
 
@@ -4769,8 +5034,7 @@ public interface J extends Tree {
 
         @Override
         @Transient
-        @Nullable
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return new JavaVisitor<AtomicReference<JavaType>>() {
                 @Override
                 public J visitBlock(Block block, AtomicReference<JavaType> javaType) {
@@ -4998,8 +5262,7 @@ public interface J extends Tree {
         @Nullable
         JContainer<Resource> resources;
 
-        @Nullable
-        public List<Resource> getResources() {
+        public @Nullable List<Resource> getResources() {
             return resources == null ? null : resources.getElements();
         }
 
@@ -5018,8 +5281,7 @@ public interface J extends Tree {
         @Nullable
         JLeftPadded<Block> finallie;
 
-        @Nullable
-        public Block getFinally() {
+        public @Nullable Block getFinally() {
             return finallie == null ? null : finallie.getElement();
         }
 
@@ -5117,8 +5379,7 @@ public interface J extends Tree {
         public static class Padding {
             private final Try t;
 
-            @Nullable
-            public JContainer<Resource> getResources() {
+            public @Nullable JContainer<Resource> getResources() {
                 return t.resources;
             }
 
@@ -5126,8 +5387,7 @@ public interface J extends Tree {
                 return t.resources == resources ? t : new Try(t.id, t.prefix, t.markers, resources, t.body, t.catches, t.finallie);
             }
 
-            @Nullable
-            public JLeftPadded<Block> getFinally() {
+            public @Nullable JLeftPadded<Block> getFinally() {
                 return t.finallie;
             }
 
@@ -5218,6 +5478,10 @@ public interface J extends Tree {
         @Getter
         List<Annotation> annotations;
 
+        @With
+        @Getter
+        List<J.Modifier> modifiers;
+
         /**
          * Will be either a {@link TypeTree} or {@link Wildcard}. Wildcards aren't possible in
          * every context where type parameters may be defined (e.g. not possible on new statements).
@@ -5229,8 +5493,7 @@ public interface J extends Tree {
         @Nullable
         JContainer<TypeTree> bounds;
 
-        @Nullable
-        public List<TypeTree> getBounds() {
+        public @Nullable List<TypeTree> getBounds() {
             return bounds == null ? null : bounds.getElements();
         }
 
@@ -5262,13 +5525,12 @@ public interface J extends Tree {
         public static class Padding {
             private final TypeParameter t;
 
-            @Nullable
-            public JContainer<TypeTree> getBounds() {
+            public @Nullable JContainer<TypeTree> getBounds() {
                 return t.bounds;
             }
 
             public TypeParameter withBounds(@Nullable JContainer<TypeTree> bounds) {
-                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.name, bounds);
+                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.name, bounds);
             }
         }
     }
@@ -5498,6 +5760,12 @@ public interface J extends Tree {
         @Getter
         Space varargs;
 
+        /**
+         * @deprecated Use {@link ArrayType} instead.
+         */
+        // For backwards compatibility.
+        @SuppressWarnings("DeprecatedIsStillUsed")
+        @Deprecated
         @With
         @Getter
         List<JLeftPadded<Space>> dimensionsBeforeName;
@@ -5523,6 +5791,10 @@ public interface J extends Tree {
             return new CoordinateBuilder.VariableDeclarations(this);
         }
 
+        /**
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         */
+        @Deprecated
         // gather annotations from everywhere they may occur
         public List<J.Annotation> getAllAnnotations() {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
@@ -5535,14 +5807,12 @@ public interface J extends Tree {
             return allAnnotations;
         }
 
-        @Nullable
-        public JavaType.FullyQualified getTypeAsFullyQualified() {
+        public JavaType.@Nullable FullyQualified getTypeAsFullyQualified() {
             return typeExpression == null ? null : TypeUtils.asFullyQualified(typeExpression.getType());
         }
 
-        @Nullable
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return typeExpression == null ? null : typeExpression.getType();
         }
 
@@ -5591,8 +5861,7 @@ public interface J extends Tree {
             @Nullable
             JLeftPadded<Expression> initializer;
 
-            @Nullable
-            public Expression getInitializer() {
+            public @Nullable Expression getInitializer() {
                 return initializer == null ? null : initializer.getElement();
             }
 
@@ -5604,10 +5873,10 @@ public interface J extends Tree {
             }
 
             @With
-            @Nullable
             @Getter
-            JavaType.Variable variableType;
+            JavaType.@Nullable Variable variableType;
 
+            @Override
             public JavaType getType() {
                 return variableType != null ? variableType.getType() : null;
             }
@@ -5638,7 +5907,7 @@ public interface J extends Tree {
             public boolean isField(Cursor cursor) {
                 Cursor declaringScope = getDeclaringScope(cursor);
                 return declaringScope.getValue() instanceof J.Block
-                        && declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
+                       && declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
             }
 
             public Padding getPadding() {
@@ -5665,8 +5934,7 @@ public interface J extends Tree {
             public static class Padding {
                 private final NamedVariable t;
 
-                @Nullable
-                public JLeftPadded<Expression> getInitializer() {
+                public @Nullable JLeftPadded<Expression> getInitializer() {
                     return t.initializer;
                 }
 
@@ -5738,10 +6006,12 @@ public interface J extends Tree {
 
         JRightPadded<Statement> body;
 
+        @Override
         public Statement getBody() {
             return body.getElement();
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public WhileLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
@@ -5812,8 +6082,7 @@ public interface J extends Tree {
         @Nullable
         JLeftPadded<Bound> bound;
 
-        @Nullable
-        public Bound getBound() {
+        public @Nullable Bound getBound() {
             return bound == null ? null : bound.getElement();
         }
 
@@ -5877,8 +6146,7 @@ public interface J extends Tree {
         public static class Padding {
             private final Wildcard t;
 
-            @Nullable
-            public JLeftPadded<Bound> getBound() {
+            public @Nullable JLeftPadded<Bound> getBound() {
                 return t.bound;
             }
 
@@ -5919,7 +6187,7 @@ public interface J extends Tree {
     @AllArgsConstructor
     @Data
     @With
-    final class Unknown implements J, Statement, Expression, TypeTree, TypedTree, NameTree {
+    final class Unknown implements J, Statement, Expression, TypeTree {
 
         @EqualsAndHashCode.Include
         UUID id;
@@ -5933,9 +6201,8 @@ public interface J extends Tree {
             return v.visitUnknown(this, p);
         }
 
-        @Nullable
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 

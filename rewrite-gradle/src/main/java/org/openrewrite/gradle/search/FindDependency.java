@@ -17,11 +17,11 @@ package org.openrewrite.gradle.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -30,7 +30,7 @@ import org.openrewrite.marker.SearchResult;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindDependency extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
@@ -55,6 +55,11 @@ public class FindDependency extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
+    }
+
+    @Override
     public String getDescription() {
         return "Finds dependencies declared in `build.gradle` files. See the [reference](https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_configurations_graph) on Gradle configurations or the diagram below for a description of what configuration to use." +
                 " A project's compile and runtime classpath is based on these configurations.\n\n<img alt=\"Gradle compile classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-main.png\" width=\"200px\"/>\n" +
@@ -66,7 +71,7 @@ public class FindDependency extends Recipe {
         MethodMatcher dependency = new MethodMatcher("DependencyHandlerSpec *(..)");
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (dependency.matches(method)) {
                     if (StringUtils.isBlank(configuration) || method.getSimpleName().equals(configuration)) {
                         List<Expression> depArgs = method.getArguments();
@@ -83,7 +88,7 @@ public class FindDependency extends Recipe {
                         }
                     }
                 }
-                return super.visitMethodInvocation(method, context);
+                return super.visitMethodInvocation(method, ctx);
             }
         });
     }

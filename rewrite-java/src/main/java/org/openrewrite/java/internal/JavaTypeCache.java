@@ -16,7 +16,7 @@
 package org.openrewrite.java.internal;
 
 import lombok.Value;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
@@ -31,6 +31,7 @@ public class JavaTypeCache implements Cloneable {
     // although also note that a String object has a 24 bytes overhead vs. the 16 bytes of a BytesKey object
     public static final int COMPRESSION_THRESHOLD = 50;
 
+    @SuppressWarnings("ClassCanBeRecord")
     @Value
     private static class BytesKey {
         byte[] data;
@@ -38,8 +39,7 @@ public class JavaTypeCache implements Cloneable {
 
     Map<Object, Object> typeCache = new HashMap<>();
 
-    @Nullable
-    public <T> T get(String signature) {
+    public <T> @Nullable T get(String signature) {
         //noinspection unchecked
         return (T) typeCache.get(key(signature));
     }
@@ -48,12 +48,18 @@ public class JavaTypeCache implements Cloneable {
         typeCache.put(key(signature), o);
     }
 
+    @Nullable
+    private static boolean snappyUsable = true;
+
     private Object key(String signature) {
-        if (signature.length() > COMPRESSION_THRESHOLD) {
+        if (signature.length() > COMPRESSION_THRESHOLD && snappyUsable) {
             try {
                 return new BytesKey(Snappy.compress(signature.getBytes(StandardCharsets.UTF_8)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
+            } catch (NoClassDefFoundError e) {
+                // Some systems fail to load Snappy native components, so fall back to not compressing
+                snappyUsable = false;
             }
         }
         return signature;

@@ -26,4 +26,3 @@ import java.lang.annotation.*;
 public @interface DocumentExample {
     String value() default "";
 }
-

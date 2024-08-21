@@ -17,11 +17,9 @@ package org.openrewrite.gradle.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
@@ -53,16 +51,17 @@ public class FindGradleProject extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         if (searchCriteria == SearchCriteria.Marker) {
-            return new JavaVisitor<ExecutionContext>() {
+            return new TreeVisitor<Tree, ExecutionContext>() {
                 @Override
-                public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                    stopAfterPreVisit();
                     if (tree instanceof JavaSourceFile) {
                         JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
                         if (cu.getMarkers().findFirst(GradleProject.class).isPresent()) {
                             return SearchResult.found(cu);
                         }
                     }
-                    return super.visit(tree, ctx);
+                    return tree;
                 }
             };
         }

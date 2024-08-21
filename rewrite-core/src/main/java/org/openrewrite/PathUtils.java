@@ -15,16 +15,22 @@
  */
 package org.openrewrite;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
 
 public class PathUtils {
-    private PathUtils() {}
+    private PathUtils() {
+    }
 
     private static final char UNIX_SEPARATOR = '/';
 
@@ -34,7 +40,6 @@ public class PathUtils {
      * Compare two paths, returning true if they indicate the same path, regardless of separators.
      * Does not account for comparison of a relative path to an absolute path, but within the context of OpenRewrite
      * all paths should be relative anyway.
-     *
      * "foo/a.txt" is considered to be equal to "foo\a.txt"
      */
     public static boolean equalIgnoringSeparators(Path a, Path b) {
@@ -44,7 +49,7 @@ public class PathUtils {
     /**
      * Compare two strings representing file paths, returning true if they indicate the same path regardless of separators
      */
-    public static boolean equalIgnoringSeparators(String a , String b) {
+    public static boolean equalIgnoringSeparators(String a, String b) {
         return separatorsToSystem(a).equals(separatorsToSystem(b));
     }
 
@@ -67,18 +72,37 @@ public class PathUtils {
         if ("**".equals(globPattern)) {
             return true;
         }
-        if (globPattern == null) {
+        if (globPattern == null || path == null) {
             return false;
         }
-        if (path == null) {
-            return false;
-        }
+
         String relativePath = path.toString();
         if (relativePath.isEmpty() && globPattern.isEmpty()) {
             return true;
         }
 
-        return matchesGlob(globPattern, relativePath);
+        List<String> eitherOrPatterns = getEitherOrPatterns(globPattern);
+        List<String> excludedPatterns = getExcludedPatterns(globPattern);
+        if (eitherOrPatterns.isEmpty() && excludedPatterns.isEmpty()) {
+            return matchesGlob(globPattern, relativePath);
+        } else if (!eitherOrPatterns.isEmpty()) {
+            for (String eitherOrPattern : eitherOrPatterns) {
+                if (matchesGlob(Paths.get(relativePath), eitherOrPattern)) {
+                    return true;
+                }
+            }
+            return false;
+        } else { // If eitherOrPatterns is empty and excludedPatterns is not
+            if (!matchesGlob(convertNegationToWildcard(globPattern), relativePath)) {
+                return false;
+            }
+            for (String excludedPattern : excludedPatterns) {
+                if (matchesGlob(excludedPattern, relativePath)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static boolean matchesGlob(String pattern, String path) {
@@ -128,7 +152,7 @@ public class PathUtils {
                 return false;
             }
             if (pattIdxEnd == (pattTokens.length - 1)
-                    && (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
+                && (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
                 return false;
             }
             pattIdxEnd--;
@@ -136,7 +160,7 @@ public class PathUtils {
         }
         if (pathIdxStart > pathIdxEnd) {
             // Path exhausted
-            for (int i = pattIdxStart; i < pattIdxEnd; i++) {
+            for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
                 if (!pattTokens[i].equals("**")) {
                     return false;
                 }
@@ -188,6 +212,61 @@ public class PathUtils {
         return true;
     }
 
+    public static String convertNegationToWildcard(String globPattern) {
+        // Regular expression to match !(...)
+        String negationPattern = "\\!\\((.*?)\\)";
+        // Replace all negation patterns with *
+        return globPattern.replaceAll(negationPattern, "*");
+    }
+
+    public static List<String> getExcludedPatterns(String globPattern) {
+        if (!globPattern.contains("!")) {
+            return emptyList();
+        }
+
+        List<String> excludedPatterns = new ArrayList<>(3);
+
+        // Regular expression to match !(...)
+        String negationPattern = "\\!\\((.*?)\\)";
+        Pattern pattern = Pattern.compile(negationPattern);
+        Matcher matcher = pattern.matcher(globPattern);
+
+        // Find all negation patterns and generate excluded patterns
+        while (matcher.find()) {
+            String negationContent = matcher.group(1);
+            String[] options = negationContent.split("\\|");
+            for (String option : options) {
+                excludedPatterns.add(globPattern.replace(matcher.group(), option));
+            }
+        }
+
+        return excludedPatterns;
+    }
+
+    public static List<String> getEitherOrPatterns(String globPattern) {
+        if (!globPattern.contains("{")) {
+            return emptyList();
+        }
+
+        List<String> eitherOrPatterns = new ArrayList<>(3);
+
+        // Regular expression to match {...}
+        String eitherOrPattern = "\\{(.*?)\\}";
+        Pattern pattern = Pattern.compile(eitherOrPattern);
+        Matcher matcher = pattern.matcher(globPattern);
+
+        // Find all possible patterns and generate patterns
+        while (matcher.find()) {
+            String eitherOrContent = matcher.group(1);
+            String[] options = eitherOrContent.split("\\,");
+            for (String option : options) {
+                eitherOrPatterns.add(globPattern.replace(matcher.group(), option));
+            }
+        }
+
+        return eitherOrPatterns;
+    }
+
     private static String[] tokenize(String path) {
         List<String> tokens = new ArrayList<>();
         int pathIdxStart = 0;
@@ -212,6 +291,7 @@ public class PathUtils {
         return isFileSeparator(false, ch);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static boolean isFileSeparator(boolean strict, char ch) {
         return strict
                 ? ch == File.separatorChar

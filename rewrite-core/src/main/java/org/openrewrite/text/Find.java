@@ -17,13 +17,14 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.table.TextMatches;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,8 +35,9 @@ import java.util.regex.Pattern;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class Find extends Recipe {
+    transient TextMatches textMatches = new TextMatches(this);
 
     @Override
     public String getDisplayName() {
@@ -44,16 +46,16 @@ public class Find extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Search for text, treating all textual sources as plain text.";
+        return "Textual search, optionally using Regular Expression (regex) to query.";
     }
 
     @Option(displayName = "Find",
-            description = "The text to find.",
+            description = "The text to find. This snippet can be multiline.",
             example = "blacklist")
     String find;
 
     @Option(displayName = "Regex",
-            description = "If true, `find` will be interpreted as a Regular Expression. Default `false`.",
+            description = "If true, `find` will be interpreted as a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression). Default `false`.",
             required = false)
     @Nullable
     Boolean regex;
@@ -105,13 +107,13 @@ public class Find extends Recipe {
                     searchStr = Pattern.quote(searchStr);
                 }
                 int patternOptions = 0;
-                if(!Boolean.TRUE.equals(caseSensitive)) {
+                if (!Boolean.TRUE.equals(caseSensitive)) {
                     patternOptions |= Pattern.CASE_INSENSITIVE;
                 }
-                if(Boolean.TRUE.equals(multiline)) {
+                if (Boolean.TRUE.equals(multiline)) {
                     patternOptions |= Pattern.MULTILINE;
                 }
-                if(Boolean.TRUE.equals(dotAll)) {
+                if (Boolean.TRUE.equals(dotAll)) {
                     patternOptions |= Pattern.DOTALL;
                 }
                 Pattern pattern = Pattern.compile(searchStr, patternOptions);
@@ -128,16 +130,29 @@ public class Find extends Recipe {
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
                     snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
                     previousEnd = matcher.end();
+
+                    int startLine = Math.max(0, rawText.substring(0, matchStart).lastIndexOf('\n') + 1);
+                    int endLine = rawText.indexOf('\n', matcher.end());
+                    if (endLine == -1) {
+                        endLine = rawText.length();
+                    }
+
+                    textMatches.insertRow(ctx, new TextMatches.Row(
+                            sourceFile.getSourcePath().toString(),
+                            rawText.substring(startLine, matcher.start()) + "~~>" +
+                            rawText.substring(matcher.start(), endLine)
+                    ));
                 }
                 snippets.add(snippet(rawText.substring(previousEnd)));
                 return plainText.withText("").withSnippets(snippets);
             }
         };
         //noinspection DuplicatedCode
-        if(filePattern != null) {
+        if (filePattern != null) {
             //noinspection unchecked
             TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                    .map(HasSourcePath<ExecutionContext>::new)
+                    .map(FindSourceFiles::new)
+                    .map(Recipe::getVisitor)
                     .toArray(TreeVisitor[]::new));
 
             visitor = Preconditions.check(check, visitor);

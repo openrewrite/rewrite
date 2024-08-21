@@ -17,19 +17,19 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AppendToSequence extends Recipe {
-    @Option(displayName = "sequence path",
-            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML sequence.",
+    @Option(displayName = "Sequence path",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a YAML sequence.",
             example = "$.universe.planets")
     String sequencePath;
 
@@ -55,6 +55,12 @@ public class AppendToSequence extends Recipe {
     @Override
     public String getDisplayName() {
         return "Append to sequence";
+    }
+
+    @Override
+    public String getInstanceName() {
+        return String.format("Append %s to sequence `%s`",
+                value, sequencePath);
     }
 
     @Override

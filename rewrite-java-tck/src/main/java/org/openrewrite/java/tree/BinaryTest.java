@@ -63,6 +63,8 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.util.Objects;
+
               class Test {
                   void test() {
                       boolean b = Objects.equals(1, 2) //

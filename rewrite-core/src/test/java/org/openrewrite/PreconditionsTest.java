@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
@@ -94,10 +95,76 @@ class PreconditionsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void orOtherSourceType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.or(
+              new PlainTextVisitor<>() {
+
+                  @Override
+                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                      return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
+                  }
+              }),
+            new TreeVisitor<>() {
+                @Override
+                public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    return SearchResult.found(tree, "recipe");
+                }
+            })
+          )),
+          other("hello")
+        );
+    }
+
+    @Test
+    void andOtherSourceType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.and(
+              new PlainTextVisitor<>() {
+
+                  @Override
+                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                      return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
+                  }
+              }),
+            new TreeVisitor<>() {
+                @Override
+                public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    return SearchResult.found(tree, "recipe");
+                }
+            })
+          )),
+          other("hello")
+        );
+    }
+
+    @Test
+    void notOtherSourceType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.not(
+              new PlainTextVisitor<>() {
+
+                  @Override
+                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                      return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
+                  }
+              }),
+            new TreeVisitor<>() {
+                @Override
+                public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    return SearchResult.found(tree, "recipe");
+                }
+            })
+          )),
+          other("hello", "~~(recipe)~~>⚛⚛⚛ The contents of this file are not visible. ⚛⚛⚛")
+        );
+    }
+
     Recipe recipe(TreeVisitor<?, ExecutionContext> applicability) {
         return toRecipe(() -> Preconditions.check(applicability, new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 return text.withText("goodbye");
             }
         }));

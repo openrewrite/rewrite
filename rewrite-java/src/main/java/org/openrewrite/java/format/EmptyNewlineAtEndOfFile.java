@@ -15,9 +15,13 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.*;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
@@ -46,7 +50,7 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-113");
+        return Collections.singleton("RSPEC-S113");
     }
 
     @Override
@@ -61,14 +65,15 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
             public J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                    GeneralFormatStyle generalFormatStyle = ((SourceFile) cu).getStyle(GeneralFormatStyle.class);
+                    GeneralFormatStyle generalFormatStyle = cu.getStyle(GeneralFormatStyle.class);
                     if (generalFormatStyle == null) {
                         generalFormatStyle = autodetectGeneralFormatStyle(cu);
                     }
                     String lineEnding = generalFormatStyle.isUseCRLFNewLines() ? "\r\n" : "\n";
 
                     Space eof = cu.getEof();
-                    if (eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
+                    if (StringUtils.isBlank(eof.getLastWhitespace()) &&
+                        eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
                         if (eof.getComments().isEmpty()) {
                             return cu.withEof(Space.format(lineEnding));
                         } else {

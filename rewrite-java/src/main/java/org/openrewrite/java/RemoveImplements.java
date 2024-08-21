@@ -17,8 +17,9 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -28,8 +29,11 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveImplements extends Recipe {
+
+    private static final AnnotationMatcher OVERRIDE_MATCHER = new AnnotationMatcher("java.lang.Override");
+
     @Override
     public String getDisplayName() {
         return "Remove interface implementations";
@@ -69,8 +73,14 @@ public class RemoveImplements extends Recipe {
                 return super.visitClassDeclaration(classDeclaration, ctx);
             }
         }, new JavaIsoVisitor<ExecutionContext>() {
+            @Nullable
+            AnnotationService annotationService;
+
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration cd, ExecutionContext ctx) {
+                if (annotationService == null) {
+                     annotationService = service(AnnotationService.class);
+                }
                 if (!(cd.getType() instanceof JavaType.Class) || cd.getImplements() == null) {
                     return super.visitClassDeclaration(cd, ctx);
                 }
@@ -90,21 +100,27 @@ public class RemoveImplements extends Recipe {
             }
 
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration md, ExecutionContext context) {
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration md, ExecutionContext ctx) {
                 if (md.getMethodType() == null) {
-                    return super.visitMethodDeclaration(md, context);
+                    return super.visitMethodDeclaration(md, ctx);
                 }
                 Object maybeClassType = getCursor().getNearestMessage(md.getMethodType().getDeclaringType().getFullyQualifiedName());
                 if (!(maybeClassType instanceof JavaType.Class)) {
-                    return super.visitMethodDeclaration(md, context);
+                    return super.visitMethodDeclaration(md, ctx);
                 }
                 JavaType.Class cdt = (JavaType.Class) maybeClassType;
-                md = md.withMethodType(md.getMethodType().withDeclaringType(cdt));
-                if (md.getAllAnnotations().stream().noneMatch(ann -> isOfClassType(ann.getType(), "java.lang.Override")) || TypeUtils.isOverride(md.getMethodType())) {
-                    return super.visitMethodDeclaration(md, context);
+                JavaType.Method mt = md.getMethodType().withDeclaringType(cdt);
+                md = md.withMethodType(mt);
+                if (md.getName().getType() != null) {
+                    md = md.withName(md.getName().withType(mt));
                 }
-                md = (J.MethodDeclaration) new RemoveAnnotation("@java.lang.Override").getVisitor().visitNonNull(md, context, getCursor().getParentOrThrow());
-                return super.visitMethodDeclaration(md, context);
+                updateCursor(md);
+                assert annotationService != null;
+                if (!annotationService.matches(getCursor(), OVERRIDE_MATCHER) || TypeUtils.isOverride(md.getMethodType())) {
+                    return super.visitMethodDeclaration(md, ctx);
+                }
+                md = (J.MethodDeclaration) new RemoveAnnotation("@java.lang.Override").getVisitor().visitNonNull(md, ctx, getCursor().getParentOrThrow());
+                return super.visitMethodDeclaration(md, ctx);
             }
         });
     }

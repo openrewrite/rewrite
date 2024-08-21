@@ -22,6 +22,7 @@ import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -124,7 +125,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.time.DateTimeException;
-                            
+
               class A {
                   /**
                    * @throws DateTimeException when ...
@@ -143,7 +144,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.Collection;
-              
+
               /** {@link List} */
               class A {
                   /** {@link Collection} */
@@ -188,7 +189,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.google.gson.annotations;
-              
+
               import java.lang.annotation.Documented;
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
@@ -206,7 +207,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import com.google.gson.annotations.SerializedName;
-              
+
               public enum PKIState {
                   @SerializedName("active") ACTIVE,
                   @SerializedName("dismissed") DISMISSED
@@ -223,7 +224,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package org.openrewrite.test;
-              
+
               public @interface YesOrNo {
                   Status status();
                   enum Status {
@@ -235,9 +236,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package org.openrewrite.test;
-              
+
               import static org.openrewrite.test.YesOrNo.Status.YES;
-              
+
               @YesOrNo(status = YES)
               public class Foo {}
               """
@@ -289,14 +290,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.*;
-              
+
               class A {
                   Collection<Integer> c;
               }
               """,
             """
               import java.util.Collection;
-              
+
               class A {
                   Collection<Integer> c;
               }
@@ -386,10 +387,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.time.DayOfWeek;
-              
+
               import static java.time.DayOfWeek.MONDAY;
               import static java.time.DayOfWeek.TUESDAY;
-              
+
               class WorkWeek {
                   DayOfWeek shortWeekStarts(){
                       return TUESDAY;
@@ -398,9 +399,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               import java.time.DayOfWeek;
-              
+
               import static java.time.DayOfWeek.TUESDAY;
-              
+
               class WorkWeek {
                   DayOfWeek shortWeekStarts(){
                       return TUESDAY;
@@ -419,14 +420,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import static java.util.Collections.emptyList;
               import static java.util.Collections.emptySet;
-              
+
               class A {
                  Object o = emptyList();
               }
               """,
             """
               import static java.util.Collections.emptyList;
-              
+
               class A {
                  Object o = emptyList();
               }
@@ -460,14 +461,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import static foo.B.STRING;
               import static foo.B.STRING2;
               import static foo.C.*;
-              
+
               public class A {
                   String a = STRING;
               }
               """,
             """
               import static foo.B.STRING;
-              
+
               public class A {
                   String a = STRING;
               }
@@ -493,7 +494,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               @Foo
               @Bar
               package foo.bar.baz;
-              
+
               import foo.Bar;
               import foo.Foo;
               import foo.FooAnnotation;
@@ -502,7 +503,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               @Foo
               @Bar
               package foo.bar.baz;
-              
+
               import foo.Bar;
               import foo.Foo;
               """
@@ -526,14 +527,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
               @Foo
               @Bar
               package foo.bar.baz;
-              
+
               import foo.*;
               """,
             """
               @Foo
               @Bar
               package foo.bar.baz;
-              
+
               import foo.Bar;
               import foo.Foo;
               """
@@ -584,7 +585,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package com.example.foo;
-              
+
               public class A {
               }
               """
@@ -599,10 +600,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.example.foo;
-              
+
               import java.util.List;
               import java.util.ArrayList;
-              
+
               public class A {
               // Intentionally misaligned to ensure formatting is not overzealous
               ArrayList<String> foo = new ArrayList<>();
@@ -610,9 +611,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package com.example.foo;
-              
+
               import java.util.ArrayList;
-              
+
               public class A {
               // Intentionally misaligned to ensure formatting is not overzealous
               ArrayList<String> foo = new ArrayList<>();
@@ -672,9 +673,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package foo.test;
-              
+
               import static org.openrewrite.Foo.*;
-              
+
               public class Test {
                   int var = FOO_CONSTANT;
                   private void method() {
@@ -707,9 +708,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package foo.test;
-              
+
               import static org.openrewrite.Foo.*;
-              
+
               public class Test {
                   int var = FOO_CONSTANT;
                   private void method() {
@@ -719,10 +720,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package foo.test;
-              
+
               import static org.openrewrite.Foo.FOO_CONSTANT;
               import static org.openrewrite.Foo.Bar;
-              
+
               public class Test {
                   int var = FOO_CONSTANT;
                   private void method() {
@@ -754,7 +755,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.*;
-              
+
               import static java.util.Collections.*;
 
               class Test {
@@ -785,7 +786,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.concurrent.*;
-              
+
               import static java.util.Collections.*;
 
               class Test {
@@ -795,9 +796,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               import java.util.concurrent.ConcurrentHashMap;
-              
+
               import static java.util.Collections.emptyMap;
-              
+
               class Test {
                   Object o = emptyMap();
                   ConcurrentHashMap<String, String> m;
@@ -827,9 +828,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.concurrent.*;
-              
+
               import static java.util.Collections.*;
-              
+
               class Test {
                   ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>(emptyMap());
               }
@@ -845,7 +846,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.google.gson.annotations;
-              
+
               import java.lang.annotation.Documented;
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
@@ -865,7 +866,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               package com.google.gson.annotations;
 
               import com.google.gson.annotations.SerializedName;
-              
+
               public enum PKIState {
                   @SerializedName("active") ACTIVE,
                   @SerializedName("dismissed") DISMISSED
@@ -873,7 +874,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package com.google.gson.annotations;
-              
+
               public enum PKIState {
                   @SerializedName("active") ACTIVE,
                   @SerializedName("dismissed") DISMISSED
@@ -903,7 +904,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
 
               import static com.source.a.SHORT1;
               import static com.source.a.SHORT2;
-              
+
               class Test {
                   short uniqueCount = SHORT1;
               }
@@ -912,7 +913,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               package com.test;
 
               import static com.source.a.SHORT1;
-              
+
               class Test {
                   short uniqueCount = SHORT1;
               }
@@ -941,7 +942,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
 
               import static com.Source.$.A.SHORT1;
               import static com.Source.$.A.SHORT2;
-              
+
               class Test {
                   short uniqueCount = SHORT1;
               }
@@ -950,7 +951,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               package com.test;
 
               import static com.Source.$.A.SHORT1;
-              
+
               class Test {
                   short uniqueCount = SHORT1;
               }
@@ -966,7 +967,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.A;
-              
+
               public class B {
                 public enum Enums {
                     B1, B2
@@ -985,7 +986,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import static com.Source.A.B.Enums.B1;
               import static com.Source.A.B.Enums.B2;
               import static com.Source.A.B.helloWorld;
-              
+
               class Test {
                   public static void main(String[] args) {
                     var uniqueCount = B1;
@@ -998,7 +999,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
 
               import static com.Source.A.B.Enums.B1;
               import static com.Source.A.B.helloWorld;
-              
+
               class Test {
                   public static void main(String[] args) {
                     var uniqueCount = B1;
@@ -1017,12 +1018,12 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.A;
-              
+
               public class B {
                 public enum Enums {
                     B1, B2
                 }
-                
+
                 public static class C {
                     public enum Enums {
                         C1, C2
@@ -1044,7 +1045,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import static com.Source.A.B.C.Enums.C1;
               import static com.Source.A.B.C.Enums.C2;
               import static com.Source.A.B.helloWorld;
-              
+
               class Test {
                   public static void main(String[] args) {
                     var uniqueCount = B1;
@@ -1059,7 +1060,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import static com.Source.A.B.Enums.B1;
               import static com.Source.A.B.C.Enums.C1;
               import static com.Source.A.B.helloWorld;
-              
+
               class Test {
                   public static void main(String[] args) {
                     var uniqueCount = B1;
@@ -1082,7 +1083,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
 
               public class A {
                   public static final short SHORT1 = (short)1;
-                  
+
                   public short getShort1() {
                     return SHORT1;
                   }
@@ -1094,7 +1095,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               package com.test;
 
               import com.Source.mine.A;
-              
+
               class Test {
                   void f(A classA) {
                     classA.getShort1();
@@ -1142,6 +1143,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotRemoveWildCardImport() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               package com.Source.mine;
@@ -1640,7 +1642,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
             """
               package pzrep.p1;
-                
+
               public class Record {
                 public A theOne() { return new A(); }
                 public B0 theOther0() { return new B0(); }
@@ -1722,27 +1724,94 @@ class RemoveUnusedImportsTest implements RewriteTest {
               }
               """
           )),
-          java("""
-            package pzrep.p2;
+          java(
+            """
+              package pzrep.p2;
 
-            import pzrep.p1.Record;
-            import pzrep.p1.*;
+              import pzrep.p1.Record;
+              import pzrep.p1.*;
 
-            class Client2 {
-                void f(Record r) {
-                  A a = r.theOne();
-                  B0 b0 = r.theOther0();
-                  B1 b1 = r.theOther1();
-                  B2 b2 = r.theOther2();
-                  B3 b3 = r.theOther3();
-                  B4 b4 = r.theOther4();
-                  B5 b5 = r.theOther5();
-                  B6 b6 = r.theOther6();
-                  B7 b7 = r.theOther7();
-                  B8 b8 = r.theOther8();
-                  B9 b9 = r.theOther9();
+              class Client2 {
+                  void f(Record r) {
+                    A a = r.theOne();
+                    B0 b0 = r.theOther0();
+                    B1 b1 = r.theOther1();
+                    B2 b2 = r.theOther2();
+                    B3 b3 = r.theOther3();
+                    B4 b4 = r.theOther4();
+                    B5 b5 = r.theOther5();
+                    B6 b6 = r.theOther6();
+                    B7 b7 = r.theOther7();
+                    B8 b8 = r.theOther8();
+                    B9 b9 = r.theOther9();
+                  }
+              }
+              """));
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3909")
+    void importUsedOnlyInReturnType() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              import javax.xml.datatype.XMLGregorianCalendar;
+              import java.time.LocalDateTime;
+              class LocalDateTimeUtil {
+                public LocalDateTime toLocalDateTime(XMLGregorianCalendar cal) {
+                    if (cal == null) {
+                        return null;
+                    }
+                    return cal.toGregorianCalendar().toZonedDateTime().toLocalDateTime();
                 }
-            }
-            """));
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4405")
+    @Test
+    void missingTypeReturnValueOfMethodWithArguments() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          // method with argument should still remove unused import
+          java(
+            """
+              import java.util.List;
+
+              public abstract class Foo1 {
+                  public abstract String m(String a);
+              }
+              """,
+            """
+              public abstract class Foo1 {
+                  public abstract String m(String a);
+              }
+              """
+          ),
+          // case with missing type should not remove the import
+          java(
+            """
+              import java.util.List;
+              import java.util.GenClass1;
+
+              public abstract class Foo3 {
+                  public abstract GenClass1 m();
+              }
+              """
+          ),
+          // case with missing type and method argument should not remove the import
+          java(
+            """
+              import java.util.GenClass1;
+
+              public abstract class Foo2 {
+                  public abstract GenClass1 m(String a);
+              }
+              """
+          )
+        );
     }
 }

@@ -29,9 +29,10 @@ import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -41,12 +42,14 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
+import static org.openrewrite.java.tree.Space.EMPTY;
+import static org.openrewrite.java.tree.Space.format;
 
 public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private final Attr attr;
 
-    @Nullable
-    private final Symbol.TypeSymbol symbol;
+    private final Symbol.@Nullable TypeSymbol symbol;
 
     @Nullable
     private final Type enclosingClassType;
@@ -501,6 +504,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     Space.EMPTY,
                     Markers.EMPTY,
                     emptyList(),
+                    emptyList(),
                     visitIdentifier(node.getName(), whitespaceBefore()).withPrefix(namePrefix),
                     null
             );
@@ -633,8 +637,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         return qualifier;
     }
 
-    @Nullable
-    private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;
@@ -648,7 +651,11 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         for (JavaType testParamType : method.getParameterTypes()) {
                             Type paramType = attr.attribType(param, symbol);
                             if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
+                                List<JavaType> bounds = ((JavaType.GenericTypeVariable) testParamType).getBounds();
+                                if (bounds.isEmpty() && paramType.tsym != null && "java.lang.Object".equals(paramType.tsym.getQualifiedName().toString())) {
+                                    return method;
+                                }
+                                for (JavaType bound : bounds) {
                                     if (paramTypeMatches(bound, paramType)) {
                                         return method;
                                     }
@@ -680,8 +687,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         return false;
     }
 
-    @Nullable
-    private JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;
@@ -699,8 +705,16 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
     @Override
     public Tree visitReturn(ReturnTree node, List<Javadoc> body) {
-        body.addAll(sourceBefore("@return"));
-        return new Javadoc.Return(randomId(), Markers.EMPTY, convertMultiline(node.getDescription()));
+        List<Javadoc> before;
+        Markers markers = Markers.EMPTY;
+        if (source.startsWith("{", cursor)) {
+            markers = markers.addIfAbsent(new LeadingBrace(Tree.randomId()));
+            before = sourceBefore("{@return");
+        } else {
+            before = sourceBefore("@return");
+        }
+        body.addAll(before);
+        return new Javadoc.Return(randomId(), markers, convertMultiline(node.getDescription()));
     }
 
     @Override
@@ -998,7 +1012,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     /**
      * A {@link J} may contain new lines in each {@link Space} and each new line will have a corresponding
      * {@link org.openrewrite.java.tree.Javadoc.LineBreak}.
-     *
+     * <p>
      * This method collects the linebreaks associated to new lines in a Space, and removes the applicable linebreaks
      * from the map.
      */
@@ -1053,39 +1067,38 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
         @Override
         public J visitArrayType(ArrayTypeTree node, Space fmt) {
-            com.sun.source.tree.Tree typeIdent = node.getType();
-            int dimCount = 1;
+            TypeTree elemType = (TypeTree) scan(node.getType(), Space.EMPTY);
 
-            while (typeIdent instanceof ArrayTypeTree) {
-                dimCount++;
-                typeIdent = ((ArrayTypeTree) typeIdent).getType();
-            }
-
-            TypeTree elemType = (TypeTree) scan(typeIdent, fmt);
-
-            List<JRightPadded<Space>> dimensions = emptyList();
-            if (dimCount > 0) {
-                dimensions = new ArrayList<>(dimCount);
-                for (int n = 0; n < dimCount; n++) {
-                    if (!source.substring(cursor).startsWith("...")) {
-                        dimensions.add(padRight(
-                                Space.build(sourceBeforeAsString("["), emptyList()),
-                                Space.build(sourceBeforeAsString("]"), emptyList())));
-                    }
-                }
+            int saveCursor = cursor;
+            Space before = whitespace();
+            JLeftPadded<Space> dimension;
+            if (source.startsWith("[", cursor)) {
+                cursor++;
+                dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
+            } else {
+                cursor = saveCursor;
+                return elemType.withPrefix(fmt);
             }
 
             return new J.ArrayType(
                     randomId(),
-                    Space.EMPTY,
+                    fmt,
                     Markers.EMPTY,
                     elemType,
-                    dimensions
+                    null,
+                    dimension,
+                    typeMapping.type(node)
             );
         }
 
-        private <T> JRightPadded<T> padRight(T tree, Space right) {
-            return new JRightPadded<>(tree, right, Markers.EMPTY);
+        private Space whitespace() {
+            int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
+            if (nextNonWhitespace == cursor) {
+                return EMPTY;
+            }
+            Space space = format(source, cursor, nextNonWhitespace);
+            cursor = nextNonWhitespace;
+            return space;
         }
 
         @Override

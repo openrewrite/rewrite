@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -50,6 +50,12 @@ public class MethodParamPad extends Recipe {
     private static class MethodParamPadVisitor extends JavaIsoVisitor<ExecutionContext> {
         SpacesStyle spacesStyle;
         MethodParamPadStyle methodParamPadStyle;
+
+        @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            // This visitor causes problems for Groovy sources as the `SpacesVisitor` is not aware of Groovy
+            return sourceFile instanceof J.CompilationUnit;
+        }
 
         @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {

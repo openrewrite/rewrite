@@ -19,9 +19,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -69,12 +69,13 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         return "Replace String literal with constant, adding import on class if needed.";
     }
 
-    public String getLiteralValue() {
+    public @Nullable String getLiteralValue() {
         if (this.literalValue == null && this.fullyQualifiedConstantName != null) {
             try {
                 this.literalValue = (String) getConstantValueByFullyQualifiedName(this.fullyQualifiedConstantName);
             } catch (ClassNotFoundException | IllegalAccessException | NoSuchFieldException e) {
-                throw new IllegalArgumentException("Failed to retrieve value from the configured constant", e);
+                // Failed to retrieve unspecified value; field might be missing in this version of the class
+                return null;
             }
         }
         return this.literalValue;
@@ -107,7 +108,8 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ReplaceStringLiteralVisitor(getLiteralValue(), getFullyQualifiedConstantName());
+        String value = getLiteralValue();
+        return value == null ? TreeVisitor.noop() : new ReplaceStringLiteralVisitor(value, fullyQualifiedConstantName);
     }
 
     private static class ReplaceStringLiteralVisitor extends JavaVisitor<ExecutionContext> {
@@ -123,11 +125,11 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         }
 
         @Override
-        public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+        public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             // Only handle String literals
             if (!TypeUtils.isString(literal.getType()) ||
                 !Objects.equals(literalValue, literal.getValue())) {
-                return super.visitLiteral(literal, executionContext);
+                return super.visitLiteral(literal, ctx);
             }
 
             // Prevent changing constant definition
@@ -135,7 +137,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             if (classDeclaration != null &&
                 classDeclaration.getType() != null &&
                 owningType.equals(classDeclaration.getType().getFullyQualifiedName())) {
-                return super.visitLiteral(literal, executionContext);
+                return super.visitLiteral(literal, ctx);
             }
 
             maybeAddImport(owningType, false);
@@ -148,8 +150,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         }
     }
 
-    @Nullable
-    private static Object getConstantValueByFullyQualifiedName(String fullyQualifiedConstantName) throws ClassNotFoundException, IllegalAccessException, NoSuchFieldException {
+    private static @Nullable Object getConstantValueByFullyQualifiedName(String fullyQualifiedConstantName) throws ClassNotFoundException, IllegalAccessException, NoSuchFieldException {
         String owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
         String constantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf('.') + 1);
         Field constantField = Class.forName(owningType).getField(constantName);

@@ -18,69 +18,38 @@ package org.openrewrite.yaml;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.HasSourcePath;
-import org.openrewrite.Preconditions;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.yaml.tree.Yaml;
 
-import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class CopyValueTest implements RewriteTest {
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+        spec.executionContext(ctx);
+    }
+
     @DocumentExample
     @Test
-    void copyValueAndItsFormatting() {
+    void changeCurrentFileWhenNull() {
         rewriteRun(
-          spec -> spec.recipe(new CopyValue(".source", ".destination")),
-          yaml(
-            """
-              id: something
-              source:   password
-              destination: whatever
-              """,
-            """
-              id: something
-              source:   password
-              destination:   password
-              """
-          )
-        );
-    }
-
-    @Test
-    void onlyCopiesScalars() {
-        rewriteRun(
-          spec -> spec.recipe(new CopyValue(".source", ".destination")),
-          yaml(
-            """
-              id: something
-              source:
-                  complex:
-                      structure: 1
-              destination: whatever
-              """
-          )
-        );
-    }
-
-    @Test
-    void insertCopyValueAndRemoveSource() {
-        rewriteRun(
-          spec -> spec.recipes(
-            new MergeYaml("$", "destination: TEMP", true, null),
-            new CopyValue(".source", ".destination"),
-            new DeleteKey(".source")
+          spec -> spec.recipe(
+            new CopyValue("$.source", null, "$.destination", null)
           ),
           yaml(
             """
-              id: something
-              source:   password
+              source: value
+              destination: original
               """,
             """
-              id: something
-              destination:   password
-              """
+              source: value
+              destination: value
+              """,
+            spec -> spec.path("a.yml")
           )
         );
     }
@@ -89,29 +58,71 @@ class CopyValueTest implements RewriteTest {
     void changeOnlyMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(
-            toRecipe(() -> Preconditions.check(new HasSourcePath<>("**/a.yml"), new YamlIsoVisitor<>() {
-                @Override
-                public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
-                    doAfterVisit(new CopyValue(".source", ".destination").getVisitor());
-                    return documents;
-                }
-            }))
+            new CopyValue("$.source", "a.yml", "$.destination", null)
           ),
           yaml(
             """
-              source: password
-              destination: whatever
+              source: value
+              destination: original
               """,
             """
-              source: password
-              destination: password
+              source: value
+              destination: value
               """,
             spec -> spec.path("a.yml")
           ),
           yaml(
             """
-              source: password
-              destination: whatever
+              source: other
+              destination: original
+              """,
+            spec -> spec.path("b.yml")
+          )
+        );
+    }
+
+    @Test
+    void copyComplexValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new CopyValue("$.source", null, "$.destination", null)
+          ),
+          yaml(
+            """
+              source:
+                foo: bar
+              destination:
+                foo: baz
+              """,
+            """
+              source:
+                foo: bar
+              destination:
+                foo: bar
+              """,
+            spec -> spec.path("a.yml")
+          )
+        );
+    }
+
+    @Test
+    void copyToOtherFile() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new CopyValue("$.source", "a.yml", "$.destination", "b.yml")
+          ),
+          yaml(
+            """
+              source: value
+              destination: original
+              """,
+            spec -> spec.path("a.yml")
+          ),
+          yaml(
+            """
+              """,
+            """
+              destination: value
               """,
             spec -> spec.path("b.yml")
           )

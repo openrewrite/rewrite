@@ -16,8 +16,8 @@
 package org.openrewrite.config;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -72,6 +72,7 @@ public class CategoryTree<G> {
             super();
         }
 
+        @Override
         public CategoryTree.Root<G> removeAll(G group) {
             // increase visibility and cast
             return (Root<G>) super.removeAll(group);
@@ -163,8 +164,7 @@ public class CategoryTree<G> {
         return sum;
     }
 
-    @Nullable
-    public CategoryTree<G> getCategory(String subcategory) {
+    public @Nullable CategoryTree<G> getCategory(String subcategory) {
         String packageName = getDescriptor().getPackageName();
         synchronized (lock) {
             String[] split = subcategory.split("\\.", 2);
@@ -187,8 +187,7 @@ public class CategoryTree<G> {
         return null;
     }
 
-    @Nullable
-    public CategoryTree<G> getCategory(String... subcategories) {
+    public @Nullable CategoryTree<G> getCategory(String... subcategories) {
         CategoryTree<G> acc = this;
         for (String subcategory : subcategories) {
             if (acc == null) {
@@ -218,8 +217,7 @@ public class CategoryTree<G> {
         return acc;
     }
 
-    @Nullable
-    public RecipeDescriptor getRecipe(String id) {
+    public @Nullable RecipeDescriptor getRecipe(String id) {
         if (id.contains(".")) {
             String[] split = id.split("\\.", 2);
             CategoryTree<G> subcategory = getCategory(split[0]);
@@ -235,8 +233,7 @@ public class CategoryTree<G> {
         return null;
     }
 
-    @Nullable
-    public G getRecipeGroup(String id) {
+    public @Nullable G getRecipeGroup(String id) {
         if (id.contains(".")) {
             String[] split = id.split("\\.", 2);
             CategoryTree<G> subcategory = getCategory(split[0]);
@@ -330,6 +327,9 @@ public class CategoryTree<G> {
     }
 
     void addRecipe(G group, RecipeDescriptor recipe) {
+        if (recipe.getName() == null) {
+            throw new IllegalArgumentException("Expected recipe to have a name " + recipe.getSource());
+        }
         if (!recipe.getName().contains(".")) {
             throw new IllegalArgumentException("Expected recipe with name '" + recipe.getName() + "' to have " +
                                                "a package, but it did not.");
@@ -413,8 +413,7 @@ public class CategoryTree<G> {
         }
     }
 
-    @Nullable
-    private CategoryTree<G> maybeAddCore(CategoryDescriptor parent) {
+    private @Nullable CategoryTree<G> maybeAddCore(CategoryDescriptor parent) {
         if (recipesByGroup.isEmpty()) {
             return null;
         }

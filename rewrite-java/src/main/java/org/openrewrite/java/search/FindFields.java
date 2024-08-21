@@ -17,9 +17,9 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.TypeMatcher;
@@ -31,7 +31,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindFields extends Recipe {
     @Option(displayName = "Fully-qualified type name",
             description = "A fully-qualified Java type name, that is used to find matching fields.",
@@ -55,6 +55,11 @@ public class FindFields extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return "on types `" + fullyQualifiedTypeName + "`";
+    }
+
+    @Override
     public String getDescription() {
         return "Find uses of a field.";
     }
@@ -63,18 +68,18 @@ public class FindFields extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesField<>(fullyQualifiedTypeName, fieldName), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 JavaType.Variable varType = fieldAccess.getName().getFieldType();
                 if (varType != null && new TypeMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchInherited)).matches(varType.getOwner()) &&
                     StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     return SearchResult.found(fieldAccess);
                 }
-                return super.visitFieldAccess(fieldAccess, executionContext);
+                return super.visitFieldAccess(fieldAccess, ctx);
             }
 
             @Override
-            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
-                J.Identifier i = super.visitIdentifier(identifier, executionContext);
+            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                J.Identifier i = super.visitIdentifier(identifier, ctx);
                 JavaType.Variable varType = identifier.getFieldType();
                 if (varType != null && new TypeMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchInherited)).matches(varType.getOwner()) &&
                     StringUtils.matchesGlob(varType.getName(), fieldName)) {

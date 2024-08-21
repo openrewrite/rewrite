@@ -17,9 +17,9 @@ package org.openrewrite.json;
 
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Parser;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.Parser;
 import org.openrewrite.json.internal.JsonParserVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Lexer;
 import org.openrewrite.json.internal.grammar.JSON5Parser;

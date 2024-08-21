@@ -16,15 +16,21 @@
 package org.openrewrite.marker;
 
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.lib.*;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
-import org.eclipse.jgit.treewalk.WorkingTreeOptions;
-import org.openrewrite.internal.lang.Nullable;
+import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.GitRemote;
+import org.openrewrite.Incubating;
+import org.openrewrite.jgit.api.Git;
+import org.openrewrite.jgit.api.errors.GitAPIException;
+import org.openrewrite.jgit.lib.*;
+import org.openrewrite.jgit.revwalk.RevCommit;
+import org.openrewrite.jgit.transport.RemoteConfig;
+import org.openrewrite.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.IncompleteGitConfigException;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
@@ -33,25 +39,30 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.time.LocalDate;
+import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
+@AllArgsConstructor(access = AccessLevel.PACKAGE) // required for @With and tests
 @With
 public class GitProvenance implements Marker {
     UUID id;
 
+    /**
+     * The URL of the origin remote, not to be confused with the SCM origin
+     * which can be found under gitRemote.getOrigin() which contains the base url of the remote SCM server
+     */
     @Nullable
     String origin;
 
     @Nullable
     String branch;
 
+    @Nullable
     String change;
 
     @Nullable
@@ -60,6 +71,40 @@ public class GitProvenance implements Marker {
     @Nullable
     EOL eol;
 
+    @Nullable
+    @Incubating(since = "8.9.0")
+    List<Committer> committers;
+
+    @Incubating(since = "8.33.0")
+    @NonFinal
+    @Nullable
+    GitRemote gitRemote;
+
+    // javadoc does not like @RequiredArgsConstructor(onConstructor_ = { @JsonCreator })
+    @JsonCreator
+    public GitProvenance(UUID id,
+                         @Nullable String origin,
+                         @Nullable String branch,
+                         @Nullable String change,
+                         @Nullable AutoCRLF autocrlf,
+                         @Nullable EOL eol,
+                         @Nullable List<Committer> committers) {
+        this.id = id;
+        this.origin = origin;
+        this.branch = branch;
+        this.change = change;
+        this.autocrlf = autocrlf;
+        this.eol = eol;
+        this.committers = committers;
+    }
+
+    public @Nullable GitRemote getGitRemote() {
+        if (gitRemote == null && origin != null) {
+            gitRemote = new GitRemote.Parser().parse(origin);
+        }
+        return gitRemote;
+    }
+
     /**
      * Extract the organization name, including sub-organizations for git hosting services which support such a concept,
      * from the origin URL. Needs to be supplied with the
@@ -67,8 +112,7 @@ public class GitProvenance implements Marker {
      * @param baseUrl the portion of the URL which precedes the organization
      * @return the portion of the git origin URL which corresponds to the organization the git repository is organized under
      */
-    @Nullable
-    public String getOrganizationName(String baseUrl) {
+    public @Nullable String getOrganizationName(String baseUrl) {
         if (origin == null) {
             return null;
         }
@@ -79,58 +123,47 @@ public class GitProvenance implements Marker {
         if (baseUrl.startsWith("git@")) {
             baseUrl = baseUrl.substring(4);
         }
-        String remainder = origin.substring(origin.indexOf(baseUrl) + baseUrl.length());
-        if (remainder.startsWith("/")) {
-            remainder = remainder.substring(1);
-        }
-
+        String remainder = origin.substring(origin.indexOf(baseUrl) + baseUrl.length())
+                .replaceFirst("^:", "")
+                .replaceFirst("^/", "");
         return remainder.substring(0, remainder.lastIndexOf('/'));
     }
 
-    /**
-     * There is too much variability in how different git hosting services arrange their organizations to reliably
-     * determine the organization component of the URL without additional information. The version of this method
-     * which accepts a "baseUrl" parameter should be used instead
-     */
-    @Deprecated
-    @Nullable
-    public String getOrganizationName() {
-        if (origin == null) {
+    public @Nullable String getOrganizationName() {
+        if (getGitRemote() == null) {
             return null;
         }
-        try {
-            String path = new URIish(origin).getPath();
-            // Strip off any trailing repository name
-            path = path.substring(0, path.lastIndexOf('/'));
-            // Strip off any leading sub organization names
-            return path.substring(path.lastIndexOf('/') + 1);
-        } catch (URISyntaxException e) {
-            return null;
-        }
+        return getGitRemote().getOrganization();
     }
 
-    @Nullable
-    public String getRepositoryName() {
-        if (origin == null) {
+    public @Nullable String getRepositoryName() {
+        if (getGitRemote() == null) {
             return null;
         }
-        try {
-            String path = new URIish(origin).getPath();
-            return path.substring(path.lastIndexOf('/') + 1)
-                    .replaceAll("\\.git$", "");
-        } catch (URISyntaxException e) {
+        return getGitRemote().getRepositoryName();
+    }
+
+    public @Nullable String getRepositoryPath() {
+        if (getGitRemote() == null) {
             return null;
         }
+        return getGitRemote().getPath();
+    }
+
+    public @Nullable String getRepositoryOrigin() {
+        if (getGitRemote() == null) {
+            return null;
+        }
+        return getGitRemote().getOrigin();
     }
 
     /**
      * @param projectDir The project directory.
      * @return A marker containing git provenance information.
-     * @deprecated Use {@link #fromProjectDirectory(Path, BuildEnvironment) instead}.
+     * @deprecated Use {@link #fromProjectDirectory(Path, BuildEnvironment, GitRemote.Parser) instead}.
      */
-    @Nullable
     @Deprecated
-    public static GitProvenance fromProjectDirectory(Path projectDir) {
+    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir) {
         return fromProjectDirectory(projectDir, null);
     }
 
@@ -141,7 +174,23 @@ public class GitProvenance implements Marker {
      * @return A marker containing git provenance information.
      */
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment environment) {
+        return fromProjectDirectory(projectDir, environment, null);
+    }
 
+    /**
+     * @param projectDir      The project directory.
+     * @param environment     In detached head scenarios, the branch is best
+     *                        determined from a {@link BuildEnvironment} marker if possible.
+     * @param gitRemoteParser Parses the remote url into a {@link GitRemote}. Custom remotes can be registered to it,
+     *                        or a default with known git hosting services can be used.
+     * @return A marker containing git provenance information.
+     */
+    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
+                                                               @Nullable BuildEnvironment environment,
+            GitRemote.@Nullable Parser gitRemoteParser) {
+        if (gitRemoteParser == null) {
+            gitRemoteParser = new GitRemote.Parser();
+        }
         if (environment != null) {
             if (environment instanceof JenkinsBuildEnvironment) {
                 JenkinsBuildEnvironment jenkinsBuildEnvironment = (JenkinsBuildEnvironment) environment;
@@ -149,7 +198,7 @@ public class GitProvenance implements Marker {
                     String branch = jenkinsBuildEnvironment.getLocalBranch() != null
                             ? jenkinsBuildEnvironment.getLocalBranch()
                             : localBranchName(repository, jenkinsBuildEnvironment.getBranch());
-                    return fromGitConfig(repository, branch, getChangeset(repository));
+                    return fromGitConfig(repository, branch, getChangeset(repository), gitRemoteParser);
                 } catch (IllegalArgumentException | GitAPIException e) {
                     // Silently ignore if the project directory is not a git repository
                     printRequireGitDirOrWorkTreeException(e);
@@ -161,18 +210,18 @@ public class GitProvenance implements Marker {
                 File gitDir = new RepositoryBuilder().findGitDir(projectDir.toFile()).getGitDir();
                 if (gitDir != null && gitDir.exists()) {
                     //it has been cloned with --depth > 0
-                    return fromGitConfig(projectDir);
+                    return fromGitConfig(projectDir, gitRemoteParser);
                 } else {
                     //there is not .git config
                     try {
                         return environment.buildGitProvenance();
                     } catch (IncompleteGitConfigException e) {
-                        return fromGitConfig(projectDir);
+                        return fromGitConfig(projectDir, gitRemoteParser);
                     }
                 }
             }
         } else {
-            return fromGitConfig(projectDir);
+            return fromGitConfig(projectDir, gitRemoteParser);
         }
     }
 
@@ -182,14 +231,14 @@ public class GitProvenance implements Marker {
         }
     }
 
-    private static GitProvenance fromGitConfig(Path projectDir) {
+    private static @Nullable GitProvenance fromGitConfig(Path projectDir, GitRemote.Parser gitRemoteParser) {
         String branch = null;
         try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
             String changeset = getChangeset(repository);
             if (!repository.getBranch().equals(changeset)) {
                 branch = repository.getBranch();
             }
-            return fromGitConfig(repository, branch, changeset);
+            return fromGitConfig(repository, branch, changeset, gitRemoteParser);
         } catch (IllegalArgumentException e) {
             printRequireGitDirOrWorkTreeException(e);
             return null;
@@ -198,17 +247,24 @@ public class GitProvenance implements Marker {
         }
     }
 
-    private static GitProvenance fromGitConfig(Repository repository, @Nullable String branch, String changeset) {
+    private static GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset, GitRemote.Parser gitRemoteParser) {
         if (branch == null) {
             branch = resolveBranchFromGitConfig(repository);
         }
-        return new GitProvenance(randomId(), getOrigin(repository), branch, changeset,
-                getAutocrlf(repository), getEOF(repository));
+        String remoteOriginUrl = getRemoteOriginUrl(repository);
+        GitRemote remote;
+        if (remoteOriginUrl == null) {
+            remote = null;
+        } else {
+            remote = gitRemoteParser.parse(remoteOriginUrl);
+        }
+        return new GitProvenance(randomId(), remoteOriginUrl, branch, changeset,
+                getAutocrlf(repository), getEOF(repository),
+                getCommitters(repository), remote);
     }
 
-    @Nullable
-    static String resolveBranchFromGitConfig(Repository repository) {
-        String branch = null;
+    static @Nullable String resolveBranchFromGitConfig(Repository repository) {
+        String branch;
         try {
             try (Git git = Git.open(repository.getDirectory())) {
                 ObjectId commit = repository.resolve(Constants.HEAD);
@@ -242,8 +298,7 @@ public class GitProvenance implements Marker {
 
     }
 
-    @Nullable
-    private static String localBranchName(Repository repository, @Nullable String remoteBranch) throws IOException, GitAPIException {
+    private static @Nullable String localBranchName(Repository repository, @Nullable String remoteBranch) throws IOException, GitAPIException {
         if (remoteBranch == null) {
             return null;
         } else if (remoteBranch.startsWith("remotes/")) {
@@ -256,7 +311,7 @@ public class GitProvenance implements Marker {
             List<RemoteConfig> remotes = git.remoteList().call();
             for (RemoteConfig remote : remotes) {
                 if (remoteBranch.startsWith(remote.getName()) &&
-                        (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
+                    (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
                     branch = remoteBranch.substring(remote.getName().length() + 1); // +1 for the forward slash
                 }
             }
@@ -265,8 +320,7 @@ public class GitProvenance implements Marker {
         return branch;
     }
 
-    @Nullable
-    private static String getOrigin(Repository repository) {
+    private static @Nullable String getRemoteOriginUrl(Repository repository) {
         Config storedConfig = repository.getConfig();
         String url = storedConfig.getString("remote", "origin", "url");
         if (url == null) {
@@ -278,8 +332,7 @@ public class GitProvenance implements Marker {
         return url;
     }
 
-    @Nullable
-    private static AutoCRLF getAutocrlf(Repository repository) {
+    private static @Nullable AutoCRLF getAutocrlf(Repository repository) {
         WorkingTreeOptions opt = repository.getConfig().get(WorkingTreeOptions.KEY);
         switch (opt.getAutoCRLF()) {
             case FALSE:
@@ -293,8 +346,7 @@ public class GitProvenance implements Marker {
         }
     }
 
-    @Nullable
-    private static EOL getEOF(Repository repository) {
+    private static @Nullable EOL getEOF(Repository repository) {
         WorkingTreeOptions opt = repository.getConfig().get(WorkingTreeOptions.KEY);
         switch (opt.getEOL()) {
             case CRLF:
@@ -308,8 +360,33 @@ public class GitProvenance implements Marker {
         }
     }
 
-    @Nullable
-    private static String getChangeset(Repository repository) throws IOException {
+    private static List<Committer> getCommitters(Repository repository) {
+        try (Git git = Git.open(repository.getDirectory())) {
+            ObjectId head = repository.readOrigHead();
+            if (head == null) {
+                Ref headRef = repository.getRefDatabase().findRef("HEAD");
+                if (headRef == null || headRef.getObjectId() == null) {
+                    return emptyList();
+                }
+                head = headRef.getObjectId();
+            }
+
+            Map<String, Committer> committers = new TreeMap<>();
+            for (RevCommit commit : git.log().add(head).call()) {
+                PersonIdent who = commit.getAuthorIdent();
+                Committer committer = committers.computeIfAbsent(who.getEmailAddress(),
+                        email -> new Committer(who.getName(), email, new TreeMap<>()));
+                committer.getCommitsByDay().compute(who.getWhen().toInstant().atZone(who.getTimeZone().toZoneId())
+                                .toLocalDate(),
+                        (day, count) -> count == null ? 1 : count + 1);
+            }
+            return new ArrayList<>(committers.values());
+        } catch (IOException | GitAPIException e) {
+            return emptyList();
+        }
+    }
+
+    private static @Nullable String getChangeset(Repository repository) throws IOException {
         ObjectId head = repository.resolve(Constants.HEAD);
         if (head == null) {
             return null;
@@ -339,5 +416,13 @@ public class GitProvenance implements Marker {
         CRLF,
         LF,
         Native
+    }
+
+    @Value
+    @With
+    public static class Committer {
+        String name;
+        String email;
+        NavigableMap<LocalDate, Integer> commitsByDay;
     }
 }

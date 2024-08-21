@@ -15,18 +15,20 @@
  */
 package org.openrewrite.text;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -134,6 +136,11 @@ public class PlainTextParser implements Parser {
                             if (matcher.matches(path)) {
                                 return true;
                             }
+                        }
+                        // PathMather will not evaluate the path "README.md" to be matched by the pattern "**/README.md"
+                        // This is counter-intuitive for most users and would otherwise require separate exclusions for files at the root and files in subdirectories
+                        if(!path.isAbsolute() && !path.startsWith(File.separator)) {
+                            return accept(Paths.get("/" + path));
                         }
                         return false;
                     }

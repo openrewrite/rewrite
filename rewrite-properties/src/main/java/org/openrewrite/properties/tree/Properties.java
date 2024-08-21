@@ -17,9 +17,10 @@ package org.openrewrite.properties.tree;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
@@ -27,10 +28,9 @@ import org.openrewrite.properties.internal.PropertiesPrinter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 public interface Properties extends Tree {
 
@@ -45,8 +45,7 @@ public interface Properties extends Tree {
         return v.isAdaptableTo(PropertiesVisitor.class);
     }
 
-    @Nullable
-    default <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
+    default <P> @Nullable Properties acceptProperties(PropertiesVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -63,12 +62,16 @@ public interface Properties extends Tree {
 
         @With
         String prefix;
+
         @With
         Markers markers;
+
         @With
         Path sourcePath;
 
+        @With
         List<Content> content;
+
         @With
         String eof;
 
@@ -98,28 +101,6 @@ public interface Properties extends Tree {
             return withCharsetName(charset.name());
         }
 
-        public List<Content> getContent() {
-            return Collections.unmodifiableList(content);
-        }
-
-        public File withContent(List<Content> content) {
-            int size = content.size();
-            if (size == this.content.size()) {
-                boolean allIdentical = true;
-                for (int i = 0; i < size; i++) {
-                    if (content.get(i) != this.content.get(i)) {
-                        allIdentical = false;
-                        break;
-                    }
-                }
-                if (allIdentical) {
-                    return this;
-                }
-            }
-
-            return new File(id, prefix, markers, sourcePath, new ArrayList<>(content), eof, charsetName, charsetBomMarked, fileAttributes, checksum);
-        }
-
         @Override
         public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
             return v.visitFile(this, p);
@@ -144,6 +125,22 @@ public interface Properties extends Tree {
         String prefix;
         Markers markers;
         String key;
+
+        /**
+         * Automatically, removes continuations from the text.
+         * @return the text value without continuations.
+         */
+        public String getKey() {
+            return Continuation.getValue(key);
+        }
+
+        /**
+         * @return the text with continuations.
+         */
+        public String getKeySource() {
+            return key;
+        }
+
         String beforeEquals;
 
         @Nullable
@@ -160,6 +157,7 @@ public interface Properties extends Tree {
             return v.visitEntry(this, p);
         }
 
+        @Getter
         public enum Delimiter {
             COLON(':'), EQUALS('='), NONE('\0');
 
@@ -174,10 +172,6 @@ public interface Properties extends Tree {
                             ":".equals(value.trim()) ? Delimiter.COLON :
                             "".equals(value.trim()) ? Delimiter.NONE :
                                     Delimiter.EQUALS;
-            }
-
-            public Character getCharacter() {
-                return character;
             }
         }
     }
@@ -197,6 +191,21 @@ public interface Properties extends Tree {
         String prefix;
         Markers markers;
         String text;
+
+        /**
+         * Automatically, removes continuations from the text.
+         * @return the text value without continuations.
+         */
+        public String getText() {
+            return Continuation.getValue(text);
+        }
+
+        /**
+         * @return the text with continuations.
+         */
+        public String getSource() {
+            return text;
+        }
     }
 
     @lombok.Value
@@ -216,6 +225,7 @@ public interface Properties extends Tree {
             return v.visitComment(this, p);
         }
 
+        @Getter
         public enum Delimiter {
             HASH_TAG('#'), EXCLAMATION_MARK('!');
 
@@ -224,10 +234,13 @@ public interface Properties extends Tree {
             Delimiter(Character character) {
                 this.character = character;
             }
+        }
+    }
 
-            public Character getCharacter() {
-                return character;
-            }
+    class Continuation {
+        private static final Pattern LINE_CONTINUATION_PATTERN = Pattern.compile("\\\\\\R\\s*");
+        static String getValue(String input) {
+            return LINE_CONTINUATION_PATTERN.matcher(input).replaceAll("");
         }
     }
 }

@@ -18,7 +18,7 @@ package org.openrewrite.hcl.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
@@ -75,8 +75,7 @@ public class HclRightPadded<T> {
         return list;
     }
 
-    @Nullable
-    public static <T> HclRightPadded<T> withElement(@Nullable HclRightPadded<T> before, @Nullable T elements) {
+    public static <T> @Nullable HclRightPadded<T> withElement(@Nullable HclRightPadded<T> before, @Nullable T elements) {
         if (before == null) {
             if (elements == null) {
                 return null;

@@ -17,10 +17,10 @@ package org.openrewrite.xml;
 
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Parser;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -78,8 +78,28 @@ public class XmlParser implements Parser {
                p.endsWith(".xsd") ||
                p.endsWith(".xsl") ||
                p.endsWith(".xslt") ||
+               p.endsWith(".xmi") ||
                p.endsWith(".tld") ||
-               p.endsWith(".xjb");
+               p.endsWith(".xjb") ||
+               p.endsWith(".jsp") ||
+               // Datastage file formats that are all xml under the hood
+               p.endsWith(".det") ||
+               p.endsWith(".pjb") ||
+               p.endsWith(".qjb") ||
+               p.endsWith(".sjb") ||
+               p.endsWith(".prt") ||
+               p.endsWith(".srt") ||
+               p.endsWith(".psc") ||
+               p.endsWith(".ssc") ||
+               p.endsWith(".tbd") ||
+               p.endsWith(".tfm") ||
+               p.endsWith(".dqs") ||
+               p.endsWith(".stp") ||
+               p.endsWith(".dcn") ||
+               p.endsWith(".pst") ||
+               // C# project files
+               p.endsWith(".csproj") ||
+               path.endsWith("packages.config");
     }
 
     @Override

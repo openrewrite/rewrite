@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,6 +171,18 @@ public class XMLParserBaseListener implements XMLParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitElement(XMLParser.ElementContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterJspdirective(XMLParser.JspdirectiveContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitJspdirective(XMLParser.JspdirectiveContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

@@ -17,8 +17,10 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,6 +61,7 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Test
+    @MinimumJava11
     void finalVar() {
         rewriteRun(
           java(
@@ -258,6 +261,23 @@ class VariableDeclarationsTest implements RewriteTest {
                     return multiVariable;
                 }
             })
+          )
+        );
+    }
+
+    @Test
+    @MinimumJava11
+    void unknownVar() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              class Test {
+                  void test(Unknown b) {
+                      final var a = b;
+                  }
+              }
+              """
           )
         );
     }

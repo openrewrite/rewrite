@@ -24,6 +24,7 @@ import org.openrewrite.marker.GitProvenance;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -56,10 +57,11 @@ public class GitlabBuildEnvironment implements BuildEnvironment {
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
         if (StringUtils.isBlank(ciRepositoryUrl)
-                || StringUtils.isBlank(ciCommitRefName)
-                || StringUtils.isBlank(ciCommitSha)) {
+            || StringUtils.isBlank(ciCommitRefName)
+            || StringUtils.isBlank(ciCommitSha)) {
             throw new IncompleteGitConfigException();
         }
-        return new GitProvenance(UUID.randomUUID(), ciRepositoryUrl, ciCommitRefName, ciCommitSha, null, null);
+        return new GitProvenance(UUID.randomUUID(), ciRepositoryUrl, ciCommitRefName, ciCommitSha,
+                null, null, emptyList());
     }
 }

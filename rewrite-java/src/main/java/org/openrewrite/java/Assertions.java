@@ -16,11 +16,11 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -52,19 +52,14 @@ public class Assertions {
         }
     }
 
-    // validateTypes and assertValidTypes can be merged into a single function once JavaRecipeTest is removed
-    static SourceFile validateTypes(SourceFile after, RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
-        if (after instanceof JavaSourceFile) {
-            TypeValidation typeValidation = testMethodSpec.getTypeValidation() != null ? testMethodSpec.getTypeValidation() : testClassSpec.getTypeValidation();
-            if (typeValidation == null) {
-                typeValidation = new TypeValidation();
-            }
-            assertValidTypes(typeValidation, (JavaSourceFile) after);
+    public static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
+        if (source instanceof JavaSourceFile) {
+            assertValidTypes(typeValidation, (JavaSourceFile) source);
         }
-        return after;
+        return source;
     }
 
-    public static void assertValidTypes(TypeValidation typeValidation, J sf) {
+    private static void assertValidTypes(TypeValidation typeValidation, J sf) {
         if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations()
                 || typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
@@ -88,7 +83,7 @@ public class Assertions {
                     })
                     .collect(Collectors.toList());
             if (!missingTypeResults.isEmpty()) {
-                throw new IllegalStateException("AST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
+                throw new IllegalStateException("LST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
                         .collect(Collectors.joining("\n\n")));
             }
         }
@@ -100,6 +95,7 @@ public class Assertions {
     }
 
     private static final Parser.Builder javaParser = JavaParser.fromJavaVersion()
+            .classpath(JavaParser.runtimeClasspath())
             .logCompilationWarningsAndErrors(true);
 
     public static SourceSpecs java(@Language("java") @Nullable String before, Consumer<SourceSpec<J.CompilationUnit>> spec) {
@@ -237,6 +233,6 @@ public class Assertions {
 
     private static JavaSourceSet javaSourceSet(String sourceSet) {
         return javaSourceSets.computeIfAbsent(sourceSet, name ->
-                new JavaSourceSet(Tree.randomId(), name, Collections.emptyList()));
+                new JavaSourceSet(Tree.randomId(), name, Collections.emptyList(), Collections.emptyMap()));
     }
 }

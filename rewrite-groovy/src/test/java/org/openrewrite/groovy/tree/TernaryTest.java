@@ -36,6 +36,13 @@ class TernaryTest implements RewriteTest {
     }
 
     @Test
+    void elvisInParens() {
+        rewriteRun(
+          groovy(" ( System.getProperty(\"foo\") ?: false ) ")
+        );
+    }
+
+    @Test
     void ternary() {
         rewriteRun(
           groovy("1 == 2 ? /no it isn't/ : /yes it is/")
@@ -54,4 +61,16 @@ class TernaryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void complex() {
+        rewriteRun(
+          groovy(
+                """
+            (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+            (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+            """)
+        );
+    }
+
 }

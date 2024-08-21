@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -104,6 +105,18 @@ class ClassDeclarationTest implements RewriteTest {
               @Deprecated
               // Some comment
               public final class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    @Disabled("class A {}~~(non-whitespace)~~>;<~~")
+    void trailingSemicolon() {
+        rewriteRun(
+          java(
+            """
+              class A {};
               """
           )
         );

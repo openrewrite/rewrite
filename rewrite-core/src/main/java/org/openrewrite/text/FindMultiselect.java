@@ -17,9 +17,9 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
@@ -37,7 +37,7 @@ import static java.util.stream.Collectors.toSet;
 
 @Incubating(since = "8.2.0")
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindMultiselect extends Recipe {
 
     @Override
@@ -52,7 +52,7 @@ public class FindMultiselect extends Recipe {
     }
 
     @Option(displayName = "Find",
-            description = "The text to find.",
+            description = "The text to find. This snippet can be multiline.",
             example = "blacklist")
     String find;
 
@@ -69,7 +69,7 @@ public class FindMultiselect extends Recipe {
                           "* Dot all - Allows `.` to match line terminators.",
             valid = {"Case-sensitive", "Multiline", "Dot all"},
             required = false)
-            @Nullable
+    @Nullable
     Set<String> regexOptions;
 
     @Option(displayName = "File pattern",
@@ -86,7 +86,7 @@ public class FindMultiselect extends Recipe {
         Boolean caseSensitive;
         Boolean multiline;
         Boolean dotAll;
-        if(regexOptions != null) {
+        if (regexOptions != null) {
             Set<String> lowerCaseOptions = regexOptions.stream()
                     .map(String::toLowerCase)
                     .collect(toSet());
@@ -112,13 +112,13 @@ public class FindMultiselect extends Recipe {
                     searchStr = Pattern.quote(searchStr);
                 }
                 int patternOptions = 0;
-                if(!Boolean.TRUE.equals(caseSensitive)) {
+                if (!Boolean.TRUE.equals(caseSensitive)) {
                     patternOptions |= Pattern.CASE_INSENSITIVE;
                 }
-                if(Boolean.TRUE.equals(multiline)) {
+                if (Boolean.TRUE.equals(multiline)) {
                     patternOptions |= Pattern.MULTILINE;
                 }
-                if(Boolean.TRUE.equals(dotAll)) {
+                if (Boolean.TRUE.equals(dotAll)) {
                     patternOptions |= Pattern.DOTALL;
                 }
                 Pattern pattern = Pattern.compile(searchStr, patternOptions);
@@ -141,10 +141,11 @@ public class FindMultiselect extends Recipe {
             }
         };
         //noinspection DuplicatedCode
-        if(filePattern != null) {
+        if (filePattern != null) {
             //noinspection unchecked
             TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                    .map(HasSourcePath<ExecutionContext>::new)
+                    .map(FindSourceFiles::new)
+                    .map(Recipe::getVisitor)
                     .toArray(TreeVisitor[]::new));
 
             visitor = Preconditions.check(check, visitor);

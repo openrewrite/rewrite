@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -84,7 +84,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
-                        impl,
+                        interfaceType instanceof JavaType.Parameterized ? impl.withType(((JavaType.Parameterized) interfaceType).getType()) : impl,
                         JContainer.build(Space.EMPTY, elements, Markers.EMPTY),
                         interfaceType
                 );

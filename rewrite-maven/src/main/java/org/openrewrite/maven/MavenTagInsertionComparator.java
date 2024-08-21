@@ -30,7 +30,7 @@ import java.util.*;
  * "After" ordering preference takes priority over "before".
  */
 public class MavenTagInsertionComparator implements Comparator<Content> {
-    private static final List<String> canonicalOrdering = Arrays.asList(
+    static final List<String> canonicalOrdering = Arrays.asList(
             "modelVersion",
             "parent",
             "groupId",
@@ -59,6 +59,7 @@ public class MavenTagInsertionComparator implements Comparator<Content> {
             "repositories",
             "pluginRepositories",
             "build",
+            "configuration",
             "reports",
             "reporting",
             "profiles"

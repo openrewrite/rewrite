@@ -17,39 +17,69 @@ package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Tree;
+import org.openrewrite.gradle.marker.GradlePluginDescriptor;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Collections;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class FindPluginsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindPlugins("com.jfrog.bintray"));
+        spec.recipe(new FindPlugins("org.openrewrite.rewrite"));
     }
 
     @DocumentExample
     @Test
     void findPlugin() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
-                  id 'com.jfrog.bintray' version '1.8.5'
+                  id 'org.openrewrite.rewrite' version '6.18.0'
               }
               """,
             """
               plugins {
-                  /*~~>*/id 'com.jfrog.bintray' version '1.8.5'
+                  /*~~>*/id 'org.openrewrite.rewrite' version '6.18.0'
               }
               """,
-            spec -> spec.beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "com.jfrog.bintray"))
+            spec -> spec
+              .beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "org.openrewrite.rewrite"))
               .isNotEmpty()
               .anySatisfy(p -> {
-                  assertThat(p.getPluginId()).isEqualTo("com.jfrog.bintray");
-                  assertThat(p.getVersion()).isEqualTo("1.8.5");
+                  assertThat(p.getPluginId()).isEqualTo("org.openrewrite.rewrite");
+                  assertThat(p.getVersion()).isEqualTo("6.18.0");
               }))
+          )
+        );
+    }
+
+    @Test
+    void findPluginFromGradleProjectMarker() {
+        rewriteRun(
+          text(
+            "stand-in for a kotlin gradle script",
+            "~~>stand-in for a kotlin gradle script",
+            spec -> spec.markers(new GradleProject(
+              Tree.randomId(),
+              "group",
+              "name",
+              "version",
+              "path",
+              Collections.singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")),
+              Collections.emptyList(),
+              Collections.emptyList(),
+              Collections.emptyMap())
+            )
           )
         );
     }

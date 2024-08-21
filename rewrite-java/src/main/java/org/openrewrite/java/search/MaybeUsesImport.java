@@ -61,7 +61,7 @@ public class MaybeUsesImport<P> extends JavaIsoVisitor<P> {
                     if (!((J.Identifier) expr).getSimpleName().equals(segment)) {
                         return false;
                     }
-                } else {
+                } else if (expr instanceof J.FieldAccess) {
                     J.FieldAccess fa = (J.FieldAccess) expr;
                     if (fa.getTarget() == prior) {
                         String simpleName = fa.getSimpleName();
@@ -72,6 +72,9 @@ public class MaybeUsesImport<P> extends JavaIsoVisitor<P> {
                         continue;
                     }
                     expr = fa.getTarget();
+                } else {
+                    // prevent endless loop; see https://github.com/openrewrite/rewrite-kotlin/issues/601
+                    break;
                 }
             }
         }

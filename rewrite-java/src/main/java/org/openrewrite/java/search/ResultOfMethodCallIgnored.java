@@ -17,18 +17,18 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ResultOfMethodCallIgnored extends Recipe {
     /**
      * A method pattern that is used to find matching method invocations.
@@ -60,8 +60,8 @@ public class ResultOfMethodCallIgnored extends Recipe {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
                     if (getCursor().getParentTreeCursor().getValue() instanceof J.Block) {
                         m = SearchResult.found(m);

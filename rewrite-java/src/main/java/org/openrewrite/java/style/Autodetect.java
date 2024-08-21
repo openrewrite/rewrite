@@ -19,11 +19,11 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
@@ -1126,7 +1126,7 @@ public class Autodetect extends NamedStyles {
         public J.Lambda visitLambda(J.Lambda lambda, SpacesStatistics stats) {
             List<J> parameters = lambda.getParameters().getParameters();
             if (parameters.size() > 1) {
-                List<JRightPadded<J>> paddedParameters = lambda.getParameters().getPadding().getParams();
+                List<JRightPadded<J>> paddedParameters = lambda.getParameters().getPadding().getParameters();
                 for (int i = 0; i < paddedParameters.size() - 1; i++) {
                     stats.beforeComma += hasSpace(paddedParameters.get(i).getAfter());
                 }

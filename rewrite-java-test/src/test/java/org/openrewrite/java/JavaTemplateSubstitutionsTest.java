@@ -45,7 +45,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   }
                   return method;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {
@@ -89,7 +89,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   }
                   return method;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {
@@ -131,7 +131,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   }
                   return method;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               class Test {
@@ -141,7 +141,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               """,
             """
               class Test {
-                            
+              
                   @SuppressWarnings("ALL")
                   void test2() {
                   }
@@ -165,7 +165,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                     .apply(getCursor(), s.getCoordinates().replace(), s,
                       ((J.VariableDeclarations) method.getParameters().get(1)).getVariables().get(0).getName());
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               import java.util.*;
@@ -200,7 +200,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                     .build()
                     .apply(getCursor(), s.getCoordinates().replace(), method.getBody());
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {
@@ -244,7 +244,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                     .build()
                     .apply(getCursor(), arrayAccess.getCoordinates().replace());
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               public class Test {
@@ -399,7 +399,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                     .build()
                     .apply(getCursor(), ternary.getCoordinates().replace(), ternary);
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          }).withMaxCycles(1)),
           java(
             """
               abstract class Test {
@@ -412,12 +412,75 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               """,
             """
               import java.util.Arrays;
-                            
+              
               abstract class Test {
                   abstract String[] array();
-                  
+              
                   void test(boolean condition) {
                       Object any = Arrays.asList(condition ? array() : new String[]{"Hello!"});
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void anyIsGenericWithUnknownType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return JavaTemplate.builder("System.out.println(#{any()})")
+                    .contextSensitive()
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method);
+              }
+          }).withMaxCycles(1)),
+          java(
+            """
+              import java.util.Map;
+              class Test {
+               void test(Map<String, ?> map) {
+                map.get("test");
+               }
+              }
+              """,
+            """
+              import java.util.Map;
+              class Test {
+               void test(Map<String, ?> map) {
+                   System.out.println(map.get("test"));
+               }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void throwNewException() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation methodInvocation, ExecutionContext executionContext) {
+                  return JavaTemplate.builder("throw new RuntimeException()")
+                    .build()
+                    .apply(getCursor(), methodInvocation.getCoordinates().replace());
+              }
+          })),
+          java(
+            """
+              public class Test {
+                  void test() {
+                      System.out.println("Hello");
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void test() {
+                      throw new RuntimeException();
                   }
               }
               """

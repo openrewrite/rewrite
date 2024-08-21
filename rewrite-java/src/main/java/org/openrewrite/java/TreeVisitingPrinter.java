@@ -15,16 +15,14 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.StreamSupport.stream;
 
 
@@ -151,20 +149,20 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
 
     private static String printTreeElement(Tree tree) {
         // skip some specific types printed in the output to make the output looks clean
-        if (tree instanceof J.CompilationUnit
-            || tree instanceof J.ClassDeclaration
-            || tree instanceof J.Block
-            || tree instanceof J.Empty
-            || tree instanceof J.Try
-            || tree instanceof J.Try.Catch
-            || tree instanceof J.ForLoop
-            || tree instanceof J.WhileLoop
-            || tree instanceof J.DoWhileLoop
-            || tree instanceof J.Lambda
-            || tree instanceof J.Lambda.Parameters
-            || tree instanceof J.If
-            || tree instanceof J.EnumValueSet
-            || tree instanceof J.TypeParameter
+        if (tree instanceof J.CompilationUnit ||
+                tree instanceof J.ClassDeclaration ||
+                tree instanceof J.Block ||
+                tree instanceof J.Empty ||
+                tree instanceof J.Try ||
+                tree instanceof J.Try.Catch ||
+                tree instanceof J.ForLoop ||
+                tree instanceof J.WhileLoop ||
+                tree instanceof J.DoWhileLoop ||
+                tree instanceof J.Lambda ||
+                tree instanceof J.Lambda.Parameters ||
+                tree instanceof J.If ||
+                tree instanceof J.EnumValueSet ||
+                tree instanceof J.TypeParameter
         ) {
             return "";
         }
@@ -174,7 +172,8 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
             return s != null ? s : "";
         }
 
-        String[] lines = tree.toString().split("\n");
+        String precedingComments = tree instanceof J ? printComments(((J) tree).getPrefix().getComments()) : "";
+        String[] lines = (precedingComments + tree).split("\n");
         StringBuilder output = new StringBuilder();
         for (int i = 0; i < lines.length; i++) {
             output.append(lines[i].trim());
@@ -197,9 +196,15 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
         sb.append(" whitespace=\"")
             .append(space.getWhitespace()).append("\"");
         sb.append(" comments=\"")
-            .append(String.join(",", space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(Collectors.toList())))
-            .append("\"");;
+            .append(printComments(space.getComments()))
+            .append("\"");
         return sb.toString().replace("\n", "\\s\n");
+    }
+
+    private static String printComments(List<Comment> comments) {
+        return comments.stream()
+                .map(c -> c.printComment(new Cursor(null, "root")))
+                .collect(joining(","));
     }
 
     @Override

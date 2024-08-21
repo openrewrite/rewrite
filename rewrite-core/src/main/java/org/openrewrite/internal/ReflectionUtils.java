@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -38,8 +38,7 @@ public class ReflectionUtils {
      */
     private static final Map<Class<?>, Method[]> declaredMethodsCache = new ConcurrentHashMap<>(256);
 
-    @Nullable
-    public static Method findMethod(Class<?> clazz, String name, Class<?>... paramTypes) {
+    public static @Nullable Method findMethod(Class<?> clazz, String name, Class<?>... paramTypes) {
         Class<?> searchType = clazz;
         while (searchType != null) {
             Method[] methods = (searchType.isInterface() ? searchType.getMethods() :
@@ -80,8 +79,7 @@ public class ReflectionUtils {
         return result;
     }
 
-    @Nullable
-    private static List<Method> findConcreteMethodsOnInterfaces(Class<?> clazz) {
+    private static @Nullable List<Method> findConcreteMethodsOnInterfaces(Class<?> clazz) {
         List<Method> result = null;
         for (Class<?> ifc : clazz.getInterfaces()) {
             for (Method ifcMethod : ifc.getMethods()) {

@@ -15,11 +15,15 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.function.Predicate;
@@ -30,8 +34,11 @@ import static java.util.Objects.requireNonNull;
 public class UsesType<P> extends JavaIsoVisitor<P> {
 
     @Nullable
+    @Getter
     private final String fullyQualifiedType;
+
     @Nullable
+    @Getter
     private final Predicate<JavaType> typePattern;
 
     @Nullable
@@ -65,25 +72,6 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
             JavaSourceFile c = cu;
 
-            for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
-                if (Boolean.TRUE.equals(includeImplicit) || method.hasFlags(Flag.Static)) {
-                    if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
-                        return c;
-                    }
-                }
-                if (Boolean.TRUE.equals(includeImplicit)) {
-                    if ((c = maybeMark(c, method.getReturnType())) != cu) {
-                        return c;
-                    }
-
-                    for (JavaType parameterType : method.getParameterTypes()) {
-                        if ((c = maybeMark(c, parameterType)) != cu) {
-                            return c;
-                        }
-                    }
-                }
-            }
-
             for (JavaType type : c.getTypesInUse().getTypesInUse()) {
                 JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
                 if ((c = maybeMark(c, checkType)) != cu) {
@@ -100,6 +88,23 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
                     return c;
                 }
             }
+
+            if (Boolean.TRUE.equals(includeImplicit)) {
+                for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
+                    if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
+                        return c;
+                    }
+                    if ((c = maybeMark(c, method.getReturnType())) != cu) {
+                        return c;
+                    }
+
+                    for (JavaType parameterType : method.getParameterTypes()) {
+                        if ((c = maybeMark(c, parameterType)) != cu) {
+                            return c;
+                        }
+                    }
+                }
+            }
         }
         return (J) tree;
     }
@@ -110,7 +115,7 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
         }
 
         if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type)
-                || fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
+            || fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
             return SearchResult.found(c);
         }
 
@@ -129,7 +134,10 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     }
 
     private static Predicate<JavaType> packagePattern(String name) {
-        return type -> type instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) type).getPackageName().equals(name);
+        return type -> type instanceof JavaType.FullyQualified &&
+                       // optimization to avoid unnecessary memory allocations
+                       ((JavaType.FullyQualified) type).getFullyQualifiedName().startsWith(name) &&
+                       ((JavaType.FullyQualified) type).getPackageName().equals(name);
     }
 
     private static Predicate<JavaType> packagePrefixPattern(String prefix) {

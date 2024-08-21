@@ -16,11 +16,13 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -31,29 +33,31 @@ class JavaVisitorTest implements RewriteTest {
     @Test
     void javaVisitorHandlesPaddedWithNullElem() {
         rewriteRun(
-          spec -> spec.recipes(
-            toRecipe(() -> new JavaIsoVisitor<>() {
-                @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                    var mi = super.visitMethodInvocation(method, p);
-                    if ("removeMethod".equals(mi.getSimpleName())) {
-                        //noinspection ConstantConditions
-                        return null;
-                    }
-                    return mi;
-                }
-            }),
-            toRecipe(() -> new JavaIsoVisitor<>() {
-                @Override
-                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                    if (method.getSimpleName().equals("allTheThings")) {
-                        return JavaTemplate.builder("Exception").contextSensitive().build()
-                          .apply(getCursor(), method.getCoordinates().replaceThrows());
-                    }
-                    return method;
-                }
-            })
-          ).cycles(2).expectedCyclesThatMakeChanges(2),
+          spec -> spec
+            .expectedCyclesThatMakeChanges(2)
+            .recipes(
+              toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                      var mi = super.visitMethodInvocation(method, p);
+                      if ("removeMethod".equals(mi.getSimpleName())) {
+                          //noinspection ConstantConditions
+                          return null;
+                      }
+                      return mi;
+                  }
+              }),
+              toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                      if (method.getSimpleName().equals("allTheThings")) {
+                          return JavaTemplate.builder("Exception").contextSensitive().build()
+                            .apply(getCursor(), method.getCoordinates().replaceThrows());
+                      }
+                      return method;
+                  }
+              })
+            ),
           java(
             """
               class A {
@@ -75,6 +79,57 @@ class JavaVisitorTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void topVisitor() {
+        final JavaIsoVisitor<ExecutionContext> afterVisitor = new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                for (Cursor parent = getCursor().getParent(); parent != null; parent = parent.getParent()) {
+                    if (method == parent.getValue()) {
+                        fail("Duplicate cursor: %s".formatted(getCursor()));
+                    }
+                }
+                return super.visitMethodDeclaration(method, p);
+            }
+        };
+        rewriteRun(
+          spec -> spec.recipe(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                    var md = super.visitMethodDeclaration(method, p);
+                    if ("myMethod".equals(md.getSimpleName())) {
+                        //noinspection ConstantConditions
+                        return (J.MethodDeclaration) new JavaIsoVisitor<ExecutionContext>() {
+                            @Override
+                            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                                doAfterVisit(afterVisitor);
+                                return super.visitMethodDeclaration(method, p);
+                            }
+                        }.visit(md, p, getCursor().getParent());
+                    }
+                    return md;
+                }
+            })
+          ),
+          java(
+                """
+           class A {
+             public void method1() {
+             }
+             
+             @Deprecated
+             public String myMethod() {
+               return "hello";
+             }
+             
+             public void method2() {
+             }
+           }
+           """)
         );
     }
 }

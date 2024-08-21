@@ -15,12 +15,12 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
@@ -37,7 +37,9 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.addTypesToSourceSet;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.srcMainJava;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("rawtypes")
@@ -121,8 +123,7 @@ class AddImportTest implements RewriteTest {
     @Test
     void dontDuplicateImports2() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Test", null, false)))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Test", null, false))),
           java(
             """
               import org.junit.jupiter.api.AfterEach;
@@ -149,8 +150,7 @@ class AddImportTest implements RewriteTest {
     void dontDuplicateImports3() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertNull", false)))
-            .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")),
           java(
             """
               import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -385,22 +385,22 @@ class AddImportTest implements RewriteTest {
     void addImportIfReferenced() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() ->
-            new JavaIsoVisitor<>() {
-                @Override
-                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                    J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
-                    maybeAddImport("java.math.BigDecimal");
-                    maybeAddImport("java.math.RoundingMode");
-                    return JavaTemplate.builder("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
-                      .imports("java.math.BigDecimal", "java.math.RoundingMode")
-                      .build()
-                      .apply(
-                        updateCursor(c),
-                        c.getBody().getCoordinates().lastStatement()
-                      );
-                }
-            }
-          ).withMaxCycles(1)),
+              new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      maybeAddImport("java.math.BigDecimal");
+                      maybeAddImport("java.math.RoundingMode");
+                      return JavaTemplate.builder("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                        .imports("java.math.BigDecimal", "java.math.RoundingMode")
+                        .build()
+                        .apply(
+                          updateCursor(c),
+                          c.getBody().getCoordinates().lastStatement()
+                        );
+                  }
+              }
+            ).withMaxCycles(1)),
           java(
             """
               package a;
@@ -840,15 +840,15 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  maybeAddImport("com.fasterxml.jackson.databind.ObjectMapper");
+                  maybeAddImport("java.io.File");
                   return super.visitCompilationUnit(cu, ctx);
               }
-          })).parser(JavaParser.fromJavaVersion().classpath("jackson-databind")),
+          })),
           java(
             """
-              import com.fasterxml.jackson.databind.ObjectMapper;
+              import java.io.File;
               class Helper {
-                  static ObjectMapper OBJECT_MAPPER;
+                  static File FILE;
               }
               """
           ),
@@ -856,7 +856,7 @@ class AddImportTest implements RewriteTest {
             """
               class Test {
                   void test() {
-                      Helper.OBJECT_MAPPER.writer();
+                      Helper.FILE.exists();
                   }
               }
               """

@@ -17,9 +17,9 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.internal.lang.Nullable;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;

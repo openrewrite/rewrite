@@ -16,7 +16,9 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
@@ -27,6 +29,49 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavaTemplateMatchTest implements RewriteTest {
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-templating/pull/91")
+    void shouldMatchAbstractStringAssertIsEqualToEmptyString() {
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion().classpath("assertj-core"))
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                // Mimics what we saw in rewrite-templating
+                final JavaTemplate before = JavaTemplate
+                  .builder("#{stringAssert:any(org.assertj.core.api.AbstractStringAssert<?>)}.isEqualTo(\"\");")
+                  .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+                  .build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                    return before.matches(getCursor()) ? SearchResult.found(mi) : mi;
+                }
+            })),
+          //language=java
+          java(
+            """
+              import static org.assertj.core.api.Assertions.assertThat;
+              class Foo {
+                  void test() {
+                      assertThat("foo").isEqualTo("");
+                  }
+              }
+              """,
+            """
+              import static org.assertj.core.api.Assertions.assertThat;
+              class Foo {
+                  void test() {
+                      /*~~>*/assertThat("foo").isEqualTo("");
+                  }
+              }
+              """
+          )
+        );
+
+    }
+
+    @DocumentExample
     @SuppressWarnings({"ConstantValue", "ConstantConditions"})
     @Test
     void matchBinary() {
@@ -370,9 +415,12 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitExpression(Expression expression, ExecutionContext ctx) {
-                  return expression.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(getCursor()) ? SearchResult.found(expression) : super.visitExpression(expression, ctx);
+                  if (template.matches(getCursor())) {
+                      return SearchResult.found(expression);
+                  }
+                  return super.visitExpression(expression, ctx);
               }
-          })),
+          }).withMaxCycles(1)),
           java(
             """
               class Test {
@@ -550,5 +598,42 @@ class JavaTemplateMatchTest implements RewriteTest {
               """)
         );
     }
-}
 
+    @SuppressWarnings("ConstantValue")
+    @Test
+    void matchRepeatedParameters() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate before = JavaTemplate
+                .builder("#{b1:any(boolean)} || (!#{b1} && #{b2:any(boolean)})").build();
+              final JavaTemplate after = JavaTemplate
+                .builder("#{b1:any(boolean)} || #{b2:any(boolean)}").build();
+
+              @Override
+              public J visitBinary(J.Binary elem, ExecutionContext ctx) {
+                  JavaTemplate.Matcher matcher;
+                  if ((matcher = before.matcher(getCursor())).find()) {
+                      return after.apply(getCursor(), elem.getCoordinates().replace(), matcher.parameter(0), matcher.parameter(1));
+                  }
+                  return super.visitBinary(elem, ctx);
+              }
+          })),
+          java(
+            """
+              class T {
+                  boolean m(boolean b1, boolean b2) {
+                      return b1 || (!b1 && b2);
+                  }
+              }
+              """,
+            """
+              class T {
+                  boolean m(boolean b1, boolean b2) {
+                      return b1 || b2;
+                  }
+              }
+              """
+          )
+        );
+    }
+}

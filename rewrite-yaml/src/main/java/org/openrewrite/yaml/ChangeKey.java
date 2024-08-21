@@ -24,10 +24,10 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeKey extends Recipe {
     @Option(displayName = "Old key path",
-            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML entry.",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a YAML entry.",
             example = "$.subjects.kind")
     String oldKeyPath;
 
@@ -42,6 +42,11 @@ public class ChangeKey extends Recipe {
     }
 
     @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` to `%s`", oldKeyPath, newKey);
+    }
+
+    @Override
     public String getDescription() {
         return "Change a YAML mapping entry key while leaving the value intact.";
     }
@@ -51,11 +56,11 @@ public class ChangeKey extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
-            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
-                Yaml.Mapping.Entry e = super.visitMappingEntry(entry, context);
+            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
+                Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 if (matcher.matches(getCursor())) {
                     if (e.getKey() instanceof Yaml.Scalar) {
-                        e = e.withKey(((Yaml.Scalar)e.getKey()).withValue(newKey));
+                        e = e.withKey(((Yaml.Scalar) e.getKey()).withValue(newKey));
                     }
                 }
                 return e;

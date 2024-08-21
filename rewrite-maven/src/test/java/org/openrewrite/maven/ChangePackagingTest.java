@@ -27,9 +27,9 @@ class ChangePackagingTest implements RewriteTest {
     @Test
     void addPackaging() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackaging("*", "*", "pom")),
+          spec -> spec.recipe(new ChangePackaging("*", "*", "pom", null)),
           pomXml(
-"""
+            """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -51,9 +51,9 @@ class ChangePackagingTest implements RewriteTest {
     @Test
     void removePackaging() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackaging("*", "*", null)),
+          spec -> spec.recipe(new ChangePackaging("*", "*", null, null)),
           pomXml(
-"""
+            """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -75,9 +75,9 @@ class ChangePackagingTest implements RewriteTest {
     @Test
     void changePackaging() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackaging("*", "*", "pom")),
+          spec -> spec.recipe(new ChangePackaging("*", "*", "pom", null)),
           pomXml(
-"""
+            """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -91,6 +91,71 @@ class ChangePackagingTest implements RewriteTest {
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
                   <packaging>pom</packaging>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changePackagingRemovingDefault() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackaging("*", "*", "jar", null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  <packaging>war</packaging>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangesIfOldPackagingDoesNotMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackaging("*", "*", "jar", "bundle")),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  <packaging>war</packaging>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changePackageIfMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackaging("*", "*", "jar", "war")),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  <packaging>war</packaging>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
               </project>
               """
           )

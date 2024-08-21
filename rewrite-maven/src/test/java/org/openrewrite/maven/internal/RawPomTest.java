@@ -32,7 +32,11 @@ class RawPomTest {
     @Test
     void profileActivationByJdk() {
         String javaVersion = System.getProperty("java.version");
-        int runtimeVersion = Integer.parseInt(javaVersion.substring(0, javaVersion.indexOf('.')));
+        int dotIndex = javaVersion.indexOf('.');
+        if (dotIndex > 0) {
+            javaVersion = javaVersion.substring(0, dotIndex);
+        }
+        int runtimeVersion = Integer.parseInt(javaVersion);
         assertThat(new ProfileActivation(false, Integer.toString(runtimeVersion), null).isActive()).isTrue();
         assertThat(new ProfileActivation(false, "[," + (runtimeVersion + 1) + ")", null).isActive()).isTrue();
         assertThat(new ProfileActivation(false, "[," + runtimeVersion + "]", null).isActive()).isFalse();
@@ -167,18 +171,18 @@ class RawPomTest {
         String pomString = """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+          
                   <parent>
                       <groupId>org.springframework.boot</groupId>
                       <artifactId>spring-boot-starter-parent</artifactId>
                       <version>2.4.0</version>
                   </parent>
-              
+          
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <packaging>jar</packaging>
-                  
+          
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -190,7 +194,7 @@ class RawPomTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
-                  
+          
                   <dependencies>
                     <dependency>
                       <groupId>org.junit.jupiter</groupId>
@@ -205,7 +209,7 @@ class RawPomTest {
                       </exclusions>
                     </dependency>
                   </dependencies>
-
+          
                   <build>
                       <plugins>
                           <plugin>
@@ -378,7 +382,7 @@ class RawPomTest {
                                   </plugins>
                               </pluginManagement>
                           </build>
-
+          
                       </profile>
                   </profiles>
               </project>

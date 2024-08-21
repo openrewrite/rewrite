@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class SourceSpecTextBlockIndentationTest implements RewriteTest {
+class SourceSpecTextBlockIndentationTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -35,6 +35,7 @@ public class SourceSpecTextBlockIndentationTest implements RewriteTest {
     @Test
     void minimalIndentation() {
         rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import org.openrewrite.test.RewriteTest;
@@ -67,6 +68,59 @@ public class SourceSpecTextBlockIndentationTest implements RewriteTest {
                     rewriteRun(
                        text(
                          \"""
+                           class Test {
+              \s
+                              \s
+                               void test() {
+                                   System.out.println("Hello, world!");
+                               }
+                           }
+                           \"""
+                       )
+                    );
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void startsOnNewline() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import org.openrewrite.test.RewriteTest;
+              import static org.openrewrite.test.SourceSpecs.text;
+
+              class MyRecipeTest implements RewriteTest {
+                  void test() {
+                    rewriteRun(
+                       text(\"""
+                           class Test {
+              \s
+                              \s
+                               void test() {
+                                   System.out.println("Hello, world!");
+                               }
+                           }
+                           \"""
+                       )
+                    );
+                  }
+              }
+              """,
+
+            """
+              import org.openrewrite.test.RewriteTest;
+              import static org.openrewrite.test.SourceSpecs.text;
+
+              class MyRecipeTest implements RewriteTest {
+                  void test() {
+                    rewriteRun(
+                       text(
+                            \"""
                            class Test {
               \s
                               \s

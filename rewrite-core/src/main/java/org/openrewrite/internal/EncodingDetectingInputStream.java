@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -74,11 +74,11 @@ public class EncodingDetectingInputStream extends InputStream {
     }
 
     private void guessCharset(int aByte) {
-        if (prev3 == 0xC3 && prev2 == 0xAF && prev == 0xC2) {
+        if (prev3 == 0xEF && prev2 == 0xBB && prev == 0xBF) {
             charsetBomMarked = true;
             charset = StandardCharsets.UTF_8;
         } else {
-            if (aByte == -1 || !(prev2 == 0 && prev == 0xC3 || prev3 == 0 && prev2 == 0xC3)) {
+            if (aByte == -1 || !(prev2 == 0 && prev == 0xEF || prev3 == 0 && prev2 == 0xEF)) {
                 if (maybeTwoByteSequence) {
                     if (aByte == -1 && !utf8SequenceEnd(prev) || aByte != -1 && !(utf8SequenceEnd(aByte))) {
                         charset = WINDOWS_1252;

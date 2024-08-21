@@ -17,15 +17,15 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveDependency extends Recipe {
 
     @Option(displayName = "Group",
@@ -40,7 +40,7 @@ public class RemoveDependency extends Recipe {
 
     @Option(displayName = "Scope",
             description = "Only remove dependencies if they are in this scope. If 'runtime', this will" +
-                    "also remove dependencies in the 'compile' scope because 'compile' dependencies are part of the runtime dependency set",
+                          "also remove dependencies in the 'compile' scope because 'compile' dependencies are part of the runtime dependency set",
             valid = {"compile", "test", "runtime", "provided"},
             example = "compile",
             required = false)
@@ -50,6 +50,11 @@ public class RemoveDependency extends Recipe {
     @Override
     public String getDisplayName() {
         return "Remove Maven dependency";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s`", groupId, artifactId);
     }
 
     @Override

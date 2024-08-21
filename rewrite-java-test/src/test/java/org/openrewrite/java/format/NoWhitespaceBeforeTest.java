@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.Checkstyle;
@@ -30,6 +31,7 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +40,7 @@ import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
+import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({
@@ -48,7 +51,6 @@ import static org.openrewrite.java.Assertions.java;
   "StatementWithEmptyBody"
 })
 class NoWhitespaceBeforeTest implements RewriteTest {
-
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new NoWhitespaceBefore());
@@ -735,7 +737,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
     @Test
     void doNotStripAnnotationArguments() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle()))
+            .typeValidationOptions(TypeValidation.none()),
           java(
             """
               import org.graalvm.compiler.core.common.SuppressFBWarnings;
@@ -751,6 +754,12 @@ class NoWhitespaceBeforeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/233")
+    void jenkinsLibrary() {
+        rewriteRun(groovy("library 'someLibrary@version'"));
     }
 
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {

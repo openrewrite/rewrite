@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.List;
@@ -38,13 +38,11 @@ public class JavaTypeVisitor<P> {
         return ListUtils.map(javaTypes, jt -> (JT) visit(jt, p));
     }
 
-    @Nullable
-    public JavaType preVisit(JavaType javaType, P p) {
+    public @Nullable JavaType preVisit(JavaType javaType, P p) {
         return javaType;
     }
 
-    @Nullable
-    public JavaType postVisit(JavaType javaType, P p) {
+    public @Nullable JavaType postVisit(JavaType javaType, P p) {
         return javaType;
     }
 
@@ -75,6 +73,8 @@ public class JavaTypeVisitor<P> {
                 javaType = visitClass((JavaType.Class) javaType, p);
             } else if (javaType instanceof JavaType.GenericTypeVariable) {
                 javaType = visitGenericTypeVariable((JavaType.GenericTypeVariable) javaType, p);
+            } else if (javaType instanceof JavaType.Intersection) {
+                javaType = visitIntersection((JavaType.Intersection) javaType, p);
             } else if (javaType instanceof JavaType.MultiCatch) {
                 javaType = visitMultiCatch((JavaType.MultiCatch) javaType, p);
             } else if (javaType instanceof JavaType.Parameterized) {
@@ -108,6 +108,7 @@ public class JavaTypeVisitor<P> {
     public JavaType visitArray(JavaType.Array array, P p) {
         JavaType.Array a = array;
         a = a.withElemType(visit(a.getElemType(), p));
+        a = a.withAnnotations(visit(a.getAnnotations(), p));
         return a;
     }
 
@@ -127,6 +128,12 @@ public class JavaTypeVisitor<P> {
         JavaType.GenericTypeVariable g = generic;
         g = g.withBounds(ListUtils.map(g.getBounds(), bound -> visit(bound, p)));
         return g;
+    }
+
+    public JavaType visitIntersection(JavaType.Intersection intersection, P p) {
+        JavaType.Intersection i = intersection;
+        i = i.withBounds(ListUtils.map(i.getBounds(), bound -> visit(bound, p)));
+        return i;
     }
 
     /**

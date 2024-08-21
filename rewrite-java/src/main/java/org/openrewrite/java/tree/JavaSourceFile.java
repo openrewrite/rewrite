@@ -15,21 +15,24 @@
  */
 package org.openrewrite.java.tree;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.internal.WhitespaceValidationService;
+import org.openrewrite.java.internal.JavaWhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 import java.util.List;
 
-public interface JavaSourceFile extends J {
+public interface JavaSourceFile extends J, SourceFile {
     TypesInUse getTypesInUse();
 
-    @Nullable
-    J.Package getPackageDeclaration();
+    J.@Nullable Package getPackageDeclaration();
 
     JavaSourceFile withPackageDeclaration(J.Package pkg);
 
@@ -50,19 +53,34 @@ public interface JavaSourceFile extends J {
     /**
      * @return An absolute or relative file path.
      */
+    @Override
     Path getSourcePath();
 
-    SourceFile withSourcePath(Path path);
-
-    @Incubating(since = "8.2.0")
+    @Override
     @SuppressWarnings("unchecked")
-    default <S> S service(Class<S> service) {
-        if (ImportService.class.getName().equals(service.getName())) {
-            return (S) new ImportService();
-        } else if (AutoFormatService.class.getName().equals(service.getName())) {
-            return (S) new AutoFormatService();
+    JavaSourceFile withSourcePath(Path path);
+
+    @SuppressWarnings("unchecked")
+    @Override
+    @Incubating(since = "8.2.0")
+    default <S, T extends S> T service(Class<S> service) {
+        try {
+            // use name indirection due to possibility of multiple class loaders being used
+            if (ImportService.class.getName().equals(service.getName())) {
+                return (T) service.getConstructor().newInstance();
+            } else if (AutoFormatService.class.getName().equals(service.getName())) {
+                return (T) service.getConstructor().newInstance();
+            } else if (AnnotationService.class.getName().equals(service.getName())) {
+                return (T) service.getConstructor().newInstance();
+            } else if (WhitespaceValidationService.class.getName().equals(service.getName())) {
+                // Only unit tests should need to use this service, so no classloading concerns
+                return (T) new JavaWhitespaceValidationService();
+            } else {
+                throw new UnsupportedOperationException("Service " + service + " not supported");
+            }
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            throw new RuntimeException(e);
         }
-        throw new UnsupportedOperationException("Service " + service + " not supported");
     }
 
     interface Padding {

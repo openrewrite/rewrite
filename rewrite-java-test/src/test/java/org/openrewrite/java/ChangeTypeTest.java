@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -171,6 +172,7 @@ class ChangeTypeTest implements RewriteTest {
               class Test {
                   Entry p;
                   Map.Entry p2;
+                  java.util.Map.Entry p3;
               }
               """,
             """
@@ -179,6 +181,7 @@ class ChangeTypeTest implements RewriteTest {
               class Test {
                   List p;
                   List p2;
+                  java.util.List p3;
               }
               """
           )
@@ -952,7 +955,7 @@ class ChangeTypeTest implements RewriteTest {
               
               public class OuterClass {
                   public static class InnerClass {
-                            
+              
                   }
               }
               """
@@ -1762,6 +1765,150 @@ class ChangeTypeTest implements RewriteTest {
                   assertThat(cu.findType("org.openrewrite.MyEnum1")).isEmpty();
                   assertThat(cu.findType("org.openrewrite.MyEnum2")).isNotEmpty();
               })
+          )
+        );
+    }
+
+    @Test
+    void doesNotModifyInnerClassesIfIgnoreDefinitionTrue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("Test.InnerA", "Test.InnerB", true)),
+          java(
+            """
+
+              public class Test {
+                  private class InnerA {
+                  }
+              
+                  private class InnerB {
+                  }
+              
+                  public void test(String s) {
+                      InnerA a = new InnerA();
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  private class InnerA {
+                  }
+              
+                  private class InnerB {
+                  }
+              
+                  public void test(String s) {
+                      InnerB a = new InnerB();
+                  }
+              }
+              """
+          )
+        );
+
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4182")
+    @Test
+    void doesNotModifyPackageOfSibling() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.openrewrite.Test", "org.openrewrite.subpackage.Test", false)),
+          java(
+            """
+              package org.openrewrite;
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.subpackage;
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package org.openrewrite;
+              
+              import org.openrewrite.Test;
+              
+              public class Sibling {
+                  public Test test() {
+                      return new Test();
+                  }
+              }
+              """,
+            """
+              package org.openrewrite;
+              
+              import org.openrewrite.subpackage.Test;
+              
+              public class Sibling {
+                  public Test test() {
+                      return new Test();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-jackson/pull/6")
+    @Test
+    void changeTypeOfStaticImportOfNestedEnumValueUsed() {
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipes(
+            new ChangeType(
+              "org.codehaus.jackson.map.ObjectMapper",
+              "com.fasterxml.jackson.databind.ObjectMapper", true),
+            new ChangeType(
+              "org.codehaus.jackson.map.SerializationConfig$Feature",
+              "com.fasterxml.jackson.databind.SerializationFeature", true)
+          ),
+          java(
+            """
+              package org.codehaus.jackson.map;
+              public class SerializationConfig {
+                  public static enum Feature {
+                      WRAP_ROOT_VALUE
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package org.codehaus.jackson.map;
+              public class ObjectMapper {
+                  public ObjectMapper configure(SerializationConfig.Feature f, boolean state) {
+                      return this;
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.codehaus.jackson.map.ObjectMapper;
+
+              import static org.codehaus.jackson.map.SerializationConfig.Feature.WRAP_ROOT_VALUE;
+
+              class A {
+                  void test() {
+                      ObjectMapper mapper = new ObjectMapper();
+                      mapper.configure(WRAP_ROOT_VALUE, true);
+                  }
+              }
+              """,
+            """
+              import com.fasterxml.jackson.databind.ObjectMapper;
+
+              import static com.fasterxml.jackson.databind.SerializationFeature.WRAP_ROOT_VALUE;
+
+              class A {
+                  void test() {
+                      ObjectMapper mapper = new ObjectMapper();
+                      mapper.configure(WRAP_ROOT_VALUE, true);
+                  }
+              }
+              """
           )
         );
     }

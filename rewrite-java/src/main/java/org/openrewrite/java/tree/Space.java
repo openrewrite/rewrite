@@ -17,7 +17,7 @@ package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -366,6 +366,7 @@ public class Space {
         IMPORT_SUFFIX,
         INSTANCEOF_PREFIX,
         INSTANCEOF_SUFFIX,
+        INTERSECTION_TYPE_PREFIX,
         LABEL_PREFIX,
         LABEL_SUFFIX,
         LAMBDA_ARROW_PREFIX,
@@ -397,6 +398,8 @@ public class Space {
         NEW_CLASS_ENCLOSING_SUFFIX,
         NEW_CLASS_PREFIX,
         NEW_PREFIX,
+        NULLABLE_TYPE_PREFIX,
+        NULLABLE_TYPE_SUFFIX,
         PACKAGE_PREFIX,
         PACKAGE_SUFFIX,
         PARAMETERIZED_TYPE_PREFIX,

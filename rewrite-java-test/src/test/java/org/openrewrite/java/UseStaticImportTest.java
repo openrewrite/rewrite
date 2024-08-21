@@ -17,15 +17,12 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
+@SuppressWarnings({"UnnecessaryCallToStringValueOf", "UnnecessaryBoxing", "RedundantTypeArguments", "rawtypes"})
 class UseStaticImportTest implements RewriteTest {
     @Test
     void replaceWithStaticImports() {
@@ -45,9 +42,9 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package test;
-                            
+
               import asserts.Assert;
-                            
+
               class Test {
                   void test() {
                       Assert.assertTrue(true);
@@ -58,9 +55,9 @@ class UseStaticImportTest implements RewriteTest {
               """,
             """
               package test;
-                            
+
               import static asserts.Assert.*;
-                            
+
               class Test {
                   void test() {
                       assertTrue(true);
@@ -73,72 +70,129 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3705")
     @Test
-    void methodInvocationsHavingNullSelect() {
+    void ignoreMethodsWithTypeParameter() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                  return super.visitClassDeclaration(classDecl, ctx).withExtends(null);
-              }
-
-              @Override
-              public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
-                  //noinspection ConstantConditions
-                  return null;
-              }
-
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  return super.visitMethodInvocation(method, executionContext)
-                    .withDeclaringType(JavaType.ShallowClass.build("asserts.Assert"));
-              }
-
-              @Override
-              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                  doAfterVisit(new UseStaticImport("asserts.Assert assert*(..)").getVisitor());
-                  return super.visitCompilationUnit(cu, executionContext);
-              }
-          })).cycles(2).expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
           java(
             """
-              package asserts;
+              import java.util.Collections;
+              import java.util.List;
 
-              public class Assert {
-                  public static void assertTrue(boolean b) {}
-                  public static void assertEquals(int m, int n) {}
+              public class Reproducer {
+                  public void methodWithTypeParameter() {
+                      List<Object> list = Collections.<Object>emptyList();
+                  }
               }
+              """
+          )
+        );
+    }
 
-              public class MyAssert {
-                  public void assertTrue(boolean b) {Assert.assertTrue(b);}
-                  public void assertEquals(int m, int n) {Assert.assertEquals(m, n);}
-              }
-              """,
-            SourceSpec::skip
-          ),
+    @Test
+    void sameMethodLocallyNoStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
           java(
             """
-              package test;
+              package com.helloworld;
 
-              import asserts.MyAssert;
+              import java.util.Collections;
+              import java.util.List;
 
-              class Test extends MyAssert {
-                  void test() {
-                      assertTrue(true);
-                      assertEquals(1, 2);
+              public class SameMethodNameLocally {
+                  public void avoidCollision() {
+                      List<Object> list = Collections.emptyList();
+                  }
+
+                  private int emptyList(String canHaveDifferentArguments) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4304")
+    void sameMethodImportedNoStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.lang.String valueOf(..)")),
+          java(
+            """
+              package com.helloworld;
+
+              import static java.lang.Integer.valueOf;
+
+              public class SameMethodNameImported {
+                  public void avoidCollision() {
+                      String a = String.valueOf("1");
+                      int b = valueOf("1");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4304")
+    void sameMethodsNoStaticImport() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UseStaticImport("java.lang.String valueOf(..)"),
+            new UseStaticImport("java.lang.Integer valueOf(..)")),
+          java(
+            """
+              package com.helloworld;
+
+              public class SameMethodNames {
+                  public void avoidCollision() {
+                      String a = String.valueOf("1");
+                      int b = Integer.valueOf("1");
                   }
               }
               """,
             """
-              package test;
+              package com.helloworld;
 
-              import static asserts.Assert.assertEquals;
-              import static asserts.Assert.assertTrue;
+              import static java.lang.String.valueOf;
 
-              class Test {
-                  void test() {
-                      assertTrue(true);
-                      assertEquals(1, 2);
+              public class SameMethodNames {
+                  public void avoidCollision() {
+                      String a = valueOf("1");
+                      int b = Integer.valueOf("1");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doReplaceWhenWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections *()")),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class SameMethodNameLocally {
+                  void avoidCollision() {
+                      List<Object> list = Collections.emptyList();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              import static java.util.Collections.emptyList;
+
+              class SameMethodNameLocally {
+                  void avoidCollision() {
+                      List<Object> list = emptyList();
                   }
               }
               """
@@ -177,6 +231,115 @@ class UseStaticImportTest implements RewriteTest {
                   @Test
                   void sample() {
                       assertEquals(42, 21*2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3663")
+    @Test
+    void javadocLinkUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              public class WithJavadoc {
+                  /**
+                   * This method uses {@link Collections#emptyList()}.
+                   */
+                  public void mustNotChangeTheJavadocAbove() {
+                      List<Object> list = Collections.emptyList();
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              import static java.util.Collections.emptyList;
+
+              public class WithJavadoc {
+                  /**
+                   * This method uses {@link Collections#emptyList()}.
+                   */
+                  public void mustNotChangeTheJavadocAbove() {
+                      List<Object> list = emptyList();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3661")
+    void staticCall() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.function.Predicate *(..)")),
+          //language=java
+          java(
+            """
+              import java.util.function.Predicate;
+              public class Reproducer {
+                  void reproduce() {
+                      Predicate<Object> predicate = x -> false;
+                      Predicate staticPredicate = Predicate.not(predicate);
+                  }
+              }
+              """,
+            """
+              import java.util.function.Predicate;
+
+              import static java.util.function.Predicate.not;
+
+              public class Reproducer {
+                  void reproduce() {
+                      Predicate<Object> predicate = x -> false;
+                      Predicate staticPredicate = not(predicate);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3661")
+    void nonStaticCall() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.function.Predicate *(..)")),
+          //language=java
+          java(
+            """
+              import java.util.function.Predicate;
+              public class Reproducer {
+                  void reproduce() {
+                      Predicate<Object> predicate = x -> false;
+                      boolean nonStatic = predicate.test(null);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noStaticImportOfMethodMatchingInstanceMethod() {
+        // Cannot do a static import of Arrays.toString() because it is ambiguous with Object.toString()
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java..* *(..)")),
+          java(
+            """
+              import java.util.Arrays;
+
+              class A {
+                  String s(String[] strings) {
+                      return Arrays.toString(strings);
                   }
               }
               """

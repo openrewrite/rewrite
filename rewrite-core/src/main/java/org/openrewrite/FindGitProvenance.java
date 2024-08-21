@@ -15,7 +15,7 @@
  */
 package org.openrewrite;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.table.DistinctGitProvenance;
 
@@ -50,7 +50,7 @@ public class FindGitProvenance extends ScanningRecipe<Set<GitProvenance>> {
     public TreeVisitor<?, ExecutionContext> getScanner(Set<GitProvenance> provenances) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 sourceFile.getMarkers().findFirst(GitProvenance.class).ifPresent(provenance ->
                         provenances.add(provenance.withId(DONT_CONSIDER_ID_IN_HASH_CODE)));

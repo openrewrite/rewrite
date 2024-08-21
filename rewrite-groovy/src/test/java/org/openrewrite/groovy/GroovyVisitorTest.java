@@ -30,8 +30,6 @@ class GroovyVisitorTest implements RewriteTest {
     void autoFormatIncludesOmitParentheses() {
         rewriteRun(
           spec -> spec
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .recipeExecutionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
                 @Override
                 public Tree treeChanged(Cursor cursor, Tree newTree) {

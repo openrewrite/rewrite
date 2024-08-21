@@ -16,27 +16,21 @@
 package org.openrewrite;
 
 import lombok.Getter;
-import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.diff.RawTextComparator;
-import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
-import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.lib.*;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.jgit.lib.FileMode;
 import org.openrewrite.marker.RecipesThatMadeChanges;
+import org.openrewrite.marker.SearchResult;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+
+import static java.util.Objects.requireNonNull;
 
 public class Result {
     /**
@@ -82,9 +76,63 @@ public class Result {
     public Result(@Nullable SourceFile before, SourceFile after) {
         this(before, after, after.getMarkers()
                 .findFirst(RecipesThatMadeChanges.class)
-                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe " +
-                                                             "reported making a change"))
+                .orElseThrow(() -> new IllegalStateException(
+                        String.format(
+                                "Source file changed but no recipe " +
+                                "reported making a change. %s",
+                                explainWhatChanged(before, after)
+                        )
+                ))
                 .getRecipes());
+    }
+
+    private static String explainWhatChanged(@Nullable SourceFile before, SourceFile after) {
+        if (before == null) {
+            return String.format("A new file %s was generated but no recipe reported generating it. This is likely a bug in OpenRewrite itself.",
+                    after.getSourcePath());
+        }
+        Map<UUID, Tree> beforeTrees = new HashMap<>();
+        new TreeVisitor<Tree, Integer>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, Integer integer) {
+                if (tree != null) {
+                    beforeTrees.put(tree.getId(), tree);
+                }
+                return super.visit(tree, integer);
+            }
+        }.visit(before, 0);
+
+        SourceFile changesMarked = (SourceFile) new TreeVisitor<Tree, Integer>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, Integer p) {
+                if (tree != null &&
+                    beforeTrees.get(tree.getId()) != tree &&
+                    !subtreeChanged(tree, beforeTrees)) {
+                    return SearchResult.found(tree);
+                }
+                return super.visit(tree, p);
+            }
+        }.visitNonNull(after, 0);
+
+        String diff = diff(before.printAllTrimmed(), changesMarked.printAllTrimmed(), after.getSourcePath());
+        return "The following diff highlights the places where unexpected changes were made:\n" +
+               Arrays.stream(requireNonNull(diff).split("\n"))
+                       .map(l -> "  " + l)
+                       .collect(Collectors.joining("\n"));
+    }
+
+    private static boolean subtreeChanged(Tree root, Map<UUID, Tree> beforeTrees) {
+        return new TreeVisitor<Tree, AtomicBoolean>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, AtomicBoolean changed) {
+                if (tree != null && tree != root) {
+                    if (beforeTrees.get(tree.getId()) != tree) {
+                        changed.set(true);
+                    }
+                }
+                return super.visit(tree, changed);
+            }
+        }.reduce(root, new AtomicBoolean(false)).get();
     }
 
     /**
@@ -140,12 +188,12 @@ public class Result {
         return diff(relativeTo, null);
     }
 
-    public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter) {
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter) {
         return diff(relativeTo, markerPrinter, false);
     }
 
     @Incubating(since = "7.34.0")
-    public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
         Path beforePath = before == null ? null : before.getSourcePath();
         Path afterPath = null;
         if (before == null && after == null) {
@@ -180,6 +228,24 @@ public class Result {
         )) {
             return diffEntry.getDiff(ignoreAllWhitespace);
         }
+    }
+
+    public static @Nullable String diff(String before, String after, Path path) {
+        String diff = null;
+        try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
+                path,
+                path,
+                null,
+                before,
+                after,
+                Collections.emptySet(),
+                FileMode.REGULAR_FILE,
+                FileMode.REGULAR_FILE
+        )) {
+            diff = diffEntry.getDiff(Boolean.FALSE);
+        } catch (Exception ignored) {
+        }
+        return diff;
     }
 
     @Override

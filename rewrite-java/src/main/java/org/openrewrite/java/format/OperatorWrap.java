@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.OperatorWrapStyle;
@@ -168,8 +168,8 @@ public class OperatorWrap extends Recipe {
             if (Boolean.TRUE.equals(operatorWrapStyle.getLiteralInstanceof())) {
                 if (OperatorWrapStyle.WrapOption.NL.equals(operatorWrapStyle.getWrapOption())) {
                     if (i.getClazz().getPrefix().getWhitespace().contains("\n")) {
-                        i = i.getPadding().withExpr(
-                                i.getPadding().getExpr().withAfter(
+                        i = i.getPadding().withExpression(
+                                i.getPadding().getExpression().withAfter(
                                         i.getClazz().getPrefix()
                                 )
                         );
@@ -179,15 +179,15 @@ public class OperatorWrap extends Recipe {
                                 )
                         );
                     }
-                } else if (i.getPadding().getExpr().getAfter().getWhitespace().contains("\n")) {
+                } else if (i.getPadding().getExpression().getAfter().getWhitespace().contains("\n")) {
                     i = i.withClazz(
                             i.getClazz().withPrefix(
-                                    i.getPadding().getExpr().getAfter()
+                                    i.getPadding().getExpression().getAfter()
                             )
                     );
-                    i = i.getPadding().withExpr(
-                            i.getPadding().getExpr().withAfter(
-                                    i.getPadding().getExpr().getAfter().withWhitespace(" ")
+                    i = i.getPadding().withExpression(
+                            i.getPadding().getExpression().withAfter(
+                                    i.getPadding().getExpression().getAfter().withWhitespace(" ")
                             )
                     );
                 }

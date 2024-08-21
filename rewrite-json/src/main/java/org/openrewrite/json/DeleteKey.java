@@ -25,10 +25,11 @@ import org.openrewrite.json.tree.Space;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class DeleteKey extends Recipe {
+
     @Option(displayName = "Key path",
-            description = "A JsonPath expression to locate a JSON entry.",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a JSON entry.",
             example = "$.subjects.kind")
     String keyPath;
 
@@ -47,8 +48,8 @@ public class DeleteKey extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
-            public Json.JsonObject visitObject(Json.JsonObject obj, ExecutionContext executionContext) {
-                Json.JsonObject o = super.visitObject(obj, executionContext);
+            public Json.JsonObject visitObject(Json.JsonObject obj, ExecutionContext ctx) {
+                Json.JsonObject o = super.visitObject(obj, ctx);
                 AtomicReference<Space> copyFirstPrefix = new AtomicReference<>();
                 o = o.withMembers(ListUtils.map(o.getMembers(), (i, e) -> {
                     if (matcher.matches(new Cursor(getCursor(), e))) {

@@ -18,14 +18,8 @@ package org.openrewrite.java.search;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.JavadocVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Javadoc;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
@@ -38,6 +32,7 @@ import java.util.stream.Collectors;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 public class FindMissingTypes extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Find missing type information on Java ASTs";
@@ -102,6 +97,9 @@ public class FindMissingTypes extends Recipe {
             if (!isWellFormedType(identifier.getType(), seenTypes) && !isAllowedToHaveNullType(identifier)) {
                 identifier = SearchResult.found(identifier, "Identifier type is missing or malformed");
             }
+            if (identifier.getFieldType() != null && !identifier.getSimpleName().equals(identifier.getFieldType().getName())) {
+                identifier = SearchResult.found(identifier, "type information has a different variable name '" + identifier.getFieldType().getName() + "'");
+            }
             return identifier;
         }
 
@@ -140,6 +138,11 @@ public class FindMissingTypes extends Recipe {
                 } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
                     mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
                 }
+                if (mi.getName().getType() != null && type != null && type != mi.getName().getType()) {
+                    // The MethodDeclaration#name#type and the methodType field should be the same object.
+                    // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
+                    mi = SearchResult.found(mi, "MethodInvocation#name#type is not the same instance as the MethodType of MethodInvocation.");
+                }
             }
             return mi;
         }
@@ -148,24 +151,38 @@ public class FindMissingTypes extends Recipe {
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
             J.MemberReference mr = super.visitMemberReference(memberRef, ctx);
             JavaType.Method type = mr.getMethodType();
-            if (!isWellFormedType(type, seenTypes)) {
-                mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
-            } else if (!type.getName().equals(mr.getReference().getSimpleName()) && !type.isConstructor()) {
-                mr = SearchResult.found(mr, "type information has a different method name '" + type.getName() + "'");
+            if (type != null) {
+                if (!isWellFormedType(type, seenTypes)) {
+                    mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
+                } else if (!type.getName().equals(mr.getReference().getSimpleName()) && !type.isConstructor()) {
+                    mr = SearchResult.found(mr, "type information has a different method name '" + type.getName() + "'");
+                }
+            } else {
+                JavaType.Variable variableType = mr.getVariableType();
+                if (!isWellFormedType(variableType, seenTypes)) {
+                    mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
+                } else if (!variableType.getName().equals(mr.getReference().getSimpleName())) {
+                    mr = SearchResult.found(mr, "type information has a different variable name '" + variableType.getName() + "'");
+                }
             }
             return mr;
         }
 
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-            J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
+            J.MethodDeclaration md = method;
             JavaType.Method type = md.getMethodType();
             if (!isWellFormedType(type, seenTypes)) {
                 md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
                 md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
             }
-            return md;
+            if (md.getName().getType() != null && type != null && type != md.getName().getType()) {
+                // The MethodDeclaration#name#type and the methodType field should be the same object.
+                // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
+                md = SearchResult.found(md, "MethodDeclaration#name#type is not the same instance as the MethodType of MethodDeclaration.");
+            }
+            return super.visitMethodDeclaration(md, ctx);
         }
 
         @Override
@@ -191,12 +208,26 @@ public class FindMissingTypes extends Recipe {
         }
 
         @Override
-        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
-            J.NewClass n = super.visitNewClass(newClass, executionContext);
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            J.NewClass n = super.visitNewClass(newClass, ctx);
             if (n == newClass && !isWellFormedType(n.getType(), seenTypes)) {
                 n = SearchResult.found(n, "NewClass type is missing or malformed");
             }
+            if (n.getClazz() instanceof J.Identifier && n.getClazz().getType() != null &&
+                    !(n.getClazz().getType() instanceof JavaType.Class || n.getClazz().getType() instanceof JavaType.Unknown)) {
+                n = SearchResult.found(n, "NewClass#clazz is J.Identifier and the type is is not JavaType$Class.");
+            }
             return n;
+        }
+
+        @Override
+        public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
+            J.ParameterizedType p = super.visitParameterizedType(type, ctx);
+            if (p.getClazz() instanceof J.Identifier && p.getClazz().getType() != null &&
+                    !(p.getClazz().getType() instanceof JavaType.Class || p.getClazz().getType() instanceof JavaType.Unknown)) {
+                p = SearchResult.found(p, "ParameterizedType#clazz is J.Identifier and the type is is not JavaType$Class.");
+            }
+            return p;
         }
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {

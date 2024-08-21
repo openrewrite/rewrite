@@ -21,6 +21,7 @@ import org.openrewrite.table.DistinctGitProvenance;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
 import static org.openrewrite.marker.GitProvenance.EOL.Native;
@@ -45,7 +46,8 @@ class FindGitProvenanceTest implements RewriteTest {
           }),
           text(
             "Hello, World!",
-            spec -> spec.markers(new GitProvenance(Tree.randomId(), "https://github.com/openrewrite/rewrite", "main", "1234567", False, Native))
+            spec -> spec.markers(new GitProvenance(Tree.randomId(), "https://github.com/openrewrite/rewrite",
+              "main", "1234567", False, Native, emptyList()))
           )
         );
     }

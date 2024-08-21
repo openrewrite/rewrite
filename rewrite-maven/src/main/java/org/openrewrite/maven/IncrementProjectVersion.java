@@ -33,31 +33,20 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, String>> {
 
-    @Override
-    public String getDisplayName() {
-        return "Increment Maven Project Version";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Increase Maven project version by incrementing either the major, minor, or patch version as defined by " +
-               "[semver](https://semver.org/). Other versioning schemes are not supported.";
-    }
-
-    @Option(displayName = "GroupId",
-            description = "The groupId of the maven project to change its version. This can be a glob expression.",
+    @Option(displayName = "Group",
+            description = "The group ID of the Maven project to change its version. This can be a glob expression.",
             example = "org.openrewrite")
     String groupId;
 
-    @Option(displayName = "ArtifactId",
-            description = "The artifactId of the maven project to change its version. This can be a glob expression.",
+    @Option(displayName = "Artifact",
+            description = "The artifact ID of the Maven project to change its version. This can be a glob expression.",
             example = "*")
     String artifactId;
 
-    @Option(displayName = "Semver Digit",
+    @Option(displayName = "Semver digit",
             description = "`MAJOR` increments the first digit, `MINOR` increments the second digit, and `PATCH` " +
                           "increments the third digit.",
             example = "PATCH")
@@ -69,9 +58,21 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
         PATCH
     }
 
-    private static final Pattern SEMVER_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
-    private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
-    private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
+    @Override
+    public String getDisplayName() {
+        return "Increment Maven project version";
+    }
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s:%s:%s`", groupId, artifactId, digit);
+    }
+
+    @Override
+    public String getDescription() {
+        return "Increase Maven project version by incrementing either the major, minor, or patch version as defined by " +
+               "[semver](https://semver.org/). Other versioning schemes are not supported.";
+    }
 
     @Override
     public Map<GroupArtifact, String> getInitialValue(ExecutionContext ctx) {
@@ -80,6 +81,9 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifact, String> acc) {
+        final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
+        final Pattern SEMVER_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
+
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -99,24 +103,63 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                 }
                 String versionTagValue = versionTag.get().getValue().get();
                 String oldVersion = resolvedPom.getValue(versionTagValue);
-                if(oldVersion == null) {
+                if (oldVersion == null) {
                     return t;
                 }
                 String newVersion = incrementSemverDigit(oldVersion);
-                if(newVersion.equals(oldVersion)) {
+                if (newVersion.equals(oldVersion)) {
                     return t;
                 }
                 acc.put(new GroupArtifact(
-                        t.getChildValue("groupId").orElse(null), t.getChildValue("artifactId").orElse(null)),
+                                t.getChildValue("groupId").orElse(null), t.getChildValue("artifactId").orElse(null)),
                         newVersion);
                 return t;
             }
+
+            private String incrementSemverDigit(String oldVersion) {
+                Matcher m = SEMVER_PATTERN.matcher(oldVersion);
+                if (!m.matches()) {
+                    return oldVersion;
+                }
+                String major = m.group(1);
+                String minor = m.group(2);
+                String patch = m.group(3);
+                // Semver does not have a concept of a fourth number, but it is common enough to support
+                String fourth = m.group(4);
+                String extra = m.group(5);
+                switch (digit) {
+                    case MAJOR:
+                        major = String.valueOf(Integer.parseInt(major) + 1);
+                        minor = "0";
+                        patch = "0";
+                        break;
+                    case MINOR:
+                        minor = String.valueOf(Integer.parseInt(minor) + 1);
+                        patch = "0";
+                        break;
+                    case PATCH:
+                        patch = String.valueOf(Integer.parseInt(patch) + 1);
+                        break;
+                }
+                if (fourth == null) {
+                    fourth = "";
+                } else {
+                    fourth = ".0";
+                }
+                if (extra == null) {
+                    extra = "";
+                }
+                return major + "." + minor + "." + patch + fourth + extra;
+            }
         };
+
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Map<GroupArtifact, String> acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
+            final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
+            final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -128,7 +171,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                 }
                 String newVersion = acc.get(new GroupArtifact(
                         t.getChildValue("groupId").orElse(null), t.getChildValue("artifactId").orElse(null)));
-                if(newVersion == null || newVersion.equals(t.getChildValue("version").orElse(null))) {
+                if (newVersion == null || newVersion.equals(t.getChildValue("version").orElse(null))) {
                     return t;
                 }
                 t = t.withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
@@ -136,41 +179,5 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                         .visitNonNull(t, ctx);
             }
         };
-    }
-
-    private String incrementSemverDigit(String oldVersion) {
-        Matcher m = SEMVER_PATTERN.matcher(oldVersion);
-        if(!m.matches()) {
-            return oldVersion;
-        }
-        String major = m.group(1);
-        String minor = m.group(2);
-        String patch = m.group(3);
-        // Semver does not have a concept of a fourth number, but it is common enough to support
-        String fourth = m.group(4);
-        String extra = m.group(5);
-        switch (digit) {
-            case MAJOR:
-                major = String.valueOf(Integer.parseInt(major) + 1);
-                minor = "0";
-                patch = "0";
-                break;
-            case MINOR:
-                minor = String.valueOf(Integer.parseInt(minor) + 1);
-                patch = "0";
-                break;
-            case PATCH:
-                patch = String.valueOf(Integer.parseInt(patch) + 1);
-                break;
-        }
-        if(fourth == null) {
-            fourth = "";
-        } else {
-            fourth = ".0";
-        }
-        if(extra == null) {
-            extra = "";
-        }
-        return major + "." + minor + "." + patch + fourth + extra;
     }
 }

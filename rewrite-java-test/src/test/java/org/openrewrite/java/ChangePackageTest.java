@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -399,6 +399,180 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    void renamePackageNullRecursiveImportedCheckStrictPackageMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.openrewrite.other",
+            "org.openrewrite.test.other",
+            null
+          )),
+          java(
+            """
+              package org.openrewrite.other;
+              public class Test {}
+              """,
+            """
+              package org.openrewrite.test.other;
+              public class Test {}
+              """
+          ),
+          java(
+            """
+              package org.openrewrite.otherone;
+              public class OtherTest {}
+              """
+          ),
+          java(
+            """
+              import org.openrewrite.otherone.OtherTest;
+              class B {
+                  OtherTest test = null;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.otherone.OtherTest")).isNotEmpty();
+                assertThat(cu.findType("org.openrewrite.test.otherone.OtherTest")).isEmpty();
+            })
+          ),
+          java(
+            """
+              import org.openrewrite.other.Test;
+              class A {
+                  Test test = null;
+              }
+              """,
+            """
+            import org.openrewrite.test.other.Test;
+            class A {
+                Test test = null;
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.other.Test")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    void renamePackageImportedCheckStrictPackageMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.openrewrite.other",
+            "org.openrewrite.test.other",
+            false
+          )),
+          java(
+            """
+              package org.openrewrite.other;
+              public class Test {}
+              """,
+            """
+              package org.openrewrite.test.other;
+              public class Test {}
+              """
+          ),
+          java(
+            """
+              package org.openrewrite.otherone;
+              public class OtherTest {}
+              """
+          ),
+          java(
+            """
+              import org.openrewrite.otherone.OtherTest;
+              class B {
+                  OtherTest test = null;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.otherone.OtherTest")).isNotEmpty();
+                assertThat(cu.findType("org.openrewrite.test.otherone.OtherTest")).isEmpty();
+            })
+          ),
+          java(
+            """
+              import org.openrewrite.other.Test;
+              class A {
+                  Test test = null;
+              }
+              """,
+            """
+            import org.openrewrite.test.other.Test;
+            class A {
+                Test test = null;
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.other.Test")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    void renamePackageRecursiveImportedStrictPackageMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.openrewrite.other",
+            "org.openrewrite.test.other",
+            true
+          )),
+          java(
+            """
+              package org.openrewrite.other;
+              public class Test {}
+              """,
+            """
+              package org.openrewrite.test.other;
+              public class Test {}
+              """
+          ),
+          java(
+            """
+              package org.openrewrite.otherone;
+              public class OtherTest {}
+              """
+          ),
+          java(
+            """
+              import org.openrewrite.otherone.OtherTest;
+              class B {
+                  OtherTest test = null;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.otherone.OtherTest")).isNotEmpty();
+                assertThat(cu.findType("org.openrewrite.test.otherone.OtherTest")).isEmpty();
+            })
+          ),
+          java(
+            """
+              import org.openrewrite.other.Test;
+              class A {
+                  Test test = null;
+              }
+              """,
+            """
+            import org.openrewrite.test.other.Test;
+            class A {
+                Test test = null;
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.other.Test")).isNotEmpty();
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
     void typeParameter() {
@@ -554,7 +728,8 @@ class ChangePackageTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgument() {
         rewriteRun(
-          java("""
+          java(
+                """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -605,7 +780,8 @@ class ChangePackageTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentNamed() {
         rewriteRun(
-          java("""
+          java(
+                """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -656,7 +832,8 @@ class ChangePackageTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentFullyQualified() {
         rewriteRun(
-          java("""
+          java(
+                """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -705,7 +882,8 @@ class ChangePackageTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentNamedFullyQualified() {
         rewriteRun(
-          java("""
+          java(
+                """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -1538,6 +1716,56 @@ class ChangePackageTest implements RewriteTest {
                 assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty();
                 assertThat(cu.findType("org.openrewrite.App")).isEmpty();
                 assertThat(cu.findType("org.openrewrite.test.App")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void packageInfoAnnotation() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite;
+                          
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+                          
+              @Target(ElementType.PACKAGE)
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface MyAnnotation {
+                  MyEnum myEnum() default MyEnum.FOO;
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package org.openrewrite;
+                          
+              public enum MyEnum {
+                  FOO,
+                  BAR
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              @org.openrewrite.MyAnnotation(myEnum = org.openrewrite.MyEnum.BAR)
+              package com.acme;
+              """,
+            """
+              @org.openrewrite.test.MyAnnotation(myEnum = org.openrewrite.test.MyEnum.BAR)
+              package com.acme;
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.MyAnnotation")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.MyAnnotation")).isNotEmpty();
+                assertThat(cu.findType("org.openrewrite.MyEnum")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty();
             })
           )
         );

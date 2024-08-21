@@ -26,7 +26,7 @@ import java.util.Objects;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeExtraProperty extends Recipe {
 
     @Override
@@ -57,7 +57,7 @@ public class ChangeExtraProperty extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.File).getVisitor(), new GroovyIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Assignment visitAssignment(J.Assignment as, ExecutionContext executionContext) {
+            public J.Assignment visitAssignment(J.Assignment as, ExecutionContext ctx) {
                 if(!(as.getAssignment() instanceof J.Literal)) {
                     return as;
                 }
@@ -94,7 +94,11 @@ public class ChangeExtraProperty extends Recipe {
         if(Objects.equals(value, asVal.getValue())) {
             return as;
         }
+        String quote = "\"";
+        if(asVal.getValueSource() != null && asVal.getValueSource().trim().startsWith("'")) {
+            quote = "'";
+        }
         return as.withAssignment(asVal.withValue(value)
-                .withValueSource("\"" + value + "\""));
+                .withValueSource(quote + value + quote));
     }
 }

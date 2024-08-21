@@ -118,13 +118,17 @@ SPECIAL_CLOSE  :  QUESTION_MARK '>'       -> popMode ; // close <?xml...?>
 SLASH_CLOSE    :  '/>'                    -> popMode ;
 S              :  [ \t\r\n]               -> skip ;
 
+// JSP extension to the XML spec
+DIRECTIVE_OPEN : '%@' ;
+DIRECTIVE_CLOSE: '%';
+
 SLASH          :  '/' ;
 EQUALS         :  '=' ;
 STRING         :  '"' ~[<"]* '"'
                |  '\'' ~[<']* '\''
                ;
 
-Name           :  NameStartChar NameChar* ;
+Name           :  (NameStartChar NameChar*) ;
 
 fragment
 HEXDIGIT       :   [a-fA-F0-9] ;

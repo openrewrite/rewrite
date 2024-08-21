@@ -17,19 +17,16 @@ package org.openrewrite.xml.security;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.nio.file.Paths;
-
 public class IsOwaspSuppressionsFile extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find OWASP `suppressions.xml`";
+        return "Find OWASP vulnerability suppression XML files";
     }
 
     @Override
@@ -41,9 +38,9 @@ public class IsOwaspSuppressionsFile extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new XmlIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                Xml.Document doc = super.visitDocument(document, executionContext);
-                if (!doc.getSourcePath().equals(Paths.get("suppressions.xml")) || doc.getRoot() == null) {
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml.Document doc = super.visitDocument(document, ctx);
+                if (doc.getRoot() == null) {
                     return doc;
                 }
                 Xml.Tag root = doc.getRoot();
@@ -62,7 +59,7 @@ public class IsOwaspSuppressionsFile extends Recipe {
                     }
                 }
                 if (isOwaspSuppressionFile) {
-                    return doc.withRoot(doc.getRoot().withMarkers(doc.getRoot().getMarkers().addIfAbsent(new SearchResult(Tree.randomId(), "Found it"))));
+                    return doc.withRoot(SearchResult.found(doc.getRoot()));
                 }
                 return doc;
             }

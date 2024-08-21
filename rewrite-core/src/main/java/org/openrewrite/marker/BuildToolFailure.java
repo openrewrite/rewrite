@@ -18,7 +18,7 @@ package org.openrewrite.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -37,6 +37,7 @@ public class BuildToolFailure implements Marker {
      * The name of the build tool that failed, possibly a wrapper.
      */
     String type;
+
     @Nullable
     String version;
 

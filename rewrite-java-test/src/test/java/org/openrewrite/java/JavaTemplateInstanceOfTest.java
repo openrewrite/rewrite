@@ -16,11 +16,11 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -55,7 +55,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         //noinspection DataFlowIssue
         spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+              public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
                   return literal.getValue() == Integer.valueOf(42) ?
                     JavaTemplate.builder("s.length()")
                       .contextSensitive()
@@ -64,11 +64,11 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                         getCursor(),
                         literal.getCoordinates().replace()
                       ) :
-                    super.visitLiteral(literal, executionContext);
+                    super.visitLiteral(literal, ctx);
               }
           }))
           // custom missing type validation
-          .typeValidationOptions(TypeValidation.none())
+          .afterTypeValidationOptions(TypeValidation.none())
           .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
 
@@ -78,14 +78,14 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           templatedJava17(
             """
-                class T {
-                    Object m(Object o) {
-                        if (true || (o instanceof String s && 42 != 1)) {
-                            return /*invalid*/ 42;
-                        }
-                        return /*invalid*/ 42;
-                    }
-                }
+              class T {
+                  Object m(Object o) {
+                      if (true || (o instanceof String s && 42 != 1)) {
+                          return /*invalid*/ 42;
+                      }
+                      return /*invalid*/ 42;
+                  }
+              }
               """
           )
         );
@@ -99,15 +99,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           templatedJava17(
             """
-                import java.util.stream.Stream;
-                class T {
-                    Object m(Object o) {
-                        if (o instanceof String s && Stream.of("x").anyMatch(e -> 42 == e.length())) {
-                            return 42;
-                        }
-                        return /*invalid*/ 42;
-                    }
-                }
+              import java.util.stream.Stream;
+              class T {
+                  Object m(Object o) {
+                      if (o instanceof String s && Stream.of("x").anyMatch(e -> 42 == e.length())) {
+                          return 42;
+                      }
+                      return /*invalid*/ 42;
+                  }
+              }
               """
           )
         );
@@ -119,19 +119,19 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           templatedJava17(
             """
-                class T {
-                    Object m(Object o) {
-                        if (!(o instanceof String s)) {
-                            return /*invalid*/ 42;
-                        } else {
-                            try {
-                            } finally {
-                                return 42;
-                            }
-                        }
-                        return /*invalid*/ 42;
-                    }
-                }
+              class T {
+                  Object m(Object o) {
+                      if (!(o instanceof String s)) {
+                          return /*invalid*/ 42;
+                      } else {
+                          try {
+                          } finally {
+                              return 42;
+                          }
+                      }
+                      return /*invalid*/ 42;
+                  }
+              }
               """
           )
         );
@@ -143,18 +143,18 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           templatedJava17(
             """
-                class T {
-                    Object m(Object o) {
-                        if (!(o instanceof String s)) {
-                            return /*invalid*/ 42;
-                        } else {
-                            A: {
-                                break A;
-                            }
-                        }
-                        return 42;
-                    }
-                }
+              class T {
+                  Object m(Object o) {
+                      if (!(o instanceof String s)) {
+                          return /*invalid*/ 42;
+                      } else {
+                          A: {
+                              break A;
+                          }
+                      }
+                      return 42;
+                  }
+              }
               """
           )
         );
@@ -165,20 +165,20 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           templatedJava17(
             """
-                class T {
-                    Object m(Object o) {
-                        A: {
-                            if (!(o instanceof String s)) {
-                                return /*invalid 1*/ 42;
-                            } else {
-                                System.out.println(42);
-                                break A;
-                            }
-                            return /*invalid 2*/ 42;
-                        }
-                        return /*invalid 3*/ 42;
-                    }
-                }
+              class T {
+                  Object m(Object o) {
+                      A: {
+                          if (!(o instanceof String s)) {
+                              return /*invalid 1*/ 42;
+                          } else {
+                              System.out.println(42);
+                              break A;
+                          }
+                          return /*invalid 2*/ 42;
+                      }
+                      return /*invalid 3*/ 42;
+                  }
+              }
               """
           )
         );
@@ -189,16 +189,16 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           templatedJava17(
             """
-                class T {
-                    Object m(Object o) {
-                        if (o instanceof String s) {
-                            return 42;
-                        } else {
-                            System.out.println(/*invalid*/ 42);
-                        }
-                        return /*invalid*/ 42;
-                    }
-                }
+              class T {
+                  Object m(Object o) {
+                      if (o instanceof String s) {
+                          return 42;
+                      } else {
+                          System.out.println(/*invalid*/ 42);
+                      }
+                      return /*invalid*/ 42;
+                  }
+              }
               """
           )
         );
@@ -209,15 +209,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           templatedJava17(
             """
-                class T {
-                    Object m(Object o) {
-                        if (o instanceof String s)
-                            return 42;
-                        else
-                            System.out.println(/*invalid*/ 42);
-                        return /*invalid*/ 42;
-                    }
-                }
+              class T {
+                  Object m(Object o) {
+                      if (o instanceof String s)
+                          return 42;
+                      else
+                          System.out.println(/*invalid*/ 42);
+                      return /*invalid*/ 42;
+                  }
+              }
               """
           )
         );
@@ -228,16 +228,16 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           templatedJava17(
             """
-                class T {
-                    Object m(Object o) {
-                        if (o instanceof String s) {
-                            System.out.println(42);
-                        } else {
-                            System.out.println(/*invalid*/ 42);
-                        }
-                        return /*invalid*/ 42;
-                    }
-                }
+              class T {
+                  Object m(Object o) {
+                      if (o instanceof String s) {
+                          System.out.println(42);
+                      } else {
+                          System.out.println(/*invalid*/ 42);
+                      }
+                      return /*invalid*/ 42;
+                  }
+              }
               """
           )
         );
@@ -248,16 +248,16 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           templatedJava17(
             """
-                class T {
-                    Object m(Object o) {
-                        if (o instanceof String s) {
-                            System.out.println(42);
-                        } else {
-                            return /*invalid*/ 42;
-                        }
-                        return 42;
-                    }
-                }
+              class T {
+                  Object m(Object o) {
+                      if (o instanceof String s) {
+                          System.out.println(42);
+                      } else {
+                          return /*invalid*/ 42;
+                      }
+                      return 42;
+                  }
+              }
               """
           )
         );
@@ -456,11 +456,11 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           templatedJava17(
             """
-                class T {
-                    Object m(Object o) {
-                        return o instanceof String s && 42 > 0 ? 42 : /*invalid*/ 42;
-                    }
-                }
+              class T {
+                  Object m(Object o) {
+                      return o instanceof String s && 42 > 0 ? 42 : /*invalid*/ 42;
+                  }
+              }
               """
           )
         );
@@ -472,8 +472,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
-                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                    J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, p);
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                     if (!new MethodMatcher("java.lang.String format(String, Object[])").matches(mi)) {
                         return mi;
                     }
@@ -489,7 +489,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                       );
 
                     mi = maybeAutoFormat(mi, mi.withArguments(
-                      ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), p);
+                      ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), ctx);
                     return mi;
                 }
             }

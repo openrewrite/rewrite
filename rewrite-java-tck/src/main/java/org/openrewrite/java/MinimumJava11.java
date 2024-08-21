@@ -26,6 +26,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Retention(RUNTIME)
 @Target({TYPE, METHOD})
-@Tag("java17")
+@Tag("java11")
 public @interface MinimumJava11 {
 }

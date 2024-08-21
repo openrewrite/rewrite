@@ -15,16 +15,17 @@
  */
 package org.openrewrite.test;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -34,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -80,10 +82,12 @@ public class RecipeSpec {
     @Nullable
     TypeValidation typeValidation;
 
+    @Nullable
+    TypeValidation afterTypeValidation;
+
     boolean serializationValidation = true;
 
-    @Nullable
-    PrintOutputCapture.MarkerPrinter markerPrinter;
+    PrintOutputCapture.@Nullable MarkerPrinter markerPrinter;
 
     List<UncheckedConsumer<List<SourceFile>>> beforeRecipes = new ArrayList<>();
 
@@ -93,6 +97,9 @@ public class RecipeSpec {
 
     @Nullable
     Function<List<SourceFile>, LargeSourceSet> sourceSet;
+
+    @Nullable
+    RecipePrinter recipePrinter;
 
     /**
      * Configuration that applies to all source file inputs.
@@ -113,26 +120,42 @@ public class RecipeSpec {
     }
 
     public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {
-        return recipe(Environment.builder()
-                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
-                .build()
-                .activateRecipes(activeRecipes));
+        return recipe(recipeFromInputStream(yaml, activeRecipes));
     }
 
     public RecipeSpec recipeFromYaml(@Language("yaml") String yaml, String... activeRecipes) {
-        return recipe(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)), activeRecipes);
+        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromYaml", yaml, key(activeRecipes)),
+                k -> recipeFromInputStream(
+                        new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)), activeRecipes)));
     }
 
     public RecipeSpec recipeFromResource(String yamlResource, String... activeRecipes) {
-        return recipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), activeRecipes);
+        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromResource", yamlResource, key(activeRecipes)),
+                k -> recipeFromInputStream(
+                        Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), activeRecipes)));
     }
 
     public RecipeSpec recipeFromResources(String... activeRecipes) {
-        return recipe(Environment.builder()
-                .scanYamlResources()
-                .build()
-                .activateRecipes(activeRecipes));
+        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromResources", key(activeRecipes)),
+                k -> Environment.builder()
+                        .scanYamlResources()
+                        .build()
+                        .activateRecipes(activeRecipes)));
     }
+
+    private static Recipe recipeFromInputStream(InputStream yaml, String... activeRecipes) {
+        return Environment.builder()
+                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, Collections.emptyList(),
+                        mapper -> mapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)))
+                .build()
+                .activateRecipes(activeRecipes);
+    }
+
+    private static String key(String... s) {
+        return String.join("-", s);
+    }
+
+    private static final Map<String, Recipe> RECIPE_CACHE = new HashMap<>();
 
     /**
      * @param parser The parser supplier to use when a matching source file is found.
@@ -143,13 +166,13 @@ public class RecipeSpec {
         return this;
     }
 
-    public RecipeSpec executionContext(ExecutionContext executionContext) {
-        this.executionContext = executionContext;
+    public RecipeSpec executionContext(ExecutionContext ctx) {
+        this.executionContext = ctx;
         return this;
     }
 
-    public RecipeSpec recipeExecutionContext(ExecutionContext executionContext) {
-        this.recipeExecutionContext = executionContext;
+    public RecipeSpec recipeExecutionContext(ExecutionContext ctx) {
+        this.recipeExecutionContext = ctx;
         return this;
     }
 
@@ -191,12 +214,19 @@ public class RecipeSpec {
                     return;
                 }
             }
-            fail("No data table found with row type " + rowType);
+            String message = "No data table found with row type: " + rowType;
+            Set<DataTable<?>> tables = run.getDataTables().keySet();
+            if (!tables.isEmpty()) {
+                message += "\nFound data tables row type(s): " + tables.stream()
+                        .map(it -> it.getType().getName().replace("$", "."))
+                        .collect(Collectors.joining(","));
+            }
+            fail(message);
         });
     }
 
     @Incubating(since = "7.35.0")
-    public <E, V> RecipeSpec dataTableAsCsv(Class<DataTable<?>> dataTableClass, String expect) {
+    public <E, V> RecipeSpec dataTableAsCsv(Class<? extends DataTable<?>> dataTableClass, String expect) {
         return dataTableAsCsv(dataTableClass.getName(), expect);
     }
 
@@ -247,8 +277,19 @@ public class RecipeSpec {
         return this;
     }
 
+    public RecipeSpec afterTypeValidationOptions(TypeValidation typeValidation) {
+        this.afterTypeValidation = typeValidation;
+        return this;
+    }
+
     @Nullable
     ExecutionContext getExecutionContext() {
         return executionContext;
+    }
+
+    @Incubating(since = "8.12.1")
+    public RecipeSpec printRecipe(RecipePrinter recipePrinter) {
+        this.recipePrinter = recipePrinter;
+        return this;
     }
 }

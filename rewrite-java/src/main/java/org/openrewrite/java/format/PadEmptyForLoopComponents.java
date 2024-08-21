@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
@@ -76,8 +76,8 @@ public class PadEmptyForLoopComponents extends Recipe {
             }
 
             @Override
-            public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext executionContext) {
-                J.ForLoop fl = super.visitForLoop(forLoop, executionContext);
+            public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
+                J.ForLoop fl = super.visitForLoop(forLoop, ctx);
                 List<Statement> updates = forLoop.getControl().getUpdate();
                 if (emptyForIteratorPadStyle != null && updates.size() == 1 && updates.get(0) instanceof J.Empty) {
                     Statement update = updates.get(0);

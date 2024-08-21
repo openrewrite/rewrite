@@ -15,7 +15,6 @@
  */
 package org.openrewrite.properties;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -109,7 +108,6 @@ class PropertiesParserTest implements RewriteTest {
     @SuppressWarnings({"WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty"})
     @Issue("https://github.com/openrewrite/rewrite/issues/2471")
     @Test
-    @Disabled
     void escapedEndOfLine() {
         rewriteRun(
           properties(
@@ -200,6 +198,54 @@ class PropertiesParserTest implements RewriteTest {
                 p.printAll();
 
             })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3741")
+    @Test
+    void windowsPaths() {
+        rewriteRun(
+          properties(
+            """
+                    ws.gson.debug.dump=true
+                    ws.gson.debug.mode=CONSOLE
+                    ws.gson.debug.path=C:\\\\Temp\\\\dump_foo\\\\
+                    """,
+            containsValues("true", "CONSOLE", "C:\\\\Temp\\\\dump_foo\\\\")
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3741")
+    @Test
+    void trailingDoubleSlash() {
+        rewriteRun(
+          properties(
+            """
+              foo=C:\\
+              
+              """,
+            spec -> spec.afterRecipe(file -> {
+                assertThat(file).isInstanceOf(Properties.File.class);
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4026")
+    @Test
+    void repeatedDelimiter() {
+        rewriteRun(
+          properties(
+            """
+              key1==value1
+              key2::value2
+              key3======value3
+              key4=:value4
+              key5 = = value5
+              """,
+            containsValues("=value1", ":value2", "=====value3", ":value4", "= value5")
           )
         );
     }
