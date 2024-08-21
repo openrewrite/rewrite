@@ -301,4 +301,20 @@ class LiteralTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void stringLiteralInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def a = ("-")
+              """
+          ),
+          groovy(
+            """
+              def a = (("-"))
+              """
+          )
+        );
+    }
 }

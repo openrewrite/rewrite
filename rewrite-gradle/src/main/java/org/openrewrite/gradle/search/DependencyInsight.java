@@ -44,7 +44,6 @@ import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class DependencyInsight extends Recipe {
@@ -102,6 +101,11 @@ public class DependencyInsight extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile.getMarkers().findFirst(GradleProject.class).isPresent();
+            }
+
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);

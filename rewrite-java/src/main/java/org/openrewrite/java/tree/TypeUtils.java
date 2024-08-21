@@ -227,6 +227,9 @@ public class TypeUtils {
                 }
                 return !(from instanceof JavaType.GenericTypeVariable) && isAssignableTo(toFq.getFullyQualifiedName(), from);
             } else if (to instanceof JavaType.GenericTypeVariable) {
+                if (from instanceof JavaType.GenericTypeVariable && isOfType(to, from)) {
+                    return true;
+                }
                 JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
                 List<JavaType> toBounds = toGeneric.getBounds();
                 if (!toGeneric.getName().equals("?")) {

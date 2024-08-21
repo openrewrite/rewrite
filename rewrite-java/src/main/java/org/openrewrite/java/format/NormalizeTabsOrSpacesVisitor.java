@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.internal.lang.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;

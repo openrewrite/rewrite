@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.trait;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -33,6 +34,7 @@ class GradleDependencyTest implements RewriteTest {
             SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
     }
 
+    @DocumentExample
     @Test
     void literal() {
         rewriteRun(

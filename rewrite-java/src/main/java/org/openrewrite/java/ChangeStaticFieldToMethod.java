@@ -19,9 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.internal.lang.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.search.UsesField;
 import org.openrewrite.java.tree.*;
 

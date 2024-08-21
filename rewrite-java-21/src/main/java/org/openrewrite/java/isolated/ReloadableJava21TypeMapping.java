@@ -47,7 +47,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
 
     public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
-                type instanceof NullType) {
+            type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
@@ -211,7 +211,12 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType generic(Type.TypeVar type, String signature) {
-        String name = type.tsym.name.toString();
+        String name;
+        if (type instanceof Type.CapturedType && ((Type.CapturedType) type).wildcard.kind == BoundKind.UNBOUND) {
+            name = "?";
+        } else {
+            name = type.tsym.name.toString();
+        }
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
                 name, INVARIANT, null);
         typeCache.put(signature, gtv);
