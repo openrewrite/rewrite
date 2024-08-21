@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.isolated;
 
+import com.sun.tools.javac.code.BoundKind;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
@@ -51,7 +52,7 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
             }
         } else if (type instanceof Type.CapturedType) { // CapturedType must be evaluated before TypeVar
-            return signature(((Type.CapturedType) type).wildcard);
+            return genericSignature(type);
         } else if (type instanceof Type.TypeVar) {
             return genericSignature(type);
         } else if (type instanceof Type.JCPrimitiveType) {
@@ -140,7 +141,12 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
-        String name = generic.tsym.name.toString();
+        String name;
+        if (generic instanceof Type.CapturedType && ((Type.CapturedType) generic).wildcard.kind == BoundKind.UNBOUND) {
+            name = "?";
+        } else {
+            name = generic.tsym.name.toString();
+        }
 
         if (typeVariableNameStack == null) {
             typeVariableNameStack = new HashSet<>();
