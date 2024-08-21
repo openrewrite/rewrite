@@ -76,34 +76,34 @@ public class GitRemoteTest {
 
     @ParameterizedTest
     @CsvSource(textBlock = """
-      https://scm.company.com/stash/scm/org/repo.git, scm.company.com/stash, Bitbucket, org/repo, org, repo
-      http://scm.company.com:80/stash/scm/org/repo.git, http://scm.company.com/stash, Bitbucket, org/repo, org, repo
-      http://scm.company.com:8080/stash/scm/org/repo.git, http://scm.company.com:8080/stash, Bitbucket, org/repo, org, repo
-      https://scm.company.com:443/stash/scm/org/repo.git, scm.company.com/stash, Bitbucket, org/repo, org, repo
-      https://scm.company.com:1234/stash/scm/org/repo.git, https://scm.company.com:1234/stash, Bitbucket, org/repo, org, repo
-      git@scm.company.com:stash/org/repo.git, scm.company.com/stash, Bitbucket, org/repo, org, repo
-      ssh://scm.company.com/stash/org/repo, scm.company.com/stash, Bitbucket, org/repo, org, repo
-      ssh://scm.company.com:22/stash/org/repo, scm.company.com/stash, Bitbucket, org/repo, org, repo
-      ssh://scm.company.com:7999/stash/org/repo, ssh://scm.company.com:7999/stash, Bitbucket, org/repo, org, repo
+      https://scm.company.com/stash/scm/org/repo.git, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
+      http://scm.company.com:80/stash/scm/org/repo.git, http://scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
+      http://scm.company.com:8080/stash/scm/org/repo.git, http://scm.company.com:8080/stash, Bitbucket, scm.company.com:8080/stash, org/repo, org, repo
+      https://scm.company.com:443/stash/scm/org/repo.git, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo,  org, repo
+      https://scm.company.com:1234/stash/scm/org/repo.git, https://scm.company.com:1234/stash, Bitbucket, scm.company.com:1234/stash, org/repo, org, repo
+      git@scm.company.com:stash/org/repo.git, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
+      ssh://scm.company.com/stash/org/repo, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
+      ssh://scm.company.com:22/stash/org/repo, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
+      ssh://scm.company.com:7999/stash/org/repo, ssh://scm.company.com:7999/stash, Bitbucket, scm.company.com:7999/stash, org/repo, org, repo
       
-      https://scm.company.com/very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, Bitbucket, org/repo, org, repo
-      https://scm.company.com:1234/very/long/context/path/org/repo.git, https://scm.company.com:1234/very/long/context/path, Bitbucket, org/repo, org, repo
-      git@scm.company.com:very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, Bitbucket, org/repo, org, repo
+      https://scm.company.com/very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, Bitbucket, scm.company.com/very/long/context/path, org/repo, org, repo
+      https://scm.company.com:1234/very/long/context/path/org/repo.git, https://scm.company.com:1234/very/long/context/path, Bitbucket, scm.company.com:1234/very/long/context/path, org/repo, org, repo
+      git@scm.company.com:very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, Bitbucket, scm.company.com/very/long/context/path, org/repo, org, repo
       
-      https://scm.company.com/group/subgroup/subergroup/subestgroup/repo, scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      https://scm.company.com:1234/group/subgroup/subergroup/subestgroup/repo, https://scm.company.com:1234, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      git@scm.company.com/group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      git@scm.company.com:group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      https://scm.company.com:443/group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      ssh://scm.company.com:22/group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      ssh://scm.company.com:222/group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com:222, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      https://scm.company.com/group/subgroup/subergroup/subestgroup/repo, scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      https://scm.company.com:1234/group/subgroup/subergroup/subestgroup/repo, https://scm.company.com:1234, GitLab, scm.company.com:1234, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      git@scm.company.com/group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      git@scm.company.com:group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      https://scm.company.com:443/group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      ssh://scm.company.com:22/group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      ssh://scm.company.com:222/group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com:222, GitLab, scm.company.com:222, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       
-      https://scm.company.com/very/long/context/path/group/subgroup/subergroup/subestgroup/repo, scm.company.com/very/long/context/path, GitLab, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      https://scm.company.com/very/long/context/path/group/subgroup/subergroup/subestgroup/repo, scm.company.com/very/long/context/path, GitLab, scm.company.com/very/long/context/path, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       """)
-    void parseRegisteredRemote(String cloneUrl, String origin, GitRemote.Service service, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
-        GitRemote.Parser parser = new GitRemote.Parser().registerRemote(service, origin);
+    void parseRegisteredRemote(String cloneUrl, String originToRegister, GitRemote.Service service, String expectedOrigin, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
+        GitRemote.Parser parser = new GitRemote.Parser().registerRemote(service, originToRegister);
         GitRemote remote = parser.parse(cloneUrl);
-        assertThat(remote.getOrigin()).isEqualTo(origin);
+        assertThat(remote.getOrigin()).isEqualTo(expectedOrigin);
         assertThat(remote.getPath()).isEqualTo(expectedPath);
         assertThat(remote.getOrganization()).isEqualTo(expectedOrganization);
         assertThat(remote.getRepositoryName()).isEqualTo(expectedRepositoryName);
@@ -203,7 +203,7 @@ public class GitRemoteTest {
     void buildUri(GitRemote.Service service, String origin, String path, String protocol, String expectedUri) {
         GitRemote remote = new GitRemote(service, null, origin, path, null, null);
         URI uri = new GitRemote.Parser()
-          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/context/bitbucket/"), List.of( URI.create("http://scm.company.com/context/bitbucket/"),URI.create("ssh://git@scm.company.com:7999/context/bitbucket")))
+          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/context/bitbucket/"), List.of(URI.create("http://scm.company.com/context/bitbucket/"), URI.create("ssh://git@scm.company.com:7999/context/bitbucket")))
           .registerRemote(GitRemote.Service.GitHub, URI.create("https://scm.company.com/context/github"), List.of(URI.create("ssh://git@scm.company.com/context/github/")))
           .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com/context/gitlab/"), List.of(URI.create("ssh://git@scm.company.com:8022/context/gitlab")))
           .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com:8443/context/gitlab"), List.of(URI.create("https://scm.company.com/context/gitlab/")))
@@ -220,7 +220,7 @@ public class GitRemoteTest {
     }
 
     @Test
-    void shouldNotStripJgit(){
+    void shouldNotStripJgit() {
         GitRemote.Parser parser = new GitRemote.Parser();
         GitRemote remote = parser.parse("https://github.com/openrewrite/jgit");
         assertThat(remote.getPath()).isEqualTo("openrewrite/jgit");

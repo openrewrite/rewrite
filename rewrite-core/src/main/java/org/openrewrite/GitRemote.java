@@ -147,7 +147,10 @@ public class GitRemote {
          * @return this
          */
         public Parser registerRemote(Service service, String origin) {
-            add(new RemoteServer(service, origin, normalize(origin)));
+            URI normalizedUri = normalize(origin);
+            String maybePort = maybePort(normalizedUri.getPort(), normalizedUri.getScheme());
+            String normalizedOrigin = normalizedUri.getHost() + maybePort + normalizedUri.getPath();
+            add(new RemoteServer(service, normalizedOrigin, normalize(origin)));
             return this;
         }
 
@@ -195,11 +198,11 @@ public class GitRemote {
                     .findFirst()
                     .orElseGet(() -> {
                         String[] segments = normalizedUri.getPath().split("/");
-                        String origin1 = normalizedUri.getHost() + maybePort(normalizedUri.getPort(), normalizedUri.getScheme());
+                        String origin = normalizedUri.getHost() + maybePort(normalizedUri.getPort(), normalizedUri.getScheme());
                         if (segments.length > 2) {
-                            origin1 += Arrays.stream(segments, 0, segments.length - 2).collect(Collectors.joining("/"));
+                            origin += Arrays.stream(segments, 0, segments.length - 2).collect(Collectors.joining("/"));
                         }
-                        return new RemoteServerMatch(Service.Unknown, origin1, URI.create(normalizedUri.getScheme() + "://" + origin1));
+                        return new RemoteServerMatch(Service.Unknown, origin, URI.create(normalizedUri.getScheme() + "://" + origin));
                     });
         }
 
