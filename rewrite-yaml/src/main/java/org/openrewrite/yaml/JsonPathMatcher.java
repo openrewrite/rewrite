@@ -21,9 +21,9 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.internal.grammar.JsonPathLexer;
 import org.openrewrite.yaml.internal.grammar.JsonPathParser;
 import org.openrewrite.yaml.internal.grammar.JsonPathParserBaseVisitor;
@@ -647,8 +647,7 @@ public class JsonPathMatcher {
             return null;
         }
 
-        @Nullable
-        private Object getBinaryExpressionResult(Object ctx) {
+        private @Nullable Object getBinaryExpressionResult(Object ctx) {
             if (ctx instanceof JsonPathParser.BinaryExpressionContext) {
                 ctx = visitBinaryExpression((JsonPathParser.BinaryExpressionContext) ctx);
 
@@ -668,8 +667,7 @@ public class JsonPathMatcher {
         }
 
         // Interpret the LHS to check the appropriate value.
-        @Nullable
-        private Yaml getOperatorResult(Object lhs, String operator, Object rhs) {
+        private @Nullable Yaml getOperatorResult(Object lhs, String operator, Object rhs) {
             if (lhs instanceof Yaml.Mapping) {
                 Yaml.Mapping mapping = (Yaml.Mapping) lhs;
                 for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
@@ -714,8 +712,7 @@ public class JsonPathMatcher {
         }
 
         // Extract the result from YAML objects that can match by key.
-        @Nullable
-        public Object getResultByKey(Object result, String key) {
+        public @Nullable Object getResultByKey(Object result, String key) {
             if (result instanceof Yaml.Mapping.Entry) {
                 Yaml.Mapping.Entry member = (Yaml.Mapping.Entry) result;
                 if (member.getValue() instanceof Yaml.Scalar) {
@@ -746,8 +743,7 @@ public class JsonPathMatcher {
         }
 
         // Extract the value from a Json object.
-        @Nullable
-        private Object getValue(Object result) {
+        private @Nullable Object getValue(Object result) {
             if (result instanceof Yaml.Mapping.Entry) {
                 return getValue(((Yaml.Mapping.Entry) result).getValue());
             } else if (result instanceof Yaml.Mapping) {

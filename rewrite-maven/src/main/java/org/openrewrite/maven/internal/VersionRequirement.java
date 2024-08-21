@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.TerminalNode;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.grammar.VersionRangeLexer;
 import org.openrewrite.maven.internal.grammar.VersionRangeParser;
@@ -214,6 +214,7 @@ public class VersionRequirement {
     @Value
     private static class Range {
         boolean lowerClosed;
+
         @Nullable
         Version lower;
 
@@ -229,16 +230,14 @@ public class VersionRequirement {
         }
     }
 
-    @Nullable
-    public String resolve(DownloadOperation<Iterable<String>> availableVersions) throws MavenDownloadingException {
+    public @Nullable String resolve(DownloadOperation<Iterable<String>> availableVersions) throws MavenDownloadingException {
         if (selected == null) {
             selected = cacheResolved(availableVersions);
         }
         return selected;
     }
 
-    @Nullable
-    private String cacheResolved(DownloadOperation<Iterable<String>> availableVersions) throws MavenDownloadingException {
+    private @Nullable String cacheResolved(DownloadOperation<Iterable<String>> availableVersions) throws MavenDownloadingException {
         String nearestSoftRequirement = null;
         VersionRequirement next = this;
         VersionRequirement nearestHardRequirement = null;
@@ -281,8 +280,7 @@ public class VersionRequirement {
         return latest.toString();
     }
 
-    @Nullable
-    public String resolve(GroupArtifact groupArtifact, MavenPomDownloader downloader, List<MavenRepository> repositories) throws MavenDownloadingException {
+    public @Nullable String resolve(GroupArtifact groupArtifact, MavenPomDownloader downloader, List<MavenRepository> repositories) throws MavenDownloadingException {
         return resolve(() -> {
             MavenMetadata metadata = downloader.downloadMetadata(groupArtifact, null, repositories);
             return metadata.getVersioning().getVersions();

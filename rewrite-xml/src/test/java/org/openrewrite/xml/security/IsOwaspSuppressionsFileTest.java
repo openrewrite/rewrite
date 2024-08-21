@@ -32,7 +32,6 @@ class IsOwaspSuppressionsFileTest implements RewriteTest {
     @Test
     void doesntAffectFilesWithoutXmlns() {
         rewriteRun(
-                spec -> spec.cycles(1).expectedCyclesThatMakeChanges(0),
                 xml("""
                         <?xml version="1.0" encoding="UTF-8" ?>
                         <suppressions>
@@ -49,7 +48,6 @@ class IsOwaspSuppressionsFileTest implements RewriteTest {
     @Test
     void doesntAffectFilesWithWrongXmlns() {
         rewriteRun(
-                spec -> spec.cycles(1).expectedCyclesThatMakeChanges(0),
                 xml("""
                         <?xml version="1.0" encoding="UTF-8" ?>
                         <suppressions xmlns="http://foo.bar/literally-anything-else.xsd">
@@ -67,7 +65,6 @@ class IsOwaspSuppressionsFileTest implements RewriteTest {
     @Test
     void addsMarkerToFilesWithCorrectXmlns() {
         rewriteRun(
-                spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1),
                 xml("""
                         <?xml version="1.0" encoding="UTF-8" ?>
                         <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -93,7 +90,6 @@ class IsOwaspSuppressionsFileTest implements RewriteTest {
     @Test
     void worksEvenWithoutOnePointThree() {
         rewriteRun(
-                spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1),
                 xml("""
                         <?xml version="1.0" encoding="UTF-8" ?>
                         <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.2.4.xsd">
@@ -119,7 +115,6 @@ class IsOwaspSuppressionsFileTest implements RewriteTest {
     @Test
     void changesIfSuppressionsFile() {
         rewriteRun(
-                spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1),
                 xml("""
                         <?xml version="1.0" encoding="UTF-8" ?>
                         <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.2.4.xsd">

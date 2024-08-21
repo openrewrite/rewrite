@@ -244,12 +244,12 @@ class UpgradePluginVersionTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-
+              
                 <packaging>pom</packaging>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app-bom</artifactId>
                 <version>1</version>
-
+              
                 <build>
                   <pluginManagement>
                     <plugins>
@@ -257,6 +257,28 @@ class UpgradePluginVersionTest implements RewriteTest {
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>rewrite-maven-plugin</artifactId>
                         <version>4.2.2</version>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <packaging>pom</packaging>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-bom</artifactId>
+                <version>1</version>
+              
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>rewrite-maven-plugin</artifactId>
+                        <version>4.2.3</version>
                       </plugin>
                     </plugins>
                   </pluginManagement>

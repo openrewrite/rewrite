@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -409,10 +409,12 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
             visit(arrayType.getElementType(), p);
             visit(arrayType.getAnnotations(), p);
-            visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
-            p.append('[');
-            visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
-            p.append(']');
+            if (arrayType.getDimension() != null) {
+                visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
+                p.append('[');
+                visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
+                p.append(']');
+            }
             afterSyntax(arrayType, p);
             return arrayType;
         }
@@ -516,7 +518,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
         }
 
-        private void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
+        private void beforeSyntax(Space prefix, Markers markers, Space.@Nullable Location loc, PrintOutputCapture<P> p) {
             for (Marker marker : markers.getMarkers()) {
                 p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
             }

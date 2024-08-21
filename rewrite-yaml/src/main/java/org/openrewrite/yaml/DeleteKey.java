@@ -17,6 +17,7 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
@@ -24,12 +25,20 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class DeleteKey extends Recipe {
     @Option(displayName = "Key path",
-            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML entry.",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a YAML entry.",
             example = "$.source.kind")
     String keyPath;
+
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
+            example = ".github/workflows/*.yml")
+    @Nullable
+    String filePattern;
 
     @Override
     public String getDisplayName() {
@@ -44,7 +53,7 @@ public class DeleteKey extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
-        return new YamlIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
                 if (matcher.matches(getCursor()) || matcher.matches(new Cursor(getCursor(), entry.getBlock()))) {
@@ -75,6 +84,6 @@ public class DeleteKey extends Recipe {
 
                 return m;
             }
-        };
+        });
     }
 }

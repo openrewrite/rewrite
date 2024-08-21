@@ -22,9 +22,9 @@ import com.sun.jna.platform.win32.Kernel32Util;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -231,8 +231,7 @@ public abstract class OperatingSystemProvenance implements Marker {
     /**
      * Locates the given executable in the system path. Returns null if not found.
      */
-    @Nullable
-    public File findInPath(String name) {
+    public @Nullable File findInPath(String name) {
         String exeName = getExecutableName(name);
         if (exeName.contains(File.separator)) {
             File candidate = new File(exeName);

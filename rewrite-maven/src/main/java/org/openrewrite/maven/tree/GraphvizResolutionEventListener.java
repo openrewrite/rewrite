@@ -24,7 +24,7 @@ import guru.nidi.graphviz.model.Link;
 import guru.nidi.graphviz.model.MutableGraph;
 import guru.nidi.graphviz.model.MutableNode;
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -121,11 +121,13 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
     }
 
     @Override
-    public void downloadError(GroupArtifactVersion gav, Pom containing) {
+    public void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
         Link link = to(gavNode(gav).add(Style.FILLED, Color.rgb("ff1947")))
                 .with(Label.of("error"));
-        gavNode(containing.getGav())
-                .addLink(link);
+        if(containing != null) {
+            gavNode(containing.getGav())
+                    .addLink(link);
+        }
     }
 
     @Override
@@ -142,6 +144,7 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
         gavNode(containing.getGav()).addLink(link);
     }
 
+    @SuppressWarnings("unused")
     public Graphviz graphviz() {
         return Graphviz.fromGraph(g);
     }
@@ -188,8 +191,7 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
         });
     }
 
-    @Nullable
-    private String gavUrl(GroupArtifactVersion gav) {
+    private @Nullable String gavUrl(GroupArtifactVersion gav) {
         if (gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
             return null;
         }

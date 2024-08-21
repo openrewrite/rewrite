@@ -18,9 +18,9 @@ package org.openrewrite.xml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
@@ -81,7 +81,7 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            return XmlParser.builder().build().parse("")
+            return XmlParser.builder().build().parse(fileContents == null ? "" : fileContents)
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
         }
@@ -94,7 +94,7 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
         return new XmlVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(document.getSourcePath())) {
+                if (Boolean.TRUE.equals(overwriteExisting) && path.equals(document.getSourcePath())) {
                     if (StringUtils.isBlank(fileContents)) {
                         return document.withProlog(null).withRoot(null);
                     }

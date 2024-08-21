@@ -15,14 +15,14 @@
  */
 package org.openrewrite.java.isolated;
 
+import com.sun.source.doctree.*;
 import com.sun.source.doctree.ErroneousTree;
 import com.sun.source.doctree.LiteralTree;
 import com.sun.source.doctree.ProvidesTree;
 import com.sun.source.doctree.ReturnTree;
 import com.sun.source.doctree.UsesTree;
-import com.sun.source.doctree.*;
-import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.*;
+import com.sun.source.tree.IdentifierTree;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
@@ -32,9 +32,9 @@ import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -52,8 +52,7 @@ import static org.openrewrite.java.tree.Space.format;
 public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private final Attr attr;
 
-    @Nullable
-    private final Symbol.TypeSymbol symbol;
+    private final Symbol.@Nullable TypeSymbol symbol;
 
     @Nullable
     private final Type enclosingClassType;
@@ -681,8 +680,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return qualifier;
     }
 
-    @Nullable
-    private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         if (type instanceof JavaType.Class) {
             JavaType.Class classType = (JavaType.Class) type;
 
@@ -738,8 +736,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return false;
     }
 
-    @Nullable
-    private JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;
@@ -1163,7 +1160,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
             } else {
                 cursor = saveCursor;
-                return elemType;
+                return elemType.withPrefix(fmt);
             }
 
             return new J.ArrayType(

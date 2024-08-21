@@ -17,7 +17,7 @@
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.text.ChangeTextToJon
 displayName: Change Text To Jon
-description: Changes Text to "Hello Jon!"
+description: Changes Text to "Hello Jon!".
 tags:
   - testing
   - plain text

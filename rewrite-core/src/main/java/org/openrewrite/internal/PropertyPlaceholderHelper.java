@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Function;
@@ -54,6 +54,14 @@ public class PropertyPlaceholderHelper {
             this.simplePrefix = this.placeholderPrefix;
         }
         this.valueSeparator = valueSeparator;
+    }
+
+    public boolean hasPlaceholders(@Nullable String value) {
+        if (value == null) {
+            return false;
+        }
+        int startIndex = value.indexOf(placeholderPrefix);
+        return startIndex > -1 && value.indexOf(placeholderSuffix, startIndex) > startIndex;
     }
 
     public String replacePlaceholders(String value, final Properties properties) {

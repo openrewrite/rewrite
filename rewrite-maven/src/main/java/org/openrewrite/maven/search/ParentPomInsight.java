@@ -17,8 +17,8 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.table.ParentPomsInUse;
@@ -28,7 +28,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class ParentPomInsight extends Recipe {
     transient ParentPomsInUse inUse = new ParentPomsInUse(this);

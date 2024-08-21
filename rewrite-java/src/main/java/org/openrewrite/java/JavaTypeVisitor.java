@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.List;
@@ -38,13 +38,11 @@ public class JavaTypeVisitor<P> {
         return ListUtils.map(javaTypes, jt -> (JT) visit(jt, p));
     }
 
-    @Nullable
-    public JavaType preVisit(JavaType javaType, P p) {
+    public @Nullable JavaType preVisit(JavaType javaType, P p) {
         return javaType;
     }
 
-    @Nullable
-    public JavaType postVisit(JavaType javaType, P p) {
+    public @Nullable JavaType postVisit(JavaType javaType, P p) {
         return javaType;
     }
 
@@ -110,6 +108,7 @@ public class JavaTypeVisitor<P> {
     public JavaType visitArray(JavaType.Array array, P p) {
         JavaType.Array a = array;
         a = a.withElemType(visit(a.getElemType(), p));
+        a = a.withAnnotations(visit(a.getAnnotations(), p));
         return a;
     }
 

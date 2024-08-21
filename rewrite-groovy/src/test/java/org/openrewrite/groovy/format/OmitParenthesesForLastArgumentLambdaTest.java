@@ -23,7 +23,7 @@ import org.openrewrite.test.SourceSpecs;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class OmitParenthesesForLastArgumentLambdaTest implements RewriteTest {
+class OmitParenthesesForLastArgumentLambdaTest implements RewriteTest {
     final SourceSpecs closureApi = groovy(
       """
         class Test {

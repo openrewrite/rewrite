@@ -19,8 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.ByteArrayInputStream;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -31,8 +29,7 @@ class SourceFileResultsTest implements RewriteTest {
     void hierarchical() {
         rewriteRun(
           spec -> spec
-            .recipe(
-              new ByteArrayInputStream(
+            .recipeFromYaml(
                 //language=yml
                 """
                   type: specs.openrewrite.org/v1beta/recipe
@@ -40,17 +37,16 @@ class SourceFileResultsTest implements RewriteTest {
                   displayName: Change text to hello
                   description: Hello world.
                   recipeList:
-                      - org.openrewrite.text.ChangeText:
-                          toText: Hello!
-                  """.getBytes()
-              ),
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello!
+                  """,
               "test.ChangeTextToHello"
             ).dataTable(SourcesFileResults.Row.class, rows -> {
-                assertThat(rows).hasSize(2);
+                assertThat(rows).hasSize(1);
                 assertThat(rows.stream().map(SourcesFileResults.Row::getParentRecipe))
-                  .containsExactly("test.ChangeTextToHello", "");
+                  .containsExactly("test.ChangeTextToHello");
                 assertThat(rows.stream().map(SourcesFileResults.Row::getRecipe))
-                  .containsExactly("org.openrewrite.text.ChangeText", "test.ChangeTextToHello");
+                  .containsExactly("org.openrewrite.text.ChangeText");
             }),
           text(
             "Hi",

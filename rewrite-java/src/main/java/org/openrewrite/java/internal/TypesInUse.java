@@ -18,8 +18,8 @@ package org.openrewrite.java.internal;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -65,8 +65,11 @@ public class TypesInUse {
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
             Object parent = Objects.requireNonNull(getCursor().getParent()).getValue();
-            if (parent instanceof J.ClassDeclaration || parent instanceof J.MethodDeclaration) {
-                // skip type of class and method declaration name
+            if (parent instanceof J.ClassDeclaration) {
+                // skip type of class
+                return identifier;
+            } else if (parent instanceof J.MethodDeclaration && ((J.MethodDeclaration) parent).getName() == identifier) {
+                // skip method name
                 return identifier;
             }
             return super.visitIdentifier(identifier, p);

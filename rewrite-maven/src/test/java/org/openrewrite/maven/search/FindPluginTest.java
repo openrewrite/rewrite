@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import java.net.URISyntaxException;
+
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class FindPluginTest implements RewriteTest {
@@ -79,6 +81,68 @@ class FindPluginTest implements RewriteTest {
                 </reporting>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void multiModulePrecondition() throws URISyntaxException {
+        rewriteRun(
+          spec ->  spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.MultiModuleTest
+            description: Test.
+            preconditions:
+              - org.openrewrite.maven.search.FindPlugin:
+                  groupId: org.apache.maven.plugins
+                  artifactId: maven-compiler-plugin
+            recipeList:
+              - org.openrewrite.maven.RemoveDependency:
+                    groupId: com.google.guava
+                    artifactId: guava
+            """, "org.openrewrite.MultiModuleTest"),
+          pomXml(
+            """
+                  <project>
+                      <groupId>org.example</groupId>
+                      <artifactId>mvn_multi_module_test</artifactId>
+                      <version>1.0-SNAPSHOT</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>submodule</module>
+                      </modules>
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.openrewrite.maven</groupId>
+                                  <artifactId>rewrite-maven-plugin</artifactId>
+                                  <version>5.28.0</version>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """, sourceSpecs -> sourceSpecs.path("pom.xml")),
+          pomXml(
+            """
+                <project>
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>mvn_multi_module_test</artifactId>
+                        <version>1.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>submodule</artifactId>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.codehaus.mojo</groupId>
+                                <artifactId>findbugs-maven-plugin</artifactId>
+                                <version>3.0.5</version>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """, sourceSpecs -> sourceSpecs.path("submodule.pom.xml")
           )
         );
     }

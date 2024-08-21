@@ -17,14 +17,14 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePropertyValue extends Recipe {
 
     @Option(displayName = "Key",
@@ -99,6 +99,7 @@ public class ChangePropertyValue extends Recipe {
                 if (isPropertyTag() && propertyName.equals(tag.getName()) &&
                     !newValue.equals(tag.getValue().orElse(null))) {
                     doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+                    maybeUpdateModel();
                 }
                 return super.visitTag(tag, ctx);
             }

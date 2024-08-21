@@ -15,15 +15,15 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.J;
 
 import static org.openrewrite.Tree.randomId;
 
 public class RandomizeIdVisitor<P> extends JavaIsoVisitor<P> {
-    @Nullable
+
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         return tree.withId(randomId());
     }
 }

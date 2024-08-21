@@ -16,14 +16,15 @@
 package org.openrewrite.yaml;
 
 import lombok.Getter;
+import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -127,10 +128,17 @@ public class YamlParser implements org.openrewrite.Parser {
             for (Event event = parser.getEvent(); event != null; event = parser.getEvent()) {
                 switch (event.getEventId()) {
                     case DocumentEnd: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
-
                         assert document != null;
+                        if (blockStack.size() == 1 && blockStack.peek() instanceof ScalarBuilder) {
+                            // The yaml document consists of a single scalar value not in a mapping or sequence
+                            ScalarBuilder builder = (ScalarBuilder) blockStack.pop();
+                            lastEnd = builder.getLastEnd();
+                            Yaml.Scalar scalar = builder.getScalar();
+                            document = document.withBlock(scalar);
+                        }
+                        String fmt = newLine + reader.prefix(lastEnd, event);
+
+                        newLine = "";
                         documents.add(document.withEnd(new Yaml.Document.End(
                                 randomId(),
                                 fmt,
@@ -246,6 +254,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 }
                                 break;
                         }
+                        Yaml.Scalar finalScalar = new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue);
                         BlockBuilder builder = blockStack.isEmpty() ? null : blockStack.peek();
                         if (builder instanceof SequenceBuilder) {
                             // Inline sequences like [1, 2] need to keep track of any whitespace between the element
@@ -256,13 +265,17 @@ public class YamlParser implements org.openrewrite.Parser {
                             String commaPrefix = null;
                             if (commaIndex != -1) {
                                 commaPrefix = betweenEvents.substring(0, commaIndex);
-
                             }
                             lastEnd = event.getEndMark().getIndex() + commaIndex + 1;
-                            sequenceBuilder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue), commaPrefix);
+                            sequenceBuilder.push(finalScalar, commaPrefix);
 
-                        } else if (builder != null) {
-                            builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue));
+                        } else if (builder == null) {
+                            if (!"".equals(finalScalar.getValue())) {
+                                // If the "scalar" is just a comment, allow it to accrue to the Document.End rather than create a phantom scalar
+                                blockStack.push(new ScalarBuilder(finalScalar, event.getEndMark().getIndex()));
+                            }
+                        } else {
+                            builder.push(finalScalar);
                             lastEnd = event.getEndMark().getIndex();
                         }
                         break;
@@ -320,7 +333,10 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (openingBracketIndex != -1) {
                             int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
-                            lastEnd = event.getEndMark().getIndex();
+                        }
+                        lastEnd = event.getEndMark().getIndex();
+                        if (shouldUseYamlParserBugWorkaround(sse)) {
+                            lastEnd--;
                         }
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor));
                         break;
@@ -362,6 +378,17 @@ public class YamlParser implements org.openrewrite.Parser {
         }
     }
 
+    /*
+    The yaml-parser library unfortunately returns inconsistent marks.
+    If the dashes of the sequence have an indentation, the end mark and the start mark point to the dash.
+    If the dashes of the sequence do not have an indentation, the end mark will point to the character AFTER the dash.
+    */
+    private boolean shouldUseYamlParserBugWorkaround(SequenceStartEvent event) {
+        int startChar = event.getStartMark().getBuffer()[event.getStartMark().getPointer()];
+        int endChar = event.getEndMark().getBuffer()[event.getEndMark().getPointer()];
+        return startChar == '-' && endChar != '-';
+    }
+
     private Yaml.Anchor buildYamlAnchor(FormatPreservingReader reader, int lastEnd, String eventPrefix, String anchorKey, int eventEndIndex, boolean isForScalar) {
         int anchorLength = isForScalar ? anchorKey.length() + 1 : anchorKey.length();
         String whitespaceAndScalar = reader.prefix(
@@ -384,9 +411,6 @@ public class YamlParser implements org.openrewrite.Parser {
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
     }
 
-    /**
-     * Return the index of the target character if it appears in a non-comment portion of the String, or -1 if it does not appear.
-     */
     private static int commentAwareIndexOf(char target, String s) {
         boolean inComment = false;
         for (int i = 0; i < s.length(); i++) {
@@ -429,15 +453,15 @@ public class YamlParser implements org.openrewrite.Parser {
         @Nullable
         private final String startBracePrefix;
 
-        @Nullable
-        private final Yaml.Anchor anchor;
+
+        private final Yaml.@Nullable Anchor anchor;
 
         private final List<Yaml.Mapping.Entry> entries = new ArrayList<>();
 
         @Nullable
         private YamlKey key;
 
-        private MappingBuilder(String prefix, @Nullable String startBracePrefix, @Nullable Yaml.Anchor anchor) {
+        private MappingBuilder(String prefix, @Nullable String startBracePrefix, Yaml.@Nullable Anchor anchor) {
             this.prefix = prefix;
             this.startBracePrefix = startBracePrefix;
             this.anchor = anchor;
@@ -479,15 +503,16 @@ public class YamlParser implements org.openrewrite.Parser {
 
     private static class SequenceBuilder implements BlockBuilder {
         private final String prefix;
+
         @Nullable
         private final String startBracketPrefix;
 
-        @Nullable
-        private final Yaml.Anchor anchor;
+
+        private final Yaml.@Nullable Anchor anchor;
 
         private final List<Yaml.Sequence.Entry> entries = new ArrayList<>();
 
-        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, @Nullable Yaml.Anchor anchor) {
+        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, Yaml.@Nullable Anchor anchor) {
             this.prefix = prefix;
             this.startBracketPrefix = startBracketPrefix;
             this.anchor = anchor;
@@ -517,6 +542,22 @@ public class YamlParser implements org.openrewrite.Parser {
         @Override
         public SequenceWithPrefix build() {
             return new SequenceWithPrefix(prefix, startBracketPrefix, entries, null, anchor);
+        }
+    }
+
+    @Value
+    private static class ScalarBuilder implements BlockBuilder {
+        Yaml.Scalar scalar;
+        int lastEnd;
+
+        @Override
+        public void push(Yaml.Block block) {
+            throw new IllegalStateException("Unable to push on top of a scalar.");
+        }
+
+        @Override
+        public Yaml.Block build() {
+            return scalar;
         }
     }
 

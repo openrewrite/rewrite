@@ -17,8 +17,8 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.SourcesFiles;
 
@@ -26,7 +26,7 @@ import java.nio.file.Path;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindSourceFiles extends Recipe {
     transient SourcesFiles results = new SourcesFiles(this);
 
@@ -50,9 +50,9 @@ public class FindSourceFiles extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
-            @Nullable
+
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     Path sourcePath = sourceFile.getSourcePath();

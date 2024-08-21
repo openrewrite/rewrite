@@ -216,7 +216,7 @@ class AnnotationTest implements RewriteTest {
               import java.lang.annotation.*;
               public class TypeAnnotationTest {
                           
-                  public @Deprecated @A TypeAnnotationTests() {
+                  public @Deprecated @A TypeAnnotationTest() {
                   }
                           
                   @Target({ ElementType.TYPE, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
@@ -228,7 +228,7 @@ class AnnotationTest implements RewriteTest {
               import java.lang.annotation.*;
               public class TypeAnnotationTest {
                           
-                  public @Deprecated TypeAnnotationTests() {
+                  public @Deprecated TypeAnnotationTest() {
                   }
                           
                   @Target({ ElementType.TYPE, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
@@ -338,16 +338,16 @@ class AnnotationTest implements RewriteTest {
                     public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
                         if (arrayType.getElementType() instanceof J.ArrayType) {
                             if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
-                                assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A2");
+                                assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A1");
+                                assertThat(arrayType.toString()).isEqualTo("Integer @A1 [] @A2 [ ]");
+                                firstDimension.set(true);
                             }
-                            assertThat(arrayType.toString()).isEqualTo("Integer @A1 [] @A2 [ ]");
-                            secondDimension.set(true);
                         } else {
                             if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
-                                assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A1");
+                                assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A2");
+                                assertThat(arrayType.toString()).isEqualTo("Integer @A2 [ ]");
+                                secondDimension.set(true);
                             }
-                            assertThat(arrayType.toString()).isEqualTo("Integer @A1 []");
-                            firstDimension.set(true);
                         }
                         return super.visitArrayType(arrayType, o);
                     }
@@ -382,14 +382,11 @@ class AnnotationTest implements RewriteTest {
                     @Override
                     public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
                         if (arrayType.getElementType() instanceof J.ArrayType) {
-                            if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
-                                assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A1");
-                            }
                             assertThat(arrayType.toString()).isEqualTo("Integer [] @A1 [ ]");
-                            secondDimension.set(true);
-                        } else {
-                            assertThat(arrayType.toString()).isEqualTo("Integer []");
                             firstDimension.set(true);
+                        } else {
+                            assertThat(arrayType.toString()).isEqualTo("Integer @A1 [ ]");
+                            secondDimension.set(true);
                         }
                         return super.visitArrayType(arrayType, o);
                     }

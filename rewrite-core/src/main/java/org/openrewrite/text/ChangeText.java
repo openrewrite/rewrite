@@ -21,7 +21,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collections;
 import java.util.Set;
@@ -32,7 +31,7 @@ import static java.util.Collections.emptyList;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeText extends Recipe {
     @Option(displayName = "Text after change",
-            description = "The text file will have only this text after the change.",
+            description = "The text file will have only this text after the change. The snippet provided here can be multiline.",
             example = "Some text.")
     String toText;
 

@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java.search;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -110,8 +110,7 @@ public class SemanticallyEqual {
             return super.visit(unwrap(tree), unwrap(j));
         }
 
-        @Nullable
-        private static J unwrap(@Nullable Tree tree) {
+        private static @Nullable J unwrap(@Nullable Tree tree) {
             if (tree instanceof Expression) {
                 tree = ((Expression) tree).unwrap();
             }
@@ -890,10 +889,12 @@ public class SemanticallyEqual {
                 boolean static_ = method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static);
                 J.MethodInvocation compareTo = (J.MethodInvocation) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
-                    !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
+                    method.getArguments().size() != compareTo.getArguments().size() ||
                     !(static_ == (compareTo.getMethodType() != null && compareTo.getMethodType().hasFlags(Flag.Static)) ||
                       !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
-                    method.getArguments().size() != compareTo.getArguments().size() ||
+                    method.getMethodType() == null ||
+                    compareTo.getMethodType() == null ||
+                    !TypeUtils.isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType()) ||
                     nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters())) {
                     isEqual.set(false);
                     return method;
@@ -906,6 +907,16 @@ public class SemanticallyEqual {
                     }
 
                     visit(method.getSelect(), compareTo.getSelect());
+                } else {
+                    JavaType.FullyQualified methodDeclaringType = method.getMethodType().getDeclaringType();
+                    JavaType.FullyQualified compareToDeclaringType = compareTo.getMethodType().getDeclaringType();
+                    if (!TypeUtils.isAssignableTo(methodDeclaringType instanceof JavaType.Parameterized ?
+                            ((JavaType.Parameterized) methodDeclaringType).getType() : methodDeclaringType,
+                            compareToDeclaringType instanceof JavaType.Parameterized ?
+                                    ((JavaType.Parameterized) compareToDeclaringType).getType() : compareToDeclaringType)) {
+                        isEqual.set(false);
+                        return method;
+                    }
                 }
                 boolean containsLiteral = false;
                 if (!compareMethodArguments) {
@@ -1076,7 +1087,9 @@ public class SemanticallyEqual {
                     return type;
                 }
 
-                this.visitList(type.getTypeParameters(), compareTo.getTypeParameters());
+                if (!(type.getTypeParameters().get(0) instanceof J.Empty || compareTo.getTypeParameters().get(0) instanceof J.Empty)) {
+                    this.visitList(type.getTypeParameters(), compareTo.getTypeParameters());
+                }
             }
             return type;
         }

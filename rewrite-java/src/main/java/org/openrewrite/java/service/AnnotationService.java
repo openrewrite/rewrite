@@ -41,7 +41,7 @@ public class AnnotationService {
     public List<J.Annotation> getAllAnnotations(Cursor cursor) {
         J j = cursor.getValue();
         if (j instanceof J.VariableDeclarations) {
-            return ((J.VariableDeclarations) j).getAllAnnotations();
+            return getAllAnnotations((J.VariableDeclarations) j);
         } else if (j instanceof J.MethodDeclaration) {
             return ((J.MethodDeclaration) j).getAllAnnotations();
         } else if (j instanceof J.ClassDeclaration) {
@@ -73,23 +73,39 @@ public class AnnotationService {
             return getAllAnnotations((J.Identifier) j);
         } else if (j instanceof J.FieldAccess) {
             return getAllAnnotations((J.FieldAccess) j);
+        } else if (j instanceof J.VariableDeclarations) {
+            return getAllAnnotations((J.VariableDeclarations) j);
         }
         return emptyList();
     }
 
+    private List<J.Annotation> getAllAnnotations(J.VariableDeclarations variableDeclarations) {
+        List<J.Annotation> allAnnotations = new ArrayList<>(variableDeclarations.getLeadingAnnotations());
+        for (J.Modifier modifier : variableDeclarations.getModifiers()) {
+            allAnnotations.addAll(modifier.getAnnotations());
+        }
+        if (variableDeclarations.getTypeExpression() instanceof J.AnnotatedType) {
+            allAnnotations.addAll(getAllAnnotations(((J.AnnotatedType) variableDeclarations.getTypeExpression())));
+        }
+        return allAnnotations;
+    }
+
     private List<J.Annotation> getAllAnnotations(J.AnnotatedType annotatedType) {
-        List<J.Annotation> annotations = new ArrayList<>(annotatedType.getAnnotations().size());
+        List<J.Annotation> targetAnnotations = getAllAnnotations(annotatedType.getTypeExpression());
+        if (targetAnnotations.isEmpty()) {
+            return annotatedType.getAnnotations();
+        }
+        List<J.Annotation> annotations = new ArrayList<>(annotatedType.getAnnotations().size() + targetAnnotations.size());
         annotations.addAll(annotatedType.getAnnotations());
-        annotations.addAll(getAllAnnotations(annotatedType.getTypeExpression()));
+        annotations.addAll(targetAnnotations);
         return annotations;
     }
 
     private List<J.Annotation> getAllAnnotations(J.ArrayType arrayType) {
-        List<J.Annotation> annotations = new ArrayList<>(arrayType.getAnnotations() == null ? 0 : arrayType.getAnnotations().size());
         if (arrayType.getAnnotations() != null) {
-            annotations.addAll(arrayType.getAnnotations());
+            return arrayType.getAnnotations();
         }
-        return annotations;
+        return emptyList();
     }
 
     private List<J.Annotation> getAllAnnotations(J.FieldAccess fieldAccess) {
@@ -97,6 +113,6 @@ public class AnnotationService {
     }
 
     private List<J.Annotation> getAllAnnotations(J.Identifier identifier) {
-        return identifier.getAnnotations() == null ? emptyList() : identifier.getAnnotations();
+        return identifier.getAnnotations();
     }
 }

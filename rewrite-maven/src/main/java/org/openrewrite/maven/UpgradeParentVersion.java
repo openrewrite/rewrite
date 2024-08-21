@@ -18,11 +18,9 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
-
-import java.util.List;
 
 @Getter
 @Value
@@ -52,15 +50,6 @@ public class UpgradeParentVersion extends Recipe {
     @Nullable
     String versionPattern;
 
-    @Option(displayName = "Retain versions",
-            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed " +
-                          "from dependency management in the new parent pom, then it will be retained with an explicit version. " +
-                          "The version can be omitted from the GAV to use the old value from dependency management",
-            example = "com.jcraft:jsch",
-            required = false)
-    @Nullable
-    List<String> retainVersions;
-
     @Override
     public String getDisplayName() {
         return "Upgrade Maven parent project version";
@@ -73,7 +62,8 @@ public class UpgradeParentVersion extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Set the parent pom version number according to a node-style semver selector or to a specific version number.";
+        return "Set the parent pom version number according to a [version selector](https://docs.openrewrite.org/reference/dependency-version-selectors) " +
+               "or to a specific version number.";
     }
 
     @Override
@@ -93,6 +83,6 @@ public class UpgradeParentVersion extends Recipe {
 
     private ChangeParentPom changeParentPom() {
         return new ChangeParentPom(groupId, null, artifactId, null, newVersion, null, null,
-                versionPattern, false, retainVersions);
+                versionPattern, false);
     }
 }

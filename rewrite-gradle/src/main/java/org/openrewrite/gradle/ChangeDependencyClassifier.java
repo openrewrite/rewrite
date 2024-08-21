@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
@@ -25,18 +26,18 @@ import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.List;
+import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyClassifier extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -50,7 +51,9 @@ public class ChangeDependencyClassifier extends Recipe {
 
     @Option(displayName = "New classifier",
             description = "A qualification classifier for the dependency.",
-            example = "sources")
+            example = "sources",
+            required = false)
+    @Nullable
     String newClassifier;
 
     @Option(displayName = "Dependency configuration",
@@ -98,7 +101,7 @@ public class ChangeDependencyClassifier extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
-                        if (dependency.getVersion() != null && dependency.getClassifier() != null && !newClassifier.equals(dependency.getClassifier()) &&
+                        if (dependency != null && dependency.getVersion() != null && !Objects.equals(newClassifier, dependency.getClassifier()) &&
                             depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
                             Dependency newDependency = dependency.withClassifier(newClassifier);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
@@ -111,7 +114,10 @@ public class ChangeDependencyClassifier extends Recipe {
                     String version = null;
                     String classifier = null;
 
-                    String classifierStringDelimiter = "'";
+                    String groupDelimiter = "'";
+                    G.MapEntry mapEntry = null;
+                    String classifierStringDelimiter = null;
+                    int index = 0;
                     for (Expression e : depArgs) {
                         if (!(e instanceof G.MapEntry)) {
                             continue;
@@ -129,38 +135,61 @@ public class ChangeDependencyClassifier extends Recipe {
                         String valueValue = (String) value.getValue();
                         if ("group".equals(keyValue)) {
                             groupId = valueValue;
+                            if (value.getValueSource() != null) {
+                                groupDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
+                            }
                         } else if ("name".equals(keyValue)) {
+                            if (index > 0 && mapEntry == null) {
+                                mapEntry = arg;
+                            }
                             artifactId = valueValue;
                         } else if ("version".equals(keyValue)) {
                             version = valueValue;
-                        } else if ("classifier".equals(keyValue) && !newClassifier.equals(valueValue)) {
+                        } else if ("classifier".equals(keyValue)) {
                             if (value.getValueSource() != null) {
                                 classifierStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
                             }
                             classifierEntry = arg;
                             classifier = valueValue;
                         }
+                        index++;
                     }
                     if (groupId == null || artifactId == null
                         || (version == null && !depMatcher.matches(groupId, artifactId))
                         || (version != null && !depMatcher.matches(groupId, artifactId, version))
-                        || classifier == null) {
+                        || Objects.equals(newClassifier, classifier)) {
                         return m;
                     }
-                    String delimiter = classifierStringDelimiter;
-                    G.MapEntry finalClassifier = classifierEntry;
-                    m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                        if (arg == finalClassifier) {
-                            return finalClassifier.withValue(((J.Literal) finalClassifier.getValue())
-                                    .withValue(newClassifier)
-                                    .withValueSource(delimiter + newClassifier + delimiter));
+
+                    if (classifier == null) {
+                        String delimiter = groupDelimiter;
+                        List<Expression> args = m.getArguments();
+                        J.Literal keyLiteral = new J.Literal(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getKey().getPrefix(), Markers.EMPTY, "classifier", "classifier", null, JavaType.Primitive.String);
+                        J.Literal valueLiteral = new J.Literal(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getValue().getPrefix(), Markers.EMPTY, newClassifier, delimiter + newClassifier + delimiter, null, JavaType.Primitive.String);
+                        args.add(new G.MapEntry(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getPrefix(), Markers.EMPTY, JRightPadded.build(keyLiteral), valueLiteral, null));
+                        m = m.withArguments(args);
+                    } else {
+                        G.MapEntry finalClassifier = classifierEntry;
+                        if (newClassifier == null) {
+                            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> arg == finalClassifier ? null : arg));
+                        } else {
+                            String delimiter = classifierStringDelimiter; // `classifierStringDelimiter` cannot be null
+                            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                                if (arg == finalClassifier) {
+                                    return finalClassifier.withValue(((J.Literal) finalClassifier.getValue())
+                                            .withValue(newClassifier)
+                                            .withValueSource(delimiter + newClassifier + delimiter));
+                                }
+                                return arg;
+                            }));
                         }
-                        return arg;
-                    }));
+                    }
+
                 }
 
                 return m;
             }
         });
     }
+
 }

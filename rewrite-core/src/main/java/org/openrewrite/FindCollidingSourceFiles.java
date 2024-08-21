@@ -17,7 +17,7 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.CollidingSourceFiles;
 
@@ -27,8 +27,8 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
-public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSourceFiles.Accumulator>{
+@EqualsAndHashCode(callSuper = false)
+public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSourceFiles.Accumulator> {
 
     transient CollidingSourceFiles collidingSourceFiles = new CollidingSourceFiles(this);
 
@@ -56,10 +56,8 @@ public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSource
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 assert tree instanceof SourceFile;
                 Path p = ((SourceFile) tree).getSourcePath();
-                if(acc.getSourcePaths().contains(p)) {
+                if (!acc.getSourcePaths().add(p)) {
                     acc.getDuplicates().add(p);
-                } else {
-                    acc.getSourcePaths().add(p);
                 }
                 return tree;
             }
@@ -77,9 +75,9 @@ public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSource
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if(tree instanceof SourceFile) {
+                if (tree instanceof SourceFile) {
                     Path p = ((SourceFile) tree).getSourcePath();
-                    if(acc.getDuplicates().contains(p)) {
+                    if (acc.getDuplicates().contains(p)) {
                         collidingSourceFiles.insertRow(ctx, new CollidingSourceFiles.Row(
                                 p.toString(),
                                 tree.getClass().toString()

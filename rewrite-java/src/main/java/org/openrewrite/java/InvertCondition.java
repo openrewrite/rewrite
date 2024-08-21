@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -35,9 +35,8 @@ public class InvertCondition extends JavaVisitor<ExecutionContext> {
                 .visit(controlParentheses, new InMemoryExecutionContext(), cursor.getParentOrThrow());
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
         J t;
         if (tree instanceof Expression && !(tree instanceof J.ControlParentheses) && !(tree instanceof J.Binary)) {
             Expression expression = (Expression) tree;

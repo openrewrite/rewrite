@@ -19,21 +19,20 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
+import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -51,8 +50,7 @@ public interface Xml extends Tree {
         return (R) acceptXml(v.adapt(XmlVisitor.class), p);
     }
 
-    @Nullable
-    default <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+    default <P> @Nullable Xml acceptXml(XmlVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -73,31 +71,31 @@ public interface Xml extends Tree {
      */
     Xml withPrefixUnsafe(String prefix);
 
+    @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     class Document implements Xml, SourceFile {
-        @Getter
         @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @Getter
         @With
         Path sourcePath;
 
         @With
         String prefixUnsafe;
 
+        @Override
         public Document withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
 
-        @Getter
         @With
         Markers markers;
 
@@ -106,16 +104,13 @@ public interface Xml extends Tree {
         String charsetName;
 
         @With
-        @Getter
         boolean charsetBomMarked;
 
         @With
-        @Getter
         @Nullable
         Checksum checksum;
 
         @With
-        @Getter
         @Nullable
         FileAttributes fileAttributes;
 
@@ -124,20 +119,18 @@ public interface Xml extends Tree {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
-        public SourceFile withCharset(Charset charset) {
+        public Xml.Document withCharset(Charset charset) {
             return withCharsetName(charset.name());
         }
 
-        @Getter
         @With
         Prolog prolog;
 
-        @Getter
         @With
         Tag root;
 
-        @Getter
         String eof;
 
         public Document withEof(String eof) {
@@ -156,6 +149,15 @@ public interface Xml extends Tree {
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new XmlPrinter<>();
         }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            if (WhitespaceValidationService.class.getName().equals(service.getName())) {
+                return (T) new XmlWhitespaceValidationService();
+            }
+            return SourceFile.super.service(service);
+        }
     }
 
     @Value
@@ -167,10 +169,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public Prolog withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -181,6 +185,8 @@ public interface Xml extends Tree {
         XmlDecl xmlDecl;
 
         List<Misc> misc;
+
+        List<JspDirective> jspDirectives;
 
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
@@ -194,12 +200,15 @@ public interface Xml extends Tree {
     class XmlDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
         UUID id;
+
         String prefixUnsafe;
 
+        @Override
         public XmlDecl withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -228,10 +237,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public ProcessingInstruction withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -251,6 +262,7 @@ public interface Xml extends Tree {
         }
     }
 
+    @SuppressWarnings("unused")
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     class Tag implements Xml, Content {
@@ -261,10 +273,12 @@ public interface Xml extends Tree {
         @With
         String prefixUnsafe;
 
+        @Override
         public Tag withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -286,6 +300,12 @@ public interface Xml extends Tree {
         }
 
         public Tag withName(String name) {
+            if(!name.equals(name.trim())) {
+                throw new IllegalArgumentException("Tag name must not contain leading or trailing whitespace");
+            }
+            if(this.name.equals(name)) {
+                return this;
+            }
             return new Tag(id, prefixUnsafe, markers, name, attributes, content,
                     closing == null ? null : closing.withName(name),
                     beforeTagDelimiterPrefix);
@@ -449,10 +469,12 @@ public interface Xml extends Tree {
 
             String prefixUnsafe;
 
+            @Override
             public Closing withPrefix(String prefix) {
                 return WithPrefix.onlyIfNotEqual(this, prefix);
             }
 
+            @Override
             public String getPrefix() {
                 return prefixUnsafe;
             }
@@ -464,6 +486,11 @@ public interface Xml extends Tree {
              * Space before '&gt;'
              */
             String beforeTagDelimiterPrefix;
+
+            @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitTagClosing(this, p);
+            }
 
             @Override
             public String toString() {
@@ -481,10 +508,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public Attribute withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -512,10 +541,12 @@ public interface Xml extends Tree {
 
             String prefixUnsafe;
 
+            @Override
             public Value withPrefix(String prefix) {
                 return WithPrefix.onlyIfNotEqual(this, prefix);
             }
 
+            @Override
             public String getPrefix() {
                 return prefixUnsafe;
             }
@@ -523,6 +554,11 @@ public interface Xml extends Tree {
             Markers markers;
             Quote quote;
             String value;
+
+            @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitAttributeValue(this, p);
+            }
         }
 
         public String getKeyAsString() {
@@ -548,10 +584,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public CharData withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -586,10 +624,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public Comment withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -617,18 +657,22 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public DocTypeDecl withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
 
         Markers markers;
         Ident name;
+
         @Nullable
         Ident externalId;
+
         List<Ident> internalSubset;
 
         @Nullable
@@ -648,16 +692,24 @@ public interface Xml extends Tree {
 
             String prefixUnsafe;
 
+            @Override
             public ExternalSubsets withPrefix(String prefix) {
                 return WithPrefix.onlyIfNotEqual(this, prefix);
             }
 
+            @Override
             public String getPrefix() {
                 return prefixUnsafe;
             }
 
             Markers markers;
             List<Element> elements;
+
+            @Override
+            public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+                return v.visitDocTypeDeclExternalSubsets(this, p);
+            }
+
         }
 
         @Override
@@ -675,10 +727,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public Element withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -706,10 +760,12 @@ public interface Xml extends Tree {
 
         String prefixUnsafe;
 
+        @Override
         public Ident withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
 
+        @Override
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -725,6 +781,60 @@ public interface Xml extends Tree {
         @Override
         public String toString() {
             return "Ident{" + name + "}";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    class JspDirective implements Xml, Content {
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @With
+        String prefixUnsafe;
+
+        @Override
+        public JspDirective withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        @Override
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
+
+        @With
+        Markers markers;
+
+        @With
+        String beforeTypePrefix;
+
+        String type;
+
+        public JspDirective withType(String type) {
+            return new JspDirective(id, prefixUnsafe, markers, beforeTypePrefix, type, attributes,
+                    beforeDirectiveEndPrefix);
+        }
+
+        @With
+        List<Attribute> attributes;
+
+        /**
+         * Space before '%&gt;'
+         */
+        @With
+        String beforeDirectiveEndPrefix;
+
+        @Override
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+            return v.visitJspDirective(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "<%@ " + type + attributes.stream().map(a -> " " + a.getKey().getName() + "=\"" + a.getValueAsString() + "\"")
+                    .collect(Collectors.joining("")) + "%>";
         }
     }
 }

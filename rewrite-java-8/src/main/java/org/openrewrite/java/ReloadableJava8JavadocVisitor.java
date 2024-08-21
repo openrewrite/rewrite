@@ -29,9 +29,9 @@ import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -49,8 +49,7 @@ import static org.openrewrite.java.tree.Space.format;
 public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private final Attr attr;
 
-    @Nullable
-    private final Symbol.TypeSymbol symbol;
+    private final Symbol.@Nullable TypeSymbol symbol;
 
     @Nullable
     private final Type enclosingClassType;
@@ -638,8 +637,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         return qualifier;
     }
 
-    @Nullable
-    private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;
@@ -689,8 +687,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         return false;
     }
 
-    @Nullable
-    private JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;
@@ -1080,7 +1077,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
             } else {
                 cursor = saveCursor;
-                return elemType;
+                return elemType.withPrefix(fmt);
             }
 
             return new J.ArrayType(

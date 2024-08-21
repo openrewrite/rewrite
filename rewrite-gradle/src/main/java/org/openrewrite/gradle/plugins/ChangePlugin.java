@@ -17,7 +17,9 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
@@ -28,20 +30,18 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.Semver;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * When changing a plugin id that uses the `apply` syntax or versionless plugins syntax, the version is will not be changed.
@@ -51,7 +51,7 @@ import static java.util.Objects.requireNonNull;
  * If you are using either of these plugin styles, you should ensure that the plugin's version is appropriately updated.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePlugin extends Recipe {
     @Option(displayName = "Plugin ID",
             description = "The current Gradle plugin id.",
@@ -144,7 +144,7 @@ public class ChangePlugin extends Recipe {
 
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                        J.MethodInvocation m = method;
                         if (versionMatcher.matches(m) &&
                             m.getSelect() instanceof J.MethodInvocation &&
                             pluginMatcher.matches(m.getSelect())) {
@@ -154,11 +154,12 @@ public class ChangePlugin extends Recipe {
                         } else if (applyMatcher.matches(m)) {
                             m = maybeUpdateApplySyntax(m);
                         }
-                        return m;
+                        return super.visitMethodInvocation(m, ctx);
                     }
 
                     private J.MethodInvocation maybeUpdateVersion(J.MethodInvocation m, ExecutionContext ctx) {
-                        if (!newPluginId.equals(((J.Literal) requireNonNull((J.MethodInvocation) m.getSelect()).getArguments().get(0)).getValue())) {
+                        J.MethodInvocation select = (J.MethodInvocation) m.getSelect();
+                        if (!pluginId.equals(((J.Literal) select.getArguments().get(0)).getValue())) {
                             return m;
                         }
 
@@ -174,13 +175,14 @@ public class ChangePlugin extends Recipe {
 
                         if (!StringUtils.isBlank(newVersion)) {
                             try {
-                                String resolvedVersion = AddPluginVisitor.resolvePluginVersion(newPluginId, "0", newVersion, null, getPluginRepositories(), ctx)
-                                        .orElse(null);
+                                String resolvedVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
+                                        .select(new GroupArtifact(newPluginId, newPluginId + ".gradle.plugin"), "classpath", newVersion, null, ctx);
                                 if (resolvedVersion == null) {
                                     return m;
                                 }
 
-                                m = m.withArguments(Collections.singletonList(ChangeStringLiteral.withStringValue(versionLiteral, resolvedVersion)));
+                                m = m.withSelect(select.withArguments(ListUtils.mapFirst(select.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newPluginId))))
+                                        .withArguments(Collections.singletonList(ChangeStringLiteral.withStringValue(versionLiteral, resolvedVersion)));
                             } catch (MavenDownloadingException e) {
                                 return e.warn(m);
                             }

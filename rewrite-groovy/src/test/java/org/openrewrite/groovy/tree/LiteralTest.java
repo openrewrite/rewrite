@@ -89,8 +89,8 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              "uid: ${ UUID.randomUUID() } "
-               """
+              " uid: ${ UUID.randomUUID() } "
+              """
           )
         );
     }
@@ -110,7 +110,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void gStringMultiPropertyAccess() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             "$System.env.BAR_BAZ"
             """)
         );
@@ -119,7 +120,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void emptyGString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             "${}"
             """)
         );
@@ -128,7 +130,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void nestedGString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             " ${ " ${ " " } " } "
             """)
         );
@@ -137,7 +140,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void gStringInterpolateString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             " ${""}\\n${" "} "
             """)
         );
@@ -278,13 +282,39 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              "\\\\n\\t"
-              '\\\\n\\t'
-              ///\\\\n\\t///
-              
+            "\\\\n\\t"
+            '\\\\n\\t'
+            ///\\\\n\\t///
             """
           )
         );
+    }
 
+    @Test
+    void differentiateEscapeFromLiteral() {
+        rewriteRun(
+          groovy(
+            """
+            '\t'
+            '	'
+            """
+          )
+        );
+    }
+
+    @Test
+    void stringLiteralInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def a = ("-")
+              """
+          ),
+          groovy(
+            """
+              def a = (("-"))
+              """
+          )
+        );
     }
 }

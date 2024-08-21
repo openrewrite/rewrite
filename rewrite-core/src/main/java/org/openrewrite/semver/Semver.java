@@ -15,9 +15,9 @@
  */
 package org.openrewrite.semver;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Scanner;
 import java.util.regex.Pattern;
@@ -46,12 +46,14 @@ public class Semver {
                 }
         ).and(Validated.<VersionComparator>none()
                 .or(LatestRelease.buildLatestRelease(toVersion, metadataPattern))
+                .or(LatestIntegration.build(toVersion, metadataPattern))
                 .or(LatestPatch.build(toVersion, metadataPattern))
                 .or(HyphenRange.build(toVersion, metadataPattern))
                 .or(XRange.build(toVersion, metadataPattern))
                 .or(TildeRange.build(toVersion, metadataPattern))
                 .or(CaretRange.build(toVersion, metadataPattern))
                 .or(SetRange.build(toVersion, metadataPattern))
+                .or(ExactVersionWithPattern.build(toVersion, metadataPattern))
                 .or(ExactVersion.build(toVersion))
         );
     }

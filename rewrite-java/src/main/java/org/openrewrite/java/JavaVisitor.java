@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
@@ -57,7 +57,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      *
      * @param clazz The class that will be imported into the compilation unit.
      */
-    public void maybeAddImport(@Nullable JavaType.FullyQualified clazz) {
+    public void maybeAddImport(JavaType.@Nullable FullyQualified clazz) {
         if (clazz != null) {
             maybeAddImport(clazz.getFullyQualifiedName());
         }
@@ -155,7 +155,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         throw new IllegalArgumentException("No JavaSourceFile parent found");
     }
 
-    public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
+    public void maybeRemoveImport(JavaType.@Nullable FullyQualified clazz) {
         if (clazz != null) {
             maybeRemoveImport(clazz.getFullyQualifiedName());
         }
@@ -198,8 +198,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }));
     }
 
-    @Nullable
-    public JavaType visitType(@Nullable JavaType javaType, P p) {
+    public @Nullable JavaType visitType(@Nullable JavaType javaType, P p) {
         return javaType;
     }
 
@@ -207,18 +206,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return nameTree;
     }
 
-    @Nullable
-    private <N extends NameTree> JLeftPadded<N> visitTypeName(@Nullable JLeftPadded<N> nameTree, P p) {
+    private <N extends NameTree> @Nullable JLeftPadded<N> visitTypeName(@Nullable JLeftPadded<N> nameTree, P p) {
         return nameTree == null ? null : nameTree.withElement(visitTypeName(nameTree.getElement(), p));
     }
 
-    @Nullable
-    private <N extends NameTree> JRightPadded<N> visitTypeName(@Nullable JRightPadded<N> nameTree, P p) {
+    private <N extends NameTree> @Nullable JRightPadded<N> visitTypeName(@Nullable JRightPadded<N> nameTree, P p) {
         return nameTree == null ? null : nameTree.withElement(visitTypeName(nameTree.getElement(), p));
     }
 
-    @Nullable
-    private <J2 extends J> JContainer<J2> visitTypeNames(@Nullable JContainer<J2> nameTrees, P p) {
+    private <J2 extends J> @Nullable JContainer<J2> visitTypeNames(@Nullable JContainer<J2> nameTrees, P p) {
         if (nameTrees == null) {
             return null;
         }
@@ -298,9 +294,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         a = a.withElementType(visitAndCast(a.getElementType(), p));
         a = a.withElementType(visitTypeName(a.getElementType(), p));
         a = a.withAnnotations(ListUtils.map(a.getAnnotations(), ann -> visitAndCast(ann, p)));
-        a = a.withDimension(a.getDimension()
-                .withBefore(visitSpace(a.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p))
-                .withElement(visitSpace(a.getDimension().getElement(), Space.Location.DIMENSION, p)));
+        if (a.getDimension() != null) {
+            a = a.withDimension(a.getDimension()
+                    .withBefore(visitSpace(a.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p))
+                    .withElement(visitSpace(a.getDimension().getElement(), Space.Location.DIMENSION, p)));
+        }
         a = a.withType(visitType(a.getType(), p));
         return a;
     }
@@ -455,14 +453,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
         c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> visitAndCast(m, p)));
         //Kind can have annotations associated with it, need to visit those.
-        c = c.getAnnotations().withKind(
-                classDecl.getAnnotations().getKind().withAnnotations(
-                        ListUtils.map(classDecl.getAnnotations().getKind().getAnnotations(), a -> visitAndCast(a, p))
+        c = c.getPadding().withKind(
+                classDecl.getPadding().getKind().withAnnotations(
+                        ListUtils.map(classDecl.getPadding().getKind().getAnnotations(), a -> visitAndCast(a, p))
                 )
         );
-        c = c.getAnnotations().withKind(
-                c.getAnnotations().getKind().withPrefix(
-                        visitSpace(c.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p)
+        c = c.getPadding().withKind(
+                c.getPadding().getKind().withPrefix(
+                        visitSpace(c.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p)
                 )
         );
         c = c.withName(visitAndCast(c.getName(), p));
@@ -741,7 +739,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             i = (J.InstanceOf) temp;
         }
-        i = i.getPadding().withExpr(visitRightPadded(i.getPadding().getExpr(), JRightPadded.Location.INSTANCEOF, p));
+        i = i.getPadding().withExpression(visitRightPadded(i.getPadding().getExpression(), JRightPadded.Location.INSTANCEOF, p));
         i = i.withClazz(visitAndCast(i.getClazz(), p));
         i = i.withPattern(visitAndCast(i.getPattern(), p));
         i = i.withType(visitType(i.getType(), p));
@@ -788,8 +786,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 )
         );
         l = l.withParameters(
-                l.getParameters().getPadding().withParams(
-                        ListUtils.map(l.getParameters().getPadding().getParams(),
+                l.getParameters().getPadding().withParameters(
+                        ListUtils.map(l.getParameters().getPadding().getParameters(),
                                 param -> visitRightPadded(param, JRightPadded.Location.LAMBDA_PARAM, p)
                         )
                 )
@@ -1330,13 +1328,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             w = (J.Wildcard) temp;
         }
-        if (w.getPadding().getBound() != null) {
-            w = w.getPadding().withBound(
-                    w.getPadding().getBound().withBefore(
-                            visitSpace(w.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p)
-                    )
-            );
-        }
+        w = w.getPadding().withBound(visitLeftPadded(w.getPadding().getBound(), JLeftPadded.Location.WILDCARD_BOUND, p));
         w = w.withBoundedType(visitAndCast(w.getBoundedType(), p));
         if (w.getBoundedType() != null) {
             // i.e. not a "wildcard" type
@@ -1402,16 +1394,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
 
         setCursor(getCursor().getParent());
-        if (t == null) {
-            // If nothing changed leave AST node the same
-            if (left.getElement() == null && before == left.getBefore()) {
-                return left;
-            }
-            //noinspection ConstantConditions
-            return null;
+        // If nothing changed leave AST node the same
+        if (left.getElement() == t && before == left.getBefore()) {
+            return left;
         }
 
-        return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
+        //noinspection ConstantConditions
+        return t == null ? null : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
     public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,

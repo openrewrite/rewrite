@@ -17,17 +17,12 @@ package org.openrewrite.benchmarks.java;
 
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.tree.J;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 @State(Scope.Benchmark)

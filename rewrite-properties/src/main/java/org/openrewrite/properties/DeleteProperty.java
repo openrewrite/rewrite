@@ -17,12 +17,12 @@ package org.openrewrite.properties;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.ArrayList;
@@ -31,7 +31,7 @@ import java.util.List;
 import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class DeleteProperty extends Recipe {
 
     @Override
@@ -60,8 +60,8 @@ public class DeleteProperty extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
-            public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
-                Properties.File f = (Properties.File) super.visitFile(file, executionContext);
+            public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+                Properties.File f = (Properties.File) super.visitFile(file, ctx);
 
                 String prefix = null;
                 List<Properties.Content> contents = f.getContent();

@@ -17,11 +17,11 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.XPathMatcher;
@@ -30,7 +30,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddProfile extends Recipe {
     private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
 
@@ -76,7 +76,6 @@ public class AddProfile extends Recipe {
     }
 
     private class AddProfileVisitor extends MavenIsoVisitor<ExecutionContext> {
-
 
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {

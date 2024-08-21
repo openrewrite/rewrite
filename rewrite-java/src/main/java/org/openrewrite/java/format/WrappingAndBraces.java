@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
@@ -43,7 +43,7 @@ public class WrappingAndBraces extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return new LinkedHashSet<>(Arrays.asList("RSPEC-121", "RSPEC-2681", "RSPEC-3972", "RSPEC-3973"));
+        return new LinkedHashSet<>(Arrays.asList("RSPEC-S121", "RSPEC-S2681", "RSPEC-S3972", "RSPEC-S3973"));
     }
 
     @Override

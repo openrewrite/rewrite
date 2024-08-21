@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
@@ -180,9 +180,21 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         return onlySpaces(str) && !" ".equals(str);
     }
 
+    private static List<J.Annotation> spaceBetweenAnnotations(List<J.Annotation> annotations) {
+        return ListUtils.map(annotations, (i, ann) -> {
+            if (i > 0 && ann.getPrefix().isEmpty()) {
+                return ann.withPrefix(Space.SINGLE_SPACE);
+            }
+            return ann;
+        });
+    }
+
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
+        if (c.getLeadingAnnotations().size() > 1) {
+            c = c.withLeadingAnnotations(spaceBetweenAnnotations(c.getLeadingAnnotations()));
+        }
         if (c.getBody() != null) {
             c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().getClassLeftBrace()));
             if (c.getBody().getStatements().isEmpty()) {
@@ -231,8 +243,20 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.Block visitBlock(J.Block block, P p) {
+        J.Block b = super.visitBlock(block, p);
+        b = b.getPadding().withStatements(
+                ListUtils.map(b.getPadding().getStatements(), stmt -> spaceAfter(stmt, false))
+        );
+        return b;
+    }
+
+    @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
+        if (m.getLeadingAnnotations().size() > 1) {
+            m = m.withLeadingAnnotations(spaceBetweenAnnotations(m.getLeadingAnnotations()));
+        }
         m = m.getPadding().withParameters(
                 spaceBefore(m.getPadding().getParameters(), style.getBeforeParentheses().getMethodDeclaration()));
         if (m.getBody() != null) {
@@ -391,7 +415,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.If visitIf(J.If iff, P p) {
         J.If i = super.visitIf(iff, p);
         i = i.withIfCondition(spaceBefore(i.getIfCondition(), style.getBeforeParentheses().getIfParentheses()));
-        i = i.getPadding().withThenPart(spaceBeforeRightPaddedElement(i.getPadding().getThenPart(), style.getBeforeLeftBrace().getIfLeftBrace()));
+        i = i.getPadding().withThenPart(spaceAfter(spaceBeforeRightPaddedElement(i.getPadding().getThenPart(), style.getBeforeLeftBrace().getIfLeftBrace()), false));
         boolean useSpaceWithinIfParentheses = style.getWithin().getIfParentheses();
         i = i.withIfCondition(
                 i.getIfCondition().getPadding().withTree(
@@ -698,6 +722,15 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+        J.VariableDeclarations vd = super.visitVariableDeclarations(multiVariable, p);
+        if (vd.getLeadingAnnotations().size() > 1) {
+            vd = vd.withLeadingAnnotations(spaceBetweenAnnotations(vd.getLeadingAnnotations()));
+        }
+        return vd;
+    }
+
+    @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, p);
         if (v.getPadding().getInitializer() != null) {
@@ -809,8 +842,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         if (!(l.getParameters().getParameters().isEmpty() || l.getParameters().getParameters().iterator().next() instanceof J.Empty)) {
             int parametersSize = l.getParameters().getParameters().size();
             l = l.withParameters(
-                    l.getParameters().getPadding().withParams(
-                            ListUtils.map(l.getParameters().getPadding().getParams(),
+                    l.getParameters().getPadding().withParameters(
+                            ListUtils.map(l.getParameters().getPadding().getParameters(),
                                     (index, elemContainer) -> {
                                         if (index != 0) {
                                             elemContainer = elemContainer.withElement(
@@ -1078,18 +1111,16 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         return tp;
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }

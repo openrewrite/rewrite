@@ -16,10 +16,11 @@
 package org.openrewrite.maven.utilities;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Checksum;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -155,12 +156,12 @@ public class MavenWrapper {
         }
     }
 
-    public String getPropertiesFormattedWrapperUrl() {
-        return wrapperUri.replaceAll("(?<!\\\\)://", "\\\\://");
+    public String getWrapperUrl() {
+        return wrapperUri;
     }
 
-    public String getPropertiesFormattedDistributionUrl() {
-        return distributionUri.replaceAll("(?<!\\\\)://", "\\\\://");
+    public String getDistributionUrl() {
+        return distributionUri;
     }
 
     public Remote wrapperJar() {
@@ -170,9 +171,23 @@ public class MavenWrapper {
         ).build();
     }
 
+    public Remote wrapperJar(SourceFile previous) {
+        return Remote.builder(
+                previous,
+                URI.create(wrapperUri)
+        ).build();
+    }
+
     public Remote wrapperDownloader() {
         return Remote.builder(
                 WRAPPER_DOWNLOADER_LOCATION,
+                URI.create(wrapperDistributionUri)
+        ).build(".mvn/wrapper/MavenWrapperDownloader.java");
+    }
+
+    public Remote wrapperDownloader(SourceFile previous) {
+        return Remote.builder(
+                previous,
                 URI.create(wrapperDistributionUri)
         ).build(".mvn/wrapper/MavenWrapperDownloader.java");
     }

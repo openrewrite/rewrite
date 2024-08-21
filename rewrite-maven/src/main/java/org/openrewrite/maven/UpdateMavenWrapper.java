@@ -19,10 +19,10 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.utilities.MavenWrapper;
@@ -55,7 +55,7 @@ import static org.openrewrite.maven.utilities.MavenWrapper.*;
  */
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenWrapperState> {
     private static final String DISTRIBUTION_URL_KEY = "distributionUrl";
     private static final String DISTRIBUTION_SHA_256_SUM_KEY = "distributionSha256Sum";
@@ -107,6 +107,14 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     @Nullable
     final Boolean addIfMissing;
 
+    @Getter
+    @Option(displayName = "Enforce checksum verification for maven-wrapper.jar",
+            description = "Enforce checksum verification for the maven-wrapper.jar. Enabling this feature may sporadically " +
+                          "result in build failures, such as [MWRAPPER-103](https://issues.apache.org/jira/browse/MWRAPPER-103). Defaults to `false`.",
+            required = false)
+    @Nullable
+    final Boolean enforceWrapperChecksumVerification;
+
     @Override
     public String getDisplayName() {
         return "Update Maven wrapper";
@@ -142,7 +150,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
 
     static class MavenWrapperState {
         boolean needsWrapperUpdate = false;
+
         @Nullable BuildTool updatedMarker;
+
         boolean addMavenWrapperProperties = true;
         boolean addMavenWrapperDownloader = true;
         boolean addMavenWrapperJar = true;
@@ -189,14 +199,16 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             acc.needsWrapperUpdate = true;
                             acc.updatedMarker = buildTool.withVersion(mavenWrapper.getDistributionVersion());
                             return true;
-                        } else return compare == 0;
+                        } else {
+                            return compare == 0;
+                        }
                     }
 
                     @Override
                     public Properties visitFile(Properties.File file, ExecutionContext ctx) {
                         Properties p = super.visitFile(file, ctx);
                         if (FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, null).isEmpty() ||
-                            FindProperties.find(p, WRAPPER_SHA_256_SUM_KEY, null).isEmpty()) {
+                            (FindProperties.find(p, WRAPPER_SHA_256_SUM_KEY, null).isEmpty() && Boolean.TRUE.equals(enforceWrapperChecksumVerification))) {
                             acc.needsWrapperUpdate = true;
                         }
                         return p;
@@ -208,13 +220,13 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                         if ("distributionUrl".equals(entry.getKey())) {
                             // Typical example: https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
                             String currentDistributionUrl = entry.getValue().getText();
-                            if (!mavenWrapper.getPropertiesFormattedDistributionUrl().equals(currentDistributionUrl)) {
+                            if (!mavenWrapper.getDistributionUrl().equals(currentDistributionUrl)) {
                                 acc.needsWrapperUpdate = true;
                             }
                         } else if ("wrapperUrl".equals(entry.getKey())) {
                             // Typical example: https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
                             String currentWrapperUrl = entry.getValue().getText();
-                            if (!mavenWrapper.getPropertiesFormattedWrapperUrl().equals(currentWrapperUrl)) {
+                            if (!mavenWrapper.getWrapperUrl().equals(currentWrapperUrl)) {
                                 acc.needsWrapperUpdate = true;
                             }
                         }
@@ -289,12 +301,15 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         if (acc.addMavenWrapperProperties) {
             @Language("properties")
             String mavenWrapperPropertiesText = ASF_LICENSE_HEADER +
-                                                DISTRIBUTION_URL_KEY + "=" + mavenWrapper.getPropertiesFormattedDistributionUrl() + "\n" +
+                                                DISTRIBUTION_URL_KEY + "=" + mavenWrapper.getDistributionUrl() + "\n" +
                                                 DISTRIBUTION_SHA_256_SUM_KEY + "=" + mavenWrapper.getDistributionChecksum().getHexValue();
             if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript) {
                 mavenWrapperPropertiesText += "\n" +
-                                              WRAPPER_URL_KEY + "=" + mavenWrapper.getPropertiesFormattedWrapperUrl() + "\n" +
-                                              WRAPPER_SHA_256_SUM_KEY + "=" + mavenWrapper.getWrapperChecksum().getHexValue();
+                                              WRAPPER_URL_KEY + "=" + mavenWrapper.getWrapperUrl();
+                if (Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
+                    mavenWrapperPropertiesText += "\n" +
+                            WRAPPER_SHA_256_SUM_KEY + "=" + mavenWrapper.getWrapperChecksum().getHexValue();
+                }
             }
             //noinspection UnusedProperty
             Properties.File mavenWrapperProperties = new PropertiesParser().parse(mavenWrapperPropertiesText)
@@ -389,7 +404,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                 }
                 if (mavenWrapper.getWrapperDistributionType() == DistributionType.Bin) {
                     if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
-                        return mavenWrapper.wrapperJar().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
+                        return mavenWrapper.wrapperJar(sourceFile);
                     }
 
                     if (PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_DOWNLOADER_LOCATION_RELATIVE_PATH)) {
@@ -397,7 +412,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     }
                 } else if (mavenWrapper.getWrapperDistributionType() == DistributionType.Source) {
                     if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_DOWNLOADER_LOCATION_RELATIVE_PATH)) {
-                        return mavenWrapper.wrapperDownloader().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
+                        return mavenWrapper.wrapperDownloader(sourceFile);
                     }
 
                     if (PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
@@ -432,7 +447,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     }
 
     @AllArgsConstructor
-    private static class WrapperPropertiesVisitor extends PropertiesIsoVisitor<ExecutionContext> {
+    private class WrapperPropertiesVisitor extends PropertiesIsoVisitor<ExecutionContext> {
         MavenWrapper mavenWrapper;
 
         @Override
@@ -444,7 +459,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                 Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", Properties.Entry.Delimiter.EQUALS, propertyValue);
                 p = p.withContent(ListUtils.concat(p.getContent(), entry));
             }
-            if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript) {
+            if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript && Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
                 Checksum wrapperJarChecksum = mavenWrapper.getWrapperChecksum();
                 if (FindProperties.find(p, WRAPPER_SHA_256_SUM_KEY, null).isEmpty() && wrapperJarChecksum != null) {
                     Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, wrapperJarChecksum.getHexValue());
@@ -459,8 +474,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         public Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if (DISTRIBUTION_URL_KEY.equals(entry.getKey())) {
                 Properties.Value value = entry.getValue();
-                if (!mavenWrapper.getPropertiesFormattedDistributionUrl().equals(value.getText())) {
-                    return entry.withValue(value.withText(mavenWrapper.getPropertiesFormattedDistributionUrl()));
+                if (!mavenWrapper.getDistributionUrl().equals(value.getText())) {
+                    return entry.withValue(value.withText(mavenWrapper.getDistributionUrl()));
                 }
             } else if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey())) {
                 Properties.Value value = entry.getValue();
@@ -471,15 +486,16 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
             } else if (WRAPPER_URL_KEY.equals(entry.getKey())) {
                 if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript) {
                     Properties.Value value = entry.getValue();
-                    if (!mavenWrapper.getPropertiesFormattedWrapperUrl().equals(value.getText())) {
-                        return entry.withValue(value.withText(mavenWrapper.getPropertiesFormattedWrapperUrl()));
+                    if (!mavenWrapper.getWrapperUrl().equals(value.getText())) {
+                        return entry.withValue(value.withText(mavenWrapper.getWrapperUrl()));
                     }
                 } else {
                     //noinspection ConstantConditions
                     return null;
                 }
             } else if (WRAPPER_SHA_256_SUM_KEY.equals(entry.getKey())) {
-                if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript) {
+                if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript
+                        && Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
                     Properties.Value value = entry.getValue();
                     Checksum wrapperJarChecksum = mavenWrapper.getWrapperChecksum();
                     if (wrapperJarChecksum != null && !wrapperJarChecksum.getHexValue().equals(value.getText())) {

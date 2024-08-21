@@ -26,7 +26,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-public class AnnotationServiceTest implements RewriteTest {
+class AnnotationServiceTest implements RewriteTest {
 
     @Test
     void classAnnotations() {
@@ -137,11 +137,11 @@ public class AnnotationServiceTest implements RewriteTest {
                     AnnotationService service = service(AnnotationService.class);
                     if (arrayType.getElementType() instanceof J.Identifier) {
                         assertThat(service.getAllAnnotations(new Cursor(null, arrayType))).satisfiesExactly(
-                          ann -> assertThat(ann.getSimpleName()).isEqualTo("A1")
+                          ann -> assertThat(ann.getSimpleName()).isEqualTo("A2")
                         );
                     } else if (arrayType.getElementType() instanceof J.ArrayType) {
                         assertThat(service.getAllAnnotations(new Cursor(null, arrayType))).satisfiesExactly(
-                          ann -> assertThat(ann.getSimpleName()).isEqualTo("A2")
+                          ann -> assertThat(ann.getSimpleName()).isEqualTo("A1")
                         );
                     }
                     return super.visitArrayType(arrayType, integer);

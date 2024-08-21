@@ -20,11 +20,8 @@ import io.github.classgraph.Resource;
 import io.github.classgraph.ResourceList;
 import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
@@ -61,11 +58,7 @@ public interface JavaParser extends Parser {
     String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.java.skipSourceSetTypeGeneration";
 
     static List<Path> runtimeClasspath() {
-        return new ClassGraph()
-                .disableNestedJarScanning()
-                .getClasspathURIs().stream()
-                .filter(uri -> "file".equals(uri.getScheme()))
-                .map(Paths::get).collect(toList());
+        return RuntimeClasspathCache.getRuntimeClasspath();
     }
 
     /**
@@ -116,29 +109,14 @@ public interface JavaParser extends Parser {
     }
 
     static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
+        if(artifactNamesWithVersions.length == 0) {
+            return Collections.emptyList();
+        }
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
         Set<String> missingArtifactNames = new LinkedHashSet<>(artifactNamesWithVersions.length);
+        missingArtifactNames.addAll(Arrays.asList(artifactNamesWithVersions));
         File resourceTarget = JavaParserExecutionContextView.view(ctx)
                 .getParserClasspathDownloadTarget();
-
-        nextArtifact:
-        for (String artifactName : artifactNamesWithVersions) {
-            Pattern jarPattern = Pattern.compile("[/\\\\]" + artifactName + "-?.*\\.jar$");
-            File[] extracted = resourceTarget.listFiles();
-            if (extracted != null) {
-                for (File file : extracted) {
-                    if (jarPattern.matcher(file.getName()).find()) {
-                        artifacts.add(file.toPath());
-                        continue nextArtifact;
-                    }
-                }
-            }
-            missingArtifactNames.add(artifactName);
-        }
-
-        if (missingArtifactNames.isEmpty()) {
-            return artifacts;
-        }
 
         Class<?> caller;
         try {
@@ -200,7 +178,6 @@ public interface JavaParser extends Parser {
             }
 
             if (!missingArtifactNames.isEmpty()) {
-                //noinspection ConstantValue
                 throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
                         missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n")) +
                         "The caller is of type " + caller.getName() + ".\n" +
@@ -296,13 +273,14 @@ public interface JavaParser extends Parser {
 
     @Override
     default boolean accept(Path path) {
-        return path.toString().endsWith(".java");
+        return path.toString().endsWith(".java") && !path.endsWith("module-info.java");
     }
 
     /**
      * Clear any in-memory parser caches that may prevent re-parsing of classes with the same fully qualified name in
      * different rounds
      */
+    @Override
     JavaParser reset();
 
     JavaParser reset(Collection<URI> uris);
@@ -356,7 +334,7 @@ public interface JavaParser extends Parser {
 
         public B dependsOn(@Language("java") String... inputsAsStrings) {
             this.dependsOn = Arrays.stream(inputsAsStrings)
-                    .map(Input::fromString)
+                    .map(input -> Input.fromString(resolveSourcePathFromSourceText(Paths.get(""), input), input))
                     .collect(toList());
             return (B) this;
         }
@@ -367,13 +345,25 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        // internal method which doesn't overwrite the classpath but just amends it
+        @Incubating(since = "8.18.3")
+        public B addClasspathEntry(Path entry) {
+            if (classpath.isEmpty()) {
+                classpath = Collections.singletonList(entry);
+            } else if (!classpath.contains(entry)) {
+                classpath = new ArrayList<>(classpath);
+                classpath.add(entry);
+            }
+            return (B) this;
+        }
+
         public B classpath(String... artifactNames) {
             this.artifactNames = Arrays.asList(artifactNames);
             this.classpath = Collections.emptyList();
             return (B) this;
         }
 
-        @SuppressWarnings("UnusedReturnValue")
+        @SuppressWarnings({"UnusedReturnValue", "unused"})
         public B classpathFromResources(ExecutionContext ctx, String... classpath) {
             this.artifactNames = Collections.emptyList();
             this.classpath = dependenciesFromResources(ctx, classpath);
@@ -394,12 +384,14 @@ public interface JavaParser extends Parser {
 
         protected Collection<Path> resolvedClasspath() {
             if (!artifactNames.isEmpty()) {
-                classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
+                classpath = new ArrayList<>(classpath);
+                classpath.addAll(JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0])));
                 artifactNames = Collections.emptyList();
             }
             return classpath;
         }
 
+        @Override
         public abstract P build();
 
         @Override
@@ -417,11 +409,20 @@ public interface JavaParser extends Parser {
 
     @Override
     default Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return resolveSourcePathFromSourceText(prefix, sourceCode);
+    }
+
+    static Path resolveSourcePathFromSourceText(Path prefix, String sourceCode) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum|record)\\s*(<[^>]*>)?\\s+(\\w+)");
+        Pattern publicClassPattern = Pattern.compile("public\\s+" + classPattern.pattern());
 
         Function<String, String> simpleName = sourceStr -> {
-            Matcher classMatcher = classPattern.matcher(sourceStr);
+            Matcher classMatcher = publicClassPattern.matcher(sourceStr);
+            if (classMatcher.find()) {
+                return classMatcher.group(3);
+            }
+            classMatcher = classPattern.matcher(sourceStr);
             return classMatcher.find() ? classMatcher.group(3) : null;
         };
 
@@ -432,5 +433,24 @@ public interface JavaParser extends Parser {
                 .orElse(Long.toString(System.nanoTime())) + ".java";
 
         return prefix.resolve(Paths.get(pkg + className));
+    }
+}
+
+class RuntimeClasspathCache {
+    private RuntimeClasspathCache() {
+    }
+
+    @Nullable
+    private static List<Path> runtimeClasspath = null;
+
+    static List<Path> getRuntimeClasspath() {
+        if (runtimeClasspath == null) {
+            runtimeClasspath = new ClassGraph()
+                    .disableNestedJarScanning()
+                    .getClasspathURIs().stream()
+                    .filter(uri -> "file".equals(uri.getScheme()))
+                    .map(Paths::get).collect(toList());
+        }
+        return runtimeClasspath;
     }
 }

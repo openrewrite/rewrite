@@ -24,6 +24,7 @@ public class PropertiesIsoVisitor<P> extends PropertiesVisitor<P> {
         return (Properties.Comment) super.visitComment(comment, p);
     }
 
+    @Override
     public Properties.File visitFile(Properties.File file, P p) {
         return (Properties.File) super.visitFile(file, p);
     }

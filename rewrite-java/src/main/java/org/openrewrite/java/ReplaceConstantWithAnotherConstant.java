@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -121,7 +121,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             return expression;
         }
 
-        private boolean isConstant(@Nullable JavaType.Variable varType) {
+        private boolean isConstant(JavaType.@Nullable Variable varType) {
             return varType != null && TypeUtils.isOfClassType(varType.getOwner(), existingOwningType) &&
                     varType.getName().equals(constantName);
         }

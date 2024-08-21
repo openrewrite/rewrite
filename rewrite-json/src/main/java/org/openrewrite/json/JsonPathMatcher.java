@@ -21,14 +21,15 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.internal.grammar.JsonPathLexer;
 import org.openrewrite.json.internal.grammar.JsonPathParser;
 import org.openrewrite.json.internal.grammar.JsonPathParserBaseVisitor;
 import org.openrewrite.json.internal.grammar.JsonPathParserVisitor;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonRightPadded;
 
 import java.util.*;
 import java.util.function.BiPredicate;
@@ -299,12 +300,13 @@ public class JsonPathMatcher {
                     scope = jsonObject.getMembers();
                     return getResultFromList(visitProperty(ctx));
                 } else {
-                    for (Json json : jsonObject.getMembers()) {
+                    String name = ctx.StringLiteral() != null ?
+                            unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                    for (JsonRightPadded<Json> padded : jsonObject.getPadding().getMembers()) {
+                        Json json = padded.getElement();
                         if (json instanceof Json.Member) {
                             Json.Member member = (Json.Member) json;
                             String key = ((Json.Literal) member.getKey()).getValue().toString();
-                            String name = ctx.StringLiteral() != null ?
-                                    unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
                             if (key.equals(name)) {
                                 return member;
                             }
@@ -628,8 +630,7 @@ public class JsonPathMatcher {
             return null;
         }
 
-        @Nullable
-        private Object getBinaryExpressionResult(Object ctx) {
+        private @Nullable Object getBinaryExpressionResult(Object ctx) {
             if (ctx instanceof JsonPathParser.BinaryExpressionContext) {
                 ctx = visitBinaryExpression((JsonPathParser.BinaryExpressionContext) ctx);
 
@@ -649,8 +650,7 @@ public class JsonPathMatcher {
         }
 
         // Interpret the LHS to check the appropriate value.
-        @Nullable
-        private Json getOperatorResult(Object lhs, String operator, Object rhs) {
+        private @Nullable Json getOperatorResult(Object lhs, String operator, Object rhs) {
             if (lhs instanceof Json.Member) {
                 Json.Member member = (Json.Member) lhs;
                 if (member.getValue() instanceof Json.Literal) {
@@ -695,8 +695,7 @@ public class JsonPathMatcher {
         }
 
         // Extract the result from JSON objects that can match by key.
-        @Nullable
-        public Object getResultByKey(Object result, String key) {
+        public @Nullable Object getResultByKey(Object result, String key) {
             if (result instanceof Json.JsonObject) {
                 Json.JsonObject jsonObject = (Json.JsonObject) result;
                 for (Json json : jsonObject.getMembers()) {
@@ -740,8 +739,7 @@ public class JsonPathMatcher {
         }
 
         // Extract the value from a Json object.
-        @Nullable
-        private Object getValue(Object result) {
+        private @Nullable Object getValue(Object result) {
             if (result instanceof Json.Member) {
                 return getValue(((Json.Member) result).getValue());
             } else if (result instanceof Json.JsonObject) {

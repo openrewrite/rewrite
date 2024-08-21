@@ -157,9 +157,46 @@ class BinaryTest implements RewriteTest {
     @Test
     void instanceOf() {
         rewriteRun(
-          groovy("""
-            def isString = "" instanceof java.lang.String
-            """)
+          groovy(
+            """
+              def isString = "" instanceof java.lang.String
+              """)
+        );
+    }
+
+    @Test
+    void spreadOperator() {
+        rewriteRun(
+          groovy("[ ] *. toString()"),
+          groovy(
+            """
+              class A {
+                  def value = 1
+              }
+              [ new A() ].findAll { it -> it.value == 1 } *. value = 2
+              """)
+        );
+    }
+
+    @Test
+    void stringMultiplied() {
+        rewriteRun(
+          groovy(
+            """
+              def foo = "-" * 4
+              """
+          )
+        );
+    }
+
+    @Test
+    void stringMultipliedInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo = ("-" * 4)
+              """
+          )
         );
     }
 }
