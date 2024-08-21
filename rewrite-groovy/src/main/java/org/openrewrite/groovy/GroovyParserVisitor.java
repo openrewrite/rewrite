@@ -25,7 +25,6 @@ import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
-import org.openrewrite.internal.lang.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -34,12 +33,13 @@ import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.Semicolon;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -480,7 +480,7 @@ public class GroovyParserVisitor {
             // Method name might be in quotes
             Space namePrefix = whitespace();
             String methodName;
-            if(source.startsWith(method.getName(), cursor)) {
+            if (source.startsWith(method.getName(), cursor)) {
                 methodName = method.getName();
             } else {
                 char openingQuote = source.charAt(cursor);
@@ -615,15 +615,7 @@ public class GroovyParserVisitor {
         }
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
-            Integer insideParenthesesLevel;
-            Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
-            if(rawIpl instanceof AtomicInteger) {
-                // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
-                insideParenthesesLevel = ((AtomicInteger) rawIpl).get();
-            } else {
-                // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
-                insideParenthesesLevel = (Integer) rawIpl;
-            }
+            Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
             if (insideParenthesesLevel != null) {
                 Stack<Space> openingParens = new Stack<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
@@ -713,8 +705,8 @@ public class GroovyParserVisitor {
                 }
             }
 
-            if(unparsedArgs.isEmpty()) {
-                args.add(JRightPadded.build((Expression)new J.Empty(randomId(), whitespace(), Markers.EMPTY))
+            if (unparsedArgs.isEmpty()) {
+                args.add(JRightPadded.build((Expression) new J.Empty(randomId(), whitespace(), Markers.EMPTY))
                         .withAfter(omitParentheses == null ? sourceBefore(")") : EMPTY));
             } else {
                 for (int i = 0; i < unparsedArgs.size(); i++) {
@@ -1193,7 +1185,7 @@ public class GroovyParserVisitor {
                     // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
                     int length = sourceLengthOfString(expression);
                     // this is an attribute selector
-                    if (source.startsWith("@"+value, cursor)) {
+                    if (source.startsWith("@" + value, cursor)) {
                         length += 1;
                     }
                     text = source.substring(cursor, cursor + length);
@@ -1325,7 +1317,7 @@ public class GroovyParserVisitor {
             queue.add(labeled(statement, () -> {
                 super.visitExpressionStatement(statement);
                 Object e = queue.poll();
-                if(e instanceof Statement) {
+                if (e instanceof Statement) {
                     return (Statement) e;
                 }
                 return new G.ExpressionStatement(randomId(), (Expression) e);
@@ -1971,12 +1963,12 @@ public class GroovyParserVisitor {
             if (expression.isDynamicTyped()) {
                 Space prefix = whitespace();
                 String keyword;
-                if(source.substring(cursor).startsWith("final")) {
+                if (source.substring(cursor).startsWith("final")) {
                     keyword = "final";
                 } else {
                     keyword = source.substring(cursor, cursor + 3);
                 }
-               cursor += keyword.length();
+                cursor += keyword.length();
                 return new J.Identifier(randomId(),
                         prefix,
                         Markers.EMPTY,
@@ -2309,7 +2301,25 @@ public class GroovyParserVisitor {
             int delimiterLength = getDelimiterLength();
             return delimiterLength + value.length() + delimiterLength;
         }
-        return lengthAccordingToAst(expr);
+        int lengthAccordingToAst = lengthAccordingToAst(expr);
+        // subtract any parentheses that were included with lengthAccordingToAst
+        Integer insideParenthesesLevel = getInsideParenthesesLevel(expr);
+        if (insideParenthesesLevel != null) {
+            return lengthAccordingToAst - insideParenthesesLevel * 2;
+        }
+
+        return lengthAccordingToAst;
+    }
+
+    private static @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
+        Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
+        if (rawIpl instanceof AtomicInteger) {
+            // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
+            return ((AtomicInteger) rawIpl).get();
+        } else {
+            // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
+            return (Integer) rawIpl;
+        }
     }
 
     private int getDelimiterLength() {
@@ -2330,7 +2340,7 @@ public class GroovyParserVisitor {
      * On older versions of the JDK/Groovy compiler string literals with following whitespace sometimes erroneously include
      * the length of the whitespace in the length of the AST node.
      * So in this method invocation:
-     *    foo( 'a' )
+     * foo( 'a' )
      * the correct source length for the AST node representing 'a' is 3, but in affected groovy versions the length
      * on the node is '4' because it is also counting the trailing whitespace.
      */
