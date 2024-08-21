@@ -2241,9 +2241,10 @@ public class GroovyParserVisitor {
         assert expr != null;
         if (classNode != null) {
             if (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
-                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, inferredType ?
+                JContainer<Expression> typeParameters = inferredType ?
                         JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
-                        visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
+                        visitTypeParameterizations(classNode.getGenericsTypes());
+                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, typeParameters, typeMapping.type(classNode));
             }
         }
         return expr.withPrefix(prefix);
