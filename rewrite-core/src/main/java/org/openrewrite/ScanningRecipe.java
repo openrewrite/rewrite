@@ -33,7 +33,8 @@ import java.util.UUID;
  * @param <T> The type of the accumulator where scanning data is held until the transformation phase.
  */
 public abstract class ScanningRecipe<T> extends Recipe {
-    private String recipeAccMessage = "org.openrewrite.recipe.acc." + UUID.randomUUID();
+    @Nullable
+    private String recipeAccMessage;
 
     private String getRecipeAccMessage() {
         if (recipeAccMessage == null) {
