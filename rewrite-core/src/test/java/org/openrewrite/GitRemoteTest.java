@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -224,5 +225,19 @@ public class GitRemoteTest {
         GitRemote.Parser parser = new GitRemote.Parser();
         GitRemote remote = parser.parse("https://github.com/openrewrite/jgit");
         assertThat(remote.getPath()).isEqualTo("openrewrite/jgit");
+    }
+
+    @Test
+    void findRemote() {
+        GitRemote.Parser parser = new GitRemote.Parser()
+          .registerRemote(GitRemote.Service.Bitbucket, URI.create("scm.company.com/stash"), Collections.emptyList());
+        assertThat(parser.findRemoteServer("github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
+        assertThat(parser.findRemoteServer("gitlab.com").getService()).isEqualTo(GitRemote.Service.GitLab);
+        assertThat(parser.findRemoteServer("bitbucket.org").getService()).isEqualTo(GitRemote.Service.BitbucketCloud);
+        assertThat(parser.findRemoteServer("dev.azure.com").getService()).isEqualTo(GitRemote.Service.AzureDevOps);
+        assertThat(parser.findRemoteServer("scm.company.com/stash").getService()).isEqualTo(GitRemote.Service.Bitbucket);
+        assertThat(parser.findRemoteServer("scm.unregistered.com").getService()).isEqualTo(GitRemote.Service.Unknown);
+        assertThat(parser.findRemoteServer("scm.unregistered.com").getOrigin()).isEqualTo("scm.unregistered.com");
+        assertThat(parser.findRemoteServer("https://scm.unregistered.com").getOrigin()).isEqualTo("scm.unregistered.com");
     }
 }
