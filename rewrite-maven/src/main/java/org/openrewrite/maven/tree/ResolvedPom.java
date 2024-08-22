@@ -424,6 +424,8 @@ public class ResolvedPom {
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
                     mergeDependencyManagement(profile.getDependencyManagement(), pomAncestry);
+                    // If two profiles are activated that both define the same dependency but with different scope/version
+                    // The first one now takes precedence, which is not how maven processes them, especially at runtime
                     mergeRequestedDependencies(profile.getDependencies());
                 }
             }
@@ -517,7 +519,6 @@ public class ResolvedPom {
                             requestedDependencies.add(incReqDep);
                         }
                     }
-                    //requestedDependencies.addAll(incomingRequestedDependencies);
                 }
             }
         }

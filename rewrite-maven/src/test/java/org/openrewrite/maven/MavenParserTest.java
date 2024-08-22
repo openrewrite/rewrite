@@ -3204,7 +3204,7 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void dependencyThatIsTransitivelyProvidedWithCorrectScopeShouldNotBeAdded() {
+    void childDependencyDefinitionShouldTakePrecedence() {
         rewriteRun(
           mavenProject("parent",
             pomXml(
@@ -3260,5 +3260,7 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
+
+    // TODO replicate above test case but with profiles
 
 }
