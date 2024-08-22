@@ -513,9 +513,15 @@ public class ResolvedPom {
                     // When a child dependency has overriden a parent dependency (either version or scope)
                     // We shouldn't add the parent definition when requested; the child takes precedence
                     for (Dependency incReqDep : incomingRequestedDependencies) {
-                        if (requestedDependencies.stream()
-                                .noneMatch(dep -> dep.getGav().getGroupId().equals(incReqDep.getGav().getGroupId())
-                                                  && dep.getGav().getArtifactId().equals(incReqDep.getGav().getArtifactId()))) {
+                        boolean found = false;
+                        for (Dependency reqDep : requestedDependencies) {
+                            if (reqDep.getGav().getGroupId().equals(incReqDep.getGav().getGroupId())
+                                && reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
                             requestedDependencies.add(incReqDep);
                         }
                     }
