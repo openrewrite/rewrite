@@ -62,7 +62,8 @@ public class GitRemote {
 
         /**
          * Transform a {@link GitRemote} into a clone url in the form of an {@link URI}
-         * @param remote the previously parsed GitRemote
+         *
+         * @param remote   the previously parsed GitRemote
          * @param protocol the protocol to use. Supported protocols: ssh, http, https
          * @return the clone url
          */
@@ -152,6 +153,16 @@ public class GitRemote {
             String normalizedOrigin = normalizedUri.getHost() + maybePort + normalizedUri.getPath();
             add(new RemoteServer(service, normalizedOrigin, normalize(origin)));
             return this;
+        }
+
+        public RemoteServer findRemoteServer(String origin) {
+            return servers.stream().filter(server -> server.origin.equals(origin))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        URI normalizedUri = normalize(origin);
+                        String normalizedOrigin = normalizedUri.getHost() + maybePort(normalizedUri.getPort(), normalizedUri.getScheme());
+                        return new RemoteServer(Service.Unknown, normalizedOrigin, normalizedUri);
+                    });
         }
 
         private void add(RemoteServer server) {
@@ -262,43 +273,6 @@ public class GitRemote {
         }
 
         @Value
-        private static class RemoteServer {
-            Service service;
-            String origin;
-            List<URI> uris = new ArrayList<>();
-
-            public RemoteServer(Service service, String origin, URI... uris) {
-                this(service, origin, Arrays.asList(uris));
-            }
-
-            public RemoteServer(Service service, String origin, Collection<URI> uris) {
-                this.service = service;
-                this.origin = origin;
-                this.uris.addAll(uris);
-            }
-
-            @Nullable
-            private RemoteServerMatch match(URI normalizedUri) {
-                for (URI uri : uris) {
-                    if (normalizedUri.toString().startsWith(normalize(uri.toString()).toString())) {
-                        return new RemoteServerMatch(service, origin, uri);
-                    }
-                }
-                return null;
-            }
-
-            public Set<String> allOrigins() {
-                Set<String> origins = new LinkedHashSet<>();
-                origins.add(origin);
-                for (URI uri : uris) {
-                    URI normalized = normalize(uri.toString());
-                    origins.add(stripProtocol(normalized.toString()));
-                }
-                return origins;
-            }
-        }
-
-        @Value
         private static class RemoteServerMatch {
             Service service;
             String origin;
@@ -316,6 +290,42 @@ public class GitRemote {
                    ("https".equals(scheme) && port == 443) ||
                    ("http".equals(scheme) && port == 80) ||
                    ("ssh".equals(scheme) && port == 22);
+        }
+    }
+
+    @Value
+    public static class RemoteServer {
+        Service service;
+        String origin;
+        List<URI> uris = new ArrayList<>();
+
+        public RemoteServer(Service service, String origin, URI... uris) {
+            this(service, origin, Arrays.asList(uris));
+        }
+
+        public RemoteServer(Service service, String origin, Collection<URI> uris) {
+            this.service = service;
+            this.origin = origin;
+            this.uris.addAll(uris);
+        }
+
+        private GitRemote.Parser.@Nullable RemoteServerMatch match(URI normalizedUri) {
+            for (URI uri : uris) {
+                if (normalizedUri.toString().startsWith(Parser.normalize(uri.toString()).toString())) {
+                    return new Parser.RemoteServerMatch(service, origin, uri);
+                }
+            }
+            return null;
+        }
+
+        public Set<String> allOrigins() {
+            Set<String> origins = new LinkedHashSet<>();
+            origins.add(origin);
+            for (URI uri : uris) {
+                URI normalized = Parser.normalize(uri.toString());
+                origins.add(Parser.stripProtocol(normalized.toString()));
+            }
+            return origins;
         }
     }
 }
