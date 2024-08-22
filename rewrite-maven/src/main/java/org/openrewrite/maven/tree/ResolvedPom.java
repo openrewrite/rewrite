@@ -508,7 +508,16 @@ public class ResolvedPom {
                     //If it's empty, we ensure to create a mutable list.
                     requestedDependencies = new ArrayList<>(incomingRequestedDependencies);
                 } else {
-                    requestedDependencies.addAll(incomingRequestedDependencies);
+                    // When a child dependency has overriden a parent dependency (either version or scope)
+                    // We shouldn't add the parent definition when requested; the child takes precedence
+                    for (Dependency incReqDep : incomingRequestedDependencies) {
+                        if (requestedDependencies.stream()
+                                .noneMatch(dep -> dep.getGav().getGroupId().equals(incReqDep.getGav().getGroupId())
+                                                  && dep.getGav().getArtifactId().equals(incReqDep.getGav().getArtifactId()))) {
+                            requestedDependencies.add(incReqDep);
+                        }
+                    }
+                    //requestedDependencies.addAll(incomingRequestedDependencies);
                 }
             }
         }
