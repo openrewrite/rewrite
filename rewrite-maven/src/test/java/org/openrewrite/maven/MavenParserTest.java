@@ -3202,4 +3202,63 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dependencyThatIsTransitivelyProvidedWithCorrectScopeShouldNotBeAdded() {
+        rewriteRun(
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>31.1-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>31.1-jre</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                      MavenResolutionResult res = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                      assertThat(res.getDependencies().get(Scope.Compile)).isEmpty();
+                      assertThat(res.getDependencies().get(Scope.Runtime)).isEmpty();
+                      assertThat(res.getDependencies().get(Scope.Provided)).isEmpty();
+                      assertThat(res.getDependencies().get(Scope.Test)).isNotEmpty().anyMatch(dep -> dep.getGroupId().equals("com.google.guava") && dep.getArtifactId().equals("guava"));
+                  }
+                )
+              )
+            )
+          )
+        );
+    }
+
 }
