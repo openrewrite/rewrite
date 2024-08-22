@@ -3260,7 +3260,4 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
-
-    // TODO replicate above test case but with profiles
-
 }
