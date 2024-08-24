@@ -116,6 +116,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     }
 
     @NonFinal
+    @Nullable
     transient GradleWrapper gradleWrapper;
 
     private GradleWrapper getGradleWrapper(ExecutionContext ctx) {
