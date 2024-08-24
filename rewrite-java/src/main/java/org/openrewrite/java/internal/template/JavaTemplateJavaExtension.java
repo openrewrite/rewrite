@@ -19,7 +19,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -186,29 +185,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 c = c.withImplements(ListUtils.concatAll(c.getImplements(), implementings));
                             }
                             if (c.getType() != null) {
-                                String fqn = c.getType().getFullyQualifiedName();
-                                c = c.withType(new JavaTypeVisitor<List<JavaType.FullyQualified>>() {
-                                    @Override
-                                    public JavaType visitClass(JavaType.Class aClass, List<JavaType.FullyQualified> fullyQualifiedTypes) {
-                                        JavaType.Class c = (JavaType.Class) super.visitClass(aClass, fullyQualifiedTypes);
-                                        if (fqn.equals(c.getFullyQualifiedName())) {
-                                            c = c.withInterfaces(ListUtils.concatAll(c.getInterfaces(), fullyQualifiedTypes));
-                                        }
-                                        return c;
-                                    }
-
-                                    @Override
-                                    public JavaType.Method visitMethod(JavaType.Method method, List<JavaType.FullyQualified> fullyQualifieds) {
-                                        // short-circuiting navigation to methods and variables.
-                                        return method;
-                                    }
-
-                                    @Override
-                                    public JavaType.Variable visitVariable(JavaType.Variable variable, List<JavaType.FullyQualified> fullyQualifieds) {
-                                        // short-circuiting navigation to methods and variables.
-                                        return variable;
-                                    }
-                                }.visitNonNull(c.getType(), implementsTypes));
+                                c = c.withType(((JavaType.Class) c.getType()).withInterfaces(ListUtils.concatAll(c.getType().getInterfaces(), implementsTypes)));
                             }
 
                             //noinspection ConstantConditions
