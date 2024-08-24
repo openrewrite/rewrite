@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -39,7 +40,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String testMethod() {}
                   }
                   """,
-                  """
+                """
                   import lombok.NonNull;
 
                   class A {
@@ -65,7 +66,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String testMethod() {}
                   }
                   """,
-                  """
+                """
                   import lombok.NonNull;
 
                   class A {
@@ -96,6 +97,38 @@ class ReplaceAnnotationTest implements RewriteTest {
                   class A {
                       @NotNull("Test")
                       String testMethod() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        @Issue("https://github.com/openrewrite/rewrite/issues/4441")
+        void methodWithAnnotatedParameter() {
+            rewriteRun(
+              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+              java(
+                """
+                  import org.jetbrains.annotations.NotNull;
+                  import org.jetbrains.annotations.Nullable;
+
+                  class A {
+                      void methodName(
+                          @Nullable final boolean valueVar) {
+                          @NotNull final String nullableVar = "test";
+                      }
+                  }
+                  """,
+                """
+                  import lombok.NonNull;
+                  import org.jetbrains.annotations.Nullable;
+
+                  class A {
+                      void methodName(
+                          @Nullable final boolean valueVar) {
+                          @NonNull final String nullableVar = "test";
+                      }
                   }
                   """
               )
