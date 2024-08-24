@@ -101,12 +101,13 @@ public class AnnotationTemplateGenerator {
 
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, Integer integer) {
-                J.Annotation withoutTemplateComment = annotation.withComments(
-                        ListUtils.concatAll(
-                                ListUtils.map(getCursor().getParentOrThrow().<J>getValue().getComments(), this::filterTemplateComment),
-                                ListUtils.map(annotation.getComments(), this::filterTemplateComment)
-                        ));
-                annotations.add(withoutTemplateComment);
+                List<Comment> combinedComments = ListUtils.concatAll(
+                        getCursor().getParentOrThrow().<J>getValue().getComments(),
+                        annotation.getComments());
+                List<Comment> filteredComments = ListUtils.map(combinedComments, this::filterTemplateComment);
+                if (combinedComments != filteredComments) {
+                    annotations.add(annotation.withComments(filteredComments));
+                }
                 return annotation;
             }
         }.visit(cu, 0);
