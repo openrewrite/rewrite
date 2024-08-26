@@ -98,6 +98,7 @@ public class AddRuntimeConfig extends ScanningRecipe<AddRuntimeConfig.Accumulato
     public static class Accumulator {
         final String targetRepresentation;
         boolean mavenProject;
+
         @Nullable
         Path matchingRuntimeConfigFile;
     }
