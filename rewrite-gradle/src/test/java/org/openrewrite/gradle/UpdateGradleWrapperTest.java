@@ -572,7 +572,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    void customDistributionUri() {
+    void customDistributionUriProvided() {
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("8.0.x", null, null, "https://company.com/repo/gradle-${version}-${distribution}.zip"))
             .expectedCyclesThatMakeChanges(2)
@@ -601,6 +601,51 @@ class UpdateGradleWrapperTest implements RewriteTest {
                     zipStorePath=wrapper/dists
                     distributionSha256Sum=%s
                     """.formatted(checksum);
+              })
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void customDistributionUriInPlace() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.x", "bin", false, null))
+            .expectedCyclesThatMakeChanges(2)
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.com/repo/gradle-8.8-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+              .after(after -> {
+                  Matcher checksumMatcher = Pattern.compile("distributionSha256Sum=(.*)").matcher(after);
+                  assertThat(checksumMatcher.find()).isTrue();
+                  String checksum = checksumMatcher.group(1);
+                  assertThat(checksum).isNotBlank();
+
+                  Matcher distUrlMatcher = Pattern.compile("distributionUrl=(.*/gradle-(.*)-bin.zip)").matcher(after);
+                  assertThat(distUrlMatcher.find()).isTrue();
+                  String distUrl = distUrlMatcher.group(1);
+                  assertThat(distUrl).isNotBlank().startsWith("https\\://company.com/repo");
+                  String distVersion = distUrlMatcher.group(2);
+                  assertThat(distVersion).isGreaterThan("8.8");
+
+                  // language=properties
+                  return """
+                    distributionBase=GRADLE_USER_HOME
+                    distributionPath=wrapper/dists
+                    distributionUrl=%s
+                    zipStoreBase=GRADLE_USER_HOME
+                    zipStorePath=wrapper/dists
+                    distributionSha256Sum=%s
+                    """.formatted(distUrl, checksum);
               })
           ),
           gradlew,
