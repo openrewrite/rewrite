@@ -24,6 +24,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.search.FindGradleProject;
+import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -35,6 +36,7 @@ import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
@@ -127,9 +129,15 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 // services.gradle.org is unreachable, possibly because of a firewall
                 // But if the user specified a wrapperUri to an internal repository things might still be workable
                 if (wrapperUri == null) {
-                    throw new IllegalArgumentException(
-                            "Could not reach services.gradle.org and no alternative wrapper URI is provided. " +
-                            "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri.", e);
+                    // If the user didn't specify a wrapperUri, but they did provide a specific version we assume they know this version
+                    // is available from whichever distribution url they were previously using and update the version
+                    if (Semver.validate(version, null).getValue() instanceof ExactVersion) {
+                        return gradleWrapper = new GradleWrapper(version, new DistributionInfos(null, null, null));
+                    } else {
+                        throw new IllegalArgumentException(
+                                "Could not reach services.gradle.org and no alternative wrapper URI is provided. " +
+                                "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri.", e);
+                    }
                 }
                 if (wrapperUri.contains("${version})")) {
                     if (version == null) {
@@ -211,10 +219,14 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return entry;
                         }
 
-                        GradleWrapper gradleWrapper = getGradleWrapper(ctx);
-
                         // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip
                         String currentDistributionUrl = entry.getValue().getText();
+
+                        GradleWrapper gradleWrpr = getGradleWrapper(ctx);
+                        if (gradleWrpr.getDistributionUrl() == null && Semver.validate(version, null).getValue() instanceof ExactVersion) {
+                            gradleWrapper = new GradleWrapper(version, new DistributionInfos(currentDistributionUrl.replace("\\", "").replaceAll("(.*gradle-)(.*)(-bin.zip)", "$1" + gradleWrapper.getVersion() + "$3"), null, null));
+                        }
+
                         if (!gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
                             acc.needsWrapperUpdate = true;
                         }

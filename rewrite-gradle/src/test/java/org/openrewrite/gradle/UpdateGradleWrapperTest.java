@@ -43,14 +43,9 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.SourceSpecs.dir;
-import static org.openrewrite.test.SourceSpecs.other;
-import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.test.SourceSpecs.*;
 
 @SuppressWarnings("UnusedProperty")
 class UpdateGradleWrapperTest implements RewriteTest {
@@ -115,22 +110,22 @@ class UpdateGradleWrapperTest implements RewriteTest {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
             .afterRecipe(run -> {
-              var gradleSh = result(run, PlainText.class, "gradlew");
-              assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
-              assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
-              assertThat(gradleSh.getFileAttributes()).isNotNull();
-              assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
-              assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
+                var gradleSh = result(run, PlainText.class, "gradlew");
+                assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
+                assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+                assertThat(gradleSh.getFileAttributes()).isNotNull();
+                assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
+                assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
 
-              var gradleBat = result(run, PlainText.class, "gradlew.bat");
-              assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
-              assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
+                var gradleBat = result(run, PlainText.class, "gradlew.bat");
+                assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
+                assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
 
-              var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
-              assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-              assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
-              assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
-          }),
+                var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+                assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
+                assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
           properties(
             """
               distributionBase=GRADLE_USER_HOME
@@ -165,17 +160,17 @@ class UpdateGradleWrapperTest implements RewriteTest {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
             .afterRecipe(run -> {
-              var gradleSh = result(run, PlainText.class, "gradlew");
-              assertThat(gradleSh.getText()).isNotBlank();
+                var gradleSh = result(run, PlainText.class, "gradlew");
+                assertThat(gradleSh.getText()).isNotBlank();
 
-              var gradleBat = result(run, PlainText.class, "gradlew.bat");
-              assertThat(gradleBat.getText()).isNotBlank();
+                var gradleBat = result(run, PlainText.class, "gradlew.bat");
+                assertThat(gradleBat.getText()).isNotBlank();
 
-              var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
-              assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
-              assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
-              assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
-          }),
+                var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+                assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
+                assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
           properties(
             """
               distributionBase=GRADLE_USER_HOME
@@ -471,19 +466,19 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void skipWorkIfUpdatedEarlier() {
         rewriteRun(
           spec -> spec.recipeFromYaml(
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.gradle.MultipleWrapperUpdates
-              displayName: Multiple wrapper updates
-              description: Multiple wrapper updates.
-              recipeList:
-                - org.openrewrite.gradle.UpdateGradleWrapper:
-                    version: 7.6.3
-                    addIfMissing: false
-                - org.openrewrite.gradle.UpdateGradleWrapper:
-                    version: 6.9.4
-                    addIfMissing: false
-            """,
+              """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.gradle.MultipleWrapperUpdates
+                  displayName: Multiple wrapper updates
+                  description: Multiple wrapper updates.
+                  recipeList:
+                    - org.openrewrite.gradle.UpdateGradleWrapper:
+                        version: 7.6.3
+                        addIfMissing: false
+                    - org.openrewrite.gradle.UpdateGradleWrapper:
+                        version: 6.9.4
+                        addIfMissing: false
+                """,
               "org.openrewrite.gradle.MultipleWrapperUpdates")
             .cycles(1)
             .expectedCyclesThatMakeChanges(1)
@@ -574,8 +569,13 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Test
     void preferExistingDistributionSourceWhenServicesGradleOrgUnavailable() {
         HttpSender unhelpfulSender = request -> {
-            if(request.getUrl().toString().contains("services.gradle.org")) {
+            if (request.getUrl().toString().contains("services.gradle.org")) {
                 throw new RuntimeException("I'm sorry Dave, I'm afraid I can't do that.");
+            }
+            if (request.getUrl().toString().contains("company.com/repo")) {
+                InputStream zipInputStream = UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip");
+                return new HttpSender.Response(200, zipInputStream, () -> {
+                });
             }
             return new HttpUrlConnectionSender().send(request);
         };
@@ -585,7 +585,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("8.10", "bin", false, null))
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
-            .expectedCyclesThatMakeChanges(2)
             .executionContext(ctx),
           properties(
             """
@@ -661,7 +660,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Test
     void servicesGradleOrgUnavailable() {
         HttpSender unhelpfulSender = request -> {
-            if(request.getUrl().toString().contains("services.gradle.org")) {
+            if (request.getUrl().toString().contains("services.gradle.org")) {
                 throw new RuntimeException("I'm sorry Dave, I'm afraid I can't do that.");
             }
             return new HttpUrlConnectionSender().send(request);
