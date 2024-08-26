@@ -154,7 +154,7 @@ class AddRuntimeConfigTest implements RewriteTest {
           POM_XML_SOURCE_SPEC,
           text(
             existingConfig,
-            existingConfig + System.lineSeparator() + "-T=3",
+            existingConfig + "\n-T=3",
             spec -> spec.path(MAVEN_CONFIG_PATH)
           )
         );
