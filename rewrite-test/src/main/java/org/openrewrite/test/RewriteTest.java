@@ -27,7 +27,6 @@ import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
@@ -586,7 +585,7 @@ public interface RewriteTest extends SourceSpecs {
                                                                       && !(result.getAfter() instanceof Remote)
                                                                       && !expectedNewResults.contains(result)
                                                                       && testMethodSpec.afterRecipes.isEmpty()));
-        if(resultToUnexpected.values().stream().anyMatch(it -> it)) {
+        if (resultToUnexpected.values().stream().anyMatch(unexpected -> unexpected)) {
             String paths = resultToUnexpected.entrySet().stream()
                     .map(it -> {
                         Result result = it.getKey();
@@ -594,10 +593,12 @@ public interface RewriteTest extends SourceSpecs {
                         String beforePath = (result.getBefore() == null) ? "null" : result.getAfter().getSourcePath().toString();
                         String afterPath = (result.getAfter() == null) ? "null" : result.getAfter().getSourcePath().toString();
                         String status = it.getValue() ? "❌️" : "✔";
-                        return "    " + beforePath + " -> " + afterPath + " " + status;
+                        return "    " + beforePath + " | " + afterPath + " | " + status;
                     })
                     .collect(Collectors.joining("\n"));
-            fail("The recipe added a source file that was not expected. All source file paths, before and after recipe run:\n" + paths);
+            fail("The recipe generated source files the test did not expect.\n" +
+                 "Source file paths before recipe, after recipe, and whether the test expected that result:\n" +
+                 "    before | after | expected\n" + paths);
         }
     }
 
@@ -632,7 +633,6 @@ public interface RewriteTest extends SourceSpecs {
         return new InMemoryExecutionContext(t -> fail("Failed to parse sources or run recipe", t));
     }
 
-    @NonNull
     @Override
     default Iterator<SourceSpec<?>> iterator() {
         return new Iterator<SourceSpec<?>>() {
