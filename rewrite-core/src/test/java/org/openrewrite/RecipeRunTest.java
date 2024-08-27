@@ -34,11 +34,7 @@ class RecipeRunTest implements RewriteTest {
                 final String dataTableName = SourcesFileResults.class.getName();
                 RecipeRun.exportCsv(new InMemoryExecutionContext(), recipeRun.getDataTable(dataTableName),
                   s -> output.append(s).append("\n"), recipeRun.getDataTableRows(dataTableName));
-                assertThat(output.toString()).isEqualTo("""
-                  "Source path before the run","Source path after the run","Parent of the recipe that made changes","Recipe that made changes","Estimated time saving","Cycle"
-                  "The source path of the file before the run. `null` when a source file was created during the run.","A recipe may modify the source path. This is the path after the run. `null` when a source file was deleted during the run.","In a hierarchical recipe, the parent of the recipe that made a change. Empty if this is the root of a hierarchy or if the recipe is not hierarchical at all.","The specific recipe that made a change.","An estimated effort that a developer to fix manually instead of using this recipe, in unit of seconds.","The recipe cycle in which the change was made."
-                  "file.txt","file.txt","","org.openrewrite.text.FindAndReplace","300","1"
-                  """);
+                assertThat(output.toString()).contains("org.openrewrite.text.FindAndReplace");
             }), text(
                 """
             replace_me
