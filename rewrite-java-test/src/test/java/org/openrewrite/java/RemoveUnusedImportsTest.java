@@ -1814,4 +1814,53 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void staticAmbiguousImport() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              package org.a;
+              public class ABC {
+                public static String A = "A";
+                public static String B = "B";
+                public static String C = "C";
+                public static String ALL = "%s%s%s".formatted(A, B, C);
+              }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class DEF {
+                public static String D = "D";
+                public static String E = "E";
+                public static String F = "F";
+                public static String ALL = "%s%s%s".formatted(D, E, F);
+              }
+              """
+          ),
+          java(
+            """
+              package org.test;
+
+              import static org.a.ABC.*;
+              import static org.b.DEF.*;
+              import static org.a.ABC.ALL;
+
+              public class Test {
+                private String abc = ALL;
+                private String a = A;
+                private String b = B;
+                private String c = C;
+                private String d = D;
+                private String e = E;
+                private String f = F;
+              }
+              """
+          )
+        );
+    }
+
 }
