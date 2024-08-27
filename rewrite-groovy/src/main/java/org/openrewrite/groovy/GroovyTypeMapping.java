@@ -17,7 +17,7 @@ package org.openrewrite.groovy;
 
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -203,7 +203,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return gtv;
     }
 
-    public @Nullable JavaType.Method methodType(@Nullable MethodNode node) {
+    public JavaType.@Nullable Method methodType(@Nullable MethodNode node) {
         if (node == null) {
             return null;
         }
@@ -264,7 +264,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return method;
     }
 
-    public @Nullable JavaType.Variable variableType(@Nullable FieldNode node) {
+    public JavaType.@Nullable Variable variableType(@Nullable FieldNode node) {
         if (node == null) {
             return null;
         }
@@ -293,11 +293,11 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     /**
      * With an undefined owner
      */
-    public @Nullable JavaType.Variable variableType(String name, @Nullable ASTNode type) {
+    public JavaType.@Nullable Variable variableType(String name, @Nullable ASTNode type) {
         return variableType(name, type(type));
     }
 
-    public @Nullable JavaType.Variable variableType(String name, @Nullable JavaType type) {
+    public JavaType.@Nullable Variable variableType(String name, @Nullable JavaType type) {
         if (type == null) {
             return null;
         }

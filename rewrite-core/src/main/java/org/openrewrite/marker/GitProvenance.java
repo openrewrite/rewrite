@@ -16,11 +16,15 @@
 package org.openrewrite.marker;
 
 
-import lombok.*;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Value;
+import lombok.With;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.GitRemote;
 import org.openrewrite.Incubating;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.jgit.lib.*;
@@ -44,7 +48,6 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @AllArgsConstructor(access = AccessLevel.PACKAGE) // required for @With and tests
-@RequiredArgsConstructor
 @With
 public class GitProvenance implements Marker {
     UUID id;
@@ -76,6 +79,24 @@ public class GitProvenance implements Marker {
     @NonFinal
     @Nullable
     GitRemote gitRemote;
+
+    // javadoc does not like @RequiredArgsConstructor(onConstructor_ = { @JsonCreator })
+    @JsonCreator
+    public GitProvenance(UUID id,
+                         @Nullable String origin,
+                         @Nullable String branch,
+                         @Nullable String change,
+                         @Nullable AutoCRLF autocrlf,
+                         @Nullable EOL eol,
+                         @Nullable List<Committer> committers) {
+        this.id = id;
+        this.origin = origin;
+        this.branch = branch;
+        this.change = change;
+        this.autocrlf = autocrlf;
+        this.eol = eol;
+        this.committers = committers;
+    }
 
     public @Nullable GitRemote getGitRemote() {
         if (gitRemote == null && origin != null) {
@@ -166,7 +187,7 @@ public class GitProvenance implements Marker {
      */
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
                                                                @Nullable BuildEnvironment environment,
-                                                               @Nullable GitRemote.Parser gitRemoteParser) {
+            GitRemote.@Nullable Parser gitRemoteParser) {
         if (gitRemoteParser == null) {
             gitRemoteParser = new GitRemote.Parser();
         }

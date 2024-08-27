@@ -24,6 +24,7 @@ import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
@@ -32,7 +33,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
@@ -263,7 +263,7 @@ class ReloadableJava8Parser implements JavaParser {
 
     private static class TimedTodo extends Todo {
         private final Todo todo;
-        private @Nullable Timer.Sample sample;
+        private Timer.@Nullable Sample sample;
 
         private TimedTodo(Todo todo) {
             super(new Context());

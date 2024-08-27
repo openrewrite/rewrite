@@ -17,10 +17,10 @@ package org.openrewrite.xml;
 
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -97,7 +97,9 @@ public class XmlParser implements Parser {
                p.endsWith(".stp") ||
                p.endsWith(".dcn") ||
                p.endsWith(".pst") ||
-               p.endsWith(".csproj");
+               // C# project files
+               p.endsWith(".csproj") ||
+               path.endsWith("packages.config");
     }
 
     @Override

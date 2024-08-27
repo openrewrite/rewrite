@@ -17,8 +17,8 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.tree.J;
@@ -81,14 +81,13 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                cu.getMarkers().findFirst(JavaVersion.class).ifPresent(javaVersion -> {
+                cu.getMarkers().findFirst(JavaVersion.class).ifPresent(javaVersion ->
                     acc.updateAndGet(current -> {
                         if (current == null || javaVersion.getMajorVersion() < current.getMajorVersion()) {
                             return javaVersion;
                         }
                         return current;
-                    });
-                });
+                    }));
                 return cu;
             }
         };

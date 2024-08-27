@@ -17,6 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsSettingsGradle;
@@ -49,6 +50,7 @@ public class AddSettingsPluginRepository extends Recipe {
             description = "The url of the artifact repository",
             required = false,
             example = "https://repo.spring.io")
+    @Nullable
     String url;
 
     @Override

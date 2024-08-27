@@ -21,10 +21,10 @@ import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
@@ -67,9 +67,17 @@ public class BlockStatementTemplateGenerator {
                         after.append('}');
                     }
 
-                    template(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
+                    if (contextSensitive) {
+                        contextTemplate(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
+                    } else {
+                        contextFreeTemplate(next(cursor), cursor.getValue(), before, after);
+                    }
 
-                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after.toString().trim();
+                    return before.toString().trim() +
+                           "\n/*" + TEMPLATE_COMMENT + "*/" +
+                           template +
+                           "/*" + STOP_COMMENT + "*/\n" +
+                           after.toString().trim();
                 });
     }
 
@@ -79,12 +87,12 @@ public class BlockStatementTemplateGenerator {
         new JavaIsoVisitor<Integer>() {
             boolean done = false;
 
-            @Nullable
-            J.Block blockEnclosingTemplateComment;
+            J.@Nullable Block blockEnclosingTemplateComment;
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
-                if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile && (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile &&
+                    (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
                     // don't visit the __P__ and __M__ classes declaring stubs
                     return classDecl;
                 }
@@ -191,14 +199,6 @@ public class BlockStatementTemplateGenerator {
         }.visit(cu, 0);
 
         return js;
-    }
-
-    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
-        if (contextSensitive) {
-            contextTemplate(cursor, prior, before, after, insertionPoint, mode);
-        } else {
-            contextFreeTemplate(cursor, prior, before, after);
-        }
     }
 
     @SuppressWarnings("DataFlowIssue")
@@ -743,7 +743,7 @@ public class BlockStatementTemplateGenerator {
      * Accepts a @FunctionalInterface and returns the single abstract method from it, or null if the single abstract
      * method cannot be found
      */
-    private static @Nullable JavaType.Method findSingleAbstractMethod(@Nullable JavaType javaType) {
+    private static JavaType.@Nullable Method findSingleAbstractMethod(@Nullable JavaType javaType) {
         if (javaType == null) {
             return null;
         }
@@ -774,11 +774,13 @@ public class BlockStatementTemplateGenerator {
 
         private static class TemplatedTreeTrimmerVisitor extends JavaVisitor<Integer> {
             private boolean stopCommentExists(@Nullable J j) {
-                if (j != null) {
-                    for (Comment comment : j.getComments()) {
-                        if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
-                            return true;
-                        }
+                return j != null && stopCommentExists(j.getComments());
+            }
+
+            private static boolean stopCommentExists(List<Comment> comments) {
+                for (Comment comment : comments) {
+                    if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
+                        return true;
                     }
                 }
                 return false;
@@ -802,6 +804,13 @@ public class BlockStatementTemplateGenerator {
                 if (stopCommentExists(mi.getName())) {
                     //noinspection ConstantConditions
                     return mi.getSelect();
+                }
+                if (method.getTypeParameters() != null) {
+                    // For method chains return `select` if `STOP_COMMENT` is found before `typeParameters`
+                    if (stopCommentExists(mi.getPadding().getTypeParameters().getBefore().getComments())) {
+                        //noinspection ConstantConditions
+                        return mi.getSelect();
+                    }
                 }
                 return mi;
             }

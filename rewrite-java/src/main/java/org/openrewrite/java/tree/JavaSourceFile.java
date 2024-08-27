@@ -15,10 +15,10 @@
  */
 package org.openrewrite.java.tree;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.WhitespaceValidationService;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaWhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AnnotationService;
@@ -32,8 +32,7 @@ import java.util.List;
 public interface JavaSourceFile extends J, SourceFile {
     TypesInUse getTypesInUse();
 
-    @Nullable
-    J.Package getPackageDeclaration();
+    J.@Nullable Package getPackageDeclaration();
 
     JavaSourceFile withPackageDeclaration(J.Package pkg);
 

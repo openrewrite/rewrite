@@ -17,15 +17,13 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.NameTree;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.table.TypeUses;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
@@ -35,6 +33,7 @@ import java.util.regex.Pattern;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindTypes extends Recipe {
+    transient TypeUses typeUses = new TypeUses(this);
 
     @Option(displayName = "Fully-qualified type name",
             description = "A fully-qualified type name, that is used to find matching type references. " +
@@ -66,14 +65,14 @@ public class FindTypes extends Recipe {
             @Override
             public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                 if (ident.getType() != null &&
-                        getCursor().firstEnclosing(J.Import.class) == null &&
-                        getCursor().firstEnclosing(J.FieldAccess.class) == null &&
-                        !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType) &&
-                        !(getCursor().getParentOrThrow().getValue() instanceof J.ArrayType)) {
+                    getCursor().firstEnclosing(J.Import.class) == null &&
+                    getCursor().firstEnclosing(J.FieldAccess.class) == null &&
+                    !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType) &&
+                    !(getCursor().getParentOrThrow().getValue() instanceof J.ArrayType)) {
                     JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                     if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         ident.getSimpleName().equals(type.getClassName())) {
-                        return SearchResult.found(ident);
+                        return found(ident, ctx);
                     }
                 }
                 return super.visitIdentifier(ident, ctx);
@@ -84,8 +83,8 @@ public class FindTypes extends Recipe {
                 N n = super.visitTypeName(name, ctx);
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(n.getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
-                        getCursor().firstEnclosing(J.Import.class) == null) {
-                    return SearchResult.found(n);
+                    getCursor().firstEnclosing(J.Import.class) == null) {
+                    return found(n, ctx);
                 }
                 return n;
             }
@@ -96,9 +95,19 @@ public class FindTypes extends Recipe {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                     fa.getName().getSimpleName().equals("class")) {
-                    return SearchResult.found(fa);
+                    return found(fa, ctx);
                 }
                 return fa;
+            }
+
+            private <J2 extends TypedTree> J2 found(J2 j, ExecutionContext ctx) {
+                JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(j.getType());
+                typeUses.insertRow(ctx, new TypeUses.Row(
+                        getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
+                        j.printTrimmed(getCursor()),
+                        fqn == null ? j.getType().toString() : fqn.getFullyQualifiedName()
+                ));
+                return SearchResult.found(j);
             }
         });
     }
@@ -155,7 +164,7 @@ public class FindTypes extends Recipe {
     }
 
     private static boolean typeMatches(boolean checkAssignability, Pattern pattern,
-                                       @Nullable JavaType.FullyQualified test) {
+            JavaType.@Nullable FullyQualified test) {
         return test != null && (checkAssignability ?
                 test.isAssignableFrom(pattern) :
                 pattern.matcher(test.getFullyQualifiedName()).matches()

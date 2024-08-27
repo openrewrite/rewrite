@@ -166,6 +166,34 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4382")
+    void migratesNestedFieldInitializer() {
+        rewriteRun(
+          java(acmeLists),
+          java(
+            """
+              import java.util.Collections;
+
+              class Foo {
+                  void bar() {
+                      final Object collection = java.util.Arrays.asList(Collections.EMPTY_LIST);
+                  }
+              }
+              """,
+            """
+              import com.acme.Lists;
+
+              class Foo {
+                  void bar() {
+                      final Object collection = java.util.Arrays.asList(Lists.of());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void ignoresUnrelatedFields() {
         rewriteRun(
           java(
@@ -237,7 +265,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
           java(
             """
               package com.example;
-                            
+
               class Test {
                   public static Object EXAMPLE = null;
               }
@@ -276,7 +304,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   private HttpResponseStatus(int code) {
                       this.code = code;
                   }
-                  
+
                   String codeAsText() {
                       return String.valueOf(code);
                   }

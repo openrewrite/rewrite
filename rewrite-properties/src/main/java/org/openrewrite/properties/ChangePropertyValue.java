@@ -17,10 +17,10 @@ package org.openrewrite.properties;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.regex.Pattern;
@@ -97,7 +97,7 @@ public class ChangePropertyValue extends Recipe {
         }
 
         // returns null if value should not change
-        private @Nullable Properties.Value updateValue(Properties.Value value) {
+        private Properties.@Nullable Value updateValue(Properties.Value value) {
             Properties.Value updatedValue = value.withText(Boolean.TRUE.equals(regex)
                     ? value.getText().replaceAll(oldValue, newValue)
                     : newValue);

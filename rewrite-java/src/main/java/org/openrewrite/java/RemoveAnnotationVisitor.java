@@ -141,7 +141,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
      *
      * @param annotation the annotation to check
      */
-    private void maybeRemoveAnnotationParameterImports(@NonNull J.Annotation annotation) {
+    private void maybeRemoveAnnotationParameterImports(J.@NonNull Annotation annotation) {
         if (ListUtils.nullIfEmpty(annotation.getArguments()) == null) {
             return;
         }
@@ -174,14 +174,14 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
         }
     }
 
-    private void maybeRemoveAnnotationFromArray(@NonNull J.NewArray newArray) {
+    private void maybeRemoveAnnotationFromArray(J.@NonNull NewArray newArray) {
         List<Expression> initializer = newArray.getInitializer();
         if (ListUtils.nullIfEmpty(initializer) != null) {
             initializer.forEach(this::maybeRemoveImportFromExpression);
         }
     }
 
-    private void maybeRemoveAnnotationFromFieldAccess(@NonNull J.FieldAccess fa) {
+    private void maybeRemoveAnnotationFromFieldAccess(J.@NonNull FieldAccess fa) {
         JavaType.Variable fieldType = fa.getName().getFieldType();
         if (fieldType != null && fieldType.getOwner() != null) {
             maybeRemoveImport(TypeUtils.asFullyQualified(fieldType.getOwner()));

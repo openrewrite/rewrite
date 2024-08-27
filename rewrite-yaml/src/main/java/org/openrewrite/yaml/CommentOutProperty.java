@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
 import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.stream.StreamSupport.stream;
 
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class CommentOutProperty extends Recipe {
@@ -59,8 +58,32 @@ public class CommentOutProperty extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new YamlIsoVisitor<ExecutionContext>() {
+            private boolean nextDocNeedsNewline;
             private String comment = "";
             private String indentation = "";
+
+            @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                Yaml.Document doc = super.visitDocument(document, ctx);
+
+                if (nextDocNeedsNewline) {
+                    nextDocNeedsNewline = false;
+                    doc = doc.withPrefix("\n" + doc.getPrefix());
+                }
+
+                // Add any leftover comment to the end of document
+                if (!comment.isEmpty()) {
+                    String newPrefix = String.format("%s# %s%s%s",
+                            indentation,
+                            commentText,
+                            indentation.contains("\n") ? "" : "\n",
+                            indentation.contains("\n") ? comment : comment.replace("#", "# "));
+                    nextDocNeedsNewline = !newPrefix.endsWith("\n");
+                    comment = "";
+                    return document.withEnd(doc.getEnd().withPrefix(newPrefix));
+                }
+                return doc;
+            }
 
             @Override
             public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry,

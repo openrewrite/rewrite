@@ -27,10 +27,10 @@ import lombok.Getter;
 import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -508,7 +508,21 @@ public class ResolvedPom {
                     //If it's empty, we ensure to create a mutable list.
                     requestedDependencies = new ArrayList<>(incomingRequestedDependencies);
                 } else {
-                    requestedDependencies.addAll(incomingRequestedDependencies);
+                    // When a child dependency has overriden a parent dependency (either version or scope)
+                    // We shouldn't add the parent definition when requested; the child takes precedence
+                    for (Dependency incReqDep : incomingRequestedDependencies) {
+                        boolean found = false;
+                        for (Dependency reqDep : requestedDependencies) {
+                            if (reqDep.getGav().getGroupId().equals(incReqDep.getGav().getGroupId())
+                                && reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            requestedDependencies.add(incReqDep);
+                        }
+                    }
                 }
             }
         }

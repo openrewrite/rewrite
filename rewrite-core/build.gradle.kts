@@ -13,6 +13,8 @@ dependencies {
     api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("net.java.dev.jna:jna-platform:latest.release")
 
+    api("org.jspecify:jspecify:latest.release")
+
     // Pinning okhttp while waiting on 5.0.0
     // https://github.com/openrewrite/rewrite/issues/1479
     compileOnly("com.squareup.okhttp3:okhttp:4.9.3")

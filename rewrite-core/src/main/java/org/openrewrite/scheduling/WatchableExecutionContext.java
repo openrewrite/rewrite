@@ -16,8 +16,8 @@
 package org.openrewrite.scheduling;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;

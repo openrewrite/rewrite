@@ -25,6 +25,7 @@ import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -33,13 +34,12 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.Semicolon;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -480,7 +480,7 @@ public class GroovyParserVisitor {
             // Method name might be in quotes
             Space namePrefix = whitespace();
             String methodName;
-            if(source.startsWith(method.getName(), cursor)) {
+            if (source.startsWith(method.getName(), cursor)) {
                 methodName = method.getName();
             } else {
                 char openingQuote = source.charAt(cursor);
@@ -615,15 +615,7 @@ public class GroovyParserVisitor {
         }
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
-            Integer insideParenthesesLevel;
-            Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
-            if(rawIpl instanceof AtomicInteger) {
-                // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
-                insideParenthesesLevel = ((AtomicInteger) rawIpl).get();
-            } else {
-                // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
-                insideParenthesesLevel = (Integer) rawIpl;
-            }
+            Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
             if (insideParenthesesLevel != null) {
                 Stack<Space> openingParens = new Stack<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
@@ -713,8 +705,8 @@ public class GroovyParserVisitor {
                 }
             }
 
-            if(unparsedArgs.isEmpty()) {
-                args.add(JRightPadded.build((Expression)new J.Empty(randomId(), whitespace(), Markers.EMPTY))
+            if (unparsedArgs.isEmpty()) {
+                args.add(JRightPadded.build((Expression) new J.Empty(randomId(), whitespace(), Markers.EMPTY))
                         .withAfter(omitParentheses == null ? sourceBefore(")") : EMPTY));
             } else {
                 for (int i = 0; i < unparsedArgs.size(); i++) {
@@ -1193,7 +1185,7 @@ public class GroovyParserVisitor {
                     // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
                     int length = sourceLengthOfString(expression);
                     // this is an attribute selector
-                    if (source.startsWith("@"+value, cursor)) {
+                    if (source.startsWith("@" + value, cursor)) {
                         length += 1;
                     }
                     text = source.substring(cursor, cursor + length);
@@ -1238,7 +1230,7 @@ public class GroovyParserVisitor {
         public void visitConstructorCallExpression(ConstructorCallExpression ctor) {
             queue.add(insideParentheses(ctor, fmt -> {
                 cursor += 3; // skip "new"
-                TypeTree clazz = visitTypeTree(ctor.getType());
+                TypeTree clazz = visitTypeTree(ctor.getType(), ctor.getMetaDataMap().containsKey(StaticTypesMarker.INFERRED_TYPE));
                 JContainer<Expression> args = visit(ctor.getArguments());
                 J.Block body = null;
                 if (ctor.isUsingAnonymousInnerClass() && ctor.getType() instanceof InnerClassNode) {
@@ -1325,7 +1317,7 @@ public class GroovyParserVisitor {
             queue.add(labeled(statement, () -> {
                 super.visitExpressionStatement(statement);
                 Object e = queue.poll();
-                if(e instanceof Statement) {
+                if (e instanceof Statement) {
                     return (Statement) e;
                 }
                 return new G.ExpressionStatement(randomId(), (Expression) e);
@@ -1457,7 +1449,7 @@ public class GroovyParserVisitor {
                     // The sub-strings within a GString have no delimiters of their own, confusing visitConstantExpression()
                     // ConstantExpression.getValue() cannot be trusted for strings as its values don't match source code because sequences like "\\" have already been replaced with a single "\"
                     // Use the AST element's line/column positions to figure out its extent, but those numbers need tweaks to be correct
-                    int length = sourceLengthOfString(cs);
+                    int length = lengthAccordingToAst(cs);
                     if (i == 0 || i == rawExprs.size() - 1) {
                         // The first and last constants within a GString have line/column position which incorrectly include the GString's delimiters
                         length -= delimiter.length();
@@ -1971,12 +1963,12 @@ public class GroovyParserVisitor {
             if (expression.isDynamicTyped()) {
                 Space prefix = whitespace();
                 String keyword;
-                if(source.substring(cursor).startsWith("final")) {
+                if (source.substring(cursor).startsWith("final")) {
                     keyword = "final";
                 } else {
                     keyword = source.substring(cursor, cursor + 3);
                 }
-               cursor += keyword.length();
+                cursor += keyword.length();
                 return new J.Identifier(randomId(),
                         prefix,
                         Markers.EMPTY,
@@ -1991,7 +1983,7 @@ public class GroovyParserVisitor {
                     emptyList(),
                     expression.getOriginType().getUnresolvedName(),
                     type, null);
-            if (type instanceof JavaType.Parameterized) {
+            if (expression.getOriginType().getGenericsTypes() != null) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
                         staticType((org.codehaus.groovy.ast.expr.Expression) expression).getGenericsTypes()), type);
             }
@@ -2132,7 +2124,7 @@ public class GroovyParserVisitor {
         int column;
 
         @Override
-        public int compareTo(@NonNull GroovyParserVisitor.LineColumn lc) {
+        public int compareTo(GroovyParserVisitor.@NonNull LineColumn lc) {
             return line != lc.line ? line - lc.line : column - lc.column;
         }
     }
@@ -2201,7 +2193,12 @@ public class GroovyParserVisitor {
         return token;
     }
 
+    @SuppressWarnings("SameParameterValue")
     private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode) {
+        return typeTree(classNode, false);
+    }
+
+    private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode, boolean inferredType) {
         if (classNode != null && classNode.isArray()) {
             //noinspection unchecked
             return (T) arrayType(classNode);
@@ -2244,7 +2241,10 @@ public class GroovyParserVisitor {
         assert expr != null;
         if (classNode != null) {
             if (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
-                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
+                JContainer<Expression> typeParameters = inferredType ?
+                        JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
+                        visitTypeParameterizations(classNode.getGenericsTypes());
+                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, typeParameters, typeMapping.type(classNode));
             }
         }
         return expr.withPrefix(prefix);
@@ -2309,7 +2309,25 @@ public class GroovyParserVisitor {
             int delimiterLength = getDelimiterLength();
             return delimiterLength + value.length() + delimiterLength;
         }
-        return lengthAccordingToAst(expr);
+        int lengthAccordingToAst = lengthAccordingToAst(expr);
+        // subtract any parentheses that were included with lengthAccordingToAst
+        Integer insideParenthesesLevel = getInsideParenthesesLevel(expr);
+        if (insideParenthesesLevel != null) {
+            return lengthAccordingToAst - insideParenthesesLevel * 2;
+        }
+
+        return lengthAccordingToAst;
+    }
+
+    private static @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
+        Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
+        if (rawIpl instanceof AtomicInteger) {
+            // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
+            return ((AtomicInteger) rawIpl).get();
+        } else {
+            // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
+            return (Integer) rawIpl;
+        }
     }
 
     private int getDelimiterLength() {
@@ -2330,7 +2348,7 @@ public class GroovyParserVisitor {
      * On older versions of the JDK/Groovy compiler string literals with following whitespace sometimes erroneously include
      * the length of the whitespace in the length of the AST node.
      * So in this method invocation:
-     *    foo( 'a' )
+     * foo( 'a' )
      * the correct source length for the AST node representing 'a' is 3, but in affected groovy versions the length
      * on the node is '4' because it is also counting the trailing whitespace.
      */
@@ -2363,6 +2381,10 @@ public class GroovyParserVisitor {
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
+        return visitTypeTree(classNode, false);
+    }
+
+    private TypeTree visitTypeTree(ClassNode classNode, boolean inferredType) {
         JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(classNode.getUnresolvedName());
         if (primitiveType != null) {
             return new J.Primitive(randomId(), sourceBefore(classNode.getUnresolvedName()), Markers.EMPTY, primitiveType);
@@ -2378,7 +2400,7 @@ public class GroovyParserVisitor {
             cursor = saveCursor;
         }
 
-        return typeTree(classNode);
+        return typeTree(classNode, inferredType);
     }
 
     private List<J.Modifier> visitModifiers(int modifiers) {

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal.lang.nonnull;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class DefaultNonNullTest {
 

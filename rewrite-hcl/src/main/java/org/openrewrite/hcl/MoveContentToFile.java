@@ -17,11 +17,11 @@ package org.openrewrite.hcl;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.hcl.tree.BodyContent;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.hcl.tree.Space;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;

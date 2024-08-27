@@ -15,8 +15,8 @@
  */
 package org.openrewrite.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
