@@ -53,4 +53,3 @@
 *.war           binary
 *.ear           binary
 *.rar           binary
-**/gradle-8.10-bin.zip filter=lfs diff=lfs merge=lfs -text

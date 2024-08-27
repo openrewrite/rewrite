@@ -135,8 +135,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         return gradleWrapper = new GradleWrapper(version, new DistributionInfos(null, null, null));
                     } else {
                         throw new IllegalArgumentException(
-                                "Could not reach services.gradle.org and no alternative wrapper URI is provided. " +
-                                "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri.", e);
+                                "Could not reach services.gradle.org, no alternative wrapper URI is provided and no exact version is provided. " +
+                                "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri or exact version.", e);
                     }
                 }
                 if (wrapperUri.contains("${version})")) {
