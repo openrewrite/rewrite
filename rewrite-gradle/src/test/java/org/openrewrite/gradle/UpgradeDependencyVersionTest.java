@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.dependenciesGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 
@@ -994,4 +995,35 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void updateDependenciesGradle() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("mysql", "mysql-connector-java", "8.x.x", null)),
+          buildGradle(
+            """
+            buildscript {
+              repositories {
+                mavenCentral()
+              }
+              apply from: "$rootDir/dependencies.gradle"
+            }
+            """
+          ),
+          dependenciesGradle(
+            """
+            dependencies {
+              implementation 'mysql:mysql-connector-java:8.0.11'
+            }
+            """,
+            // TODO assert new version is greater
+            """
+            dependencies {
+              implementation 'mysql:mysql-connector-java:8.0.33'
+            }
+            """
+          )
+        );
+    }
+
 }
