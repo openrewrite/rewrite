@@ -84,6 +84,47 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @Test
+    void nonRecursiveShouldIgnoreNestedWildcardImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "com.sun.net.ssl",
+            "javax.net.ssl",
+            false)),
+          //language=java
+          java(
+            """
+              import com.sun.net.ssl.internal.*;
+              import com.sun.net.ssl.HostnameVerifier;
+              class Foo {
+                  com.sun.net.ssl.HostnameVerifier hv;
+              }
+              """,
+            """
+              import com.sun.net.ssl.internal.*;
+              import javax.net.ssl.HostnameVerifier;
+              class Foo {
+                  javax.net.ssl.HostnameVerifier hv;
+              }
+              """
+          ),
+          java(
+            """
+              import com.sun.net.ssl.internal.*;
+              class Bar {
+                  com.sun.net.ssl.HostnameVerifier hv;
+              }
+              """,
+            """
+              import com.sun.net.ssl.internal.*;
+              class Bar {
+                  javax.net.ssl.HostnameVerifier hv;
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void renameUsingSimplePackageName() {
