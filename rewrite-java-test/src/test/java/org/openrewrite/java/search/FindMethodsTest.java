@@ -15,15 +15,65 @@
  */
 package org.openrewrite.java.search;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.table.MethodCalls;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
+
+import java.util.stream.Stream;
 
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("RedundantOperationOnEmptyContainer")
 class FindMethodsTest implements RewriteTest {
+
+    static Stream<JavaType.FullyQualified> missingTypes() {
+        return Stream.of(null, JavaType.Unknown.getInstance());
+    }
+
+    @ParameterizedTest
+    @MethodSource("missingTypes")
+    void anyTypeMatchesOnNullDeclaringType(JavaType.FullyQualified declaringType) {
+        rewriteRun(
+          spec -> spec
+            .recipe(new FindMethods("*..* substring(..)", false))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              class Test {
+                  String test(String s) {
+                      return s.substring(1);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String test(String s) {
+                      return /*~~>*/s.substring(1);
+                  }
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
+                @Override
+                public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer integer) {
+                    // simulate declaring type being unavailable on type attribution
+                    return javaType instanceof JavaType.Method ?
+                      ((JavaType.Method) javaType).withDeclaringType(declaringType) :
+                      javaType;
+                }
+            }.visitNonNull(cu, 0))
+          )
+        );
+    }
 
     @DocumentExample
     @Test
@@ -255,7 +305,7 @@ class FindMethodsTest implements RewriteTest {
             """
               public @interface Example {
                   String name() default "";
-              
+                            
                   String description() default "";
               }
               """
