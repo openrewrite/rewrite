@@ -131,8 +131,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 if (wrapperUri == null) {
                     // If the user didn't specify a wrapperUri, but they did provide a specific version we assume they know this version
                     // is available from whichever distribution url they were previously using and update the version
-                    if (Semver.validate(version, null).getValue() instanceof ExactVersion) {
-                        return gradleWrapper = new GradleWrapper(version, new DistributionInfos(null, null, null));
+                    if (version != null && Semver.validate(version, null).getValue() instanceof ExactVersion) {
+                        return gradleWrapper = new GradleWrapper(version, new DistributionInfos("", null, null));
                     } else {
                         throw new IllegalArgumentException(
                                 "Could not reach services.gradle.org, no alternative wrapper URI is provided and no exact version is provided. " +
@@ -225,8 +225,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         String currentDistributionUrl = entry.getValue().getText();
 
                         GradleWrapper gradleWrpr = getGradleWrapper(ctx);
-                        //noinspection ConstantValue
-                        if (gradleWrpr.getDistributionUrl() == null && Semver.validate(version, null).getValue() instanceof ExactVersion) {
+                        if (StringUtils.isBlank(gradleWrpr.getDistributionUrl()) &&
+                            version != null && Semver.validate(version, null).getValue() instanceof ExactVersion) {
                             String newDownloadUrl = currentDistributionUrl.replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)", "$1" + gradleWrapper.getVersion() + "$3");
                             gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));
