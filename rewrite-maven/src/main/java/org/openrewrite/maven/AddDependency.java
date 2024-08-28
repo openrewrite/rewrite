@@ -133,6 +133,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Nullable
     Boolean acceptTransitive;
 
+    @Option(displayName = "Specific module name",
+            description = "Specify the module name in a Multi-Module project in which the dependency should be added.",
+            example = "moduleName",
+            required = false)
+    @Nullable
+    String specificModuleName;
+
     @Override
     public Validated<Object> validate() {
         Validated<Object> validated = super.validate();
@@ -212,7 +219,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                 JavaProject javaProject = document.getMarkers().findFirst(JavaProject.class).orElse(null);
                 String maybeScope = javaProject == null ? null : acc.scopeByProject.get(javaProject);
-                if (onlyIfUsing != null && maybeScope == null && !acc.scopeByProject.isEmpty()) {
+                if ((onlyIfUsing != null && maybeScope == null && !acc.scopeByProject.isEmpty()) || (specificModuleName != null && !specificModuleName.contains(getResolutionResult().getPom().getGav().getArtifactId()))) {
                     return maven;
                 }
 
@@ -235,7 +242,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
                 }
 
-                if(onlyIfUsing == null && getResolutionResult().getParent() != null && acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav())) {
+                if(onlyIfUsing == null && getResolutionResult().getParent() != null && acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav()) && (specificModuleName == null || !specificModuleName.contains(getResolutionResult().getPom().getGav().getArtifactId()))) {
                     return maven;
                 }
 

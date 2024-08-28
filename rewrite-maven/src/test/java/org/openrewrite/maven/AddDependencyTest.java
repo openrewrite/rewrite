@@ -130,7 +130,7 @@ class AddDependencyTest implements RewriteTest {
     void pomType() {
         rewriteRun(
           spec -> spec
-            .recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, null, null, "pom", null, null, null, null)),
+            .recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, null, null, "pom", null, null, null, null, null)),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
@@ -240,7 +240,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependencyWithClassifier() {
         AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null,
-          "compile", true, "com.google.common.math.IntMath", null, "linux-x86_64", false, null, null);
+          "compile", true, "com.google.common.math.IntMath", null, "linux-x86_64", false, null, null, null);
         rewriteRun(
           spec -> spec.recipe(addDep),
           mavenProject(
@@ -494,7 +494,7 @@ class AddDependencyTest implements RewriteTest {
     void semverSelector(String onlyIfUsing) {
         rewriteRun(
           spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.x", "-jre", null, false, onlyIfUsing,
-            null, null, false, null, null)),
+            null, null, false, null, null, null)),
           mavenProject(
             "project",
             srcMainJava(
@@ -777,7 +777,7 @@ class AddDependencyTest implements RewriteTest {
     void useRequestedVersionInUseByOtherMembersOfTheFamily() {
         rewriteRun(
           spec -> spec.recipe(new AddDependency("com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
-            null, null, false, "com.fasterxml.jackson.databind.*", null, null, null, "com.fasterxml.*", null)),
+            null, null, false, "com.fasterxml.jackson.databind.*", null, null, null, "com.fasterxml.*", null, null)),
           mavenProject(
             "project",
             srcMainJava(
@@ -1018,6 +1018,171 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addDependencyToOneSpecificModuleInProject() {
+        rewriteRun(
+          spec -> spec.recipe(addDependencyWithSpecificModule("com.google.guava:guava:29.0-jre", "project1")),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>project1</module>
+                        <module>project2</module>
+                    </modules>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project1",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project1</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project1</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project2",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project2</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyToTwoSpecificModulesInProject() {
+        rewriteRun(
+          spec -> spec.recipe(addDependencyWithSpecificModule("com.google.guava:guava:29.0-jre", "project1,project2")),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>project1</module>
+                        <module>project2</module>
+                    </modules>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project1",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project1</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project1</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project2",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project2</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project2</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void preferRootPom() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
@@ -1232,7 +1397,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependenciesOnEmptyProjectWithMavenProject() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null)),
+          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null, null)),
           mavenProject("my-app", pomXml("""
                 <project>
                     <groupId>com.mycompany.app</groupId>
@@ -1260,7 +1425,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependenciesOnEmptyProject() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null)),
+          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null, null)),
           pomXml("""
               <project>
                   <groupId>com.mycompany.app</groupId>
@@ -1299,7 +1464,7 @@ class AddDependencyTest implements RewriteTest {
             .recipes(
               new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
                 null, null, null, "main.java.checkerframework..*", null, null, null, null,
-                true),
+                true, null),
               new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
             ),
           mavenProject("parent",
@@ -1401,7 +1566,7 @@ class AddDependencyTest implements RewriteTest {
             .recipes(
               new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
                 null, null, null, "main.java.checkerframework..*", null, null, null, null,
-                true),
+                true, null),
               new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
             ),
           mavenProject("parent",
@@ -1465,24 +1630,28 @@ class AddDependencyTest implements RewriteTest {
     }
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
-        return addDependency(gav, null, null, null);
+        return addDependency(gav, null, null, null, null);
     }
 
     private AddDependency addDependency(String gav, @Nullable String onlyIfUsing) {
-        return addDependency(gav, onlyIfUsing, null, null);
+        return addDependency(gav, onlyIfUsing, null, null, null);
+    }
+
+    private AddDependency addDependencyWithSpecificModule(String gav, @Nullable String specificModuleName) {
+        return addDependency(gav, null, null, null, specificModuleName);
     }
 
     private AddDependency addDependency(String gav, @Nullable String onlyIfUsing, @SuppressWarnings("SameParameterValue") Boolean acceptTransitive) {
-        return addDependency(gav, onlyIfUsing, null, acceptTransitive);
+        return addDependency(gav, onlyIfUsing, null, acceptTransitive, null);
     }
 
     private AddDependency addDependency(String gav, @Nullable String onlyIfUsing, @Nullable String scope) {
-        return addDependency(gav, onlyIfUsing, scope, null);
+        return addDependency(gav, onlyIfUsing, scope, null, null);
     }
 
-    private AddDependency addDependency(String gav, @Nullable String onlyIfUsing, @Nullable String scope, @Nullable Boolean acceptTransitive) {
+    private AddDependency addDependency(String gav, @Nullable String onlyIfUsing, @Nullable String scope, @Nullable Boolean acceptTransitive, @Nullable String specificModuleName) {
         String[] gavParts = gav.split(":");
         return new AddDependency(gavParts[0], gavParts[1], gavParts[2], null, scope, true, onlyIfUsing, null, null,
-          false, null, acceptTransitive);
+          false, null, acceptTransitive, specificModuleName);
     }
 }
