@@ -41,18 +41,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private boolean shouldAutoFormat = true;
 
     public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty) {
-        this(scope,
-                new YamlParser().parse(yamlString)
-                        .findFirst()
-                        .map(Yaml.Documents.class::cast)
-                        .map(docs -> {
-                            // Any comments will have been put on the parent Document node, preserve by copying to the mapping
-                            Yaml.Document doc = docs.getDocuments().get(0);
-                            return doc.getBlock().withPrefix(doc.getPrefix());
-                        })
-                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML")),
-                acceptTheirs,
-                objectIdentifyingProperty);
+        this(scope, new YamlParser().parse(yamlString)
+                .findFirst()
+                .map(Yaml.Documents.class::cast)
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"))
+                .getDocuments().get(0).getBlock(), acceptTheirs, objectIdentifyingProperty);
     }
 
     @Override
@@ -112,7 +105,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 if (keyMatches(existingEntry, incomingEntry)) {
                     return existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(),
                             incomingEntry.getValue(), acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
-                            .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
+                            .visit(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
                 }
             }
             return existingEntry;

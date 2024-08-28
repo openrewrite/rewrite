@@ -19,7 +19,6 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
@@ -284,16 +283,12 @@ public interface Yaml extends Tree {
             return "";
         }
 
-        /**
-         * Mappings do not have a prefix of their own, it instead accrues to the first entry.
-         * This is a shortcut for changing the prefix of the first entry in the list of entries.
-         */
         @Override
         public Mapping withPrefix(String prefix) {
-            if (entries.isEmpty()) {
-                return this;
+            if (!prefix.isEmpty()) {
+                throw new UnsupportedOperationException("Yaml.Mapping may not have a non-empty prefix");
             }
-            return withEntries(ListUtils.mapFirst(entries, e -> e.withPrefix(prefix)));
+            return this;
         }
 
         @Value
