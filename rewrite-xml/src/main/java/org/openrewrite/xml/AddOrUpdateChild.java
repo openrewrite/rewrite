@@ -42,11 +42,10 @@ public class AddOrUpdateChild<P> extends XmlVisitor<P> {
                 }
                 t = mapChildren(t, it -> {
                     if (it == maybeChild.get()) {
-                        return child.withPrefix(maybeChild.get().getPrefix());
+                        return autoFormat(child.withPrefix(maybeChild.get().getPrefix()), p, getCursor());
                     }
                     return it;
                 });
-                t = autoFormat(t, p, getCursor().getParentOrThrow());
             } else {
                 t = addToTag(t, child, getCursor().getParentOrThrow());
             }
