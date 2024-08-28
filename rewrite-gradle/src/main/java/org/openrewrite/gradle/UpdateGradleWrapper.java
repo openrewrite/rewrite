@@ -162,6 +162,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     public static class GradleWrapperState {
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
+
         @Nullable BuildTool updatedMarker;
         boolean addGradleWrapperProperties = true;
         boolean addGradleWrapperJar = true;
