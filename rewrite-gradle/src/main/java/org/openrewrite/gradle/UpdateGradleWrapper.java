@@ -228,7 +228,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         //noinspection ConstantValue
                         if (gradleWrpr.getDistributionUrl() == null && Semver.validate(version, null).getValue() instanceof ExactVersion) {
                             String newDownloadUrl = currentDistributionUrl.replace("\\", "")
-                                    .replaceAll("(.*gradle-)(.*)(-(bin|all).zip)", "$1" + gradleWrapper.getVersion() + "$3");
+                                    .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)", "$1" + gradleWrapper.getVersion() + "$3");
                             gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));
                         }
 
