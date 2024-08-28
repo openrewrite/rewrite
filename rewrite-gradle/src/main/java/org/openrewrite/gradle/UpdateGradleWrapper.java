@@ -162,7 +162,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     public static class GradleWrapperState {
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
-        BuildTool updatedMarker;
+        @Nullable BuildTool updatedMarker;
         boolean addGradleWrapperProperties = true;
         boolean addGradleWrapperJar = true;
         boolean addGradleShellScript = true;
@@ -199,14 +199,14 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return false;
                         }
 
-                        GradleWrapper gradleWrapper = getGradleWrapper(ctx);
+                        String gradleWrapperVersion = getGradleWrapper(ctx).getVersion();
 
                         VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
-                        int compare = versionComparator.compare(null, buildTool.getVersion(), gradleWrapper.getVersion());
+                        int compare = versionComparator.compare(null, buildTool.getVersion(), gradleWrapperVersion);
                         // maybe we want to update the distribution type or url
                         if (compare < 0) {
                             acc.needsWrapperUpdate = true;
-                            acc.updatedMarker = buildTool.withVersion(gradleWrapper.getVersion());
+                            acc.updatedMarker = buildTool.withVersion(gradleWrapperVersion);
                             return true;
                         } else {
                             return compare == 0;
@@ -223,8 +223,11 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         String currentDistributionUrl = entry.getValue().getText();
 
                         GradleWrapper gradleWrpr = getGradleWrapper(ctx);
+                        //noinspection ConstantValue
                         if (gradleWrpr.getDistributionUrl() == null && Semver.validate(version, null).getValue() instanceof ExactVersion) {
-                            gradleWrapper = new GradleWrapper(version, new DistributionInfos(currentDistributionUrl.replace("\\", "").replaceAll("(.*gradle-)(.*)(-bin.zip)", "$1" + gradleWrapper.getVersion() + "$3"), null, null));
+                            String newDownloadUrl = currentDistributionUrl.replace("\\", "")
+                                    .replaceAll("(.*gradle-)(.*)(-(bin|all).zip)", "$1" + gradleWrapper.getVersion() + "$3");
+                            gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));
                         }
 
                         if (!gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
