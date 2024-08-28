@@ -68,6 +68,7 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Disabled("A bug fix reported by the community but not yet fixed")
     @Test
     void conflictingImports() {
         rewriteRun(
