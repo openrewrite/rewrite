@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -45,6 +46,12 @@ class MethodMatcherTest implements RewriteTest {
 
     private Pattern argRegex(String signature) {
         return new MethodMatcher(signature).getArgumentPattern();
+    }
+
+    @Test
+    void anyTypeMatchesNullTargetType() {
+        assertTrue(new MethodMatcher("*..* equals(Object)", true).matchesTargetType(null));
+        assertTrue(new MethodMatcher("*..* equals(Object)", true).matchesTargetType(JavaType.Unknown.getInstance()));
     }
 
     @Test

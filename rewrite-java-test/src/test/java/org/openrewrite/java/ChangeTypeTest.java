@@ -68,6 +68,31 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Disabled("A bug fix reported by the community but not yet fixed")
+    @Test
+    void conflictingImports() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "java.util.List", "kotlin.collections.Set", true)),
+          java(
+            """
+              import java.util.*;
+              class Test {
+                  Set<String> s;
+                  List<String> s;
+              }
+              """,
+            """
+              import java.util.*;
+              class Test {
+                  Set<String> s;
+                  kotlin.collections.Set<String> s;
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings({"deprecation", "KotlinRedundantDiagnosticSuppress"})
     @Test
     void starImport() {
@@ -105,7 +130,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import java.util.logging.LoggingMXBean;
-              
+                            
               class Test {
                   static void method() {
                       LoggingMXBean loggingBean = null;
@@ -114,7 +139,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import java.lang.management.PlatformLoggingMXBean;
-              
+                            
               class Test {
                   static void method() {
                       PlatformLoggingMXBean loggingBean = null;
@@ -134,7 +159,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import test.Outer;
-              
+                            
               class Test {
                   private Outer p = Outer.of();
                   private Outer p2 = test.Outer.of();
@@ -144,12 +169,12 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package test;
-              
+                            
               public class Outer {
                   public static Outer of() {
                       return new Outer();
                   }
-              
+                            
                   public static class Inner {
                   }
               }
@@ -168,7 +193,7 @@ class ChangeTypeTest implements RewriteTest {
             """
               import java.util.Map;
               import java.util.Map.Entry;
-              
+                            
               class Test {
                   Entry p;
                   Map.Entry p2;
@@ -177,7 +202,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import java.util.List;
-              
+                            
               class Test {
                   List p;
                   List p2;
@@ -196,14 +221,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import java.io.File;
-              
+                            
               class Test {
                   String p = File.separator;
               }
               """,
             """
               import my.pkg.List;
-              
+                            
               class Test {
                   String p = List.separator;
               }
@@ -228,14 +253,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import java.io.File;
-              
+                            
               class Test {
                   File p;
               }
               """,
             """
               import java.util.Map;
-              
+                            
               class Test {
                   Map.Entry p;
               }
@@ -252,14 +277,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package a;
-              
+                            
               class A {
                   private static class B1 {}
               }
               """,
             """
               package a;
-              
+                            
               class A {
                   private static class B2 {}
               }
@@ -276,7 +301,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package a;
-              
+                            
               class A {
                   public static class B {
                       public static class C {
@@ -286,7 +311,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package a;
-              
+                            
               class A {
                   public static class B {
                       public static class C2 {
@@ -304,12 +329,12 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B extends A1 {}
               """,
             """
               import a.A2;
-              
+                            
               public class B extends A2 {}
               """
           ),
@@ -350,7 +375,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.product;
-              
+                            
               public class Pojo {
               }
               """
@@ -358,12 +383,12 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.project.impl;
-              
+                            
               import com.acme.product.Pojo;
-              
+                            
               public class UsePojo2 {
                   Pojo[] p;
-              
+                            
                   void run() {
                       p[0] = null;
                   }
@@ -371,12 +396,12 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package com.acme.project.impl;
-              
+                            
               import com.acme.product.v2.Pojo;
-              
+                            
               public class UsePojo2 {
                   Pojo[] p;
-              
+                            
                   void run() {
                       p[0] = null;
                   }
@@ -395,14 +420,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B {
                  A1[] a = new A1[0];
               }
               """,
             """
               import a.A2;
-              
+                            
               public class B {
                  A2[] a = new A2[0];
               }
@@ -419,14 +444,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class A {
                   A1[][] multiDimensionalArray;
               }
               """,
             """
               import a.A2;
-              
+                            
               public class A {
                   A2[][] multiDimensionalArray;
               }
@@ -453,12 +478,12 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B extends A1 implements I1 {}
               """,
             """
               import a.A2;
-              
+                            
               public class B extends A2 implements I2 {}
               """
           )
@@ -474,14 +499,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B {
                  public A1 foo() throws A1 { return null; }
               }
               """,
             """
               import a.A2;
-              
+                            
               public class B {
                  public A2 foo() throws A2 { return null; }
               }
@@ -498,10 +523,10 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B {
                  public <T extends A1> T generic(T n, java.util.List<? super A1> in) {
-              
+                            
                  }
                  public void test() {
                      A1.stat();
@@ -511,10 +536,10 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import a.A2;
-              
+                            
               public class B {
                  public <T extends A2> T generic(T n, java.util.List<? super A2> in) {
-              
+                            
                  }
                  public void test() {
                      A2.stat();
@@ -535,7 +560,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B {
                  public void test() {
                      try {}
@@ -545,7 +570,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import a.A2;
-              
+                            
               public class B {
                  public void test() {
                      try {}
@@ -565,14 +590,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B {
                  A1 f1, f2;
               }
               """,
             """
               import a.A2;
-              
+                            
               public class B {
                  A2 f1, f2;
               }
@@ -589,14 +614,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B {
                  A1 a = new A1();
               }
               """,
             """
               import a.A2;
-              
+                            
               public class B {
                  A2 a = new A2();
               }
@@ -616,7 +641,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               class B {
                   void method(A1 param) {
                       A1 a = param;
@@ -625,7 +650,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import a.A2;
-              
+                            
               class B {
                   void method(A2 param) {
                       A2 a = param;
@@ -644,18 +669,18 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               import java.util.Map;
-              
+                            
               public class B {
                  Map<A1, A1> m;
               }
               """,
             """
               import a.A2;
-              
+                            
               import java.util.Map;
-              
+                            
               public class B {
                  Map<A2, A2> m;
               }
@@ -673,14 +698,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B {
                  A1 a = (A1) null;
               }
               """,
             """
               import a.A2;
-              
+                            
               public class B {
                  A2 a = (A2) null;
               }
@@ -697,14 +722,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class A {
                   Class<?> clazz = A1.class;
               }
               """,
             """
               import a.A2;
-              
+                            
               public class A {
                   Class<?> clazz = A2.class;
               }
@@ -721,7 +746,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B {
                  A1 a = null;
                  public void test() { a.foo(); }
@@ -729,7 +754,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import a.A2;
-              
+                            
               public class B {
                  A2 a = null;
                  public void test() { a.foo(); }
@@ -748,7 +773,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import static a.A1.stat;
-              
+                            
               public class B {
                   public void test() {
                       stat();
@@ -757,7 +782,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import static a.A2.stat;
-              
+                            
               public class B {
                   public void test() {
                       stat();
@@ -774,7 +799,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.product;
-              
+                            
               public class RunnableFactory {
                   public static String getString() {
                       return "hello";
@@ -785,9 +810,9 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.project.impl;
-              
+                            
               import static com.acme.product.RunnableFactory.getString;
-              
+                            
               public class StaticImportWorker {
                   public void work() {
                       getString().toLowerCase();
@@ -796,9 +821,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package com.acme.project.impl;
-              
+                            
               import static com.acme.product.v2.RunnableFactory.getString;
-              
+                            
               public class StaticImportWorker {
                   public void work() {
                       getString().toLowerCase();
@@ -816,7 +841,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.product;
-              
+                            
               public class RunnableFactory {
                   public static final String CONSTANT = "hello";
               }
@@ -825,9 +850,9 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.project.impl;
-              
+                            
               import static com.acme.product.RunnableFactory.CONSTANT;
-              
+                            
               public class StaticImportWorker {
                   public void work() {
                       System.out.println(CONSTANT + " fred.");
@@ -836,9 +861,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package com.acme.project.impl;
-              
+                            
               import static com.acme.product.v2.RunnableFactory.CONSTANT;
-              
+                            
               public class StaticImportWorker {
                   public void work() {
                       System.out.println(CONSTANT + " fred.");
@@ -920,23 +945,23 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.myorg;
-              
+                            
               import java.util.ArrayList;
               import com.yourorg.a.A;
               import java.util.List;
-              
+                            
               public class Foo {
                   List<A> a = new ArrayList<>();
               }
               """,
             """
               package com.myorg;
-              
+                            
               import com.myorg.b.B;
-              
+                            
               import java.util.ArrayList;
               import java.util.List;
-              
+                            
               public class Foo {
                   List<B> a = new ArrayList<>();
               }
@@ -952,10 +977,10 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.product;
-              
+                            
               public class OuterClass {
                   public static class InnerClass {
-              
+                            
                   }
               }
               """
@@ -963,15 +988,15 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package de;
-              
+                            
               import com.acme.product.OuterClass;
               import com.acme.product.OuterClass.InnerClass;
-              
+                            
               public class UseInnerClass {
                   public String work() {
                       return new InnerClass().toString();
                   }
-              
+                            
                   public String work2() {
                       return new OuterClass().toString();
                   }
@@ -979,15 +1004,15 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package de;
-              
+                            
               import com.acme.product.v2.OuterClass;
               import com.acme.product.v2.OuterClass.InnerClass;
-              
+                            
               public class UseInnerClass {
                   public String work() {
                       return new InnerClass().toString();
                   }
-              
+                            
                   public String work2() {
                       return new OuterClass().toString();
                   }
@@ -1005,7 +1030,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.product.util.accessDecision;
-              
+                            
               public enum AccessVote {
                   ABSTAIN
               }
@@ -1014,9 +1039,9 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package de;
-              
+                            
               import com.acme.product.util.accessDecision.AccessVote;
-              
+                            
               public class ProjectVoter {
                   public AccessVote vote() {
                       return AccessVote.ABSTAIN;
@@ -1025,9 +1050,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package de;
-              
+                            
               import com.acme.product.v2.util.accessDecision.AccessVote;
-              
+                            
               public class ProjectVoter {
                   public AccessVote vote() {
                       return AccessVote.ABSTAIN;
@@ -1054,7 +1079,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import com.acme.product.Procedure;
-              
+                            
               public abstract class Worker {
                   void callWorker() {
                       worker(() -> {
@@ -1065,7 +1090,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import com.acme.product.Procedure2;
-              
+                            
               public abstract class Worker {
                   void callWorker() {
                       worker(() -> {
@@ -1086,7 +1111,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.product.util.accessDecision;
-              
+                            
               public enum AccessVote {
                   ABSTAIN,
                   GRANT
@@ -1096,9 +1121,9 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package de;
-              
+                            
               import com.acme.product.util.accessDecision.AccessVote;
-              
+                            
               public class ProjectVoter {
                   public AccessVote vote(Object input) {
                       AccessVote fred;
@@ -1109,9 +1134,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package de;
-              
+                            
               import com.acme.product.v2.util.accessDecision.AccessVote;
-              
+                            
               public class ProjectVoter {
                   public AccessVote vote(Object input) {
                       AccessVote fred;
@@ -1132,7 +1157,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.product.util.accessDecision;
-              
+                            
               public enum AccessVote {
                   ABSTAIN,
                   GRANT
@@ -1142,9 +1167,9 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package de;
-              
+                            
               import com.acme.product.util.accessDecision.AccessVote;
-              
+                            
               public class ProjectVoter {
                   public AccessVote vote(Object input) {
                       return input == null ? AccessVote.GRANT : AccessVote.ABSTAIN;
@@ -1153,9 +1178,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package de;
-              
+                            
               import com.acme.product.v2.util.accessDecision.AccessVote;
-              
+                            
               public class ProjectVoter {
                   public AccessVote vote(Object input) {
                       return input == null ? AccessVote.GRANT : AccessVote.ABSTAIN;
@@ -1205,7 +1230,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import java.util.List;
-              
+                            
               /**
                * {@link List} here
                */
@@ -1215,7 +1240,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import java.util.Collection;
-              
+                            
               /**
                * {@link Collection} here
                */
@@ -1235,7 +1260,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.product.factory;
-              
+                            
               public class V1Factory {
                   public static String getItem() {
                       return "V1Factory";
@@ -1246,7 +1271,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package com.acme.product.factory;
-              
+                            
               public class V2Factory {
                   public static String getItem() {
                       return "V2Factory";
@@ -1257,16 +1282,16 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import com.acme.product.factory.V1Factory;
-              
+                            
               import static com.acme.product.factory.V2Factory.getItem;
-              
+                            
               public class UseFactories {
                   static class MyV1Factory extends V1Factory {
                       static String getMyItemInherited() {
                           return getItem();
                       }
                   }
-              
+                            
                   static String getMyItemStaticImport() {
                       return getItem();
                   }
@@ -1274,16 +1299,16 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import com.acme.product.factory.V1FactoryA;
-              
+                            
               import static com.acme.product.factory.V2Factory.getItem;
-              
+                            
               public class UseFactories {
                   static class MyV1Factory extends V1FactoryA {
                       static String getMyItemInherited() {
                           return getItem();
                       }
                   }
-              
+                            
                   static String getMyItemStaticImport() {
                       return getItem();
                   }
@@ -1366,15 +1391,15 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package a.b;
-              
+                            
               import java.util.List;
-              
+                            
               class Original {
               }
               """,
             """
               import java.util.List;
-              
+                            
               class Target {
               }
               """
@@ -1510,9 +1535,9 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package org.foo;
-              
+                            
               import a.A1;
-              
+                            
               public class Example {
                   public A1 method(A1 a1) {
                       return a1;
@@ -1521,9 +1546,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package org.foo;
-              
+                            
               import a.A2;
-              
+                            
               public class Example {
                   public A2 method(A2 a1) {
                       return a1;
@@ -1535,7 +1560,7 @@ class ChangeTypeTest implements RewriteTest {
             """
               import a.A1;
               import org.foo.Example;
-              
+                            
               public class Test {
                   A1 local = new Example().method(null);
               }
@@ -1543,7 +1568,7 @@ class ChangeTypeTest implements RewriteTest {
             """
               import a.A2;
               import org.foo.Example;
-              
+                            
               public class Test {
                   A2 local = new Example().method(null);
               }
@@ -1571,14 +1596,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class Test {
                   A1 a;
               }
               """,
             """
               import a.A2;
-              
+                            
               public class Test {
                   A2 a;
               }
@@ -1601,7 +1626,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class Test {
                   <T extends A1> T method(T t) {
                       return t;
@@ -1610,7 +1635,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import a.A2;
-              
+                            
               public class Test {
                   <T extends A2> T method(T t) {
                       return t;
@@ -1633,7 +1658,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package a;
-              
+                            
               public class A1 {
                   public A1() {
                   }
@@ -1641,7 +1666,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package a;
-              
+                            
               public class A2 {
                   public A2() {
                   }
@@ -1664,12 +1689,12 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-              
+                            
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-              
+                            
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test1 {}
@@ -1678,12 +1703,12 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-              
+                            
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-              
+                            
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test2 {}
@@ -1692,7 +1717,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test1;
-              
+                            
               public class A {
                   @Test1
                   void method() {}
@@ -1700,7 +1725,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import org.openrewrite.Test2;
-              
+                            
               public class A {
                   @Test2
                   void method() {}
@@ -1779,10 +1804,10 @@ class ChangeTypeTest implements RewriteTest {
               public class Test {
                   private class InnerA {
                   }
-              
+                            
                   private class InnerB {
                   }
-              
+                            
                   public void test(String s) {
                       InnerA a = new InnerA();
                   }
@@ -1792,10 +1817,10 @@ class ChangeTypeTest implements RewriteTest {
               public class Test {
                   private class InnerA {
                   }
-              
+                            
                   private class InnerB {
                   }
-              
+                            
                   public void test(String s) {
                       InnerB a = new InnerB();
                   }
@@ -1826,9 +1851,9 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-              
+                            
               import org.openrewrite.Test;
-              
+                            
               public class Sibling {
                   public Test test() {
                       return new Test();
@@ -1837,9 +1862,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-              
+                            
               import org.openrewrite.subpackage.Test;
-              
+                            
               public class Sibling {
                   public Test test() {
                       return new Test();
