@@ -164,6 +164,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         boolean needsWrapperUpdate = false;
 
         @Nullable BuildTool updatedMarker;
+
         boolean addGradleWrapperProperties = true;
         boolean addGradleWrapperJar = true;
         boolean addGradleShellScript = true;
