@@ -231,7 +231,8 @@ public class GitRemote {
 
         private static final Pattern PORT_PATTERN = Pattern.compile(":\\d+");
 
-        static URI normalize(String url) {
+        static URI normalize(String original) {
+            String url = original.toLowerCase(Locale.ENGLISH);
             try {
                 URIish uri = new URIish(url);
                 String scheme = uri.getScheme();

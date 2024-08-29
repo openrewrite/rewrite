@@ -39,13 +39,16 @@ public class GitRemoteTest {
       git@gitlab.com:group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       ssh://git@gitlab.com:22/group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       
-      https://bitbucket.org/PRJ/repo, bitbucket.org, PRJ/repo, PRJ, repo
-      git@bitbucket.org:PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
-      ssh://bitbucket.org/PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
+      https://bitbucket.org/PRJ/repo, bitbucket.org, prj/repo, prj, repo
+      git@bitbucket.org:PRJ/repo.git, bitbucket.org, prj/repo, prj, repo
+      ssh://bitbucket.org/PRJ/repo.git, bitbucket.org, prj/repo, prj, repo
       
       https://org@dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
       https://dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
       git@ssh.dev.azure.com:v3/org/project/repo, dev.azure.com, org/project/repo, org/project, repo
+      
+      HTTPS://GITHUB.COM/ORG/REPO.GIT, github.com, org/repo, org, repo
+      HtTpS://GitHub.CoM/OrG/R3P0.GIT, github.com, org/r3p0, org, r3p0
       """)
     void parseKnownRemotes(String cloneUrl, String expectedOrigin, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
         GitRemote.Parser parser = new GitRemote.Parser();
