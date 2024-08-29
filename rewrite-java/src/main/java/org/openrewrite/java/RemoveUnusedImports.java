@@ -256,7 +256,7 @@ public class RemoveUnusedImports extends Recipe {
                 J.Import elem = anImport.imports.get(0).getElement();
                 if (!"*".equals(elem.getQualid().getSimpleName())) {
                     if (elem.isStatic()) {
-                        if (usedStaticWildcardImports.contains(elem.getTypeName())) {
+                        if (usedStaticWildcardImports.contains(elem.getTypeName()) && !becomesAmbiguous(elem, typesByPackage)) {
                             anImport.used = false;
                             changed = true;
                         }
@@ -296,6 +296,15 @@ public class RemoveUnusedImports extends Recipe {
             }
 
             return cu;
+        }
+
+        private static boolean becomesAmbiguous(J.Import imprt, Map<String, Set<JavaType.FullyQualified>> typesByPackage) {
+            return typesByPackage.entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals(imprt.getPackageName()))
+                    .flatMap(entry -> entry.getValue().stream())
+                    .flatMap(fq -> fq.getMembers().stream())
+                    .filter(member -> member.getFlags().contains(Flag.Static))
+                    .anyMatch(member -> member.getName().equals(imprt.getQualid().getSimpleName()));
         }
 
         private static final Set<String> JAVA_LANG_CLASS_NAMES = new HashSet<>(Arrays.asList(
