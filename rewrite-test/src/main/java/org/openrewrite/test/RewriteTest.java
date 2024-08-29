@@ -266,7 +266,7 @@ public interface RewriteTest extends SourceSpecs {
                 for (UncheckedConsumer<SourceSpec<?>> consumer : testClassSpec.allSources) {
                     consumer.accept(sourceSpec);
                 }
-                inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(parser.getCharset(ctx)))));
+                inputs.put(sourceSpec, Parser.Input.fromString(sourcePath, beforeTrimmed, parser.getCharset(ctx)));
             }
 
             Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
