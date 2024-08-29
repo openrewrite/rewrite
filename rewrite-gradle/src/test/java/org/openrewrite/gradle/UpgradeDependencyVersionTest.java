@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.customGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
@@ -1011,7 +1012,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               apply from: "dependencies.gradle"
               """
           ),
-          customGradle(
+          groovy(
             """
               dependencies {
                 implementation 'mysql:mysql-connector-java:8.0.11'

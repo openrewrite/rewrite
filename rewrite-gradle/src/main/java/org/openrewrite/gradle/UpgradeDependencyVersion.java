@@ -47,7 +47,10 @@ import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -132,6 +135,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
          * or a MavenDownloadingException representing an error during resolution.
          */
         Map<GroupArtifact, Object> gaToNewVersion = new HashMap<>();
+        /**
+         * Any custom Gradle scripts used in the build, which might need to be updated later
+         */
+        Set<Path> customGradleScripts = new LinkedHashSet<>();
     }
 
     @Override
@@ -139,10 +146,33 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new DependencyVersionState();
     }
 
+    private static final MethodMatcher APPLY_PLUGIN_MATCHER = new MethodMatcher("RewriteGradleProject apply(java.util.Map)");
+
+    private @Nullable Path findCustomScriptPath(Cursor cursor) {
+        if (!(cursor.getValue() instanceof J.MethodInvocation)) {
+            return null;
+        }
+        J.MethodInvocation m = cursor.getValue();
+        if (!APPLY_PLUGIN_MATCHER.matches(m)) {
+            return null;
+        }
+
+        Expression applyArgumentMap = m.getArguments().get(0);
+        if (applyArgumentMap instanceof G.MapEntry) {
+            G.MapEntry mapEntry = (G.MapEntry) applyArgumentMap;
+            if (mapEntry.getValue() instanceof J.Literal &&
+                mapEntry.getKey() instanceof J.Literal &&
+                Objects.equals(((J.Literal) mapEntry.getKey()).getValue(), "from")) {
+                return Paths.get((String) ((J.Literal) mapEntry.getValue()).getValue());
+            }
+        }
+        return null;
+    }
+
     private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(groovy.lang.Closure)");
     private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
 
-    private static boolean isLikelyDependencyConfiguration(Cursor cursor) {
+    private static boolean isLikelyDependencyConfiguration(Cursor cursor, boolean isKnownCustomScriptFile) {
         if (!(cursor.getValue() instanceof J.MethodInvocation)) {
             return false;
         }
@@ -166,10 +196,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (DEPENDENCY_DSL_MATCHER.matches(m)) {
                     return true;
                 }
+                // in custom scripts we cannot match, because the method does not have a known type
+                if ("dependencies".equals(methodName) &&
+                    m.getArguments().size() == 1 &&
+                    isClosure(m.getArguments().get(0)) &&
+                    isKnownCustomScriptFile) {
+                    return true;
+                }
             }
             cursor = cursor.getParent();
         }
         return false;
+    }
+
+    private static boolean isClosure(Expression expression) {
+        return expression instanceof J.Lambda &&
+               expression.getType() != null &&
+               expression.getType().isAssignableFrom(Pattern.compile("groovy\\.lang\\.Closure"));
     }
 
     @Override
@@ -190,7 +233,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (isLikelyDependencyConfiguration(getCursor())) {
+                Path maybeCustomScriptPath = findCustomScriptPath(getCursor());
+                if (maybeCustomScriptPath != null) {
+                    acc.getCustomGradleScripts().add(maybeCustomScriptPath);
+                    return m;
+                }
+                if (isLikelyDependencyConfiguration(getCursor(), false)) {
                     if (m.getArguments().get(0) instanceof G.MapEntry) {
                         String groupId = null;
                         String artifactId = null;
@@ -360,6 +408,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private class UpdateGroovy extends GroovyVisitor<ExecutionContext> {
         final DependencyVersionState acc;
         GradleProject gradleProject;
+        boolean isKnownCustomScriptFile = false;
         final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
 
         @Override
@@ -369,6 +418,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             if (gradleProject == null) {
                 return cu;
             }
+            isKnownCustomScriptFile = acc.getCustomGradleScripts().contains(cu.getSourcePath());
             return super.visitCompilationUnit(cu, ctx);
         }
 
@@ -400,7 +450,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return method;
             }
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-            if (isLikelyDependencyConfiguration(getCursor())) {
+            if (isLikelyDependencyConfiguration(getCursor(), isKnownCustomScriptFile)) {
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m, ctx);
