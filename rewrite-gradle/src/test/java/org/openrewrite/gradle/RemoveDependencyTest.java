@@ -455,4 +455,54 @@ class RemoveDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeDependencyDefinedInJvmTestSuite() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
+                              implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
