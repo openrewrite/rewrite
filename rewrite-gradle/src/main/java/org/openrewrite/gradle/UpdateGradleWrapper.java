@@ -131,7 +131,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 if (wrapperUri == null) {
                     // If the user didn't specify a wrapperUri, but they did provide a specific version we assume they know this version
                     // is available from whichever distribution url they were previously using and update the version
-                    if (!StringUtils.isNullOrEmpty(version) && Semver.validate(version, null).getValue() instanceof ExactVersion) {
+                    if (!StringUtils.isBlank(version) && Semver.validate(version, null).getValue() instanceof ExactVersion) {
                         return gradleWrapper = new GradleWrapper(version, new DistributionInfos("", null, null));
                     } else {
                         throw new IllegalArgumentException(
@@ -227,7 +227,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
                         GradleWrapper gradleWrpr = getGradleWrapper(ctx);
                         if (StringUtils.isBlank(gradleWrpr.getDistributionUrl()) &&
-                            !StringUtils.isNullOrEmpty(version)  && Semver.validate(version, null).getValue() instanceof ExactVersion) {
+                            !StringUtils.isBlank(version)  && Semver.validate(version, null).getValue() instanceof ExactVersion) {
                             String newDownloadUrl = currentDistributionUrl.replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)", "$1" + gradleWrapper.getVersion() + "$3");
                             gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));

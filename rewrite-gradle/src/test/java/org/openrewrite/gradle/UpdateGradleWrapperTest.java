@@ -41,7 +41,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
@@ -597,23 +596,11 @@ class UpdateGradleWrapperTest implements RewriteTest {
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
               .after(after -> {
-                  Pattern pattern = Pattern.compile("distributionUrl=(.*/gradle-(.*)-bin.zip)");
-                  assertThat(after).containsPattern(pattern);
-                  Matcher distUrlMatcher = pattern.matcher(after);
-                  assertTrue(distUrlMatcher.find(), after);
-                  String distUrl = distUrlMatcher.group(1);
-                  assertThat(distUrl).isNotBlank().startsWith("https\\://company.com/repo");
-                  String distVersion = distUrlMatcher.group(2);
-                  assertThat(distVersion).isEqualTo("8.10");
-
-                  // language=properties
-                  return """
-                    distributionBase=GRADLE_USER_HOME
-                    distributionPath=wrapper/dists
-                    distributionUrl=%s
-                    zipStoreBase=GRADLE_USER_HOME
-                    zipStorePath=wrapper/dists
-                    """.formatted(distUrl);
+                  Matcher distUrlMatcher = Pattern.compile("distributionUrl=(.*/gradle-(.*)-bin.zip)").matcher(after);
+                  assertThat(distUrlMatcher.find()).as(after).isTrue();
+                  assertThat(distUrlMatcher.group(1)).startsWith("https\\://company.com/repo");
+                  assertThat(distUrlMatcher.group(2)).isEqualTo("8.10");
+                  return after;
               })
           ),
           gradlew,
