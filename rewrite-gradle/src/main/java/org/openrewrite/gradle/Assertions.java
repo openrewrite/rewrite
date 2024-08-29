@@ -101,27 +101,27 @@ public class Assertions {
         return gradle;
     }
 
-    public static SourceSpecs dependenciesGradle(@Language("groovy") @Nullable String before) {
-        return dependenciesGradle(before, s -> {
+    public static SourceSpecs customGradle(@Language("groovy") @Nullable String before) {
+        return customGradle(before, s -> {
         });
     }
 
-    public static SourceSpecs dependenciesGradle(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
+    public static SourceSpecs customGradle(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, null);
-        gradle.path(Paths.get("dependencies.gradle"));
+        gradle.path("custom.gradle");
         spec.accept(gradle);
         return gradle;
     }
 
-    public static SourceSpecs dependenciesGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after) {
-        return dependenciesGradle(before, after, s -> {
+    public static SourceSpecs customGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after) {
+        return customGradle(before, after, s -> {
         });
     }
 
-    public static SourceSpecs dependenciesGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
-                                          Consumer<SourceSpec<G.CompilationUnit>> spec) {
+    public static SourceSpecs customGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
+                                           Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
-        gradle.path("dependencies.gradle");
+        gradle.path("custom.gradle");
         spec.accept(gradle);
         return gradle;
     }

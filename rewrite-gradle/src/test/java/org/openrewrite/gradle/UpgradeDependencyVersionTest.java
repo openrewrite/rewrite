@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.dependenciesGradle;
+import static org.openrewrite.gradle.Assertions.customGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 
@@ -704,7 +704,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-
+              
               repositories {
                 mavenCentral()
               }
@@ -912,7 +912,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/pull/106")
-    void isAcceptable(){
+    void isAcceptable() {
         // Mimic org.openrewrite.java.dependencies.UpgradeTransitiveDependencyVersion#getVisitor
         UpgradeDependencyVersion guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
         TreeVisitor<?, ExecutionContext> visitor = guava.getVisitor();
@@ -999,29 +999,30 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void updateDependenciesGradle() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("mysql", "mysql-connector-java", "8.x.x", null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("mysql", "mysql-connector-java", "8.0.33", null)),
           buildGradle(
             """
-            buildscript {
+              plugins {
+                id 'java'
+              }
               repositories {
                 mavenCentral()
               }
-              apply from: "$rootDir/dependencies.gradle"
-            }
-            """
+              apply from: "dependencies.gradle"
+              """
           ),
-          dependenciesGradle(
+          customGradle(
             """
-            dependencies {
-              implementation 'mysql:mysql-connector-java:8.0.11'
-            }
-            """,
-            // TODO assert new version is greater
+              dependencies {
+                implementation 'mysql:mysql-connector-java:8.0.11'
+              }
+              """,
             """
-            dependencies {
-              implementation 'mysql:mysql-connector-java:8.0.33'
-            }
-            """
+              dependencies {
+                implementation 'mysql:mysql-connector-java:8.0.33'
+              }
+              """
+            , spec -> spec.path("dependencies.gradle")
           )
         );
     }
