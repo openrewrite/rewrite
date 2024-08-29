@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyExtensionTest implements RewriteTest {
 
@@ -215,6 +216,86 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api "org.eclipse.jetty:jetty-servlet:9.4.50.v20221201:tests@war"
                   api group: 'org.eclipse.jetty', name: 'jetty-servlet', version: '9.4.50.v20221201', classifier: 'tests', ext: 'war'
                   api group: "org.eclipse.jetty", name: "jetty-servlet", version: "9.4.50.v20221201", classifier: "tests", ext: "war"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInJvmTestSuite() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", ""))
+            .beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.openrewrite:rewrite-gradle:latest.integration@jar'
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.openrewrite:rewrite-gradle:latest.integration@war'
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInBuildScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", ""))
+            .beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.openrewrite:rewrite-gradle:latest.integration@jar'
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.openrewrite:rewrite-gradle:latest.integration@war'
+                  }
               }
               """
           )
