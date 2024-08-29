@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyConfigurationTest implements RewriteTest {
     @DocumentExample
@@ -260,6 +261,56 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               dependencies {
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   testImplementation group: "org.openrewrite", name: "rewrite-test", version: "latest.release"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInJvmTestSuite() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyConfiguration("org.openrewrite", "*", "implementation", ""))
+            .beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              runtimeOnly 'org.openrewrite:rewrite-gradle:latest.release'
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.openrewrite:rewrite-gradle:latest.release'
+                          }
+                      }
+                  }
               }
               """
           )
