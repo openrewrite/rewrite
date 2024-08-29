@@ -1937,4 +1937,34 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4452")
+    void shouldFullyQualifyWhenNewTypeIsAmbiguous() {
+        // language=java
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("javax.annotation.Nonnull", "org.checkerframework.checker.nullness.qual.NonNull", null)),
+          java(
+            """
+              import lombok.NonNull;
+              import javax.annotation.Nonnull;
+              import org.immutables.value.Value;
+              
+              @Value.Immutable
+              @Value.Style(passAnnotations = Nonnull.class)
+              public interface ConflictingImports {
+                      private void lombokMethod(@NonNull final String lombokNonNull){}
+              }
+              """,
+            """
+              import lombok.NonNull;
+              import org.immutables.value.Value;
+              
+              @Value.Immutable
+              @Value.Style(passAnnotations = org.checkerframework.checker.nullness.qual.NonNull.class)
+              public interface ConflictingImports {
+                      private void lombokMethod(@NonNull final String lombokNonNull){}
+              }
+              """));
+    }
 }
