@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyClassifierTest implements RewriteTest {
     @DocumentExample
@@ -406,6 +407,86 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInJvmTestSuite() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", ""))
+            .beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.openrewrite:rewrite-gradle:latest.release:javadoc'
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.openrewrite:rewrite-gradle:latest.release:classified'
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInBuildScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", ""))
+            .beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.openrewrite:rewrite-gradle:latest.release:javadoc'
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.openrewrite:rewrite-gradle:latest.release:classified'
+                  }
               }
               """
           )

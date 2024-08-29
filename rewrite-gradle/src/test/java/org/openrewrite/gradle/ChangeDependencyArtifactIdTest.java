@@ -350,7 +350,6 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void worksWithDependencyDefinedInJvmTestSuite() {
         rewriteRun(
