@@ -266,7 +266,7 @@ public class GitRemote {
                 String path = uri.getPath().replaceFirst("/$", "")
                         .replaceFirst("\\.git$", "")
                         .replaceFirst("^/", "");
-                return URI.create((scheme + "://" + host + maybePort + "/" + path).replaceFirst("/$", "").toLowerCase());
+                return URI.create((scheme + "://" + host + maybePort + "/" + path).replaceFirst("/$", "").toLowerCase(Locale.ENGLISH));
             } catch (URISyntaxException e) {
                 throw new IllegalStateException("Unable to parse origin from: " + url, e);
             }
@@ -305,10 +305,10 @@ public class GitRemote {
 
         public RemoteServer(Service service, String origin, Collection<URI> uris) {
             this.service = service;
-            this.origin = origin.toLowerCase();
+            this.origin = origin.toLowerCase(Locale.ENGLISH);
             this.uris.addAll(uris.stream()
                     .map(URI::toString)
-                    .map(String::toLowerCase)
+                    .map(urlString -> urlString.toLowerCase(Locale.ENGLISH))
                     .map(URI::create)
                     .collect(Collectors.toList()));
         }
