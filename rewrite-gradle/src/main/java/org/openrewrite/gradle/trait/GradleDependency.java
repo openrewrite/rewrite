@@ -68,6 +68,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return null;
                 }
 
+                if (!withinDependenciesBlock(cursor)) {
+                    return null;
+                }
+
                 GradleDependencyConfiguration configuration = gradleProject.getConfiguration(methodInvocation.getSimpleName());
                 if (configuration == null) {
                     return null;
@@ -117,6 +121,21 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
 
             return null;
+        }
+
+        private boolean withinDependenciesBlock(Cursor cursor) {
+            Cursor parentCursor = cursor.getParent();
+            while (parentCursor != null) {
+                if (parentCursor.getValue() instanceof J.MethodInvocation) {
+                    J.MethodInvocation m = parentCursor.getValue();
+                    if (m.getSimpleName().equals("dependencies")) {
+                        return true;
+                    }
+                }
+                parentCursor = parentCursor.getParent();
+            }
+
+            return false;
         }
 
         private org.openrewrite.gradle.util.@Nullable Dependency parseDependency(List<Expression> arguments) {
