@@ -24,6 +24,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.search.FindGradleProject;
+import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -35,6 +36,7 @@ import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
@@ -127,9 +129,15 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 // services.gradle.org is unreachable, possibly because of a firewall
                 // But if the user specified a wrapperUri to an internal repository things might still be workable
                 if (wrapperUri == null) {
-                    throw new IllegalArgumentException(
-                            "Could not reach services.gradle.org and no alternative wrapper URI is provided. " +
-                            "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri.", e);
+                    // If the user didn't specify a wrapperUri, but they did provide a specific version we assume they know this version
+                    // is available from whichever distribution url they were previously using and update the version
+                    if (!StringUtils.isBlank(version) && Semver.validate(version, null).getValue() instanceof ExactVersion) {
+                        return gradleWrapper = new GradleWrapper(version, new DistributionInfos("", null, null));
+                    } else {
+                        throw new IllegalArgumentException(
+                                "Could not reach services.gradle.org, no alternative wrapper URI is provided and no exact version is provided. " +
+                                "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri or exact version.", e);
+                    }
                 }
                 if (wrapperUri.contains("${version})")) {
                     if (version == null) {
@@ -154,7 +162,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     public static class GradleWrapperState {
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
+
+        @Nullable
         BuildTool updatedMarker;
+
         boolean addGradleWrapperProperties = true;
         boolean addGradleWrapperJar = true;
         boolean addGradleShellScript = true;
@@ -191,14 +202,14 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return false;
                         }
 
-                        GradleWrapper gradleWrapper = getGradleWrapper(ctx);
+                        String gradleWrapperVersion = getGradleWrapper(ctx).getVersion();
 
                         VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
-                        int compare = versionComparator.compare(null, buildTool.getVersion(), gradleWrapper.getVersion());
+                        int compare = versionComparator.compare(null, buildTool.getVersion(), gradleWrapperVersion);
                         // maybe we want to update the distribution type or url
                         if (compare < 0) {
                             acc.needsWrapperUpdate = true;
-                            acc.updatedMarker = buildTool.withVersion(gradleWrapper.getVersion());
+                            acc.updatedMarker = buildTool.withVersion(gradleWrapperVersion);
                             return true;
                         } else {
                             return compare == 0;
@@ -211,10 +222,17 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return entry;
                         }
 
-                        GradleWrapper gradleWrapper = getGradleWrapper(ctx);
-
                         // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip
                         String currentDistributionUrl = entry.getValue().getText();
+
+                        GradleWrapper gradleWrpr = getGradleWrapper(ctx);
+                        if (StringUtils.isBlank(gradleWrpr.getDistributionUrl()) &&
+                            !StringUtils.isBlank(version)  && Semver.validate(version, null).getValue() instanceof ExactVersion) {
+                            String newDownloadUrl = currentDistributionUrl.replace("\\", "")
+                                    .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)", "$1" + gradleWrapper.getVersion() + "$3");
+                            gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));
+                        }
+
                         if (!gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
                             acc.needsWrapperUpdate = true;
                         }
