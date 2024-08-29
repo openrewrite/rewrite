@@ -65,6 +65,9 @@ public class MethodMatcher {
     private static final Pattern ANY_ARGUMENTS_PATTERN = Pattern.compile(".*");
 
     @Nullable
+    private String targetTypeAspectJ;
+
+    @Nullable
     private Pattern targetTypePattern;
 
     @Nullable
@@ -99,6 +102,7 @@ public class MethodMatcher {
             public Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
                 MethodSignatureParser.TargetTypePatternContext targetTypePatternContext = ctx.targetTypePattern();
                 String pattern = new TypeVisitor().visitTargetTypePattern(targetTypePatternContext);
+                targetTypeAspectJ = pattern;
                 if (isPlainIdentifier(targetTypePatternContext)) {
                     targetType = pattern;
                 } else {
@@ -185,7 +189,7 @@ public class MethodMatcher {
     }
 
     boolean matchesTargetType(JavaType.@Nullable FullyQualified type) {
-        return TypeUtils.isOfTypeWithName(
+        return ((type == null || type instanceof JavaType.Unknown) && "*..*".equals(targetTypeAspectJ)) || TypeUtils.isOfTypeWithName(
                 type,
                 matchOverrides,
                 this::matchesTargetTypeName
@@ -389,7 +393,7 @@ public class MethodMatcher {
         Expression target = fieldAccess.getTarget();
         if (target instanceof J.Identifier) {
             return targetType != null && targetType.equals(((J.Identifier) target).getSimpleName()) ||
-                    targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
+                   targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
         } else if (target instanceof J.FieldAccess) {
             return ((J.FieldAccess) target).isFullyQualifiedClassReference(targetType != null ? targetType : targetTypePattern.pattern());
         }
