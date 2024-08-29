@@ -24,6 +24,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
+import org.openrewrite.gradle.util.DependencyMatchPredicate;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
@@ -140,14 +141,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(groovy.lang.Closure)");
-    private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
 
     private static boolean isLikelyDependencyConfiguration(Cursor cursor) {
         if (!(cursor.getValue() instanceof J.MethodInvocation)) {
             return false;
         }
         J.MethodInvocation m = cursor.getValue();
-        if (DEPENDENCY_CONFIGURATION_MATCHER.matches(m)) {
+
+        if (new DependencyMatchPredicate().test(cursor)) {
             return true;
         }
         // If it's a configuration created by a plugin, we may not be able to type-attribute it

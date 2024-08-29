@@ -994,4 +994,54 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradesDependencyVersionDefinedInJvmTestSuite() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'com.google.guava:guava:29.0-jre'
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'com.google.guava:guava:30.1.1-jre'
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
