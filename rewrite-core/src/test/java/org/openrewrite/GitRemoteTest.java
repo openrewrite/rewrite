@@ -86,9 +86,9 @@ public class GitRemoteTest {
       https://scm.company.com:443/stash/scm/org/repo.git, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo,  org, repo
       https://scm.company.com:1234/stash/scm/org/repo.git, https://scm.company.com:1234/stash, Bitbucket, scm.company.com:1234/stash, org/repo, org, repo
       git@scm.company.com:stash/org/repo.git, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
-      ssh://scm.company.com/stash/org/repo, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
+      ssh://scm.CompanY.com/stash/org/repo, scm.cOMpAnY.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
       ssh://scm.company.com:22/stash/org/repo, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
-      ssh://scm.company.com:7999/stash/org/repo, ssh://scm.company.com:7999/stash, Bitbucket, scm.company.com:7999/stash, org/repo, org, repo
+      ssh://scm.company.com:7999/stash/org/repo, ssh://sCm.company.com:7999/stash, Bitbucket, scm.company.com:7999/stash, org/repo, org, repo
       
       https://scm.company.com/very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, Bitbucket, scm.company.com/very/long/context/path, org/repo, org, repo
       https://scm.company.com:1234/very/long/context/path/org/repo.git, https://scm.company.com:1234/very/long/context/path, Bitbucket, scm.company.com:1234/very/long/context/path, org/repo, org, repo
@@ -100,7 +100,7 @@ public class GitRemoteTest {
       git@scm.company.com:group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       https://scm.company.com:443/group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       ssh://scm.company.com:22/group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      ssh://scm.company.com:222/group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com:222, GitLab, scm.company.com:222, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      ssh://SCM.COMPANY.COM:222/group/subgroup/subergroup/subestgroup/repo.git, ssh://SCM.CoMpAnY.cOm:222, GitLab, scm.company.com:222, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       
       https://scm.company.com/very/long/context/path/group/subgroup/subergroup/subestgroup/repo, scm.company.com/very/long/context/path, GitLab, scm.company.com/very/long/context/path, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       """)
