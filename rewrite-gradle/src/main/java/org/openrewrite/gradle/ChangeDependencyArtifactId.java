@@ -23,6 +23,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
+import org.openrewrite.gradle.util.DependencyMatchPredicate;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
@@ -112,7 +113,7 @@ public class ChangeDependencyArtifactId extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!dependencyDsl.matches(m) || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
+                if (!new DependencyMatchPredicate().test(getCursor()) || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
                     return m;
                 }
 

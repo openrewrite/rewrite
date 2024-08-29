@@ -349,4 +349,85 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @DocumentExample
+    @Test
+    void worksWithDependencyDefinedInJvmTestSuite() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyArtifactId("org.springframework.boot", "spring-boot-starter", "new-starter", ""))
+            .beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.springframework.boot:spring-boot-starter:2.5.4'
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.springframework.boot:new-starter:2.5.4'
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInBuildScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyArtifactId("org.springframework.boot", "spring-boot-starter", "new-starter", ""))
+            .beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.springframework.boot:spring-boot-starter:2.5.4'
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.springframework.boot:new-starter:2.5.4'
+                  }
+              }
+              """
+          )
+        );
+    }
 }
