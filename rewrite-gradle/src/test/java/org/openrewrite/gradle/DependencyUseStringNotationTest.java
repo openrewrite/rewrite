@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class DependencyUseStringNotationTest implements RewriteTest {
 
@@ -255,6 +256,35 @@ class DependencyUseStringNotationTest implements RewriteTest {
               dependencies {
                   api("org.openrewrite:rewrite-core:$version") {
                       exclude group: "group", module: "artifact"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInBuildScript() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath("org.openrewrite:rewrite-core:latest.release")
                   }
               }
               """
