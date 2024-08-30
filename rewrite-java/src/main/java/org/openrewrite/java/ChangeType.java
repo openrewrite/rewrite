@@ -205,9 +205,9 @@ public class ChangeType extends Recipe {
                         if (maybeType instanceof JavaType.FullyQualified) {
                             JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
                             if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(sf, ctx, getCursor().getParentOrThrow());
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
                             } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(sf, ctx, getCursor().getParentOrThrow());
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
                             }
                         }
                     }
@@ -217,7 +217,7 @@ public class ChangeType extends Recipe {
                 if (fullyQualifiedTarget != null) {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
                     if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName())) {
-                        if (sf != null && !becomesAmbiguous(sf)) {
+                        if (hasNoConflictingImport(sf)) {
                             if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
                                 addImport(owningClass);
                             }
@@ -228,11 +228,7 @@ public class ChangeType extends Recipe {
                     }
                 }
 
-                if (sf != null) {
-                    sf = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
-                }
-
-                j = sf;
+                j = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
             }
 
             return j;
@@ -303,7 +299,7 @@ public class ChangeType extends Recipe {
                     className = originalType.getFullyQualifiedName().substring(iType.getOwningClass().getFullyQualifiedName().length() + 1);
                 }
 
-                JavaSourceFile cu = getCursor().firstEnclosing(JavaSourceFile.class);
+                JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
                 if (ident.getSimpleName().equals(className)) {
                     if (targetType instanceof JavaType.FullyQualified) {
                         if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
@@ -311,7 +307,7 @@ public class ChangeType extends Recipe {
                                     .withType(null)
                                     .withPrefix(ident.getPrefix()));
                         } else {
-                            if (cu != null && !becomesAmbiguous(cu)) {
+                            if (sf != null && hasNoConflictingImport(sf)) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
                             } else {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getFullyQualifiedName());
@@ -323,8 +319,8 @@ public class ChangeType extends Recipe {
                 }
 
                 // Recreate any static imports as needed
-                if (cu != null) {
-                    for (J.Import anImport : cu.getImports()) {
+                if (sf != null) {
+                    for (J.Import anImport : sf.getImports()) {
                         if (anImport.isStatic() && anImport.getQualid().getTarget().getType() != null) {
                             JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
                             if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
@@ -512,16 +508,21 @@ public class ChangeType extends Recipe {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified;
         }
 
-        private boolean becomesAmbiguous(JavaSourceFile cu) {
-            JavaType.FullyQualified newType = TypeUtils.asFullyQualified(targetType);
+        private boolean hasNoConflictingImport(JavaSourceFile sf) {
             JavaType.FullyQualified oldType = TypeUtils.asFullyQualified(originalType);
-
-            return newType != null && oldType != null && cu.getImports().stream().anyMatch(imprt -> {
-                JavaType.FullyQualified currType = TypeUtils.asFullyQualified(imprt.getQualid().getType());
-                return currType != null
-                       && !currType.getFullyQualifiedName().equals(oldType.getFullyQualifiedName())
-                       && currType.getClassName().equals(newType.getClassName());
-            });
+            JavaType.FullyQualified newType = TypeUtils.asFullyQualified(targetType);
+            if (oldType == null || newType == null) {
+                return false; // No way to be sure
+            }
+            for (J.Import anImport : sf.getImports()) {
+                JavaType.FullyQualified currType = TypeUtils.asFullyQualified(anImport.getQualid().getType());
+                if (currType != null &&
+                    !TypeUtils.isOfType(currType, oldType) &&
+                    currType.getClassName().equals(newType.getClassName())) {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 
