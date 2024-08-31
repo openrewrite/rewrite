@@ -124,7 +124,7 @@ class AddMethodParameterTest implements RewriteTest {
               package foo;
               
               public class Foo {
-                  public void bar(java.util.regex.Pattern p) {
+                  public void bar() {
                   }
                   public void bar(int j) {
                   }
