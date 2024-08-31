@@ -41,16 +41,9 @@ public class AddMethodParameter extends Recipe {
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method declarations.",
+            description = "A method pattern that is used to find the method declarations to modify.",
             example = "com.yourorg.A foo(int, int)")
     String methodPattern;
-
-    @Option(displayName = "Parameter index",
-            description = "A zero-based index that indicates the position at which the parameter will be added. At the end by default.",
-            example = "0",
-            required = false)
-    @Nullable
-    Integer parameterIndex;
 
     @Option(displayName = "Parameter type",
             description = "The type of the parameter that gets added.",
@@ -61,6 +54,13 @@ public class AddMethodParameter extends Recipe {
             description = "The name of the parameter that gets added.",
             example = "name")
     String parameterName;
+
+    @Option(displayName = "Parameter index",
+            description = "A zero-based index that indicates the position at which the parameter will be added. At the end by default.",
+            example = "0",
+            required = false)
+    @Nullable
+    Integer parameterIndex;
 
     @Override
     public String getInstanceNameSuffix() {

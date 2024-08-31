@@ -25,7 +25,7 @@ class AddMethodParameterTest implements RewriteTest {
     @Test
     void primitive() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", null, "int", "i")),
+          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "int", "i", null)),
           java(
             """
               package foo;
@@ -50,7 +50,7 @@ class AddMethodParameterTest implements RewriteTest {
     @Test
     void string() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", null, "String", "i")),
+          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "String", "i", null)),
           java(
             """
               package foo;
@@ -87,7 +87,7 @@ class AddMethodParameterTest implements RewriteTest {
     @Test
     void first() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", 0, "int", "i")),
+          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "int", "i", 0)),
           java(
             """
               package foo;
@@ -118,13 +118,13 @@ class AddMethodParameterTest implements RewriteTest {
     @Test
     void qualified() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", null, "java.util.regex.Pattern", "p")),
+          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.regex.Pattern", "p", null)),
           java(
             """
               package foo;
               
               public class Foo {
-                  public void bar() {
+                  public void bar(java.util.regex.Pattern p) {
                   }
                   public void bar(int j) {
                   }
@@ -150,7 +150,7 @@ class AddMethodParameterTest implements RewriteTest {
     @Test
     void object() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", null, "Object", "o")),
+          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "Object", "o", null)),
           java(
             """
               package foo;
