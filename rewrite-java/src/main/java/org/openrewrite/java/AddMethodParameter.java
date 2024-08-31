@@ -178,12 +178,14 @@ public class AddMethodParameter extends Recipe {
 
         private TypeTree createTypeTree() {
             JavaType.Primitive type = JavaType.Primitive.fromKeyword(parameterType);
-            if (type != null) return new J.Primitive(
-                    randomId(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    type
-            );
+            if (type != null) {
+                return new J.Primitive(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        type
+                );
+            }
             if (parameterType.indexOf('.') == -1) {
                 String javaLangType = TypeUtils.findQualifiedJavaLangTypeName(parameterType);
                 if (javaLangType != null) {
