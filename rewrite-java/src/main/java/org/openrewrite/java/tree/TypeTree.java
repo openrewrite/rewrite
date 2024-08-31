@@ -116,11 +116,6 @@ public interface TypeTree extends NameTree {
             }
         }
         assert expr != null;
-        if (expr instanceof J.FieldAccess) {
-            expr = ((J.FieldAccess) expr).withName(((J.FieldAccess) expr).getName().withType(expr.getType()));
-        } else if (expr.getType() == null) {
-            expr = ((Identifier) expr).withType(JavaType.ShallowClass.build(fullName.toString()));
-        }
         //noinspection unchecked
         return (T) expr;
     }

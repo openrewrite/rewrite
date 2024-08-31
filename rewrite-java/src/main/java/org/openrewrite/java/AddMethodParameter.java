@@ -200,7 +200,14 @@ public class AddMethodParameter extends Recipe {
                     );
                 }
             }
-            return TypeTree.build(parameterType);
+            TypeTree typeTree = TypeTree.build(parameterType);
+            // somehow the type attribution is incomplete, but `ChangeType` relies on this
+            if (typeTree instanceof J.FieldAccess) {
+                typeTree = ((J.FieldAccess) typeTree).withName(((J.FieldAccess) typeTree).getName().withType(typeTree.getType()));
+            } else if (typeTree.getType() == null) {
+                typeTree = ((J.Identifier) typeTree).withType(JavaType.ShallowClass.build(parameterType));
+            }
+            return typeTree;
         }
     }
 }
