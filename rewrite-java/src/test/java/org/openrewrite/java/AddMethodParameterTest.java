@@ -101,6 +101,60 @@ class AddMethodParameterTest implements RewriteTest {
     }
 
     @Test
+    void wildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.List<?>", "i", null)),
+          java(
+            """
+              package foo;
+              
+              public class Foo {
+                  public void bar() {
+                  }
+              }
+              """,
+            """
+              package foo;
+              
+              import java.util.List;
+              
+              public class Foo {
+                  public void bar(List<?> i) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wildcardExtends() {
+        rewriteRun(
+          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.List<? extends Object>", "i", null)),
+          java(
+            """
+              package foo;
+              
+              public class Foo {
+                  public void bar() {
+                  }
+              }
+              """,
+            """
+              package foo;
+              
+              import java.util.List;
+              
+              public class Foo {
+                  public void bar(List<? extends Object> i) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void string() {
         rewriteRun(
           spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "String", "i", null)),

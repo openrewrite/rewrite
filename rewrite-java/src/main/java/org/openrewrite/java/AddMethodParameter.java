@@ -215,6 +215,24 @@ public class AddMethodParameter extends Recipe {
                         type
                 );
             }
+            if (typeName.equals("?")) {
+                return new J.Wildcard(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        null,
+                        null
+                );
+            }
+            if (typeName.startsWith("?") && typeName.contains("extends")) {
+                return new J.Wildcard(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        new JLeftPadded<>(Space.SINGLE_SPACE, J.Wildcard.Bound.Extends, Markers.EMPTY),
+                        createTypeTree(typeName.substring(typeName.indexOf("extends") + "extends".length() + 1).trim()).withPrefix(Space.SINGLE_SPACE)
+                );
+            }
             if (typeName.indexOf('.') == -1) {
                 String javaLangType = TypeUtils.findQualifiedJavaLangTypeName(typeName);
                 if (javaLangType != null) {
