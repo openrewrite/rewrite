@@ -446,43 +446,6 @@ public class MethodMatcher {
 }
 
 class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
-    private static final Set<String> COMMON_JAVA_LANG_TYPES =
-            new HashSet<>(Arrays.asList(
-                    "Appendable",
-                    "AutoCloseable",
-                    "Boolean",
-                    "Byte",
-                    "Character",
-                    "CharSequence",
-                    "Class",
-                    "ClassLoader",
-                    "Cloneable",
-                    "Comparable",
-                    "Double",
-                    "Enum",
-                    "Error",
-                    "Exception",
-                    "Float",
-                    "FunctionalInterface",
-                    "Integer",
-                    "Iterable",
-                    "Long",
-                    "Math",
-                    "Number",
-                    "Object",
-                    "Readable",
-                    "Record",
-                    "Runnable",
-                    "Short",
-                    "String",
-                    "StringBuffer",
-                    "StringBuilder",
-                    "System",
-                    "Thread",
-                    "Throwable",
-                    "Void"
-            ));
-
     @Override
     public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
         StringBuilder classNameBuilder = new StringBuilder();
@@ -497,7 +460,7 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
             if (Character.isLowerCase(beforeArr.charAt(0)) && JavaType.Primitive.fromKeyword(beforeArr) != null) {
                 return className;
             } else {
-                if (COMMON_JAVA_LANG_TYPES.contains(beforeArr)) {
+                if (TypeUtils.findQualifiedJavaLangTypeName(beforeArr) != null) {
                     return "java.lang." + className;
                 }
             }

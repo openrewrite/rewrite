@@ -460,7 +460,6 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void ternaryDoubleNegation() {
         rewriteRun(
-          //language=java
           java(
             """
               class A {
@@ -599,7 +598,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       a == null || !a.isEmpty()                                // a == null || !a.isEmpty()
       a != null && a.isEmpty()                                 // a != null && a.isEmpty()
       a != null && !a.isEmpty()                                // a != null && !a.isEmpty()
-      
+
       "" == null || "".isEmpty()                               // true
       "" == null || !"".isEmpty()                              // false
       "" != null && "".isEmpty()                               // true
@@ -609,7 +608,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       "b" == null || !"b".isEmpty()                            // true
       "b" != null && "b".isEmpty()                             // false
       "b" != null && !"b".isEmpty()                            // true
-      
+
       a == null || a.isEmpty() || "" == null || "".isEmpty()   // true
       a == null || a.isEmpty() || "" == null || !"".isEmpty()  // a == null || a.isEmpty()
       a == null || a.isEmpty() || "" != null && "".isEmpty()   // true
@@ -626,7 +625,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       a == null || !a.isEmpty() && "" == null || !"".isEmpty() // a == null
       a == null || !a.isEmpty() && "" != null && "".isEmpty()  // a == null || !a.isEmpty() 
       a == null || !a.isEmpty() && "" != null && !"".isEmpty() // a == null
-      
+
       a == null || a.isEmpty() || "b" == null || "b".isEmpty()   // a == null || a.isEmpty()
       a == null || a.isEmpty() || "b" == null || !"b".isEmpty()  // true
       a == null || a.isEmpty() || "b" != null && "b".isEmpty()   // a == null || a.isEmpty()
