@@ -24,6 +24,7 @@ import org.openrewrite.java.search.DeclaresType;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -81,7 +82,8 @@ public class AddMethodParameter extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         int idx = methodPattern.indexOf('#');
         idx = idx == -1 ? methodPattern.indexOf(' ') : idx;
-        return Preconditions.check(new DeclaresType<>(methodPattern.substring(0, idx)), new AddNullMethodArgumentVisitor(methodPattern));
+        boolean typePattern = idx != -1 && methodPattern.lastIndexOf('*', idx) != -1;
+        return Preconditions.check(typePattern ? new DeclaresMatchingType(methodPattern.substring(0, idx)) : new DeclaresType<>(methodPattern.substring(0, idx)), new AddNullMethodArgumentVisitor(methodPattern));
     }
 
     private class AddNullMethodArgumentVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -255,6 +257,22 @@ public class AddMethodParameter extends Recipe {
                 typeTree = ((J.Identifier) typeTree).withType(JavaType.ShallowClass.build(typeName));
             }
             return typeTree;
+        }
+    }
+
+    private static class DeclaresMatchingType extends JavaIsoVisitor<ExecutionContext> {
+        private final TypeMatcher typeMatcher;
+
+        public DeclaresMatchingType(String type) {
+            this.typeMatcher = new TypeMatcher(type);
+        }
+
+        @Override
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+            if (classDecl.getType() != null && typeMatcher.matches(classDecl.getType())) {
+                return SearchResult.found(classDecl);
+            }
+            return super.visitClassDeclaration(classDecl, ctx);
         }
     }
 }

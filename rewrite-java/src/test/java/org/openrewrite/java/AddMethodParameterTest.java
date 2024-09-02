@@ -48,6 +48,31 @@ class AddMethodParameterTest implements RewriteTest {
     }
 
     @Test
+    void typePattern() {
+        rewriteRun(
+          spec -> spec.recipe(new AddMethodParameter("*..*#bar(..)", "int", "i", null)),
+          java(
+            """
+              package foo;
+              
+              public class Foo {
+                  public void bar() {
+                  }
+              }
+              """,
+            """
+              package foo;
+              
+              public class Foo {
+                  public void bar(int i) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void primitiveArray() {
         rewriteRun(
           spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "int[]", "i", null)),
