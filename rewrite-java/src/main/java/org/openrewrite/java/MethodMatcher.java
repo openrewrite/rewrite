@@ -460,9 +460,8 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
             if (Character.isLowerCase(beforeArr.charAt(0)) && JavaType.Primitive.fromKeyword(beforeArr) != null) {
                 return className;
             } else {
-                String javaLangType = TypeUtils.findQualifiedJavaLangTypeName(beforeArr);
-                if (javaLangType != null) {
-                    return javaLangType;
+                if (TypeUtils.findQualifiedJavaLangTypeName(beforeArr) != null) {
+                    return "java.lang." + className;
                 }
             }
         }

@@ -48,6 +48,59 @@ class AddMethodParameterTest implements RewriteTest {
     }
 
     @Test
+    void primitiveArray() {
+        rewriteRun(
+          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "int[]", "i", null)),
+          java(
+            """
+              package foo;
+              
+              public class Foo {
+                  public void bar() {
+                  }
+              }
+              """,
+            """
+              package foo;
+              
+              public class Foo {
+                  public void bar(int[] i) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterized() {
+        rewriteRun(
+          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.List<java.util.regex.Pattern>", "i", null)),
+          java(
+            """
+              package foo;
+              
+              public class Foo {
+                  public void bar() {
+                  }
+              }
+              """,
+            """
+              package foo;
+              
+              import java.util.List;
+              import java.util.regex.Pattern;
+              
+              public class Foo {
+                  public void bar(List<Pattern> i) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void string() {
         rewriteRun(
           spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "String", "i", null)),
