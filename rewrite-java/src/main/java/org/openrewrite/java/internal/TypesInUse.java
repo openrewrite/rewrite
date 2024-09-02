@@ -85,7 +85,13 @@ public class TypesInUse {
                     variables.add(jType);
                     if (jType.getOwner() != null && jType.getOwner() instanceof JavaType.Class) {
                         JavaType.Class owner = (JavaType.Class) jType.getOwner();
-                        String ownerPackage = owner.getFullyQualifiedName().substring(0, owner.getFullyQualifiedName().lastIndexOf("."));
+                        String ownerPackage;
+                        if (owner.getFullyQualifiedName().contains(".")) {
+                            ownerPackage = owner.getFullyQualifiedName().substring(0, owner.getFullyQualifiedName().lastIndexOf("."));
+                        } else {
+                            ownerPackage = owner.getFullyQualifiedName();
+                        }
+
                         // If we're accessing a variable that has the static flag and is not owned by the
                         // CompilationUnit we are visiting we should add the owning class of the variable as a used type
                         if (jType.getFlags().contains(Flag.Static)
