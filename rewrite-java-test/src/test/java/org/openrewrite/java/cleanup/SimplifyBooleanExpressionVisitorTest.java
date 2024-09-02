@@ -460,8 +460,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void ternaryDoubleNegation() {
         rewriteRun(
-          //language=java
-          java("""
+          java(
+            """
               class A {
                   boolean orElse(Boolean nullable, boolean nonnull) {
                       return !(nullable != null ? nullable : nonnull);
