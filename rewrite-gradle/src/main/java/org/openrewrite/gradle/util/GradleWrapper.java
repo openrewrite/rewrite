@@ -102,7 +102,7 @@ public class GradleWrapper {
     public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
         String version = "";
         Matcher matcher = GRADLE_VERSION_PATTERN.matcher(fullDistributionUri.toString());
-        if(matcher.find()) {
+        if (matcher.find()) {
             version = matcher.group(1);
         }
         return new GradleWrapper(version, new DistributionInfos(fullDistributionUri.toString(), null, null));

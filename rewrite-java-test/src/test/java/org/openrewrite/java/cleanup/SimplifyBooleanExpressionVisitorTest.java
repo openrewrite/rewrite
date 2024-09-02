@@ -458,38 +458,60 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
-    void negatedTernary() {
+    void ternaryDoubleNegation() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  boolean orElse(Boolean nullable, boolean nonnull) {
+                      return !(nullable != null ? nullable : nonnull);
+                  }
+              }
+              """,
+            """
+              class A {
+                  boolean orElse(Boolean nullable, boolean nonnull) {
+                      return nullable == null ? nonnull : nullable;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ternayNegation() {
         rewriteRun(
           java(
             """
               public class A {
-                  boolean m1(boolean a) {
-                      return !(a ? true : false);
+                  boolean m1(boolean a, boolean b, boolean c) {
+                      return !(a ? b : c);
                   }
-                  boolean m2(boolean a) {
-                      return !(!a ? true : false);
+                  boolean m2(boolean a, boolean b, boolean c) {
+                      return !(!a ? b : c);
                   }
-                  boolean m3(boolean a) {
-                      return !a ? true : false;
+                  boolean m3(boolean a, boolean b, boolean c) {
+                      return !a ? b : c;
                   }
-                  boolean m4(boolean a) {
-                      return a ? true : false;
+                  boolean m4(boolean a, boolean b, boolean c) {
+                      return a ? b : c;
                   }
               }
               """,
             """
               public class A {
-                  boolean m1(boolean a) {
-                      return a ? false : true;
+                  boolean m1(boolean a, boolean b, boolean c) {
+                      return a ? c : b;
                   }
-                  boolean m2(boolean a) {
-                      return a ? true : false;
+                  boolean m2(boolean a, boolean b, boolean c) {
+                      return a ? b : c;
                   }
-                  boolean m3(boolean a) {
-                      return a ? false : true;
+                  boolean m3(boolean a, boolean b, boolean c) {
+                      return a ? c : b;
                   }
-                  boolean m4(boolean a) {
-                      return a ? true : false;
+                  boolean m4(boolean a, boolean b, boolean c) {
+                      return a ? b : c;
                   }
               }
               """
