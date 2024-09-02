@@ -104,9 +104,9 @@ public class AddMethodParameter extends Recipe {
                     }
                 }
                 J.VariableDeclarations parameter = createParameter(method);
-                method = addParameter(method, parameter);
+                method = autoFormat(addParameter(method, parameter), parameter, ctx, getCursor().getParentTreeCursor());
             }
-            return autoFormat(method, ctx);
+            return method;
         }
 
         private J.MethodDeclaration addParameter(J.MethodDeclaration method, J.VariableDeclarations parameter) {
