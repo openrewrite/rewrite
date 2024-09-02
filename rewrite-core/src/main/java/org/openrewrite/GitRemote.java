@@ -231,8 +231,7 @@ public class GitRemote {
 
         private static final Pattern PORT_PATTERN = Pattern.compile(":\\d+");
 
-        static URI normalize(String original) {
-            String url = original.toLowerCase(Locale.ENGLISH);
+        static URI normalize(String url) {
             try {
                 URIish uri = new URIish(url);
                 String scheme = uri.getScheme();
@@ -267,7 +266,7 @@ public class GitRemote {
                 String path = uri.getPath().replaceFirst("/$", "")
                         .replaceFirst("\\.git$", "")
                         .replaceFirst("^/", "");
-                return URI.create((scheme + "://" + host + maybePort + "/" + path).replaceFirst("/$", "").toLowerCase(Locale.ENGLISH));
+                return URI.create((scheme + "://" + host + maybePort + "/" + path).replaceFirst("/$", ""));
             } catch (URISyntaxException e) {
                 throw new IllegalStateException("Unable to parse origin from: " + url, e);
             }
@@ -306,12 +305,8 @@ public class GitRemote {
 
         public RemoteServer(Service service, String origin, Collection<URI> uris) {
             this.service = service;
-            this.origin = origin.toLowerCase(Locale.ENGLISH);
-            this.uris.addAll(uris.stream()
-                    .map(URI::toString)
-                    .map(urlString -> urlString.toLowerCase(Locale.ENGLISH))
-                    .map(URI::create)
-                    .collect(Collectors.toList()));
+            this.origin = origin;
+            this.uris.addAll(uris);
         }
 
         private GitRemote.Parser.@Nullable RemoteServerMatch match(URI normalizedUri) {
