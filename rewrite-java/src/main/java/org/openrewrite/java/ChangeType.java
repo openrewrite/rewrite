@@ -518,6 +518,7 @@ public class ChangeType extends Recipe {
                 JavaType.FullyQualified currType = TypeUtils.asFullyQualified(anImport.getQualid().getType());
                 if (currType != null &&
                     !TypeUtils.isOfType(currType, oldType) &&
+                    !TypeUtils.isOfType(currType, newType) &&
                     currType.getClassName().equals(newType.getClassName())) {
                     return false;
                 }

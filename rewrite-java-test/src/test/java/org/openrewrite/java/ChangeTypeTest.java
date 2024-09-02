@@ -1971,4 +1971,52 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void shouldNotFullyQualifyWhenNewTypeIsAlreadyUsed() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "org.a.A",
+            "org.ab.AB",
+            true)),
+          java(
+            """
+            package org.a;
+
+            public class A {
+              public static String A = "A";
+            }
+            """),
+          java(
+            """
+            package org.ab;
+
+            public class AB {
+              public static String A = "A";
+              public static String B = "B";
+            }
+            """),
+          // language=java
+          java(
+            """
+              import org.a.A;
+              import org.ab.AB;
+
+              class Letters {
+                String a = A.A;
+                String b = AB.B;
+              }
+              """,
+            """
+              import org.ab.AB;
+
+              class Letters {
+                String a = AB.A;
+                String b = AB.B;
+              }
+              """
+          )
+        );
+    }
+
 }
