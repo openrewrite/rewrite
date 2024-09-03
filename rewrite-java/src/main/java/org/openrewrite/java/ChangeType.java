@@ -307,7 +307,7 @@ public class ChangeType extends Recipe {
                                     .withType(null)
                                     .withPrefix(ident.getPrefix()));
                         } else {
-                            if (sf != null && hasNoConflictingImport(sf)) {
+                            if (hasNoConflictingImport(sf)) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
                             } else {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getFullyQualifiedName());
@@ -508,11 +508,11 @@ public class ChangeType extends Recipe {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified;
         }
 
-        private boolean hasNoConflictingImport(JavaSourceFile sf) {
+        private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf) {
             JavaType.FullyQualified oldType = TypeUtils.asFullyQualified(originalType);
             JavaType.FullyQualified newType = TypeUtils.asFullyQualified(targetType);
-            if (oldType == null || newType == null) {
-                return false; // No way to be sure
+            if (sf == null || oldType == null || newType == null) {
+                return true; // No way to be sure so we retain previous behaviour
             }
             for (J.Import anImport : sf.getImports()) {
                 JavaType.FullyQualified currType = TypeUtils.asFullyQualified(anImport.getQualid().getType());
