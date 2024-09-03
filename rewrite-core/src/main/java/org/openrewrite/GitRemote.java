@@ -80,7 +80,10 @@ public class GitRemote {
                 selectedBaseUrl = URI.create(protocol + "://" + stripProtocol(remote.origin));
             } else {
                 selectedBaseUrl = servers.stream()
-                        .filter(server -> server.allOrigins().contains(stripProtocol(remote.origin)))
+                        .filter(server -> server.allOrigins()
+                                .stream()
+                                .anyMatch(origin -> origin.equalsIgnoreCase(stripProtocol(remote.origin)))
+                        )
                         .flatMap(server -> server.getUris().stream())
                         .filter(uri -> uri.getScheme().equals(protocol))
                         .findFirst()
@@ -156,7 +159,7 @@ public class GitRemote {
         }
 
         public RemoteServer findRemoteServer(String origin) {
-            return servers.stream().filter(server -> server.origin.equals(origin))
+            return servers.stream().filter(server -> server.origin.equalsIgnoreCase(origin))
                     .findFirst()
                     .orElseGet(() -> {
                         URI normalizedUri = normalize(origin);
@@ -166,7 +169,7 @@ public class GitRemote {
         }
 
         private void add(RemoteServer server) {
-            if (server.service != Service.Unknown || servers.stream().noneMatch(s -> s.origin.equals(server.origin))) {
+            if (server.service != Service.Unknown || servers.stream().noneMatch(s -> s.origin.equalsIgnoreCase(server.origin))) {
                 servers.add(server);
             }
         }
@@ -179,15 +182,15 @@ public class GitRemote {
 
             switch (match.service) {
                 case AzureDevOps:
-                    if (match.matchedUri.getHost().equals("ssh.dev.azure.com")) {
-                        repositoryPath = repositoryPath.replaceFirst("v3/", "");
+                    if (match.matchedUri.getHost().equalsIgnoreCase("ssh.dev.azure.com")) {
+                        repositoryPath = repositoryPath.replaceFirst("(?i)v3/", "");
                     } else {
-                        repositoryPath = repositoryPath.replaceFirst("/_git/", "/");
+                        repositoryPath = repositoryPath.replaceFirst("(?i)/_git/", "/");
                     }
                     break;
                 case Bitbucket:
                     if (url.startsWith("http")) {
-                        repositoryPath = repositoryPath.replaceFirst("scm/", "");
+                        repositoryPath = repositoryPath.replaceFirst("(?i)scm/", "");
                     }
                     break;
             }
@@ -222,7 +225,9 @@ public class GitRemote {
             String uri = normalizedUri.toString();
             String contextPath = origin.getPath();
             String path = normalizedUri.getPath();
-            if (!normalizedUri.getHost().equals(origin.getHost()) || normalizedUri.getPort() != origin.getPort() || !path.startsWith(contextPath)) {
+            if (!normalizedUri.getHost().equalsIgnoreCase(origin.getHost()) ||
+                normalizedUri.getPort() != origin.getPort() ||
+                !path.toLowerCase(Locale.ENGLISH).startsWith(contextPath.toLowerCase(Locale.ENGLISH))) {
                 throw new IllegalArgumentException("Origin: " + origin + " does not match the clone url: " + uri);
             }
             return path.substring(contextPath.length())
@@ -264,7 +269,7 @@ public class GitRemote {
                 String maybePort = maybePort(uri.getPort(), scheme);
 
                 String path = uri.getPath().replaceFirst("/$", "")
-                        .replaceFirst("\\.git$", "")
+                        .replaceFirst("(?i)\\.git$", "")
                         .replaceFirst("^/", "");
                 return URI.create((scheme + "://" + host + maybePort + "/" + path).replaceFirst("/$", ""));
             } catch (URISyntaxException e) {
@@ -310,8 +315,10 @@ public class GitRemote {
         }
 
         private GitRemote.Parser.@Nullable RemoteServerMatch match(URI normalizedUri) {
+            String lowerCaseNormalizedUri = normalizedUri.toString().toLowerCase(Locale.ENGLISH);
             for (URI uri : uris) {
-                if (normalizedUri.toString().startsWith(Parser.normalize(uri.toString()).toString())) {
+                String normalizedServerUri = Parser.normalize(uri.toString()).toString().toLowerCase(Locale.ENGLISH);
+                if (lowerCaseNormalizedUri.startsWith(normalizedServerUri)) {
                     return new Parser.RemoteServerMatch(service, origin, uri);
                 }
             }
