@@ -240,4 +240,21 @@ public class GitRemoteTest {
         assertThat(parser.findRemoteServer("scm.unregistered.com").getOrigin()).isEqualTo("scm.unregistered.com");
         assertThat(parser.findRemoteServer("https://scm.unregistered.com").getOrigin()).isEqualTo("scm.unregistered.com");
     }
+
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      https://github.com/org/repo, github.com, org/repo, org, repo
+      https://GITHUB.COM/ORG/REPO, github.com, ORG/REPO, ORG, REPO
+      ssh://GITHUB.COM/ORG/REPO.GIT, github.com, ORG/REPO, ORG, REPO
+      https://DEV.AZURE.COM/ORG/PROJECT/_GIT/REPO, dev.azure.com, ORG/PROJECT/REPO, ORG/PROJECT, REPO
+      GIT@SSH.DEV.AZURE.COM:V3/ORG/PROJECT/REPO, dev.azure.com, ORG/PROJECT/REPO, ORG/PROJECT, REPO
+      """)
+    void parseOriginCaseInsensitive(String cloneUrl, String expectedOrigin, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
+        GitRemote.Parser parser = new GitRemote.Parser();
+        GitRemote remote = parser.parse(cloneUrl);
+        assertThat(remote.getOrigin()).isEqualTo(expectedOrigin);
+        assertThat(remote.getPath()).isEqualTo(expectedPath);
+        assertThat(remote.getOrganization()).isEqualTo(expectedOrganization);
+        assertThat(remote.getRepositoryName()).isEqualTo(expectedRepositoryName);
+    }
 }
