@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal.lang;
 
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
 
 import javax.annotation.meta.TypeQualifierNickname;
