@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.Value;
+import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.jgit.transport.URIish;
@@ -37,6 +38,32 @@ public class GitRemote {
     String organization;
 
     String repositoryName;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        GitRemote gitRemote = (GitRemote) o;
+        return service == gitRemote.service &&
+               StringUtils.equalsIgnoreCase(url, gitRemote.url) &&
+               StringUtils.equalsIgnoreCase(origin, gitRemote.origin) &&
+               StringUtils.equalsIgnoreCase(path, gitRemote.path) &&
+               StringUtils.equalsIgnoreCase(organization, gitRemote.organization) &&
+               StringUtils.equalsIgnoreCase(repositoryName, gitRemote.repositoryName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(service, url,
+                origin == null ? null : origin.toLowerCase(Locale.ENGLISH),
+                path == null ? null : path.toLowerCase(Locale.ENGLISH),
+                organization == null ? null : organization.toLowerCase(Locale.ENGLISH),
+                repositoryName == null ? null : repositoryName.toLowerCase(Locale.ENGLISH));
+    }
 
     public enum Service {
         GitHub,
