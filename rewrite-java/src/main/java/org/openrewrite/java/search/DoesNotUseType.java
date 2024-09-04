@@ -18,7 +18,6 @@ package org.openrewrite.java.search;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -26,14 +25,12 @@ import org.openrewrite.TreeVisitor;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class NotUsesType extends Recipe {
+public class DoesNotUseType extends Recipe {
 
-    @Nullable
     @Getter
-    private final String fullyQualifiedType;
+    String fullyQualifiedType;
 
-    @Nullable
-    private final Boolean includeImplicit;
+    Boolean includeImplicit;
 
     @Override
     public String getDisplayName() {
@@ -42,7 +39,7 @@ public class NotUsesType extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Inverse of `UsesType`.";
+        return "To be used as a precondition to invalidate classes using the provided type. So recipe X doesn't run on a class using type Y";
     }
 
     @Override

@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-class NotUsesTypeTest implements RewriteTest {
+class DoesNotUseTypeTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -33,7 +33,7 @@ class NotUsesTypeTest implements RewriteTest {
               name: org.openrewrite.NotUsesTypeTest
               description: Test.
               preconditions:
-                - org.openrewrite.java.search.NotUsesType:
+                - org.openrewrite.java.search.DoesNotUseType:
                     fullyQualifiedType: java.lang.String
                     includeImplicit: true
               recipeList:
