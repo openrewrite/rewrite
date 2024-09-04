@@ -26,16 +26,30 @@ class NotUsesTypeTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new NotUsesType("java.lang.String", true));
+        spec.recipeFromYaml(
+          """
+          ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.NotUsesTypeTest
+            description: Test.
+            preconditions:
+              - org.openrewrite.java.search.NotUsesType:
+                  fullyQualifiedType: java.lang.String
+                  includeImplicit: true
+            recipeList:
+              - org.openrewrite.java.OrderImports:
+                 removeUnused: false
+          """);
     }
 
     @DocumentExample
     @Test
     void doesNotUseType() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(1),
           java(
             """
+            import java.lang.StringBuilder;
+            
             class Foo{
                 int bla = 123;
             }
@@ -48,6 +62,9 @@ class NotUsesTypeTest implements RewriteTest {
         rewriteRun(
           java(
             """
+            import java.lang.StringBuilder;
+            
+            
             class Foo{
                 String bla = "bla";
             }
