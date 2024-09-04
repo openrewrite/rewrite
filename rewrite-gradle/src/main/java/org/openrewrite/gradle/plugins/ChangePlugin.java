@@ -247,9 +247,9 @@ public class ChangePlugin extends Recipe {
 
                     private List<MavenRepository> getPluginRepositories() {
                         if (gradleProject != null) {
-                            return gradleProject.getBuildscript().getMavenRepositories();
+                            return gradleProject.getMavenPluginRepositories();
                         }
-                        return gradleSettings.getBuildscript().getMavenRepositories();
+                        return gradleSettings.getPluginRepositories();
                     }
                 }
         );

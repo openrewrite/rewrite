@@ -167,11 +167,11 @@ public class DependencyVersionSelector {
 
     private List<MavenRepository> determineRepos(@Nullable String configuration) {
         if (gradleSettings != null) {
-            return gradleSettings.getBuildscript().getMavenRepositories();
+            return gradleSettings.getPluginRepositories();
         }
         Objects.requireNonNull(gradleProject);
         return "classpath".equals(configuration) ?
-                gradleProject.getBuildscript().getMavenRepositories() :
+                gradleProject.getMavenPluginRepositories() :
                 gradleProject.getMavenRepositories();
     }
 }
