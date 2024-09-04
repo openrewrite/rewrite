@@ -72,7 +72,24 @@ public class GitRemote {
         Bitbucket,
         BitbucketCloud,
         AzureDevOps,
-        Unknown
+        Unknown;
+
+        public static Service forName(String serviceName) {
+            switch (serviceName.toLowerCase(Locale.ENGLISH).replaceAll("[-_ ]", "")) {
+                case "github":
+                    return GitHub;
+                case "gitlab":
+                    return GitLab;
+                case "bitbucket":
+                    return Bitbucket;
+                case "bitbucketcloud":
+                    return BitbucketCloud;
+                case "azuredevops":
+                    return AzureDevOps;
+                default:
+                    return Unknown;
+            }
+        }
     }
 
     public static class Parser {

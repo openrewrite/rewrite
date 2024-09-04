@@ -258,6 +258,23 @@ public class GitRemoteTest {
         assertThat(remote.getRepositoryName()).isEqualTo(expectedRepositoryName);
     }
 
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      GitHub, GitHub
+      GITLAB, GitLab
+      bitbucket, Bitbucket
+      BitbucketCloud, BitbucketCloud
+      Bitbucket Cloud, BitbucketCloud
+      BITBUCKET_CLOUD, BitbucketCloud
+      AzureDevOps, AzureDevOps
+      AZURE_DEVOPS, AzureDevOps
+      Azure DevOps, AzureDevOps
+      idontknow, Unknown
+    """)
+    void findServiceForName(String name, GitRemote.Service service){
+        assertThat(GitRemote.Service.forName(name)).isEqualTo(service);
+    }
+
     @Test
     void equalsIgnoresCase() {
         assertThat(new GitRemote(GitRemote.Service.GitHub, "https://github.com/org/repo", "github.com", "org/repo", "org", "repo"))
