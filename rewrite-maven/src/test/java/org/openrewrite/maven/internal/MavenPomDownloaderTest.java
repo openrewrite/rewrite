@@ -777,4 +777,112 @@ class MavenPomDownloaderTest {
         return new GroupArtifactVersion("org.openrewrite", "rewrite", "1.0.0");
     }
 
+    @Test
+    void shouldNotThrowExceptionForModulesInModulesWithRightProperty() {
+        var gav = new GroupArtifactVersion("test", "test2", "${test}");
+
+        Path pomPath = Paths.get("test/test2/pom.xml");
+        Pom pom = Pom.builder()
+          .sourcePath(pomPath)
+          .repository(MAVEN_CENTRAL)
+          .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+          .parent(new Parent(new GroupArtifactVersion("test", "test", "${test}"), "../pom.xml"))
+          .gav(new ResolvedGroupArtifactVersion(
+            "${REPO_URL}", "test", "test2", "7.0.0", null))
+          .build();
+
+        ResolvedPom resolvedPom = ResolvedPom.builder()
+          .requested(pom)
+          .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+          .repositories(singletonList(MAVEN_CENTRAL))
+          .build();
+
+        Path pomPath2 = Paths.get("test/pom.xml");
+        Pom pom2 = Pom.builder()
+          .sourcePath(pomPath)
+          .repository(MAVEN_CENTRAL)
+          .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+          .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
+          .gav(new ResolvedGroupArtifactVersion(
+            "${REPO_URL}", "test", "test", "7.0.0", null))
+          .build();
+
+
+        Path parentPomPath = Paths.get("pom.xml");
+        Pom parentPom = Pom.builder()
+          .sourcePath(parentPomPath)
+          .repository(MAVEN_CENTRAL)
+          .properties(singletonMap("test", "7.0.0"))
+          .parent(null)
+          .gav(new ResolvedGroupArtifactVersion(
+            "${REPO_URL}", "test", "root-test", "7.0.0", null))
+          .build();
+
+        Map<Path, Pom> pomsByPath = new HashMap<>();
+        pomsByPath.put(parentPomPath, parentPom);
+        pomsByPath.put(pomPath, pom);
+        pomsByPath.put(pomPath2, pom2);
+
+        String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
+        MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
+
+        MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+
+        assertDoesNotThrow(() -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
+    }
+
+    @Test
+    void shouldThrowExceptionForModulesInModulesWithNoRightProperty() {
+        var gav = new GroupArtifactVersion("test", "test2", "${test}");
+
+        Path pomPath = Paths.get("test/test2/pom.xml");
+        Pom pom = Pom.builder()
+          .sourcePath(pomPath)
+          .repository(MAVEN_CENTRAL)
+          .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+          .parent(new Parent(new GroupArtifactVersion("test", "test", "${test}"), "../pom.xml"))
+          .gav(new ResolvedGroupArtifactVersion(
+            "${REPO_URL}", "test", "test2", "7.0.0", null))
+          .build();
+
+        ResolvedPom resolvedPom = ResolvedPom.builder()
+          .requested(pom)
+          .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+          .repositories(singletonList(MAVEN_CENTRAL))
+          .build();
+
+        Path pomPath2 = Paths.get("test/pom.xml");
+        Pom pom2 = Pom.builder()
+          .sourcePath(pomPath)
+          .repository(MAVEN_CENTRAL)
+          .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+          .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
+          .gav(new ResolvedGroupArtifactVersion(
+            "${REPO_URL}", "test", "test", "7.0.0", null))
+          .build();
+
+
+        Path parentPomPath = Paths.get("pom.xml");
+        Pom parentPom = Pom.builder()
+          .sourcePath(parentPomPath)
+          .repository(MAVEN_CENTRAL)
+          .properties(singletonMap("tt", "7.0.0"))
+          .parent(null)
+          .gav(new ResolvedGroupArtifactVersion(
+            "${REPO_URL}", "test", "root-test", "7.0.0", null))
+          .build();
+
+        Map<Path, Pom> pomsByPath = new HashMap<>();
+        pomsByPath.put(parentPomPath, parentPom);
+        pomsByPath.put(pomPath, pom);
+        pomsByPath.put(pomPath2, pom2);
+
+        String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
+        MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
+
+        MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+
+        assertThrows(IllegalArgumentException.class, () -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
+    }
+
 }
