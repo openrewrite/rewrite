@@ -257,4 +257,16 @@ public class GitRemoteTest {
         assertThat(remote.getOrganization()).isEqualTo(expectedOrganization);
         assertThat(remote.getRepositoryName()).isEqualTo(expectedRepositoryName);
     }
+
+    @Test
+    void equalsIgnoresCase() {
+        assertThat(new GitRemote(GitRemote.Service.GitHub, "https://github.com/org/repo", "github.com", "org/repo", "org", "repo"))
+          .isEqualTo(new GitRemote(GitRemote.Service.GitHub, "https://GITHUB.COM/ORG/REPO", "GITHUB.COM", "ORG/REPO", "ORG", "REPO"));
+    }
+
+    @Test
+    void hashCodeIgnoresCase() {
+        assertThat(new GitRemote(GitRemote.Service.GitHub, "https://github.com/org/repo", "github.com", "org/repo", "org", "repo"))
+          .hasSameHashCodeAs(new GitRemote(GitRemote.Service.GitHub, "https://GITHUB.COM/ORG/REPO", "GITHUB.COM", "ORG/REPO", "ORG", "REPO"));
+    }
 }

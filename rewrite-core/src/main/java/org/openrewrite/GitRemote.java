@@ -58,7 +58,8 @@ public class GitRemote {
 
     @Override
     public int hashCode() {
-        return Objects.hash(service, url,
+        return Objects.hash(service,
+                url == null ? null : url.toLowerCase(Locale.ENGLISH),
                 origin == null ? null : origin.toLowerCase(Locale.ENGLISH),
                 path == null ? null : path.toLowerCase(Locale.ENGLISH),
                 organization == null ? null : organization.toLowerCase(Locale.ENGLISH),
