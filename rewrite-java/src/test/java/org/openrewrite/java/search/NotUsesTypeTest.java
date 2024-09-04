@@ -28,18 +28,19 @@ class NotUsesTypeTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.recipeFromYaml(
           """
-          ---
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.openrewrite.NotUsesTypeTest
-            description: Test.
-            preconditions:
-              - org.openrewrite.java.search.NotUsesType:
-                  fullyQualifiedType: java.lang.String
-                  includeImplicit: true
-            recipeList:
-              - org.openrewrite.java.OrderImports:
-                 removeUnused: true
-          """);
+            ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.NotUsesTypeTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.java.search.NotUsesType:
+                    fullyQualifiedType: java.lang.String
+                    includeImplicit: true
+              recipeList:
+                - org.openrewrite.java.OrderImports:
+                   removeUnused: true
+            """
+        );
     }
 
     @DocumentExample
@@ -48,13 +49,14 @@ class NotUsesTypeTest implements RewriteTest {
         rewriteRun(
           java(
             """
-            import java.lang.StringBuilder;
-            
-            class Foo{
-                int bla = 123;
-            }
-            """
-          ));
+              import java.lang.StringBuilder;
+              
+              class Foo{
+                  int bla = 123;
+              }
+              """
+          )
+        );
     }
 
     @Test
@@ -62,13 +64,14 @@ class NotUsesTypeTest implements RewriteTest {
         rewriteRun(
           java(
             """
-            import java.lang.StringBuilder;
-            
-            
-            class Foo{
-                String bla = "bla";
-            }
-            """));
+              import java.lang.StringBuilder;
+              
+              
+              class Foo{
+                  String bla = "bla";
+              }
+              """
+          )
+        );
     }
-
 }
