@@ -16,34 +16,38 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class DoesNotUseType extends Recipe {
 
-    @Getter
-    String fullyQualifiedType;
+    @Option(displayName = "Fully-qualified type name",
+            description = "A fully-qualified type name, that is used to find matching type references. " +
+                          "Supports glob expressions. `java..*` finds every type from every subpackage of the `java` package.",
+            example = "java.util.List")
+    String fullyQualifiedTypeName;
 
+    @Option(displayName = "Include implicit type references",
+            description = "Whether to include implicit type references, such as those in method signatures.",
+            required = false)
+    @Nullable
     Boolean includeImplicit;
 
     @Override
     public String getDisplayName() {
-        return "Check whether a type is not in use";
+        return "Check whether a type is **not** in use";
     }
 
     @Override
     public String getDescription() {
-        return "To be used as a precondition to invalidate classes using the provided type. So recipe X doesn't run on a class using type Y";
+        return "Useful as a precondition to skip over compilation units using the argument type.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.not(new UsesType<>(fullyQualifiedType, includeImplicit));
+        return Preconditions.not(new UsesType<>(fullyQualifiedTypeName, includeImplicit));
     }
 }

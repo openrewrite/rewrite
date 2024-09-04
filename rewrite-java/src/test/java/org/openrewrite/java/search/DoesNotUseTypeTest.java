@@ -28,30 +28,34 @@ class DoesNotUseTypeTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.recipeFromYaml(
           """
-            ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.NotUsesTypeTest
-              description: Test.
-              preconditions:
-                - org.openrewrite.java.search.DoesNotUseType:
-                    fullyQualifiedType: java.lang.String
-                    includeImplicit: true
-              recipeList:
-                - org.openrewrite.java.OrderImports:
-                   removeUnused: true
-            """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.acme.RemoveUnusedImportsIfNotUsingString
+            description: Test.
+            preconditions:
+              - org.openrewrite.java.search.DoesNotUseType:
+                  fullyQualifiedTypeName: java.lang.String
+                  includeImplicit: true
+            recipeList:
+              - org.openrewrite.java.RemoveUnusedImports
+            """,
+          "org.acme.RemoveUnusedImportsIfNotUsingString"
         );
     }
 
     @DocumentExample
     @Test
-    void doesNotUseType() {
+    void importRemovedWhenTypeNotFound() {
         rewriteRun(
           java(
             """
               import java.lang.StringBuilder;
-              
-              class Foo{
+
+              class Foo {
+                  int bla = 123;
+              }
+              """,
+            """
+              class Foo {
                   int bla = 123;
               }
               """
@@ -60,14 +64,13 @@ class DoesNotUseTypeTest implements RewriteTest {
     }
 
     @Test
-    void doesUseType() {
+    void importRetainedWhenTypeInUse() {
         rewriteRun(
           java(
             """
               import java.lang.StringBuilder;
-              
-              
-              class Foo{
+
+              class Foo {
                   String bla = "bla";
               }
               """
