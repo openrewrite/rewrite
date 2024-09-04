@@ -38,7 +38,7 @@ class NotUsesTypeTest implements RewriteTest {
                   includeImplicit: true
             recipeList:
               - org.openrewrite.java.OrderImports:
-                 removeUnused: false
+                 removeUnused: true
           """);
     }
 
