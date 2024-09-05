@@ -15,6 +15,8 @@
  */
 package org.openrewrite.gradle.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -22,28 +24,54 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.Serializable;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Value
 @With
+@AllArgsConstructor(onConstructor_ = { @JsonCreator})
 public class GradleSettings implements Marker, Serializable {
     UUID id;
+
+    @Deprecated
+    @Nullable
     List<MavenRepository> pluginRepositories;
+
     List<GradlePluginDescriptor> plugins;
     Map<String, FeaturePreview> featurePreviews;
+    GradleBuildscript buildscript;
+
+    // Backwards compatibility to ease convoluted release process with rewrite-gradle-tooling-model
+    public GradleSettings(
+            UUID id,
+            List<MavenRepository> pluginRepositories,
+            List<GradlePluginDescriptor> plugins,
+            Map<String, FeaturePreview> featurePreviews
+    ) {
+        this(id, pluginRepositories, plugins, featurePreviews, null);
+    }
 
     public @Nullable Boolean isFeatureEnabled(String name) {
-        // Unclear how enabled status can be determined in latest gradle APIs
-        return null;
+        return featurePreviews.get(name).getEnabled();
     }
 
     public Set<FeaturePreview> getActiveFeatures() {
         return featurePreviews.values().stream()
                 .filter(FeaturePreview::isActive)
                 .collect(Collectors.toSet());
+    }
+
+    /**
+     * Get a list of Maven plugin repositories.
+     *
+     * @return list of Maven plugin repositories
+     * @deprecated Use {@link GradleBuildscript#getMavenRepositories()} instead.
+     */
+    @Deprecated
+    public List<MavenRepository> getPluginRepositories() {
+        if (buildscript != null) {
+            return buildscript.getMavenRepositories();
+        }
+        return pluginRepositories == null ? Collections.emptyList() : pluginRepositories;
     }
 }
