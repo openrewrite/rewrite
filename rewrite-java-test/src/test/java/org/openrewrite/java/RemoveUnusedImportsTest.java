@@ -1814,4 +1814,17 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4473")
+    @Test
+    void doesNotRemoveReferencedAnnotationFromRecordParameter() {
+        rewriteRun(
+          java(
+            """
+              import java.beans.BeanProperty;
+              record A(@BeanProperty String a) {}
+              """
+          )
+        );
+    }
 }
