@@ -27,6 +27,42 @@ import java.util.stream.IntStream;
 
 public class TypeUtils {
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
+    private static final Set<String> COMMON_JAVA_LANG_TYPES =
+            new HashSet<>(Arrays.asList(
+                    "Appendable",
+                    "AutoCloseable",
+                    "Boolean",
+                    "Byte",
+                    "Character",
+                    "CharSequence",
+                    "Class",
+                    "ClassLoader",
+                    "Cloneable",
+                    "Comparable",
+                    "Double",
+                    "Enum",
+                    "Error",
+                    "Exception",
+                    "Float",
+                    "FunctionalInterface",
+                    "Integer",
+                    "Iterable",
+                    "Long",
+                    "Math",
+                    "Number",
+                    "Object",
+                    "Readable",
+                    "Record",
+                    "Runnable",
+                    "Short",
+                    "String",
+                    "StringBuffer",
+                    "StringBuilder",
+                    "System",
+                    "Thread",
+                    "Throwable",
+                    "Void"
+            ));
 
     private TypeUtils() {
     }
@@ -34,6 +70,10 @@ public class TypeUtils {
     public static boolean isObject(@Nullable JavaType type) {
         return type instanceof JavaType.FullyQualified &&
                "java.lang.Object".equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
+    }
+
+    public static @Nullable String findQualifiedJavaLangTypeName(String name) {
+        return COMMON_JAVA_LANG_TYPES.contains(name) ? "java.lang." + name : null;
     }
 
     public static boolean isString(@Nullable JavaType type) {

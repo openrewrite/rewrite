@@ -89,6 +89,7 @@ tasks.named<Copy>("processResources") {
 //Javadoc compiler will complain about the use of the internal types.
 tasks.withType<Javadoc> {
     exclude(
-        "**/GradleProject**"
+        "**/GradleProject**",
+        "**/GradleSettings**"
     )
 }

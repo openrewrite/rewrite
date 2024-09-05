@@ -60,24 +60,40 @@ public class GradleProject implements Marker, Serializable {
     List<MavenRepository> mavenRepositories;
 
     @With
+    @Deprecated
+    @Nullable
     List<MavenRepository> mavenPluginRepositories;
 
     Map<String, GradleDependencyConfiguration> nameToConfiguration;
 
+    GradleBuildscript buildscript;
+
     // Backwards compatibility to ease convoluted release process with rewrite-gradle-tooling-model
     public GradleProject(
             UUID id,
+            String group,
             String name,
+            String version,
             String path,
             List<GradlePluginDescriptor> plugins,
             List<MavenRepository> mavenRepositories,
             List<MavenRepository> mavenPluginRepositories,
             Map<String, GradleDependencyConfiguration> nameToConfiguration
     ) {
-        this(id, "", name, "", path, plugins, mavenRepositories, mavenPluginRepositories, nameToConfiguration);
+        this(id, group, name, version, path, plugins, mavenRepositories, mavenPluginRepositories, nameToConfiguration, null);
     }
 
+    /**
+     * Get a list of Maven plugin repositories.
+     *
+     * @return list of Maven plugin repositories
+     * @deprecated Use {@link GradleBuildscript#getMavenRepositories()} instead.
+     */
+    @Deprecated
     public List<MavenRepository> getMavenPluginRepositories() {
+        if (buildscript != null) {
+            return buildscript.getMavenRepositories();
+        }
         return mavenPluginRepositories == null ? Collections.emptyList() : mavenPluginRepositories;
     }
 
@@ -151,7 +167,8 @@ public class GradleProject implements Marker, Serializable {
                 plugins,
                 mavenRepositories,
                 mavenPluginRepositories,
-                configurations
+                configurations,
+                buildscript
         );
     }
 }

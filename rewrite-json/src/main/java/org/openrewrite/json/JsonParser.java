@@ -39,9 +39,11 @@ public class JsonParser implements Parser {
         return acceptedInputs(sourceFiles).map(input -> {
             parsingListener.startedParsing(input);
             try (InputStream sourceStream = input.getSource(ctx)) {
-                JSON5Parser parser = new JSON5Parser(new CommonTokenStream(new JSON5Lexer(
-                        CharStreams.fromStream(sourceStream))));
+                JSON5Lexer lexer = new JSON5Lexer(CharStreams.fromStream(sourceStream));
+                lexer.removeErrorListeners();
+                lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
+                JSON5Parser parser = new JSON5Parser(new CommonTokenStream(lexer));
                 parser.removeErrorListeners();
                 parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 

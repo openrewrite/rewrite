@@ -205,9 +205,9 @@ public class ChangeType extends Recipe {
                         if (maybeType instanceof JavaType.FullyQualified) {
                             JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
                             if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(sf, ctx, getCursor().getParentOrThrow());
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
                             } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(sf, ctx, getCursor().getParentOrThrow());
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
                             }
                         }
                     }
@@ -217,20 +217,18 @@ public class ChangeType extends Recipe {
                 if (fullyQualifiedTarget != null) {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
                     if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName())) {
-                        if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                            addImport(owningClass);
-                        }
-                        if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                            addImport(fullyQualifiedTarget);
+                        if (hasNoConflictingImport(sf)) {
+                            if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
+                                addImport(owningClass);
+                            }
+                            if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
+                                addImport(fullyQualifiedTarget);
+                            }
                         }
                     }
                 }
 
-                if (sf != null) {
-                    sf = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
-                }
-
-                j = sf;
+                j = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
             }
 
             return j;
@@ -301,6 +299,7 @@ public class ChangeType extends Recipe {
                     className = originalType.getFullyQualifiedName().substring(iType.getOwningClass().getFullyQualifiedName().length() + 1);
                 }
 
+                JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
                 if (ident.getSimpleName().equals(className)) {
                     if (targetType instanceof JavaType.FullyQualified) {
                         if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
@@ -308,7 +307,11 @@ public class ChangeType extends Recipe {
                                     .withType(null)
                                     .withPrefix(ident.getPrefix()));
                         } else {
-                            ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
+                            if (hasNoConflictingImport(sf)) {
+                                ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
+                            } else {
+                                ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getFullyQualifiedName());
+                            }
                         }
                     } else if (targetType instanceof JavaType.Primitive) {
                         ident = ident.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
@@ -316,9 +319,8 @@ public class ChangeType extends Recipe {
                 }
 
                 // Recreate any static imports as needed
-                JavaSourceFile cu = getCursor().firstEnclosing(JavaSourceFile.class);
-                if (cu != null) {
-                    for (J.Import anImport : cu.getImports()) {
+                if (sf != null) {
+                    for (J.Import anImport : sf.getImports()) {
                         if (anImport.isStatic() && anImport.getQualid().getTarget().getType() != null) {
                             JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
                             if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
@@ -504,6 +506,24 @@ public class ChangeType extends Recipe {
 
         private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified;
+        }
+
+        private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf) {
+            JavaType.FullyQualified oldType = TypeUtils.asFullyQualified(originalType);
+            JavaType.FullyQualified newType = TypeUtils.asFullyQualified(targetType);
+            if (sf == null || oldType == null || newType == null) {
+                return true; // No way to be sure so we retain previous behaviour
+            }
+            for (J.Import anImport : sf.getImports()) {
+                JavaType.FullyQualified currType = TypeUtils.asFullyQualified(anImport.getQualid().getType());
+                if (currType != null &&
+                    !TypeUtils.isOfType(currType, oldType) &&
+                    !TypeUtils.isOfType(currType, newType) &&
+                    currType.getClassName().equals(newType.getClassName())) {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 
