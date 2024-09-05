@@ -1821,8 +1821,22 @@ class RemoveUnusedImportsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              import java.beans.BeanProperty;
-              record A(@BeanProperty String a) {}
+              package a;
+
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ ElementType.PARAMETER, ElementType.RECORD_COMPONENT })
+              public @interface A {}
+              """
+          ),
+          java(
+            """
+              package b;
+
+              import a.A;
+
+              record B(@A String a) {}
               """
           )
         );
