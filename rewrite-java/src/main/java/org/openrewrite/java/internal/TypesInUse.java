@@ -52,19 +52,19 @@ public class TypesInUse {
     }
 
     @Getter
-    public static class FindTypesInUse extends JavaIsoVisitor<JavaSourceFile> {
+    public static class FindTypesInUse extends JavaIsoVisitor<J> {
         private final Set<JavaType> types = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Method> declaredMethods = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Method> usedMethods = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Variable> variables = newSetFromMap(new IdentityHashMap<>());
 
         @Override
-        public J.Import visitImport(J.Import _import, JavaSourceFile cu) {
+        public J.Import visitImport(J.Import _import, J cu) {
             return _import;
         }
 
         @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, JavaSourceFile cu) {
+        public J.Identifier visitIdentifier(J.Identifier identifier, J cu) {
             Object parent = Objects.requireNonNull(getCursor().getParent()).getValue();
             if (parent instanceof J.ClassDeclaration) {
                 // skip type of class
@@ -77,7 +77,7 @@ public class TypesInUse {
         }
 
         @Override
-        public @Nullable JavaType visitType(@Nullable JavaType javaType, JavaSourceFile cu) {
+        public @Nullable JavaType visitType(@Nullable JavaType javaType, J cu) {
             if (javaType != null && !(javaType instanceof JavaType.Unknown)) {
                 Cursor cursor = getCursor();
                 if (javaType instanceof JavaType.Variable) {
@@ -92,10 +92,11 @@ public class TypesInUse {
                             ownerPackage = owner.getFullyQualifiedName();
                         }
 
+                        JavaSourceFile jsf = (JavaSourceFile) cu;
                         // If we're accessing a variable that has the static flag and is not owned by the
                         // CompilationUnit we are visiting we should add the owning class of the variable as a used type
                         if (jType.getFlags().contains(Flag.Static)
-                            && cu.getPackageDeclaration() != null && !ownerPackage.equals(cu.getPackageDeclaration().getPackageName())) {
+                            && jsf.getPackageDeclaration() != null && !ownerPackage.equals(jsf.getPackageDeclaration().getPackageName())) {
                             types.add(jType.getOwner());
                         }
                     }
