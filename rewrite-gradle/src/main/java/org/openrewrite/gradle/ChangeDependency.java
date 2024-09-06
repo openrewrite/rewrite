@@ -23,9 +23,9 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyMatchPredicate;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
@@ -180,7 +180,9 @@ public class ChangeDependency extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                if (!new DependencyMatchPredicate().test(getCursor())) {
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
+
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;
                 }
 

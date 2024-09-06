@@ -19,12 +19,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.mavenProject;
 
 class ChangeDependencyConfigurationTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi());
+    }
+
     @DocumentExample
     @Test
     void changeConfiguration() {
@@ -211,21 +220,55 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource(value = {"*:a", "*:*"}, delimiterString = ":")
+    @CsvSource(value = {"*:project2", "*:*"}, delimiterString = ":")
     void worksForProjectDependencies(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyConfiguration(group, artifact, "implementation", null)),
-          buildGradle(
-            """
-              dependencies {
-                  compile project(":a")
-              }
-              """,
-            """
-              dependencies {
-                  implementation project(":a")
-              }
+          mavenProject("root",
+            buildGradle(
+              ""
+            ),
+            settingsGradle(
               """
+                include "project1"
+                include "project2"
+                """
+            ),
+            mavenProject("project1",
+              buildGradle(
+                """
+                  plugins {
+                    id 'java-library'
+                  }
+                                
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      api project(":project2")
+                  }
+                      """,
+                """
+                  plugins {
+                    id 'java-library'
+                  }
+                                
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation project(":project2")
+                  }
+                  """
+              )
+            ),
+            mavenProject("project2",
+              buildGradle(
+                ""
+              )
+            )
           )
         );
     }
@@ -270,8 +313,7 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
     @Test
     void worksWithDependencyDefinedInJvmTestSuite() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyConfiguration("org.openrewrite", "*", "implementation", ""))
-            .beforeRecipe(withToolingApi()),
+          spec -> spec.recipe(new ChangeDependencyConfiguration("org.openrewrite", "*", "implementation", "")),
           buildGradle(
             """
               plugins {

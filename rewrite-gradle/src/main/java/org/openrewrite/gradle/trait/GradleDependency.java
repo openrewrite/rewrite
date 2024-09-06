@@ -72,7 +72,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return null;
                 }
 
-                GradleDependencyConfiguration configuration = gradleProject.getConfiguration(methodInvocation.getSimpleName());
+                GradleDependencyConfiguration configuration = getConfiguration(gradleProject, methodInvocation);
                 if (configuration == null) {
                     return null;
                 }
@@ -121,6 +121,15 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
 
             return null;
+        }
+
+        private static @org.jetbrains.annotations.Nullable GradleDependencyConfiguration getConfiguration(GradleProject gradleProject, J.MethodInvocation methodInvocation) {
+            String methodName = methodInvocation.getSimpleName();
+            if (methodName.equals("classpath")) {
+                return gradleProject.getBuildscript().getConfiguration(methodName);
+            } else {
+                return gradleProject.getConfiguration(methodName);
+            }
         }
 
         private boolean withinDependenciesBlock(Cursor cursor) {

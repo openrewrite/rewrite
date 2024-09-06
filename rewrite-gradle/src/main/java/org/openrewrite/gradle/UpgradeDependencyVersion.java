@@ -22,9 +22,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyMatchPredicate;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
@@ -148,7 +148,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
         J.MethodInvocation m = cursor.getValue();
 
-        if (new DependencyMatchPredicate().test(cursor)) {
+        GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
+
+        if (gradleDependencyMatcher.get(cursor).isPresent()) {
             return true;
         }
         // If it's a configuration created by a plugin, we may not be able to type-attribute it

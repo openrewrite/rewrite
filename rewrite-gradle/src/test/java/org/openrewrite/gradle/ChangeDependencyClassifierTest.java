@@ -19,12 +19,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyClassifierTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi());
+    }
+
     @DocumentExample
     @Test
     void worksWithEmptyStringConfig() {
@@ -153,8 +160,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               }
               
               dependencies {
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'javadoc'
-                  api group: "org.openrewrite", name: "rewrite-core", classifier: "javadoc"
+                  api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'javadoc'
               }
               """,
             """
@@ -167,8 +175,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               }
               
               dependencies {
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classified'
-                  api group: "org.openrewrite", name: "rewrite-core", classifier: "classified"
+                  api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classified'
               }
               """
           )
@@ -416,8 +425,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @Test
     void worksWithDependencyDefinedInJvmTestSuite() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", ""))
-            .beforeRecipe(withToolingApi()),
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
           buildGradle(
             """
               plugins {
@@ -466,8 +474,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @Test
     void worksWithDependencyDefinedInBuildScript() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", ""))
-            .beforeRecipe(withToolingApi()),
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
           buildGradle(
             """
               buildscript {

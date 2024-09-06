@@ -998,8 +998,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradesDependencyVersionDefinedInJvmTestSuite() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi()),
-
           buildGradle(
             """
               plugins {

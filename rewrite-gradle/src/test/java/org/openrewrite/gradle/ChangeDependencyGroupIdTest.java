@@ -21,6 +21,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +29,11 @@ import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyGroupIdTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi());
+    }
 
     @DocumentExample
     @Test
@@ -69,8 +75,7 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void findDependency(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupId(group, artifact, "org.dewrite", null))
-            .beforeRecipe(withToolingApi()),
+          spec -> spec.recipe(new ChangeDependencyGroupId(group, artifact, "org.dewrite", null)),
           buildGradle(
             """
               plugins {
@@ -353,8 +358,7 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
     @Test
     void worksWithDependencyDefinedInJvmTestSuite() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupId("org.springframework.boot", "spring-boot-starter", "org.newboot", ""))
-            .beforeRecipe(withToolingApi()),
+          spec -> spec.recipe(new ChangeDependencyGroupId("org.springframework.boot", "spring-boot-starter", "org.newboot", "")),
           buildGradle(
             """
               plugins {
@@ -403,8 +407,7 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
     @Test
     void worksWithDependencyDefinedInBuildScript() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupId("org.springframework.boot", "spring-boot-starter", "org.newboot", ""))
-            .beforeRecipe(withToolingApi()),
+          spec -> spec.recipe(new ChangeDependencyGroupId("org.springframework.boot", "spring-boot-starter", "org.newboot", "")),
           buildGradle(
             """
               buildscript {

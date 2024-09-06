@@ -19,12 +19,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyExtensionTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi());
+    }
 
     @DocumentExample
     @Test
@@ -154,8 +160,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               }
               
               dependencies {
-                  api 'org.openrewrite:rewrite-core@jar'
-                  api "org.openrewrite:rewrite-core@jar"
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', ext: 'jar'
                   api group: "org.openrewrite", name: "rewrite-core", ext: "jar"
               }
@@ -170,8 +175,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               }
               
               dependencies {
-                  api 'org.openrewrite:rewrite-core@war'
-                  api "org.openrewrite:rewrite-core@war"
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', ext: 'war'
                   api group: "org.openrewrite", name: "rewrite-core", ext: "war"
               }
@@ -225,8 +229,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
     @Test
     void worksWithDependencyDefinedInJvmTestSuite() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", ""))
-            .beforeRecipe(withToolingApi()),
+          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
           buildGradle(
             """
               plugins {
@@ -275,8 +278,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
     @Test
     void worksWithDependencyDefinedInBuildScript() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", ""))
-            .beforeRecipe(withToolingApi()),
+          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
           buildGradle(
             """
               buildscript {

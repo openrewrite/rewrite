@@ -28,7 +28,9 @@ class DependencyUseMapNotationTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new DependencyUseMapNotation());
+
+        spec.beforeRecipe(withToolingApi())
+          .recipe(new DependencyUseMapNotation());
     }
 
     @DocumentExample
@@ -47,7 +49,7 @@ class DependencyUseMapNotationTest implements RewriteTest {
               
               dependencies {
                   api('org.openrewrite:rewrite-core:latest.release')
-                  implementation "group:artifact:version"
+                  implementation "org.openrewrite:rewrite-core:latest.release"
               }
               """,
             """
@@ -61,7 +63,7 @@ class DependencyUseMapNotationTest implements RewriteTest {
               
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
-                  implementation group: 'group', name: 'artifact', version: 'version'
+                  implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
               }
               """
           )
@@ -84,7 +86,7 @@ class DependencyUseMapNotationTest implements RewriteTest {
               def version = "latest.release"
               dependencies {
                   api("org.openrewrite:rewrite-core:$version")
-                  implementation "group:artifact:$version"
+                  implementation "org.openrewrite:rewrite-gradle:$version"
               }
               """,
             """
@@ -99,7 +101,7 @@ class DependencyUseMapNotationTest implements RewriteTest {
               def version = "latest.release"
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: version)
-                  implementation group: 'group', name: 'artifact', version: version
+                  implementation group: 'org.openrewrite', name: 'rewrite-gradle', version: version
               }
               """
           )
@@ -121,10 +123,10 @@ class DependencyUseMapNotationTest implements RewriteTest {
               
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release") {
-                      exclude group: "group", module: "artifact"
+                      exclude group: "org.openrewrite", module: "rewrite-gradle"
                   }
-                  implementation "group:artifact:version", {
-                      exclude group: "group2", module: "artifact2"
+                  implementation "org.openrewrite:rewrite-gradle:latest.release", {
+                      exclude group: "org.openrewrite", module: "rewrite-core"
                   }
               }
               """,
@@ -139,10 +141,10 @@ class DependencyUseMapNotationTest implements RewriteTest {
               
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release') {
-                      exclude group: "group", module: "artifact"
+                      exclude group: "org.openrewrite", module: "rewrite-gradle"
                   }
-                  implementation group: 'group', name: 'artifact', version: 'version', {
-                      exclude group: "group2", module: "artifact2"
+                  implementation group: 'org.openrewrite', name: 'rewrite-gradle', version: 'latest.release', {
+                      exclude group: "org.openrewrite", module: "rewrite-core"
                   }
               }
               """
@@ -163,12 +165,13 @@ class DependencyUseMapNotationTest implements RewriteTest {
                   mavenCentral()
               }
               
+              def version = "latest.release"
               dependencies {
                   api("org.openrewrite:rewrite-core:$version") {
-                      exclude group: "group", module: "artifact"
+                      exclude group: "org.openrewrite", module: "rewrite-gradle"
                   }
-                  implementation "group:artifact:$version", {
-                      exclude group: "group2", module: "artifact2"
+                  implementation "org.openrewrite:rewrite-gradle:$version", {
+                      exclude group: "org.openrewrite", module: "rewrite-core"
                   }
               }
               """,
@@ -181,12 +184,13 @@ class DependencyUseMapNotationTest implements RewriteTest {
                   mavenCentral()
               }
               
+              def version = "latest.release"
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: version) {
-                      exclude group: "group", module: "artifact"
+                      exclude group: "org.openrewrite", module: "rewrite-gradle"
                   }
-                  implementation group: 'group', name: 'artifact', version: version, {
-                      exclude group: "group2", module: "artifact2"
+                  implementation group: 'org.openrewrite', name: 'rewrite-gradle', version: version, {
+                      exclude group: "org.openrewrite", module: "rewrite-core"
                   }
               }
               """
@@ -209,7 +213,8 @@ class DependencyUseMapNotationTest implements RewriteTest {
               }
 
               dependencies {
-                implementation "org.openrewrite:rewrite-core"
+                implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
+                implementation "org.openrewrite.recipe:rewrite-logging-frameworks"
               }
               """,
             """
@@ -222,7 +227,8 @@ class DependencyUseMapNotationTest implements RewriteTest {
               }
 
               dependencies {
-                implementation group: 'org.openrewrite', name: 'rewrite-core'
+                implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
+                implementation group: 'org.openrewrite.recipe', name: 'rewrite-logging-frameworks'
               }
               """
           )
@@ -266,8 +272,6 @@ class DependencyUseMapNotationTest implements RewriteTest {
     @Test
     void worksWithDependencyDefinedInJvmTestSuite() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi()),
-
           buildGradle(
             """
               plugins {
@@ -316,7 +320,6 @@ class DependencyUseMapNotationTest implements RewriteTest {
     @Test
     void worksWithDependencyDefinedInBuildScript() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               buildscript {
