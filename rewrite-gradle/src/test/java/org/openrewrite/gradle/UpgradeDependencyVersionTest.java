@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 
@@ -636,7 +637,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   repositories {
                       mavenCentral()
                   }
-              
+                  
+                  apply plugin: "java-library"
+                  
                   dependencies {
                     implementation ("com.google.guava:guava:$guavaVersion")
                   }
@@ -644,9 +647,20 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """,
             spec -> spec.path("build.gradle")
           ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              include("moduleA")
+              """
+          ),
           buildGradle(
             """
-              dependencies {
+              plugins {
+                id 'java-library'
+              }
+                            
+              repositories {
+                  mavenCentral()
               }
               """,
             spec -> spec.path("moduleA/build.gradle")

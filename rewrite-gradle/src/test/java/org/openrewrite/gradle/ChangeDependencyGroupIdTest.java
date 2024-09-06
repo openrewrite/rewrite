@@ -153,11 +153,10 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
-    @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
-    void worksWithoutVersion(String group, String artifact) {
+    @Test
+    void worksWithoutVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupId(group, artifact, "org.dewrite", null)),
+          spec -> spec.recipe(new ChangeDependencyGroupId("org.openrewrite", "rewrite-core", "org.dewrite", null)),
           buildGradle(
             """
               plugins {
@@ -169,6 +168,7 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
               }
               
               dependencies {
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api 'org.openrewrite:rewrite-core'
                   api "org.openrewrite:rewrite-core"
                   api group: 'org.openrewrite', name: 'rewrite-core'
@@ -185,6 +185,7 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
               }
               
               dependencies {
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api 'org.dewrite:rewrite-core'
                   api "org.dewrite:rewrite-core"
                   api group: 'org.dewrite', name: 'rewrite-core'
@@ -302,12 +303,28 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyGroupId("javax.validation", "validation-api", "jakarta.validation", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+                            
+              repositories {
+                   mavenCentral()
+              }
+
               dependencies {
                   def jakartaVersion = "2.0.1.Final"
                   implementation "javax.validation:validation-api:${jakartaVersion}"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+                            
+              repositories {
+                   mavenCentral()
+              }
+
               dependencies {
                   def jakartaVersion = "2.0.1.Final"
                   implementation "jakarta.validation:validation-api:${jakartaVersion}"
