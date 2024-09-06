@@ -994,4 +994,46 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.17.2", null)),
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("com.fasterxml.jackson.core:jackson-databind:2.15.2")
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
 }
