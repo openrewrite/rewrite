@@ -22,6 +22,7 @@ import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
 import static java.util.Collections.emptySet;
@@ -1380,22 +1381,24 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import java.util.*;
 
               import static java.util.Collections.emptyList;
+              import static java.util.Collections.singletonList;
 
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = new HashSet<>();
-                 List<String> l = singletonList("a","b","c");
+                 List<String> l = singletonList("a");
               }
               """,
             """
               import java.util.*;
 
               import static java.util.Collections.emptyList;
+              import static java.util.Collections.singletonList;
 
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = new HashSet<>();
-                 List<String> l = singletonList("a","b","c");
+                 List<String> l = singletonList("a");
               }
               """
           )
@@ -1449,7 +1452,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
-                 List<String> l = singletonList("c","b","a");
+                 List<String> l = singletonList("c");
                  Iterator<Short> i = emptyIterator();
               }
               """,
@@ -1461,7 +1464,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
-                 List<String> l = singletonList("c","b","a");
+                 List<String> l = singletonList("c");
                  Iterator<Short> i = emptyIterator();
               }
               """
@@ -1822,34 +1825,75 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package org.a;
-              public class ABC {
+              public class Abc {
                 public static String A = "A";
                 public static String B = "B";
                 public static String C = "C";
                 public static String ALL = "%s%s%s".formatted(A, B, C);
               }
-              """
+              """,
+            SourceSpec::skip
           ),
           java(
             """
               package org.b;
-              public class DEF {
+              public class Def {
                 public static String D = "D";
                 public static String E = "E";
                 public static String F = "F";
                 public static String ALL = "%s%s%s".formatted(D, E, F);
               }
-              """
+              """,
+            SourceSpec::skip
           ),
+          // No change when removal would cause ambiguity
           java(
             """
               package org.test;
 
-              import static org.a.ABC.*;
-              import static org.b.DEF.*;
-              import static org.a.ABC.ALL;
+              import static org.a.Abc.*;
+              import static org.a.Abc.ALL;
+              import static org.b.Def.*;
 
-              public class Test {
+              public class Foo {
+                private String abc = ALL;
+                private String a = A;
+                private String b = B;
+                private String c = C;
+                private String d = D;
+                private String e = E;
+                private String f = F;
+              }
+              """
+          ),
+          // Do still remove unambiguous imports
+          java(
+            """
+              package org.test;
+
+              import static org.a.Abc.*;
+              import static org.a.Abc.A;
+              import static org.a.Abc.ALL;
+              import static org.b.Def.*;
+
+              public class Bar {
+                private String abc = ALL;
+                private String a = A;
+                private String b = B;
+                private String c = C;
+                private String d = D;
+                private String e = E;
+                private String f = F;
+              }
+              """,
+            """
+              package org.test;
+
+              import static org.a.Abc.*;
+              import static org.a.Abc.ALL;
+              import static org.b.Def.*;
+
+              public class Bar {
                 private String abc = ALL;
                 private String a = A;
                 private String b = B;
@@ -1862,5 +1906,4 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
-
 }

@@ -21,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -43,7 +42,7 @@ public class TypesInUse {
 
     public static TypesInUse build(JavaSourceFile cu) {
         FindTypesInUse findTypesInUse = new FindTypesInUse();
-        findTypesInUse.visit(cu, cu);
+        findTypesInUse.visit(cu, 0);
         return new TypesInUse(cu,
                 findTypesInUse.getTypes(),
                 findTypesInUse.getDeclaredMethods(),
@@ -52,19 +51,19 @@ public class TypesInUse {
     }
 
     @Getter
-    public static class FindTypesInUse extends JavaIsoVisitor<J> {
+    public static class FindTypesInUse extends JavaIsoVisitor<Integer> {
         private final Set<JavaType> types = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Method> declaredMethods = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Method> usedMethods = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Variable> variables = newSetFromMap(new IdentityHashMap<>());
 
         @Override
-        public J.Import visitImport(J.Import _import, J cu) {
+        public J.Import visitImport(J.Import _import, Integer p) {
             return _import;
         }
 
         @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, J cu) {
+        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
             Object parent = Objects.requireNonNull(getCursor().getParent()).getValue();
             if (parent instanceof J.ClassDeclaration) {
                 // skip type of class
@@ -73,33 +72,15 @@ public class TypesInUse {
                 // skip method name
                 return identifier;
             }
-            return super.visitIdentifier(identifier, cu);
+            return super.visitIdentifier(identifier, p);
         }
 
         @Override
-        public @Nullable JavaType visitType(@Nullable JavaType javaType, J cu) {
+        public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer p) {
             if (javaType != null && !(javaType instanceof JavaType.Unknown)) {
                 Cursor cursor = getCursor();
                 if (javaType instanceof JavaType.Variable) {
-                    JavaType.Variable jType = (JavaType.Variable) javaType;
-                    variables.add(jType);
-                    if (jType.getOwner() != null && jType.getOwner() instanceof JavaType.Class) {
-                        JavaType.Class owner = (JavaType.Class) jType.getOwner();
-                        String ownerPackage;
-                        if (owner.getFullyQualifiedName().contains(".")) {
-                            ownerPackage = owner.getFullyQualifiedName().substring(0, owner.getFullyQualifiedName().lastIndexOf("."));
-                        } else {
-                            ownerPackage = owner.getFullyQualifiedName();
-                        }
-
-                        JavaSourceFile jsf = (JavaSourceFile) cu;
-                        // If we're accessing a variable that has the static flag and is not owned by the
-                        // CompilationUnit we are visiting we should add the owning class of the variable as a used type
-                        if (jType.getFlags().contains(Flag.Static)
-                            && jsf.getPackageDeclaration() != null && !ownerPackage.equals(jsf.getPackageDeclaration().getPackageName())) {
-                            types.add(jType.getOwner());
-                        }
-                    }
+                    variables.add((JavaType.Variable) javaType);
                 } else if (javaType instanceof JavaType.Method) {
                     if (cursor.getValue() instanceof J.MethodDeclaration) {
                         declaredMethods.add((JavaType.Method) javaType);
