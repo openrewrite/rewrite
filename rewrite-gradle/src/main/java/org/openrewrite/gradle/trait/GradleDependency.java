@@ -30,6 +30,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.trait.Trait;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -79,7 +80,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
                 org.openrewrite.gradle.util.Dependency dependency = null;
                 Expression argument = methodInvocation.getArguments().get(0);
-                if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry) {
+                if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral) {
                     dependency = parseDependency(methodInvocation.getArguments());
                 } else if (argument instanceof J.MethodInvocation &&
                         (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
@@ -157,39 +158,49 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
                     return DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
                 }
+            } else if (argument instanceof G.MapLiteral) {
+                List<Expression> mapEntryExpressions = ((G.MapLiteral) argument).getElements()
+                        .stream()
+                        .map(e -> (Expression) e)
+                        .collect(Collectors.toList());
+                return getMapEntriesDependency(mapEntryExpressions);
             } else if (argument instanceof G.MapEntry) {
-                String group = null;
-                String artifact = null;
-
-                for (Expression e : arguments) {
-                    if (!(e instanceof G.MapEntry)) {
-                        continue;
-                    }
-                    G.MapEntry arg = (G.MapEntry) e;
-                    if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                        continue;
-                    }
-                    J.Literal key = (J.Literal) arg.getKey();
-                    J.Literal value = (J.Literal) arg.getValue();
-                    if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                        continue;
-                    }
-                    String keyValue = (String) key.getValue();
-                    if ("group".equals(keyValue)) {
-                        group = (String) value.getValue();
-                    } else if ("name".equals(keyValue)) {
-                        artifact = (String) value.getValue();
-                    }
-                }
-
-                if (group == null || artifact == null) {
-                    return null;
-                }
-
-                return new org.openrewrite.gradle.util.Dependency(group, artifact, null, null, null);
+                return getMapEntriesDependency(arguments);
             }
 
             return null;
+        }
+
+        private static org.openrewrite.gradle.util.@org.jetbrains.annotations.Nullable Dependency getMapEntriesDependency(List<Expression> arguments) {
+            String group = null;
+            String artifact = null;
+
+            for (Expression e : arguments) {
+                if (!(e instanceof G.MapEntry)) {
+                    continue;
+                }
+                G.MapEntry arg = (G.MapEntry) e;
+                if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
+                    continue;
+                }
+                J.Literal key = (J.Literal) arg.getKey();
+                J.Literal value = (J.Literal) arg.getValue();
+                if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+                    continue;
+                }
+                String keyValue = (String) key.getValue();
+                if ("group".equals(keyValue)) {
+                    group = (String) value.getValue();
+                } else if ("name".equals(keyValue)) {
+                    artifact = (String) value.getValue();
+                }
+            }
+
+            if (group == null || artifact == null) {
+                return null;
+            }
+
+            return new org.openrewrite.gradle.util.Dependency(group, artifact, null, null, null);
         }
     }
 }
