@@ -25,6 +25,7 @@ import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
@@ -93,9 +94,10 @@ public class ChangeDependencyConfiguration extends Recipe {
 
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
-                if (!gradleDependencyMatcher.get(getCursor()).isPresent() || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
+                if ((!gradleDependencyMatcher.get(getCursor()).isPresent() || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) && !methodSignatureMatches(m)) {
                     return m;
                 }
+
 
                 DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
                 List<Expression> args = m.getArguments();
@@ -174,5 +176,9 @@ public class ChangeDependencyConfiguration extends Recipe {
                 return m.withName(m.getName().withSimpleName(newConfiguration));
             }
         });
+    }
+
+    private static boolean methodSignatureMatches(J.MethodInvocation methodInvocation) {
+        return new MethodMatcher("DependencyHandlerSpec *(..)").matches(methodInvocation);
     }
 }

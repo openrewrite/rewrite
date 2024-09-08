@@ -151,7 +151,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
-        if (gradleDependencyMatcher.get(cursor).isPresent()) {
+        if (gradleDependencyMatcher.get(cursor).isPresent() || methodSignatureMatches(m)) {
             return true;
         }
         // If it's a configuration created by a plugin, we may not be able to type-attribute it
@@ -174,6 +174,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             cursor = cursor.getParent();
         }
         return false;
+    }
+
+    private static boolean methodSignatureMatches(J.MethodInvocation methodInvocation) {
+        return new MethodMatcher("DependencyHandlerSpec *(..)").matches(methodInvocation);
     }
 
     @Override
