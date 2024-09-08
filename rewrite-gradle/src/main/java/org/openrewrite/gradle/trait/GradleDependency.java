@@ -124,7 +124,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return null;
         }
 
-        private static @org.jetbrains.annotations.Nullable GradleDependencyConfiguration getConfiguration(GradleProject gradleProject, J.MethodInvocation methodInvocation) {
+        private static @Nullable GradleDependencyConfiguration getConfiguration(GradleProject gradleProject, J.MethodInvocation methodInvocation) {
             String methodName = methodInvocation.getSimpleName();
             if (methodName.equals("classpath")) {
                 return gradleProject.getBuildscript().getConfiguration(methodName);
@@ -171,7 +171,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return null;
         }
 
-        private static org.openrewrite.gradle.util.@org.jetbrains.annotations.Nullable Dependency getMapEntriesDependency(List<Expression> arguments) {
+        private static org.openrewrite.gradle.util.@Nullable Dependency getMapEntriesDependency(List<Expression> arguments) {
             String group = null;
             String artifact = null;
 
