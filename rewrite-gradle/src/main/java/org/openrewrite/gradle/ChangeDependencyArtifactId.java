@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
@@ -112,7 +113,10 @@ public class ChangeDependencyArtifactId extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!dependencyDsl.matches(m) || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
+
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
+                
+                if (!((gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m)) && (StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration)))) {
                     return m;
                 }
 
