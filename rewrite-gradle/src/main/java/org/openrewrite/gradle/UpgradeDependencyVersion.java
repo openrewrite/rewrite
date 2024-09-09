@@ -372,8 +372,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @RequiredArgsConstructor
     private class UpdateGroovy extends GroovyVisitor<ExecutionContext> {
         final DependencyVersionState acc;
+
         @Nullable
         GradleProject gradleProject;
+
         final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
 
         @Override
