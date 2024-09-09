@@ -1907,6 +1907,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3283")
     @Test
     void nestedImport() {
         rewriteRun(
@@ -1947,6 +1948,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3283")
     @Test
     void nestedImportStaticInnerClass() {
         rewriteRun(
