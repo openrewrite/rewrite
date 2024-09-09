@@ -369,7 +369,7 @@ class DependencyUseMapNotationTest implements RewriteTest {
                   }
               }
               dependencies {
-                  implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
+                  implementation(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
               }
               """,
             spec -> spec.path("dependencies.gradle")

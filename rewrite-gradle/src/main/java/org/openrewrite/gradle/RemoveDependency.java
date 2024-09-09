@@ -90,7 +90,8 @@ public class RemoveDependency extends Recipe {
 
                 Optional<GradleProject> maybeGp = g.getMarkers().findFirst(GradleProject.class);
                 if (!maybeGp.isPresent()) {
-                    return cu;
+                    // Allow modification of freestanding scripts which do not carry a GradleProject marker
+                    return g;
                 }
 
                 GradleProject gp = maybeGp.get();
@@ -138,7 +139,7 @@ public class RemoveDependency extends Recipe {
 
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
-                if (gradleDependencyMatcher.get(getCursor()).isPresent() && (StringUtils.isEmpty(configuration) || configuration.equals(m.getSimpleName()))) {
+                if ((gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m)) && (StringUtils.isEmpty(configuration) || configuration.equals(m.getSimpleName()))) {
                     Expression firstArgument = m.getArguments().get(0);
                     if (firstArgument instanceof J.Literal || firstArgument instanceof G.GString || firstArgument instanceof G.MapEntry) {
                         //noinspection DataFlowIssue
