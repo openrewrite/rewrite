@@ -432,11 +432,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+              
               repositories {
                   mavenCentral()
               }
-                  
+              
               testing {
                   suites {
                       test {
@@ -452,11 +452,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+              
               repositories {
                   mavenCentral()
               }
-                  
+              
               testing {
                   suites {
                       test {
@@ -495,6 +495,48 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                       classpath 'org.openrewrite:rewrite-gradle:latest.release:classified'
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-gradle:latest.release:javadoc")
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-gradle:latest.release:classified")
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
               """
           )
         );

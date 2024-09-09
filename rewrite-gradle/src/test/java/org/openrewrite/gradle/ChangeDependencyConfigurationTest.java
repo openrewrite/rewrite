@@ -320,11 +320,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+              
               repositories {
                   mavenCentral()
               }
-                  
+              
               testing {
                   suites {
                       test {
@@ -340,11 +340,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+              
               repositories {
                   mavenCentral()
               }
-                  
+              
               testing {
                   suites {
                       test {
@@ -354,6 +354,48 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                       }
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyConfiguration("org.openrewrite", "*", "implementation", "")),
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  runtimeOnly 'org.openrewrite:rewrite-gradle:latest.release'
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-gradle:latest.release'
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
               """
           )
         );

@@ -23,6 +23,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.Dependency;
@@ -43,17 +44,25 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
     public static class Matcher extends GradleTraitMatcher<GradleDependency> {
         @Nullable
+        protected String configuration;
+
+        @Nullable
         protected String groupId;
 
         @Nullable
         protected String artifactId;
 
-        public Matcher groupId(String groupId) {
+        public Matcher configuration(@Nullable String configuration) {
+            this.configuration = configuration;
+            return this;
+        }
+
+        public Matcher groupId(@Nullable String groupId) {
             this.groupId = groupId;
             return this;
         }
 
-        public Matcher artifactId(String artifactId) {
+        public Matcher artifactId(@Nullable String artifactId) {
             this.artifactId = artifactId;
             return this;
         }
@@ -64,17 +73,21 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             if (object instanceof J.MethodInvocation) {
                 J.MethodInvocation methodInvocation = (J.MethodInvocation) object;
 
+                if (!withinDependenciesBlock(cursor)) {
+                    return null;
+                }
+
                 GradleProject gradleProject = getGradleProject(cursor);
                 if (gradleProject == null) {
                     return null;
                 }
 
-                if (!withinDependenciesBlock(cursor)) {
+                GradleDependencyConfiguration gdc = getConfiguration(gradleProject, methodInvocation);
+                if (gdc == null) {
                     return null;
                 }
 
-                GradleDependencyConfiguration configuration = getConfiguration(gradleProject, methodInvocation);
-                if (configuration == null) {
+                if (!(StringUtils.isBlank(configuration) || methodInvocation.getSimpleName().equals(configuration))) {
                     return null;
                 }
 
@@ -92,8 +105,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return null;
                 }
 
-                if (configuration.isCanBeResolved()) {
-                    for (ResolvedDependency resolvedDependency : configuration.getResolved()) {
+                if (gdc.isCanBeResolved()) {
+                    for (ResolvedDependency resolvedDependency : gdc.getResolved()) {
                         if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
                                 (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
                             Dependency req = resolvedDependency.getRequested();
@@ -104,7 +117,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         }
                     }
                 } else {
-                    for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(configuration, true)) {
+                    for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
                         if (transitiveConfiguration.isCanBeResolved()) {
                             for (ResolvedDependency resolvedDependency : transitiveConfiguration.getResolved()) {
                                 if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&

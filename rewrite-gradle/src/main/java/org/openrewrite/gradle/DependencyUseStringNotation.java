@@ -23,6 +23,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -49,13 +50,15 @@ public class DependencyUseStringNotation extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+            final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
+
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
-                
-                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
+
+                if (!(gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m))) {
                     return m;
                 }
 

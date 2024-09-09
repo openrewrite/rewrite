@@ -822,6 +822,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   id 'java'
                   id "org.hidetake.swagger.generator" version "2.18.2"
               }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   swaggerCodegen "org.openapitools:openapi-generator-cli:5.2.0"
               }
@@ -831,6 +836,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   id 'java'
                   id "org.hidetake.swagger.generator" version "2.18.2"
               }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   swaggerCodegen "org.openapitools:openapi-generator-cli:5.2.1"
               }

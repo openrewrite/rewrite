@@ -27,6 +27,7 @@ import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.semver.DependencyMatcher;
@@ -87,13 +88,14 @@ public class ChangeDependencyClassifier extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
+            final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
-                
-                if (!gradleDependencyMatcher.get(getCursor()).isPresent() || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
+
+                if (!((gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m)) && (StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration)))) {
                     return m;
                 }
 

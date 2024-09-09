@@ -116,7 +116,7 @@ public class ChangeDependencyArtifactId extends Recipe {
 
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
                 
-                if (!gradleDependencyMatcher.get(getCursor()).isPresent() || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
+                if (!((gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m)) && (StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration)))) {
                     return m;
                 }
 

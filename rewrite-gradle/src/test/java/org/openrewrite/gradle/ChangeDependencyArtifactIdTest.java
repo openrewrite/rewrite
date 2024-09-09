@@ -382,11 +382,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+              
               repositories {
                   mavenCentral()
               }
-                  
+              
               testing {
                   suites {
                       test {
@@ -402,11 +402,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+              
               repositories {
                   mavenCentral()
               }
-                  
+              
               testing {
                   suites {
                       test {
@@ -445,6 +445,48 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
                       classpath 'org.springframework.boot:new-starter:2.5.4'
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyArtifactId("org.springframework.boot", "spring-boot-starter", "new-starter", null)),
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter:2.5.4")
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.springframework.boot:new-starter:2.5.4")
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
               """
           )
         );

@@ -29,6 +29,7 @@ import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -91,6 +92,7 @@ public class ChangeDependencyGroupId extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
+            final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             final Map<GroupArtifact, GroupArtifact> updatedDependencies = new HashMap<>();
 
@@ -113,8 +115,8 @@ public class ChangeDependencyGroupId extends Recipe {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
-                
-                if (!gradleDependencyMatcher.get(getCursor()).isPresent() || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
+
+                if (!((gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m)) && (StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration)))) {
                     return m;
                 }
 

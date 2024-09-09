@@ -137,7 +137,7 @@ public class RemoveDependency extends Recipe {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
-                
+
                 if (gradleDependencyMatcher.get(getCursor()).isPresent() && (StringUtils.isEmpty(configuration) || configuration.equals(m.getSimpleName()))) {
                     Expression firstArgument = m.getArguments().get(0);
                     if (firstArgument instanceof J.Literal || firstArgument instanceof G.GString || firstArgument instanceof G.MapEntry) {
@@ -216,6 +216,4 @@ public class RemoveDependency extends Recipe {
             }
         });
     }
-
-
 }

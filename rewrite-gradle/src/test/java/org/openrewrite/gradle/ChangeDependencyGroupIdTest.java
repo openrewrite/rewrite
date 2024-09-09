@@ -449,4 +449,46 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupId("org.springframework.boot", "spring-boot-starter", "org.newboot", "")),
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter:2.5.4")
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.newboot:spring-boot-starter:2.5.4")
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
 }

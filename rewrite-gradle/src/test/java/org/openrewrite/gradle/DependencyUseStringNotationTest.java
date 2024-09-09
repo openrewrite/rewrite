@@ -357,4 +357,45 @@ class DependencyUseStringNotationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-core:latest.release")
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
 }

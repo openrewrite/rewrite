@@ -87,6 +87,7 @@ public class ChangeDependencyConfiguration extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+            final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -94,7 +95,7 @@ public class ChangeDependencyConfiguration extends Recipe {
 
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
-                if ((!gradleDependencyMatcher.get(getCursor()).isPresent() || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) && !methodSignatureMatches(m)) {
+                if (!((gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m)) && (StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration)))) {
                     return m;
                 }
 
@@ -176,9 +177,5 @@ public class ChangeDependencyConfiguration extends Recipe {
                 return m.withName(m.getName().withSimpleName(newConfiguration));
             }
         });
-    }
-
-    private static boolean methodSignatureMatches(J.MethodInvocation methodInvocation) {
-        return new MethodMatcher("DependencyHandlerSpec *(..)").matches(methodInvocation);
     }
 }

@@ -28,7 +28,6 @@ class DependencyUseMapNotationTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-
         spec.beforeRecipe(withToolingApi())
           .recipe(new DependencyUseMapNotation());
     }
@@ -340,6 +339,47 @@ class DependencyUseMapNotationTest implements RewriteTest {
                       classpath group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-core:latest.release")
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
               """
           )
         );
