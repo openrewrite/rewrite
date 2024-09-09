@@ -310,11 +310,14 @@ public interface JavaType {
         public abstract @Nullable FullyQualified getSupertype();
 
         /**
-         * @return The class name without package qualification. If an inner class, outer/inner classes are separated by '.'.
+         * @return The class name without package qualification.
+         * If an inner class, outer/inner classes are separated by '.'.
+         * If a static inner class, outer/inner classes are separated by '$'.
          */
         public String getClassName() {
             String fqn = getFullyQualifiedName();
             String className = fqn.substring(fqn.lastIndexOf('.') + 1);
+            className = className.substring(className.lastIndexOf('$') + 1);
             return TypeUtils.toFullyQualifiedName(className);
         }
 
