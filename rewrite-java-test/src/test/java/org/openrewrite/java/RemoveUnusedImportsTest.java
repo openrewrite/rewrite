@@ -1983,4 +1983,57 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void incompatibleType() {
+        rewriteRun(
+          java(
+            """
+              package com.a;
+
+              interface a {}
+
+              class AnImpl implements a {
+              }
+              """
+          ),
+          java(
+            """
+              package com.b;
+
+              interface b {}
+
+              public class AnImpl implements b {
+                  public AnImpl() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.c;
+
+              import com.b.AnImpl;
+
+              public class ImplProvider {
+                  static AnImpl getImpl(){
+                      return new AnImpl();
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.a;
+
+              import com.b.AnImpl;
+              import com.c.ImplProvider;
+
+              class CImpl {
+                 AnImpl impl = ImplProvider.getImpl();
+              }
+              """
+          )
+        );
+    }
 }
