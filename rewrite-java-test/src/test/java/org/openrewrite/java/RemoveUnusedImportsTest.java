@@ -1983,4 +1983,56 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void retainExplicitImportWhenConflictingClassInSamePackage() {
+        rewriteRun(
+          java(
+            """
+              package com.a;
+
+              class ConflictingClass {
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.b;
+
+              public class ConflictingClass {
+                  public ConflictingClass() {
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.c;
+
+              import com.b.ConflictingClass;
+
+              public class ImplProvider {
+                  static ConflictingClass getImpl(){
+                      return new ConflictingClass();
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.a;
+
+              import com.b.ConflictingClass;
+              import com.c.ImplProvider;
+
+              class CImpl {
+                  ConflictingClass impl = ImplProvider.getImpl();
+              }
+              """
+          )
+        );
+    }
 }
