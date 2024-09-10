@@ -236,7 +236,7 @@ public class RemoveUnusedImports extends Recipe {
 
                             changed = true;
                         } else {
-                            usedWildcardImports.add(((J.FieldAccess) elem.getQualid().getTarget()).toString());
+                            usedWildcardImports.add(elem.getQualid().getTarget().toString());
                         }
                     } else if (combinedTypes.stream().noneMatch(c -> {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
