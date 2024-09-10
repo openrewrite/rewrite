@@ -50,7 +50,7 @@ public class ReplaceAnnotation extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Replace Annotation";
+        return "Replace annotation";
     }
 
     @Override
