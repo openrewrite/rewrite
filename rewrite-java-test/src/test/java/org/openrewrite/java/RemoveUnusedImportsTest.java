@@ -2029,7 +2029,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import com.c.ImplProvider;
 
               class CImpl {
-                 ConflictingClass impl = ImplProvider.getImpl();
+                  ConflictingClass impl = ImplProvider.getImpl();
               }
               """
           )
