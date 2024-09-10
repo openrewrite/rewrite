@@ -17,9 +17,11 @@ package org.openrewrite.gradle.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.tree.MavenRepository;
 
@@ -27,19 +29,32 @@ import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static org.openrewrite.Tree.randomId;
+
 @Value
 @With
 @AllArgsConstructor(onConstructor_ = { @JsonCreator})
+@Builder
 public class GradleSettings implements Marker, Serializable {
-    UUID id;
+
+    @Builder.Default
+    UUID id = randomId();
 
     @Deprecated
     @Nullable
-    List<MavenRepository> pluginRepositories;
+    @Builder.Default
+    List<MavenRepository> pluginRepositories = emptyList();
 
-    List<GradlePluginDescriptor> plugins;
-    Map<String, FeaturePreview> featurePreviews;
-    GradleBuildscript buildscript;
+    @Builder.Default
+    List<GradlePluginDescriptor> plugins = emptyList();
+
+    @Builder.Default
+    Map<String, FeaturePreview> featurePreviews = emptyMap();
+
+    @Builder.Default
+    GradleBuildscript buildscript = GradleBuildscript.builder().build();
 
     // Backwards compatibility to ease convoluted release process with rewrite-gradle-tooling-model
     public GradleSettings(
@@ -72,6 +87,6 @@ public class GradleSettings implements Marker, Serializable {
         if (buildscript != null) {
             return buildscript.getMavenRepositories();
         }
-        return pluginRepositories == null ? Collections.emptyList() : pluginRepositories;
+        return pluginRepositories == null ? emptyList() : pluginRepositories;
     }
 }
