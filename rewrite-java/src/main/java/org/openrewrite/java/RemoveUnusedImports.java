@@ -226,7 +226,7 @@ public class RemoveUnusedImports extends Recipe {
                             // add each unfolded import
                             combinedTypes.stream().map(JavaType.FullyQualified::getClassName).sorted().distinct().forEach(type ->
                                     anImport.imports.add(new JRightPadded<>(elem
-                                            .withQualid(qualid.withName(name.withSimpleName(type)))
+                                            .withQualid(qualid.withName(name.withSimpleName(type.substring(type.lastIndexOf('.') + 1))))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
                             );
 

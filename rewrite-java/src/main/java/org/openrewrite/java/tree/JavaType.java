@@ -317,7 +317,6 @@ public interface JavaType {
         public String getClassName() {
             String fqn = getFullyQualifiedName();
             String className = fqn.substring(fqn.lastIndexOf('.') + 1);
-            className = className.substring(className.lastIndexOf('$') + 1);
             return TypeUtils.toFullyQualifiedName(className);
         }
 
