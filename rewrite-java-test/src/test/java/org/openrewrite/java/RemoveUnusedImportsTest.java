@@ -94,7 +94,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.Map.Entry;
-
+              
               public abstract class MyMapEntry<K, V> implements Entry<K, V> {
               }
               """
@@ -109,9 +109,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package java.util;
-
+              
               import java.util.Map.Entry;
-
+              
               public abstract class MyMapEntry<K, V> implements Entry<K, V> {
               }
               """
@@ -126,7 +126,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.time.DateTimeException;
-
+              
               class A {
                   /**
                    * @throws DateTimeException when ...
@@ -145,7 +145,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.Collection;
-
+              
               /** {@link List} */
               class A {
                   /** {@link Collection} */
@@ -190,13 +190,13 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.google.gson.annotations;
-
+              
               import java.lang.annotation.Documented;
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-
+              
               @Documented
               @Retention(RetentionPolicy.RUNTIME)
               @Target({ElementType.FIELD, ElementType.METHOD})
@@ -208,7 +208,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import com.google.gson.annotations.SerializedName;
-
+              
               public enum PKIState {
                   @SerializedName("active") ACTIVE,
                   @SerializedName("dismissed") DISMISSED
@@ -225,7 +225,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package org.openrewrite.test;
-
+              
               public @interface YesOrNo {
                   Status status();
                   enum Status {
@@ -237,9 +237,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package org.openrewrite.test;
-
+              
               import static org.openrewrite.test.YesOrNo.Status.YES;
-
+              
               @YesOrNo(status = YES)
               public class Foo {}
               """
@@ -265,7 +265,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                * header
                */
               package x;
-
+              
               class A {}
               """
           )
@@ -291,14 +291,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.*;
-
+              
               class A {
                   Collection<Integer> c;
               }
               """,
             """
               import java.util.Collection;
-
+              
               class A {
                   Collection<Integer> c;
               }
@@ -388,10 +388,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.time.DayOfWeek;
-
+              
               import static java.time.DayOfWeek.MONDAY;
               import static java.time.DayOfWeek.TUESDAY;
-
+              
               class WorkWeek {
                   DayOfWeek shortWeekStarts(){
                       return TUESDAY;
@@ -400,9 +400,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               import java.time.DayOfWeek;
-
+              
               import static java.time.DayOfWeek.TUESDAY;
-
+              
               class WorkWeek {
                   DayOfWeek shortWeekStarts(){
                       return TUESDAY;
@@ -421,14 +421,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import static java.util.Collections.emptyList;
               import static java.util.Collections.emptySet;
-
+              
               class A {
                  Object o = emptyList();
               }
               """,
             """
               import static java.util.Collections.emptyList;
-
+              
               class A {
                  Object o = emptyList();
               }
@@ -462,14 +462,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import static foo.B.STRING;
               import static foo.B.STRING2;
               import static foo.C.*;
-
+              
               public class A {
                   String a = STRING;
               }
               """,
             """
               import static foo.B.STRING;
-
+              
               public class A {
                   String a = STRING;
               }
@@ -495,7 +495,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               @Foo
               @Bar
               package foo.bar.baz;
-
+              
               import foo.Bar;
               import foo.Foo;
               import foo.FooAnnotation;
@@ -504,7 +504,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               @Foo
               @Bar
               package foo.bar.baz;
-
+              
               import foo.Bar;
               import foo.Foo;
               """
@@ -528,14 +528,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
               @Foo
               @Bar
               package foo.bar.baz;
-
+              
               import foo.*;
               """,
             """
               @Foo
               @Bar
               package foo.bar.baz;
-
+              
               import foo.Bar;
               import foo.Foo;
               """
@@ -586,7 +586,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package com.example.foo;
-
+              
               public class A {
               }
               """
@@ -601,10 +601,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.example.foo;
-
+              
               import java.util.List;
               import java.util.ArrayList;
-
+              
               public class A {
               // Intentionally misaligned to ensure formatting is not overzealous
               ArrayList<String> foo = new ArrayList<>();
@@ -612,9 +612,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package com.example.foo;
-
+              
               import java.util.ArrayList;
-
+              
               public class A {
               // Intentionally misaligned to ensure formatting is not overzealous
               ArrayList<String> foo = new ArrayList<>();
@@ -641,9 +641,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package foo.test;
-
+              
               import static org.openrewrite.Bar.Buz;
-
+              
               public class Test {
                   private void method() {
                       new Buz();
@@ -674,9 +674,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package foo.test;
-
+              
               import static org.openrewrite.Foo.*;
-
+              
               public class Test {
                   int var = FOO_CONSTANT;
                   private void method() {
@@ -709,9 +709,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package foo.test;
-
+              
               import static org.openrewrite.Foo.*;
-
+              
               public class Test {
                   int var = FOO_CONSTANT;
                   private void method() {
@@ -721,10 +721,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package foo.test;
-
+              
               import static org.openrewrite.Foo.FOO_CONSTANT;
               import static org.openrewrite.Foo.Bar;
-
+              
               public class Test {
                   int var = FOO_CONSTANT;
                   private void method() {
@@ -756,9 +756,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.*;
-
+              
               import static java.util.Collections.*;
-
+              
               class Test {
                   List<String> l = emptyList();
               }
@@ -787,9 +787,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.concurrent.*;
-
+              
               import static java.util.Collections.*;
-
+              
               class Test {
                   Object o = emptyMap();
                   ConcurrentHashMap<String, String> m;
@@ -797,9 +797,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               import java.util.concurrent.ConcurrentHashMap;
-
+              
               import static java.util.Collections.emptyMap;
-
+              
               class Test {
                   Object o = emptyMap();
                   ConcurrentHashMap<String, String> m;
@@ -829,9 +829,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.concurrent.*;
-
+              
               import static java.util.Collections.*;
-
+              
               class Test {
                   ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>(emptyMap());
               }
@@ -847,13 +847,13 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.google.gson.annotations;
-
+              
               import java.lang.annotation.Documented;
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-
+              
               @Documented
               @Retention(RetentionPolicy.RUNTIME)
               @Target({ElementType.FIELD, ElementType.METHOD})
@@ -865,9 +865,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.google.gson.annotations;
-
+              
               import com.google.gson.annotations.SerializedName;
-
+              
               public enum PKIState {
                   @SerializedName("active") ACTIVE,
                   @SerializedName("dismissed") DISMISSED
@@ -875,7 +875,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package com.google.gson.annotations;
-
+              
               public enum PKIState {
                   @SerializedName("active") ACTIVE,
                   @SerializedName("dismissed") DISMISSED
@@ -892,7 +892,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.source;
-
+              
               public class a {
                   public static final short SHORT1 = (short)1;
                   public static final short SHORT2 = (short)2;
@@ -902,19 +902,19 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.test;
-
+              
               import static com.source.a.SHORT1;
               import static com.source.a.SHORT2;
-
+              
               class Test {
                   short uniqueCount = SHORT1;
               }
               """,
             """
               package com.test;
-
+              
               import static com.source.a.SHORT1;
-
+              
               class Test {
                   short uniqueCount = SHORT1;
               }
@@ -930,7 +930,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.$;
-
+              
               public class A {
                   public static final short SHORT1 = (short)1;
                   public static final short SHORT2 = (short)2;
@@ -940,19 +940,19 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.test;
-
+              
               import static com.Source.$.A.SHORT1;
               import static com.Source.$.A.SHORT2;
-
+              
               class Test {
                   short uniqueCount = SHORT1;
               }
               """,
             """
               package com.test;
-
+              
               import static com.Source.$.A.SHORT1;
-
+              
               class Test {
                   short uniqueCount = SHORT1;
               }
@@ -968,12 +968,12 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.A;
-
+              
               public class B {
                 public enum Enums {
                     B1, B2
                 }
-
+              
                 public static void helloWorld() {
                     System.out.println("hello world!");
                 }
@@ -983,11 +983,11 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.test;
-
+              
               import static com.Source.A.B.Enums.B1;
               import static com.Source.A.B.Enums.B2;
               import static com.Source.A.B.helloWorld;
-
+              
               class Test {
                   public static void main(String[] args) {
                     var uniqueCount = B1;
@@ -997,10 +997,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package com.test;
-
+              
               import static com.Source.A.B.Enums.B1;
               import static com.Source.A.B.helloWorld;
-
+              
               class Test {
                   public static void main(String[] args) {
                     var uniqueCount = B1;
@@ -1019,18 +1019,18 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.A;
-
+              
               public class B {
                 public enum Enums {
                     B1, B2
                 }
-
+              
                 public static class C {
                     public enum Enums {
                         C1, C2
                     }
                 }
-
+              
                 public static void helloWorld() {
                     System.out.println("hello world!");
                 }
@@ -1040,13 +1040,13 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.test;
-
+              
               import static com.Source.A.B.Enums.B1;
               import static com.Source.A.B.Enums.B2;
               import static com.Source.A.B.C.Enums.C1;
               import static com.Source.A.B.C.Enums.C2;
               import static com.Source.A.B.helloWorld;
-
+              
               class Test {
                   public static void main(String[] args) {
                     var uniqueCount = B1;
@@ -1057,11 +1057,11 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package com.test;
-
+              
               import static com.Source.A.B.Enums.B1;
               import static com.Source.A.B.C.Enums.C1;
               import static com.Source.A.B.helloWorld;
-
+              
               class Test {
                   public static void main(String[] args) {
                     var uniqueCount = B1;
@@ -1081,10 +1081,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.mine;
-
+              
               public class A {
                   public static final short SHORT1 = (short)1;
-
+              
                   public short getShort1() {
                     return SHORT1;
                   }
@@ -1094,9 +1094,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.test;
-
+              
               import com.Source.mine.A;
-
+              
               class Test {
                   void f(A classA) {
                     classA.getShort1();
@@ -1114,10 +1114,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.$;
-
+              
               public class A {
                   public static final short SHORT1 = (short)1;
-
+              
                   public short getShort1() {
                     return SHORT1;
                   }
@@ -1127,9 +1127,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.test;
-
+              
               import com.Source.$.A;
-
+              
               class Test {
                   void f(A classA) {
                     classA.getShort1();
@@ -1148,7 +1148,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.mine;
-
+              
               public class A {
                   public void f() {}
               }
@@ -1157,7 +1157,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.mine;
-
+              
               public class B {
                   public void f() {}
               }
@@ -1166,7 +1166,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.mine;
-
+              
               public class C {
                   public void f() {}
               }
@@ -1175,7 +1175,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.mine;
-
+              
               public class Record {
                   public A theOne() { return new A(); }
                   public B theOther1() { return new B(); }
@@ -1186,10 +1186,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.test;
-
+              
               import com.Source.mine.Record;
               import com.Source.mine.*;
-
+              
               class Test {
                   void f(Record r) {
                     A a = r.theOne();
@@ -1200,12 +1200,12 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package com.test;
-
+              
               import com.Source.mine.Record;
               import com.Source.mine.A;
               import com.Source.mine.B;
               import com.Source.mine.C;
-
+              
               class Test {
                   void f(Record r) {
                     A a = r.theOne();
@@ -1226,7 +1226,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.mine;
-
+              
               public class A {
                   public void f() {}
               }
@@ -1235,7 +1235,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.mine;
-
+              
               public class B {
                   public void f() {}
               }
@@ -1244,7 +1244,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.mine;
-
+              
               public class C {
                   public void f() {}
               }
@@ -1253,7 +1253,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.Source.mine;
-
+              
               public class Record {
                   public A theOne() { return new A(); }
                   public B theOther1() { return new B(); }
@@ -1264,12 +1264,12 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package com.test;
-
+              
               import com.Source.mine.Record;
               import com.Source.mine.A;
               import com.Source.mine.B;
               import com.Source.mine.C;
-
+              
               class Test {
                   void f(Record r) {
                     A a = r.theOne();
@@ -1289,7 +1289,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.HashMap;
               import java.util.function.Function;
-
+              
               public class Test {
                   public static void foo(){
                       final HashMap<Integer,String> map = new HashMap<>();
@@ -1299,7 +1299,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               import java.util.HashMap;
-
+              
               public class Test {
                   public static void foo(){
                       final HashMap<Integer,String> map = new HashMap<>();
@@ -1319,7 +1319,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import java.util.HashMap;
               import java.util.ArrayList;
               import java.util.Set;
-
+              
               public class Test {
                   public static void foo(){
                       new ArrayList<>(new HashMap<Integer, String>().keySet());
@@ -1329,7 +1329,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.HashMap;
               import java.util.ArrayList;
-
+              
               public class Test {
                   public static void foo(){
                       new ArrayList<>(new HashMap<Integer, String>().keySet());
@@ -1347,19 +1347,19 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.Collection;
               import java.util.Collection;
-
+              
               import static java.util.Collections.emptyList;
               import static java.util.Collections.emptyList;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
               }
               """,
             """
               import java.util.Collection;
-
+              
               import static java.util.Collections.emptyList;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
               }
@@ -1379,10 +1379,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.*;
-
+              
               import static java.util.Collections.emptyList;
               import static java.util.Collections.singletonList;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = new HashSet<>();
@@ -1391,10 +1391,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               import java.util.*;
-
+              
               import static java.util.Collections.emptyList;
               import static java.util.Collections.singletonList;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = new HashSet<>();
@@ -1413,19 +1413,19 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.Collection;
-
+              
               import static java.util.Collections.*;
               import static java.util.Collections.emptyList;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
               }
               """,
             """
               import java.util.Collection;
-
+              
               import static java.util.Collections.emptyList;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
               }
@@ -1445,10 +1445,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.Set;
               import java.util.*;
-
+              
               import static java.util.Collections.emptyList;
               import static java.util.Collections.*;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
@@ -1458,9 +1458,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               import java.util.*;
-
+              
               import static java.util.Collections.*;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
@@ -1480,10 +1480,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.Set;
               import java.util.*;
-
+              
               import static java.util.Collections.emptyList;
               import static java.util.Collections.*;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
@@ -1492,10 +1492,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.Set;
               import java.util.Collection;
-
+              
               import static java.util.Collections.emptyList;
               import static java.util.Collections.emptySet;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
@@ -1512,9 +1512,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.Map.Entry;
-
+              
               import static java.util.Collections.*;
-
+              
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
@@ -1613,12 +1613,12 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package org.a;
-
+              
               import org.b.*;
               import org.b.Pair;
               import org.c.*;
               import org.c.Table;
-
+              
               class A {
                   void method() {
                       Pair<String, String > pair = new Pair<>();
@@ -1645,7 +1645,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
             """
               package pzrep.p1;
-
+              
               public class Record {
                 public A theOne() { return new A(); }
                 public B0 theOther0() { return new B0(); }
@@ -1661,67 +1661,67 @@ class RemoveUnusedImportsTest implements RewriteTest {
               }
               """, """
               package pzrep.p1;
-
+              
               public class A {
                 public void f() {}
               }
               """, """
               package pzrep.p1;
-
+              
               public class B0 {
                 public void f() {}
               }
               """, """
               package pzrep.p1;
-
+              
               public class B1 {
                 public void f() {}
               }
               """, """
               package pzrep.p1;
-
+              
               public class B2 {
                 public void f() {}
               }
               """, """
               package pzrep.p1;
-
+              
               public class B3 {
                 public void f() {}
               }
               """, """
               package pzrep.p1;
-
+              
               public class B4 {
                 public void f() {}
               }
               """, """
               package pzrep.p1;
-
+              
               public class B5 {
                 public void f() {}
               }
               """, """
               package pzrep.p1;
-
+              
               public class B6 {
                 public void f() {}
               }
               """, """
               package pzrep.p1;
-
+              
               public class B7 {
                 public void f() {}
               }
               """, """
               package pzrep.p1;
-
+              
               public class B8 {
                 public void f() {}
               }
               """, """
               package pzrep.p1;
-
+              
               public class B9 {
                 public void f() {}
               }
@@ -1730,10 +1730,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package pzrep.p2;
-
+              
               import pzrep.p1.Record;
               import pzrep.p1.*;
-
+              
               class Client2 {
                   void f(Record r) {
                     A a = r.theOne();
@@ -1783,7 +1783,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.List;
-
+              
               public abstract class Foo1 {
                   public abstract String m(String a);
               }
@@ -1799,7 +1799,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.GenClass1;
-
+              
               public abstract class Foo3 {
                   public abstract GenClass1 m();
               }
@@ -1809,7 +1809,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import java.util.GenClass1;
-
+              
               public abstract class Foo2 {
                   public abstract GenClass1 m(String a);
               }
@@ -1850,11 +1850,11 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package org.test;
-
+              
               import static org.a.Abc.*;
               import static org.a.Abc.ALL;
               import static org.b.Def.*;
-
+              
               public class Foo {
                 private String abc = ALL;
                 private String a = A;
@@ -1870,12 +1870,12 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package org.test;
-
+              
               import static org.a.Abc.*;
               import static org.a.Abc.A;
               import static org.a.Abc.ALL;
               import static org.b.Def.*;
-
+              
               public class Bar {
                 private String abc = ALL;
                 private String a = A;
@@ -1888,11 +1888,11 @@ class RemoveUnusedImportsTest implements RewriteTest {
               """,
             """
               package org.test;
-
+              
               import static org.a.Abc.*;
               import static org.a.Abc.ALL;
               import static org.b.Def.*;
-
+              
               public class Bar {
                 private String abc = ALL;
                 private String a = A;
@@ -1914,7 +1914,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package foo;
-
+              
               public interface J {
                   final class One implements J {}
                   final class Two implements J {}
@@ -1928,10 +1928,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package bar;
-
+              
               import foo.J;
               import foo.J.*;
-
+              
               class Quz {
                 void test() {
                   J j = null;
@@ -1991,23 +1991,21 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               package com.a;
 
-              interface a {}
-
-              class AnImpl implements a {
+              class AnImpl {
               }
-              """
+              """,
+            SourceSpec::skip
           ),
           java(
             """
               package com.b;
 
-              interface b {}
-
-              public class AnImpl implements b {
+              public class AnImpl {
                   public AnImpl() {
                   }
               }
-              """
+              """,
+            SourceSpec::skip
           ),
           java(
             """
@@ -2020,7 +2018,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
                       return new AnImpl();
                   }
               }
-              """
+              """,
+            SourceSpec::skip
           ),
           java(
             """
