@@ -33,7 +33,6 @@ import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.tree.ParseError;
 
-import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -152,10 +151,9 @@ public interface RewriteTest extends SourceSpecs {
 
         PrintOutputCapture<Integer> out = new PrintOutputCapture<>(0, markerPrinter);
 
-        Recipe recipe = testMethodSpec.recipe == null ? testClassSpec.recipe : testMethodSpec.recipe;
-        assertThat(recipe)
-                .as("A recipe must be specified")
-                .isNotNull();
+        Recipe recipe = testMethodSpec.recipe == null ?
+                testClassSpec.recipe == null ? Recipe.noop() : testClassSpec.recipe :
+                testMethodSpec.recipe;
 
         if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof AdHocScanningRecipe) &&
             !(recipe instanceof CompositeRecipe) && !(recipe.equals(Recipe.noop())) &&
