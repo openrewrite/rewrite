@@ -578,9 +578,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   repositories {
                       mavenCentral()
                   }
-                  
+              
                   apply plugin: "java-library"
-                  
+              
                   dependencies {
                     implementation ("com.google.guava:guava:$guavaVersion")
                   }
@@ -599,7 +599,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                 id 'java-library'
               }
-                            
+              
               repositories {
                   mavenCentral()
               }
@@ -969,11 +969,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+              
               repositories {
                   mavenCentral()
               }
-                  
+              
               testing {
                   suites {
                       test {
@@ -989,11 +989,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+              
               repositories {
                   mavenCentral()
               }
-                  
+              
               testing {
                   suites {
                       test {
@@ -1011,7 +1011,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void dependenciesBlockInFreestandingScript() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.17.2", null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.17.0-2.17.2", null)),
           buildGradle(
             """
               repositories {

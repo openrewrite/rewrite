@@ -21,7 +21,6 @@ import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Tree;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.tree.MavenRepository;
 
