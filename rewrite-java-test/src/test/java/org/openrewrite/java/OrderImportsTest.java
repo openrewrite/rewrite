@@ -22,6 +22,7 @@ import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -721,6 +722,40 @@ class OrderImportsTest implements RewriteTest {
                 JContainer<JavaType> myContainer = null;
                 Space mySpace = null;
                 JavaType.Variable myVariable = null;
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void testRecipe2() {
+        // language=java
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true)),
+          java(
+            """
+            package a;
+
+            public class A {
+                public final class B {}
+                public static class C {}
+            }
+            """,
+            SourceSpec::skip),
+          java(
+            """
+            import a.*;
+
+            public class Foo {
+                A method(A.B ab, A.C ac) {}
+            }
+            """,
+            """
+            import a.A;
+
+            public class Foo {
+                A method(A.B ab, A.C ac) {}
             }
             """
           )
