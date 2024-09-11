@@ -18,11 +18,16 @@ package org.openrewrite.maven;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.function.Consumer;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class Assertions {
     private Assertions() {
@@ -41,7 +46,7 @@ public class Assertions {
 
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", MavenParser.builder(), before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext);
+                Assertions::pomResolvedSuccessfully, Assertions::customizeExecutionContext);
         maven.path("pom.xml");
         spec.accept(maven);
         return maven;
@@ -55,10 +60,16 @@ public class Assertions {
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, @Language("xml") @Nullable String after,
                                Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", MavenParser.builder(), before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext).after(s -> after);
+               Assertions::pomResolvedSuccessfully, Assertions::customizeExecutionContext).after(s -> after);
         maven.path("pom.xml");
         spec.accept(maven);
         return maven;
     }
 
+    private static SourceFile pomResolvedSuccessfully(SourceFile sourceFile, TypeValidation typeValidation) {
+        sourceFile.getMarkers()
+                .findFirst(MavenResolutionResult.class)
+                .orElseThrow(() -> new IllegalStateException("No MavenResolutionResult found"));
+        return sourceFile;
+    }
 }
