@@ -1906,4 +1906,133 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3283")
+    @Test
+    void nestedImport() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+
+              public interface J {
+                  final class One implements J {}
+                  final class Two implements J {}
+                  final class Three implements J {}
+                  final class Four implements J {}
+                  final class Five implements J {}
+                  final class Six implements J {}
+              }
+              """
+          ),
+          java(
+            """
+              package bar;
+
+              import foo.J;
+              import foo.J.*;
+
+              class Quz {
+                void test() {
+                  J j = null;
+                  One one = null;
+                  Two two = null;
+                  Three three = null;
+                  Four four = null;
+                  Five five = null;
+                  Six six = null;
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3283")
+    @Test
+    void nestedImportStaticInnerClass() {
+        rewriteRun(
+          java(
+            """
+              package com.a.b.c;
+              public final class ParentBaseClass {
+                public static abstract class BaseImplClass {
+                   void foo() {
+                    }
+                }
+              }
+              """
+          ),
+          java(
+            """
+              import com.a.b.c.ParentBaseClass.*;
+              public class MyClass extends BaseImplClass {
+                 @Override
+                 public void foo() {
+                 }
+              }
+              """,
+            """
+              import com.a.b.c.ParentBaseClass.BaseImplClass;
+              public class MyClass extends BaseImplClass {
+                 @Override
+                 public void foo() {
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainExplicitImportWhenConflictingClassInSamePackage() {
+        rewriteRun(
+          java(
+            """
+              package com.a;
+
+              class ConflictingClass {
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.b;
+
+              public class ConflictingClass {
+                  public ConflictingClass() {
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.c;
+
+              import com.b.ConflictingClass;
+
+              public class ImplProvider {
+                  static ConflictingClass getImpl(){
+                      return new ConflictingClass();
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.a;
+
+              import com.b.ConflictingClass;
+              import com.c.ImplProvider;
+
+              class CImpl {
+                  ConflictingClass impl = ImplProvider.getImpl();
+              }
+              """
+          )
+        );
+    }
 }
