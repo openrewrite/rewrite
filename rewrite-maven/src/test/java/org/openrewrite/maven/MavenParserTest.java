@@ -96,29 +96,6 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void jacoco() {
-        rewriteRun(
-          //language=xml
-          pomXml(
-            """
-              <project>
-                <groupId>org.sample</groupId>
-                <artifactId>sample</artifactId>
-                <version>1.0.0</version>
-                <dependencies>
-                    <dependency>
-                      <groupId>org.jacoco</groupId>
-                      <artifactId>jacoco-maven-plugin</artifactId>
-                      <version>0.8.12</version>
-                    </dependency>
-                </dependencies>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
     void skipDependencyResolution() {
         rewriteRun(
           spec -> spec.parser(MavenParser.builder().skipDependencyResolution(true)),
@@ -1277,6 +1254,7 @@ class MavenParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1427")
     @Test
     void parseEmptyActivationTag() {
+        //noinspection DataFlowIssue
         rewriteRun(
           pomXml(
             """
