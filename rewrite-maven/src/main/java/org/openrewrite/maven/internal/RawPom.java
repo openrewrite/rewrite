@@ -91,6 +91,9 @@ public class RawPom {
     String description;
 
     @Nullable
+    Prerequisites prerequisites;
+
+    @Nullable
     String packaging;
 
     @Nullable
@@ -190,6 +193,14 @@ public class RawPom {
         public Licenses(@JacksonXmlProperty(localName = "license") List<License> licenses) {
             this.licenses = licenses;
         }
+    }
+
+    @Getter
+    public static class Prerequisites {
+
+        @JacksonXmlProperty(localName = "maven")
+        @Nullable
+        public String maven;
     }
 
     @Getter
@@ -371,6 +382,7 @@ public class RawPom {
                         null))
                 .name(name)
                 .obsoletePomVersion(pomVersion)
+                .prerequisites(prerequisites == null ? null : new org.openrewrite.maven.tree.Prerequisites(prerequisites.getMaven()))
                 .packaging(packaging)
                 .properties(getProperties() == null ? emptyMap() : getProperties())
                 .licenses(mapLicenses(getLicenses()))

@@ -301,6 +301,10 @@ public class ResolvedPom {
             case "project.parent.version":
             case "parent.version":
                 return requested.getParent() != null ? requested.getParent().getVersion() : null;
+            case "prerequisites.maven":
+            case "pom.prerequisites.maven":
+            case "project.prerequisites.maven":
+                return requested.getPrerequisites() == null ? null : requested.getPrerequisites().getMaven();
         }
 
         return System.getProperty(property);
