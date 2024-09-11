@@ -686,4 +686,44 @@ class OrderImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void testRecipe() {
+        // language=java
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true)),
+          java(
+            """
+            import org.openrewrite.java.tree.JContainer;
+            import org.openrewrite.java.tree.JLeftPadded;
+            import org.openrewrite.java.tree.JRightPadded;
+            import org.openrewrite.java.tree.JavaType;
+            import org.openrewrite.java.tree.JavaType.Variable;
+            import org.openrewrite.java.tree.Space;
+
+            public class Foo {
+                Variable myVariable = null;
+                JLeftPadded<JavaType> myLeftPadded = null;
+                JRightPadded<JavaType> myRightPadded = null;
+                JContainer<JavaType> myContainer = null;
+                Space mySpace = null;
+                JavaType.Variable myVariable = null;
+            }
+            """,
+            """
+            import org.openrewrite.java.tree.*;
+            import org.openrewrite.java.tree.JavaType.Variable;
+
+            public class Foo {
+                Variable myVariable = null;
+                JLeftPadded<JavaType> myLeftPadded = null;
+                JRightPadded<JavaType> myRightPadded = null;
+                JContainer<JavaType> myContainer = null;
+                Space mySpace = null;
+                JavaType.Variable myVariable = null;
+            }
+            """
+          )
+        );
+    }
 }

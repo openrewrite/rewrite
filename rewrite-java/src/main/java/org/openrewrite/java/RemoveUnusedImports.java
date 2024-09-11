@@ -111,7 +111,7 @@ public class RemoveUnusedImports extends Recipe {
                     }
                 } else if (javaType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
-                    typesByPackage.computeIfAbsent(fq.getPackageName(), f -> new HashSet<>()).add(fq);
+                    typesByPackage.computeIfAbsent(fq.getOwningClass() == null ? fq.getPackageName() : fq.getOwningClass().getFullyQualifiedName(), f -> new HashSet<>()).add(fq);
                 }
             }
 
@@ -152,7 +152,7 @@ public class RemoveUnusedImports extends Recipe {
                     SortedSet<String> targetMethodsAndFields = methodsAndFieldsByTypeName.get(modifiedTarget);
 
                     Set<JavaType.FullyQualified> staticClasses = null;
-                    for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(elem.getPackageName(), emptySet())) {
+                    for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(qualid.getTarget().toString(), emptySet())) {
                         if (maybeStatic.getOwningClass() != null && outerType.startsWith(maybeStatic.getOwningClass().getFullyQualifiedName())) {
                             if (staticClasses == null) {
                                 staticClasses = new HashSet<>();
@@ -207,7 +207,7 @@ public class RemoveUnusedImports extends Recipe {
                         changed = true;
                     }
                 } else {
-                    Set<JavaType.FullyQualified> types = typesByPackage.getOrDefault(elem.getPackageName(), new HashSet<>());
+                    Set<JavaType.FullyQualified> types = typesByPackage.getOrDefault(qualid.getTarget().toString(), new HashSet<>());
                     Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath = typesByPackage.getOrDefault(toFullyQualifiedName(elem.getPackageName()), new HashSet<>());
                     Set<JavaType.FullyQualified> combinedTypes = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
                             .collect(Collectors.toSet());
@@ -236,7 +236,7 @@ public class RemoveUnusedImports extends Recipe {
 
                             changed = true;
                         } else {
-                            usedWildcardImports.add(elem.getQualid().getTarget().toString());
+                            usedWildcardImports.add(qualid.getTarget().toString());
                         }
                     } else if (combinedTypes.stream().noneMatch(c -> {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
