@@ -686,4 +686,48 @@ class OrderImportsTest implements RewriteTest {
           )
         );
     }
+
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4165")
+    @Test
+    void orderAndPreserveInnerEnumWhenFolding() {
+        rewriteRun(
+          java(
+            """
+              package com.fasterxml.jackson.core.util.Separators;
+              
+              public class Separators {
+                  public enum Spacing { NONE, BEFORE, AFTER, BOTH}
+              }
+              """
+          ),
+          java(//At the time of writing all imports are collapsed into `import com.fasterxml.jackson.core.util.*`
+            //Therefore `Spacing.NONE` can no longer be resolved, it would have to be `Separators.Spacing.NONE`
+            """
+              import com.fasterxml.jackson.core.util.DefaultIndenter;
+              import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+              import com.fasterxml.jackson.core.util.MinimalPrettyPrinter;
+              import com.fasterxml.jackson.core.util.Separators;
+              import com.fasterxml.jackson.core.util.Separators.Spacing;
+              public class PrettyPrinterTest {
+                  void printit() {
+                      System.out.println(Spacing.NONE);
+                  }
+              }
+              """,
+            """
+              import com.fasterxml.jackson.core.util.*;
+              import com.fasterxml.jackson.core.util.Separators.Spacing;
+              
+              public class PrettyPrinterTest {
+                  void printit() {
+                      System.out.println(Spacing.NONE);
+                  }
+              }
+              """
+            )
+        );
+    }
+
+
 }
