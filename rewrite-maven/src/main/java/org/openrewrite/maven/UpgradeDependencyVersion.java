@@ -19,9 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.utilities.RetainVersions;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestPatch;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -34,6 +36,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -151,7 +154,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         // if the resolved dependency exists AND it does not represent an artifact that was parsed
                         // as a source file, attempt to find a new version.
                         try {
-                            String newerVersion = findNewerVersion(d.getVersion(),
+                            String newerVersion = findNewerVersion(d.getVersion(), getResolutionResult(),
                                     () -> downloadMetadata(d.getGroupId(), d.getArtifactId(), ctx), versionComparator, ctx);
                             if (newerVersion != null) {
                                 Optional<Xml.Tag> version = tag.getChild("version");
@@ -400,13 +403,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             private @Nullable String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx)
                     throws MavenDownloadingException {
                 return UpgradeDependencyVersion.this.findNewerVersion(
-                        version, () -> downloadMetadata(groupId, artifactId, ctx), versionComparator, ctx);
+                        version, getResolutionResult(), () -> downloadMetadata(groupId, artifactId, ctx), versionComparator, ctx);
             }
         };
     }
 
     private @Nullable String findNewerVersion(
-            String version, MavenMetadataFailures.MavenMetadataDownloader download, VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
+            String version,
+            MavenResolutionResult mrr,
+            MavenMetadataFailures.MavenMetadataDownloader download,
+            VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
         String finalVersion = !Semver.isVersion(version) ? "0.0.0" : version;
 
         // in the case of "latest.patch", a new version can only be derived if the
@@ -423,6 +429,29 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     versions.add(v);
                 }
             }
+
+            // Some repositories will have corrupt or incomplete maven metadata which
+            // prevents an upgrade even to a fixed version. For example this metadata file is missing all versions after 2019:
+            // https://repository.mapr.com/nexus/content/groups/mapr-public/org/apache/hbase/hbase-annotations/maven-metadata.xml
+            if (versionComparator instanceof ExactVersion) {
+                String exactVersion = ((ExactVersion) versionComparator).getVersion();
+                if (!versions.contains(exactVersion)) {
+                    try {
+                        // This is a best effort attempt to see if the pom is there anyway, in spite of the
+                        // fact that it's not in the metadata. Usually it won't be, only in situations like the
+                        // MapR repository mentioned in the comment above will it be.
+                        Pom pom = new MavenPomDownloader(emptyMap(), ctx,
+                                mrr.getMavenSettings(), mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
+                                null, null, mrr.getPom().getRepositories());
+                        if (pom.getGav().getVersion().equals(exactVersion)) {
+                            return exactVersion;
+                        }
+                    } catch (MavenDownloadingException e) {
+                        return null;
+                    }
+                }
+            }
+
             // handle upgrades from non semver versions like "org.springframework.cloud:spring-cloud-dependencies:Camden.SR5"
             if (!Semver.isVersion(finalVersion) && !versions.isEmpty()) {
                 versions.sort(versionComparator);
