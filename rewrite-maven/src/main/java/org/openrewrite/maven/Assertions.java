@@ -27,8 +27,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.function.Consumer;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 public class Assertions {
     private Assertions() {
     }
@@ -67,9 +65,11 @@ public class Assertions {
     }
 
     private static SourceFile pomResolvedSuccessfully(SourceFile sourceFile, TypeValidation typeValidation) {
-        sourceFile.getMarkers()
-                .findFirst(MavenResolutionResult.class)
-                .orElseThrow(() -> new IllegalStateException("No MavenResolutionResult found"));
+        if (typeValidation.dependencyModel()) {
+            sourceFile.getMarkers()
+                    .findFirst(MavenResolutionResult.class)
+                    .orElseThrow(() -> new IllegalStateException("No MavenResolutionResult found"));
+        }
         return sourceFile;
     }
 }
