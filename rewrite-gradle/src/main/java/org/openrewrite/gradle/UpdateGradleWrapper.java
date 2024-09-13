@@ -111,6 +111,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Override
     public Validated<Object> validate() {
         Validated<Object> validated = super.validate();
+        if (wrapperUri != null && (version != null || distribution != null)) {
+            return Validated.invalid("wrapperUri", wrapperUri, "WrapperUri cannot be used with other parameters");
+        }
         if (version != null) {
             validated = validated.and(Semver.validate(version, null));
         }
@@ -123,37 +126,21 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     private GradleWrapper getGradleWrapper(ExecutionContext ctx) {
         if (gradleWrapper == null) {
+            if (wrapperUri != null) {
+                return gradleWrapper = GradleWrapper.create(URI.create(wrapperUri), ctx);
+            }
             try {
                 gradleWrapper = GradleWrapper.create(distribution, version, null, ctx);
             } catch (Exception e) {
-                // services.gradle.org is unreachable, possibly because of a firewall
-                // But if the user specified a wrapperUri to an internal repository things might still be workable
-                if (wrapperUri == null) {
-                    // If the user didn't specify a wrapperUri, but they did provide a specific version we assume they know this version
-                    // is available from whichever distribution url they were previously using and update the version
-                    if (!StringUtils.isBlank(version) && Semver.validate(version, null).getValue() instanceof ExactVersion) {
-                        return gradleWrapper = new GradleWrapper(version, new DistributionInfos("", null, null));
-                    } else {
-                        throw new IllegalArgumentException(
-                                "Could not reach services.gradle.org, no alternative wrapper URI is provided and no exact version is provided. " +
-                                "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri or exact version.", e);
-                    }
+                // services.gradle.org is unreachable
+                // If the user didn't specify a wrapperUri, but they did provide a specific version we assume they know this version
+                // is available from whichever distribution url they were previously using and update the version
+                if (!StringUtils.isBlank(version) && Semver.validate(version, null).getValue() instanceof ExactVersion) {
+                    return gradleWrapper = new GradleWrapper(version, new DistributionInfos("", null, null));
                 }
-                if (wrapperUri.contains("${version})")) {
-                    if (version == null) {
-                        throw new IllegalArgumentException(
-                                "wrapperUri contains a ${version} interpolation specifier but no version parameter was specified.", e);
-                    }
-                    if (!version.matches("[0-9.]+")) {
-                        throw new IllegalArgumentException(
-                                "Version selectors like \"" + version + "\" are unavailable when services.gradle.org cannot be reached. " +
-                                "Specify an exact, literal version number.", e);
-                    }
-                }
-                String effectiveWrapperUri = wrapperUri
-                        .replace("${version}", version == null ? "" : version)
-                        .replace("${distribution}", distribution == null ? "bin" : distribution);
-                gradleWrapper = GradleWrapper.create(URI.create(effectiveWrapperUri), ctx);
+                throw new IllegalArgumentException(
+                        "Could not reach services.gradle.org. " +
+                        "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri or exact version.", e);
             }
         }
         return gradleWrapper;
