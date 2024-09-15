@@ -42,6 +42,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
+    static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("///pluginManagement/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
 
 
@@ -221,6 +222,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return isPluginTag() && hasPluginGroupId(groupId) && hasPluginArtifactId(artifactId);
     }
 
+    public boolean isManagedPluginTag() {
+        return isTag("plugin") && MANAGED_PLUGIN_MATCHER.matches(getCursor());
+    }
+
     private boolean hasPluginGroupId(String groupId) {
         Xml.Tag tag = getCursor().getValue();
         boolean isGroupIdFound = matchesGlob(tag.getChildValue("groupId").orElse("org.apache.maven.plugins"), groupId);
@@ -388,16 +393,27 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public @Nullable Plugin findPlugin(Xml.Tag tag) {
-        List<Plugin> plugins = getResolutionResult().getPom().getPlugins();
-        if (plugins != null) {
-            for (Plugin resolvedPlugin : plugins) {
-                String reqGroup = resolvedPlugin.getGroupId();
-                String reqVersion = resolvedPlugin.getVersion();
-                if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                    resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                    (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
-                    return resolvedPlugin;
-                }
+        for (Plugin resolvedPlugin : getResolutionResult().getPom().getPlugins()) {
+            String reqGroup = resolvedPlugin.getGroupId();
+            String reqVersion = resolvedPlugin.getVersion();
+            if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
+                resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
+                return resolvedPlugin;
+            }
+        }
+        return null;
+    }
+
+    public @Nullable Plugin findManagedPlugin(Xml.Tag tag) {
+        for (Plugin resolvedPlugin : getResolutionResult().getPom().getPluginManagement()) {
+            String reqGroup = resolvedPlugin.getGroupId();
+            String artifactId = resolvedPlugin.getArtifactId();
+            String reqVersion = resolvedPlugin.getVersion();
+            if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
+                (artifactId == null || artifactId.equals(tag.getChildValue("artifactId").orElse(null)) )&&
+                (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
+                return resolvedPlugin;
             }
         }
         return null;
