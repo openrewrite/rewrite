@@ -214,7 +214,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     break;
                             }
                         }
-                        if (groupId == null || artifactId == null) {
+                        if (groupId == null || artifactId == null || version == null) {
                             return m;
                         }
 
