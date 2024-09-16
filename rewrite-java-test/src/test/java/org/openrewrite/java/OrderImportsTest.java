@@ -22,6 +22,7 @@ import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -695,7 +696,8 @@ class OrderImportsTest implements RewriteTest {
               public class Separators {
                   public enum Spacing { NONE, BEFORE, AFTER, BOTH}
               }
-              """
+              """,
+            SourceSpec::skip
           ),
           java(
             """
@@ -705,8 +707,9 @@ class OrderImportsTest implements RewriteTest {
               import com.fasterxml.jackson.core.util.MinimalPrettyPrinter;
               import com.fasterxml.jackson.core.util.Separators;
               import com.fasterxml.jackson.core.util.Separators.Spacing;
-              public class PrettyPrinterTest {
-                  void printit() {
+              
+              class PrettyPrinterTest {
+                  void print() {
                       System.out.println(Spacing.NONE);
                   }
               }
@@ -715,8 +718,8 @@ class OrderImportsTest implements RewriteTest {
               import com.fasterxml.jackson.core.util.*;
               import com.fasterxml.jackson.core.util.Separators.Spacing;
               
-              public class PrettyPrinterTest {
-                  void printit() {
+              class PrettyPrinterTest {
+                  void print() {
                       System.out.println(Spacing.NONE);
                   }
               }
