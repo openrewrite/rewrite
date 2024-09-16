@@ -689,7 +689,7 @@ class OrderImportsTest implements RewriteTest {
     }
 
     @Test
-    void testRecipe() {
+    void nestedInnerClass() {
         // language=java
         rewriteRun(
           spec -> spec.recipe(new OrderImports(true)),
@@ -729,7 +729,7 @@ class OrderImportsTest implements RewriteTest {
     }
 
     @Test
-    void testRecipe2() {
+    void staticNestedInnerClass() {
         // language=java
         rewriteRun(
           spec -> spec.recipe(new OrderImports(true)),
