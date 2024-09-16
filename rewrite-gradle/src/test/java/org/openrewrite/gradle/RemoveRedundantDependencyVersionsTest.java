@@ -32,7 +32,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void platform() {
+    void literal() {
         rewriteRun(
           buildGradle(
             """
@@ -47,7 +47,6 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.apache.commons:commons-lang3:3.14.0")
-                  implementation(group: "org.apache.commons", name: "commons-lang3", version: "3.14.0")
               }
               """,
             """
@@ -62,8 +61,189 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.apache.commons:commons-lang3")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void mapEntry() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation(group: "org.apache.commons", name: "commons-lang3", version: "3.14.0")
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation(group: "org.apache.commons", name: "commons-lang3")
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void mapLiteral() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation([group: "org.apache.commons", name: "commons-lang3", version: "3.14.0"])
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation([group: "org.apache.commons", name: "commons-lang3"])
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enforcedPlatform() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(enforcedPlatform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(enforcedPlatform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.apache.commons:commons-lang3")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void platformUsingMapEntry() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(enforcedPlatform(group: "org.springframework.boot", name: "spring-boot-dependencies", version: "3.3.3"))
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(enforcedPlatform(group: "org.springframework.boot", name: "spring-boot-dependencies", version: "3.3.3"))
+                  implementation("org.apache.commons:commons-lang3")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void freestandingScript() {
+        rewriteRun(
+          buildGradle(
+            """
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """,
+            """
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.apache.commons:commons-lang3")
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              
+              apply from: 'dependencies.gradle'
               """
           )
         );
