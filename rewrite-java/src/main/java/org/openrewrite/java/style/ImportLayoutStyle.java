@@ -548,7 +548,7 @@ public class ImportLayoutStyle implements JavaStyle {
             for (JRightPadded<J.Import> anImport : originalImports) {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
                 nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>(3))
-                        .add(anImport.getElement().getQualid().getTarget().toString());
+                        .add(anImport.getElement().getPackageName());
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {
@@ -785,8 +785,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
     private static String packageOrOuterClassName(JRightPadded<J.Import> anImport) {
         String typeName = anImport.getElement().getTypeName();
-        JavaType.FullyQualified type = TypeUtils.asFullyQualified(anImport.getElement().getQualid().getType());
-        if (anImport.getElement().isStatic() || (type != null && type.hasFlags(Flag.Static))) {
+        if (anImport.getElement().isStatic()) {
             return typeName;
         } else {
             if (typeName.contains("$")) {
@@ -919,7 +918,7 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                         return "import " + (importPackage.isStatic() ? "static " : "") + importPackage.getPackageWildcard().pattern()
                                 .replace("\\.", ".")
                                 .replace(".+", "*")
-                                .replace("[^.]+", "*") + withSubpackages;
+                                .replace("[^.]+", "*")  + withSubpackages;
                     }
                     return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
                 })
