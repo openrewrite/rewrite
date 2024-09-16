@@ -789,7 +789,7 @@ public class ImportLayoutStyle implements JavaStyle {
             return typeName;
         } else {
             if (typeName.contains("$")) {
-                return typeName.substring(0, typeName.lastIndexOf('$'));
+                return typeName.substring(0, typeName.lastIndexOf('$')).replace('$', '.');
             }
             return anImport.getElement().getPackageName();
         }
