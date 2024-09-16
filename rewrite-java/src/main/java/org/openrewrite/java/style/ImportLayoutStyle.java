@@ -786,7 +786,7 @@ public class ImportLayoutStyle implements JavaStyle {
     private static String packageOrOuterClassName(JRightPadded<J.Import> anImport) {
         String typeName = anImport.getElement().getTypeName();
         JavaType.FullyQualified type = TypeUtils.asFullyQualified(anImport.getElement().getQualid().getType());
-        if (anImport.getElement().isStatic() || (type != null && type.getFlags().contains(Flag.Static))) {
+        if (anImport.getElement().isStatic() || (type != null && type.hasFlags(Flag.Static))) {
             return typeName;
         } else {
             String className = anImport.getElement().getClassName();
