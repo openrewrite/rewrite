@@ -54,7 +54,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     String artifactPattern;
 
     @Option(displayName = "Only if versions match",
-            description = "Only remove the explicit version if it exactly matches the managed dependency version. " +
+            description = "Deprecated; use `onlyIfManagedVersionIs` instead. " +
+                          "Only remove the explicit version if it exactly matches the managed dependency version. " +
                           "When `false` explicit versions will be removed if they are older than or equal to the managed dependency version. " +
                           "Default `true`.",
             required = false)
