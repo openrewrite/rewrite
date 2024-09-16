@@ -548,7 +548,7 @@ public class ImportLayoutStyle implements JavaStyle {
             for (JRightPadded<J.Import> anImport : originalImports) {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
                 nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>(3))
-                                .add(anImport.getElement().getPackageName());
+                                .add(anImport.getElement().getQualid().getTarget().toString());
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {
@@ -785,7 +785,8 @@ public class ImportLayoutStyle implements JavaStyle {
 
     private static String packageOrOuterClassName(JRightPadded<J.Import> anImport) {
         String typeName = anImport.getElement().getTypeName();
-        if (anImport.getElement().isStatic()) {
+        JavaType.FullyQualified type = TypeUtils.asFullyQualified(anImport.getElement().getQualid().getType());
+        if (anImport.getElement().isStatic() || (type != null && type.getKind().equals(JavaType.FullyQualified.Kind.Enum))) {
             return typeName;
         } else {
             String className = anImport.getElement().getClassName();

@@ -706,6 +706,7 @@ class OrderImportsTest implements RewriteTest {
             """
               import com.fasterxml.jackson.core.util.DefaultIndenter;
               import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+              import com.fasterxml.jackson.core.util.JacksonFeature;
               import com.fasterxml.jackson.core.util.MinimalPrettyPrinter;
               import com.fasterxml.jackson.core.util.Separators;
               import com.fasterxml.jackson.core.util.Separators.Spacing;
