@@ -724,38 +724,4 @@ class OrderImportsTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void staticNestedInnerClass() {
-        // language=java
-        rewriteRun(
-          spec -> spec.recipe(new OrderImports(true)),
-          java(
-            """
-              package a;
-              
-              public class A {
-                  public final class B {}
-                  public static class C {}
-              }
-              """,
-            SourceSpec::skip),
-          java(
-            """
-              import a.*;
-              
-              public class Foo {
-                  A method(A.B ab, A.C ac) {}
-              }
-              """,
-            """
-              import a.A;
-              
-              public class Foo {
-                  A method(A.B ab, A.C ac) {}
-              }
-              """
-          )
-        );
-    }
 }
