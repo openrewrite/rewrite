@@ -233,7 +233,7 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         if (isFoldable && (((paddedToAdd.getElement().isStatic() && nameCountToUseStarImport <= sameCount) ||
-                (!paddedToAdd.getElement().isStatic() && classCountToUseStarImport <= sameCount)) || isPackageAlwaysFolded(packagesToFold, paddedToAdd.getElement()))) {
+                            (!paddedToAdd.getElement().isStatic() && classCountToUseStarImport <= sameCount)) || isPackageAlwaysFolded(packagesToFold, paddedToAdd.getElement()))) {
             starFold.set(true);
             if (insertPosition != starFoldFrom.get()) {
                 // if we're adding to the middle of a group of imports that are getting star folded,
@@ -258,7 +258,7 @@ public class ImportLayoutStyle implements JavaStyle {
             if (block(after) == addToBlock) {
                 after = after.withElement(after.getElement().withPrefix(Space.format("\n")));
             } else if (!isNewBlock.get() && after.getElement().getPrefix().getLastWhitespace().chars()
-                    .filter(c -> c == '\n').count() < 2) {
+                                                    .filter(c -> c == '\n').count() < 2) {
                 after = after.withElement(after.getElement().withPrefix(Space.format("\n\n")));
             }
         }
@@ -350,8 +350,8 @@ public class ImportLayoutStyle implements JavaStyle {
                         // Preserve the existing newline character type of either CRLF or LF.
                         // Classic Mac OS new line return '\r' is replaced by '\n'.
                         String newLineCharacters = whitespaceContainsCRLF ||
-                                StringUtils.isNullOrEmpty(orderedImport.getElement().getPrefix().getWhitespace()) &&
-                                        "\r\n".equals(prevWhitespace) ? "\r\n" : "\n";
+                                                   StringUtils.isNullOrEmpty(orderedImport.getElement().getPrefix().getWhitespace()) &&
+                                                   "\r\n".equals(prevWhitespace) ? "\r\n" : "\n";
 
                         StringBuilder newWhitespace = new StringBuilder(newLineCharacters);
                         for (int i = 0; i < extraLineSpaceCount; i++) {
@@ -399,7 +399,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         public Builder blankLine() {
             if (!blocks.isEmpty() &&
-                    blocks.get(blocks.size() - 1) instanceof Block.BlankLines) {
+                blocks.get(blocks.size() - 1) instanceof Block.BlankLines) {
                 ((Block.BlankLines) blocks.get(blocks.size() - 1)).count++;
             } else {
                 blocks.add(new Block.BlankLines());
@@ -548,7 +548,7 @@ public class ImportLayoutStyle implements JavaStyle {
             for (JRightPadded<J.Import> anImport : originalImports) {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
                 nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>(3))
-                                .add(anImport.getElement().getQualid().getTarget().toString());
+                        .add(anImport.getElement().getQualid().getTarget().toString());
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {
@@ -664,7 +664,7 @@ public class ImportLayoutStyle implements JavaStyle {
             @Override
             public boolean accept(JRightPadded<J.Import> anImport) {
                 return anImport.getElement().isStatic() == statik &&
-                        packageWildcard.matcher(anImport.getElement().getQualid().printTrimmed()).matches();
+                       packageWildcard.matcher(anImport.getElement().getQualid().printTrimmed()).matches();
             }
 
             @Override
@@ -689,7 +689,7 @@ public class ImportLayoutStyle implements JavaStyle {
                             .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
 
                     if (importLayoutConflictDetection.isPackageFoldable(packageOrOuterClassName(toStar)) &&
-                            (isPackageAlwaysFolded(packagesToFold, toStar.getElement()) || importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1))) {
+                        (isPackageAlwaysFolded(packagesToFold, toStar.getElement()) || importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1))) {
 
                         J.FieldAccess qualid = toStar.getElement().getQualid();
                         J.Identifier name = qualid.getName();
@@ -792,8 +792,8 @@ public class ImportLayoutStyle implements JavaStyle {
             String className = anImport.getElement().getClassName();
             if (className.contains("$")) {
                 return anImport.getElement().getPackageName() + "." +
-                        className.substring(0, className.lastIndexOf('$'))
-                                .replace('$', '.');
+                       className.substring(0, className.lastIndexOf('$'))
+                               .replace('$', '.');
             }
             return anImport.getElement().getPackageName();
         }
@@ -901,7 +901,7 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                         return "<blank line>";
                     } else if (block instanceof ImportLayoutStyle.Block.AllOthers) {
                         return "import " + (((ImportLayoutStyle.Block.AllOthers) block).isStatic() ? "static " : "") +
-                                "all other imports";
+                               "all other imports";
                     } else if (block instanceof ImportLayoutStyle.Block.ImportPackage) {
                         ImportLayoutStyle.Block.ImportPackage importPackage = (ImportLayoutStyle.Block.ImportPackage) block;
                         String withSubpackages = importPackage.getPackageWildcard().pattern().contains("[^.]+") ? " without subpackages" : "";
@@ -922,7 +922,7 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                         return "import " + (importPackage.isStatic() ? "static " : "") + importPackage.getPackageWildcard().pattern()
                                 .replace("\\.", ".")
                                 .replace(".+", "*")
-                                .replace("[^.]+", "*")  + withSubpackages;
+                                .replace("[^.]+", "*") + withSubpackages;
                     }
                     return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
                 })
