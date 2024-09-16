@@ -28,6 +28,7 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -112,7 +113,6 @@ public class RemoveRedundantDependencyVersions extends ScanningRecipe<RemoveRedu
                 new IsBuildGradle<>(),
                 new GroovyIsoVisitor<ExecutionContext>() {
                     final MethodMatcher platformMatcher = new MethodMatcher("org.gradle.api.artifacts.dsl.DependencyHandler platform(..)");
-                    // TODO: how to `enforcedPlatform`s effect dependency versions
                     final MethodMatcher enforcedPlatformMatcher = new MethodMatcher("org.gradle.api.artifacts.dsl.DependencyHandler enforcedPlatform(..)");
 
                     GradleProject gradleProject;
@@ -130,7 +130,7 @@ public class RemoveRedundantDependencyVersions extends ScanningRecipe<RemoveRedu
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                        if (!platformMatcher.matches(m)) {
+                        if (!platformMatcher.matches(m) && !enforcedPlatformMatcher.matches(m)) {
                             return m;
                         }
 
@@ -150,7 +150,51 @@ public class RemoveRedundantDependencyVersions extends ScanningRecipe<RemoveRedu
                                 return m;
                             }
                         } else if (m.getArguments().get(0) instanceof G.MapEntry) {
-                            // TODO: Implement me
+                            String groupId = null;
+                            String artifactId = null;
+                            String version = null;
+
+                            for (Expression arg : m.getArguments()) {
+                                if (!(arg instanceof G.MapEntry)) {
+                                    continue;
+                                }
+
+                                G.MapEntry entry = (G.MapEntry) arg;
+                                if (!(entry.getKey() instanceof J.Literal) || !(entry.getValue() instanceof J.Literal)) {
+                                    continue;
+                                }
+
+                                J.Literal key = (J.Literal) entry.getKey();
+                                J.Literal value = (J.Literal) entry.getValue();
+                                if (key.getType() != JavaType.Primitive.String || value.getType() != JavaType.Primitive.String) {
+                                    continue;
+                                }
+
+                                switch ((String) key.getValue()) {
+                                    case "group":
+                                        groupId = (String) value.getValue();
+                                        break;
+                                    case "name":
+                                        artifactId = (String) value.getValue();
+                                        break;
+                                    case "version":
+                                        version = (String) value.getValue();
+                                        break;
+                                }
+                            }
+
+                            if (groupId == null || artifactId == null || version == null) {
+                                return m;
+                            }
+
+                            MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                            try {
+                                ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(groupId, artifactId, version), null, null, gradleProject.getMavenRepositories())
+                                        .resolve(Collections.emptyList(), mpd, ctx);
+                                acc.platforms.add(platformPom);
+                            } catch (MavenDownloadingException e) {
+                                return m;
+                            }
                         }
                         return m;
                     }
@@ -186,12 +230,27 @@ public class RemoveRedundantDependencyVersions extends ScanningRecipe<RemoveRedu
                                 }
 
                                 return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue(l, dep.toStringNotation())));
-                            }/* else if (m.getArguments().get(0) instanceof G.MapEntry) {
+                            } else if (m.getArguments().get(0) instanceof G.MapLiteral) {
+                                return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                                    G.MapLiteral mapLiteral = (G.MapLiteral) arg;
+                                    return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), entry -> {
+                                        if (entry.getKey() instanceof J.Literal &&
+                                                "version".equals(((J.Literal) entry.getKey()).getValue())) {
+                                            return null;
+                                        }
+                                        return entry;
+                                    }));
+                                }));
+                            } else if (m.getArguments().get(0) instanceof G.MapEntry) {
                                 return m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                                     G.MapEntry entry = (G.MapEntry) arg;
-                                    if (entry.getKey() instanceof J.Literal && ((J.Literal) entry.getKey()).getValue().equals("version"))
-                                }))
-                            }*/
+                                    if (entry.getKey() instanceof J.Literal &&
+                                            "version".equals(((J.Literal) entry.getKey()).getValue())) {
+                                        return null;
+                                    }
+                                    return entry;
+                                }));
+                            }
                         }
                     }
 
