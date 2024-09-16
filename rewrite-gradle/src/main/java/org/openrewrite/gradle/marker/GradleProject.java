@@ -82,21 +82,6 @@ public class GradleProject implements Marker, Serializable {
     @Builder.Default
     GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
 
-    // Backwards compatibility to ease convoluted release process with rewrite-gradle-tooling-model
-    public GradleProject(
-            UUID id,
-            String group,
-            String name,
-            String version,
-            String path,
-            List<GradlePluginDescriptor> plugins,
-            List<MavenRepository> mavenRepositories,
-            List<MavenRepository> mavenPluginRepositories,
-            Map<String, GradleDependencyConfiguration> nameToConfiguration
-    ) {
-        this(id, group, name, version, path, plugins, mavenRepositories, mavenPluginRepositories, nameToConfiguration, null);
-    }
-
     /**
      * Get a list of Maven plugin repositories.
      *
@@ -105,6 +90,7 @@ public class GradleProject implements Marker, Serializable {
      */
     @Deprecated
     public List<MavenRepository> getMavenPluginRepositories() {
+        //noinspection ConstantValue
         if (buildscript != null) {
             return buildscript.getMavenRepositories();
         }
