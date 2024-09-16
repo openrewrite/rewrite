@@ -727,4 +727,45 @@ class OrderImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4165")
+    @Test
+    void doNotPreserveOuterEnum() {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true)),
+          java(
+            """
+              package com.fasterxml.jackson.core.util;
+              
+              public enum Spacing { NONE, BEFORE, AFTER, BOTH }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import com.fasterxml.jackson.core.util.DefaultIndenter;
+              import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+              import com.fasterxml.jackson.core.util.JacksonFeature;
+              import com.fasterxml.jackson.core.util.MinimalPrettyPrinter;
+              import com.fasterxml.jackson.core.util.Separators;
+              import com.fasterxml.jackson.core.util.Spacing;
+              
+              class PrettyPrinterTest {
+                  void print() {
+                      System.out.println(Spacing.NONE);
+                  }
+              }
+              """,
+            """
+              import com.fasterxml.jackson.core.util.Spacing;
+              
+              class PrettyPrinterTest {
+                  void print() {
+                      System.out.println(Spacing.NONE);
+                  }
+              }
+              """
+          )
+        );
+    }
 }
