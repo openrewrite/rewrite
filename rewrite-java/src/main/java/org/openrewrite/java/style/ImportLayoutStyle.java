@@ -918,7 +918,7 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                         return "import " + (importPackage.isStatic() ? "static " : "") + importPackage.getPackageWildcard().pattern()
                                 .replace("\\.", ".")
                                 .replace(".+", "*")
-                                .replace("[^.]+", "*")  + withSubpackages;
+                                .replace("[^.]+", "*") + withSubpackages;
                     }
                     return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
                 })
