@@ -1661,7 +1661,6 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
     private <J2 extends J> J.Erroneous getErroneous(List<JRightPadded<J2>> converted) {
         PrintOutputCapture p = new PrintOutputCapture<>(0);
-        PrintOut
         new JavaPrinter<>().visitContainer(JContainer.build(EMPTY, converted, Markers.EMPTY), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p);
         return new J.Erroneous(
                 org.openrewrite.Tree.randomId(),
