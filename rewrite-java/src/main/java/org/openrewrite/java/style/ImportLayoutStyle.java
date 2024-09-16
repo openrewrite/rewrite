@@ -788,11 +788,8 @@ public class ImportLayoutStyle implements JavaStyle {
         if (anImport.getElement().isStatic()) {
             return typeName;
         } else {
-            String className = anImport.getElement().getClassName();
-            if (className.contains("$")) {
-                return anImport.getElement().getPackageName() + "." +
-                        className.substring(0, className.lastIndexOf('$'))
-                                .replace('$', '.');
+            if (typeName.contains("$")) {
+                return typeName.substring(0, typeName.lastIndexOf('$')).replace('$', '.');
             }
             return anImport.getElement().getPackageName();
         }
