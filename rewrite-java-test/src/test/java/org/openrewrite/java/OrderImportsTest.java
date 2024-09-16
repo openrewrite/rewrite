@@ -697,8 +697,7 @@ class OrderImportsTest implements RewriteTest {
               }
               """
           ),
-          java(//At the time of writing all imports are collapsed into `import com.fasterxml.jackson.core.util.*`
-            //Therefore `Spacing.NONE` can no longer be resolved, it would have to be `Separators.Spacing.NONE`
+          java(
             """
               import com.fasterxml.jackson.core.util.DefaultIndenter;
               import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
