@@ -42,9 +42,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
-    static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("///pluginManagement/plugins/plugin");
+    static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
-
 
     private transient Xml.@Nullable Document document;
 
@@ -408,10 +407,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     public @Nullable Plugin findManagedPlugin(Xml.Tag tag) {
         for (Plugin resolvedPlugin : getResolutionResult().getPom().getPluginManagement()) {
             String reqGroup = resolvedPlugin.getGroupId();
-            String artifactId = resolvedPlugin.getArtifactId();
             String reqVersion = resolvedPlugin.getVersion();
             if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                (artifactId == null || artifactId.equals(tag.getChildValue("artifactId").orElse(null)) )&&
+                resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
                 (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
                 return resolvedPlugin;
             }

@@ -39,7 +39,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class RemoveRedundantDependencyVersions extends Recipe {
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                    "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                          "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.*",
             required = false)
     @Nullable
@@ -47,7 +47,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                    "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                          "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava*",
             required = false)
     @Nullable
@@ -55,8 +55,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Only if versions match",
             description = "Only remove the explicit version if it exactly matches the managed dependency version. " +
-                    "When `false` explicit versions will be removed if they are older than or equal to the managed dependency version. " +
-                    "Default `true`.",
+                          "When `false` explicit versions will be removed if they are older than or equal to the managed dependency version. " +
+                          "Default `true`.",
             required = false)
     @Nullable
     @Deprecated
@@ -65,8 +65,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Only if managed version is ...",
             description = "Only remove the explicit version if the managed version has the specified comparative relationship to the explicit version. " +
-                    "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
-                    "Default `eq`.",
+                          "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
+                          "Default `eq`.",
             valid = {"any", "eq", "lt", "lte", "gt", "gte"},
             required = false)
     @Nullable
@@ -74,7 +74,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Except",
             description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe."
-                    + " GAV versions are ignored if provided.",
+                          + " GAV versions are ignored if provided.",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable
@@ -121,7 +121,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Override
     public String getDescription() {
         return "Remove explicitly-specified dependency/plugin versions when a parent POM's `dependencyManagement`/`pluginManagement` " +
-                "specifies the version.";
+               "specifies the version.";
     }
 
     @Override
@@ -353,8 +353,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     final String[] split = gav.split(":");
                     final String exceptedGroupId = split[0];
                     final String exceptedArtifactId = split[1];
-                    if (matchesGlob(d.getGroupId(), exceptedGroupId)
-                            && matchesGlob(d.getArtifactId(), exceptedArtifactId)) {
+                    if (matchesGlob(d.getGroupId(), exceptedGroupId) &&
+                        matchesGlob(d.getArtifactId(), exceptedArtifactId)) {
                         return false;
                     }
                 }
@@ -368,7 +368,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             if (Objects.equals(
                     Optional.ofNullable(p.getGroupId()).orElse("org.apache.maven.plugins"),
                     Optional.ofNullable(groupId).orElse("org.apache.maven.plugins")) &&
-                    Objects.equals(p.getArtifactId(), artifactId)) {
+                Objects.equals(p.getArtifactId(), artifactId)) {
                 return resolvedPom.getValue(p.getVersion());
             }
         }
