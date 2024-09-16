@@ -1175,6 +1175,67 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void removeRedundantVersionsFromManagedButNonInheritedPlugins() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <version>4.9.10</version>
+                                  <inherited>false</inherited>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                              <version>4.9.10</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <version>4.9.10</version>
+                                  <inherited>false</inherited>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
     void removeRedundantVersionsFromPluginsManagedByParent() {
         rewriteRun(
@@ -1225,6 +1286,85 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void keepPluginIfParentInheritanceDisabled() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child-with-pluginManagement</module>
+                      <module>child-with-plugin-execution</module>
+                  </modules>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <version>4.9.10</version>
+                                  <inherited>false</inherited>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """
+          ),
+          mavenProject("child-with-pluginManagement",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>child-with-pluginManagement</artifactId>
+                    <build>
+                        <pluginManagement>
+                            <plugins>
+                                <plugin>
+                                    <groupId>pl.project13.maven</groupId>
+                                    <artifactId>git-commit-id-plugin</artifactId>
+                                    <version>4.9.10</version>
+                                </plugin>
+                            </plugins>
+                        </pluginManagement>
+                    </build>
+                </project>
+                """
+            )
+          ),
+          mavenProject("child-with-plugin-execution",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>child-with-plugin-execution</artifactId>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>pl.project13.maven</groupId>
+                                <artifactId>git-commit-id-plugin</artifactId>
+                                <version>4.9.10</version>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """
+            )
           )
         );
     }
