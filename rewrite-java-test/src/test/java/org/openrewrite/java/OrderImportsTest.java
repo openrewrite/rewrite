@@ -27,7 +27,10 @@ import org.openrewrite.test.SourceSpec;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.addTypesToSourceSet;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.srcMainJava;
+import static org.openrewrite.java.Assertions.version;
 
 class OrderImportsTest implements RewriteTest {
 
@@ -684,6 +687,47 @@ class OrderImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nestedInnerClass() {
+        // language=java
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true)),
+          java(
+            """
+              import org.openrewrite.java.tree.JContainer;
+              import org.openrewrite.java.tree.JLeftPadded;
+              import org.openrewrite.java.tree.JRightPadded;
+              import org.openrewrite.java.tree.JavaType;
+              import org.openrewrite.java.tree.JavaType.Variable;
+              import org.openrewrite.java.tree.Space;
+              
+              public class Foo {
+                  Variable myVariable = null;
+                  JLeftPadded<JavaType> myLeftPadded = null;
+                  JRightPadded<JavaType> myRightPadded = null;
+                  JContainer<JavaType> myContainer = null;
+                  Space mySpace = null;
+                  JavaType.Variable myVariable = null;
+              }
+              """,
+            """
+              import org.openrewrite.java.tree.*;
+              import org.openrewrite.java.tree.JavaType.Variable;
+              
+              public class Foo {
+                  Variable myVariable = null;
+                  JLeftPadded<JavaType> myLeftPadded = null;
+                  JRightPadded<JavaType> myRightPadded = null;
+                  JContainer<JavaType> myContainer = null;
+                  Space mySpace = null;
+                  JavaType.Variable myVariable = null;
+              }
+              """
+          )
+        );
+    }
+
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4165")
     @Test
