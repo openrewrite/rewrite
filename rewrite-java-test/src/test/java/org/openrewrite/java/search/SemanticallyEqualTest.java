@@ -299,6 +299,28 @@ class SemanticallyEqualTest {
         );
     }
 
+    @Test
+    void lambdaParameterNames() {
+        assertExpressionsEqual(
+          """
+            import java.util.Comparator;
+            class T {
+                Comparator<Integer> a = (x1, y1) -> x1 - y1;
+                Comparator<Integer> b = (x2, y2) -> x2 - y2;
+            }
+            """
+        );
+        assertExpressionsNotEqual(
+          """
+            import java.util.Comparator;
+            class T {
+                Comparator<Integer> a = (x1, y1) -> x1 - y1;
+                Comparator<Integer> b = (x2, y2) -> y2 - x2;
+            }
+            """
+        );
+    }
+
     @Nested
     class Generics {
         @Test
