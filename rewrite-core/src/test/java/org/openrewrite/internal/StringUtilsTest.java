@@ -19,7 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.internal.StringUtils.*;
+import static org.openrewrite.internal.StringUtils.containsOnlyWhitespaceAndComments;
+import static org.openrewrite.internal.StringUtils.countOccurrences;
+import static org.openrewrite.internal.StringUtils.greatestCommonMargin;
+import static org.openrewrite.internal.StringUtils.greatestCommonSubstringLength;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
+import static org.openrewrite.internal.StringUtils.replaceFirst;
+import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 class StringUtilsTest {
 
