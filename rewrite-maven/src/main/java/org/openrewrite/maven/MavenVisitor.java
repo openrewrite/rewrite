@@ -392,20 +392,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public @Nullable Plugin findPlugin(Xml.Tag tag) {
-        for (Plugin resolvedPlugin : getResolutionResult().getPom().getPlugins()) {
-            String reqGroup = resolvedPlugin.getGroupId();
-            String reqVersion = resolvedPlugin.getVersion();
-            if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
-                return resolvedPlugin;
-            }
-        }
-        return null;
+        return findPlugin(tag, getResolutionResult().getPom().getPlugins());
     }
 
     public @Nullable Plugin findManagedPlugin(Xml.Tag tag) {
-        for (Plugin resolvedPlugin : getResolutionResult().getPom().getPluginManagement()) {
+        return findPlugin(tag, getResolutionResult().getPom().getPluginManagement());
+    }
+
+    private static @Nullable Plugin findPlugin(Xml.Tag tag, List<Plugin> pluginManagement) {
+        for (Plugin resolvedPlugin : pluginManagement) {
             String reqGroup = resolvedPlugin.getGroupId();
             String reqVersion = resolvedPlugin.getVersion();
             if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
