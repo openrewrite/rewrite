@@ -403,17 +403,24 @@ class MavenPomDownloaderTest {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest recordedRequest) {
-                    return recordedRequest.getHeaders().get("Authorization") != null ?
-                      new MockResponse().setResponseCode(200).setBody(
-                        //language=xml
-                        """
-                          <project>
-                              <groupId>org.springframework.cloud</groupId>
-                              <artifactId>spring-cloud-dataflow-build</artifactId>
-                              <version>2.10.0-SNAPSHOT</version>
-                          </project>
-                          """) :
-                      new MockResponse().setResponseCode(401).setBody("");
+                    MockResponse response = new MockResponse();
+                    if (recordedRequest.getHeaders().get("Authorization") != null) {
+                        response.setResponseCode(200);
+                        if (!"HEAD".equalsIgnoreCase(recordedRequest.getMethod())) {
+                            response.setBody(
+                              //language=xml
+                              """
+                                <project>
+                                    <groupId>org.springframework.cloud</groupId>
+                                    <artifactId>spring-cloud-dataflow-build</artifactId>
+                                    <version>2.10.0-SNAPSHOT</version>
+                                </project>
+                                """);
+                        }
+                    } else {
+                        response.setResponseCode(401);
+                    }
+                    return response;
                 }
             });
             mockRepo.start();
