@@ -44,11 +44,9 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
               repositories {
                   mavenCentral()
               }
-              
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.release'
               }
@@ -57,11 +55,9 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
               repositories {
                   mavenCentral()
               }
-              
               dependencies {
                   implementation 'org.openrewrite:rewrite-gradle:latest.release'
               }
@@ -79,11 +75,9 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
               repositories {
                   mavenCentral()
               }
-              
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.release'
               }
@@ -92,11 +86,9 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
               repositories {
                   mavenCentral()
               }
-              
               dependencies {
                   implementation 'org.openrewrite:rewrite-gradle:latest.release'
               }
@@ -240,24 +232,20 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                   plugins {
                     id 'java-library'
                   }
-                                
                   repositories {
                       mavenCentral()
                   }
-
                   dependencies {
                       api project(":project2")
                   }
-                      """,
+                  """,
                 """
                   plugins {
                     id 'java-library'
                   }
-                                
                   repositories {
                       mavenCentral()
                   }
-
                   dependencies {
                       implementation project(":project2")
                   }
