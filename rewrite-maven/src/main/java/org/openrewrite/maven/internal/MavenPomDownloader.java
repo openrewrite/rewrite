@@ -750,7 +750,7 @@ public class MavenPomDownloader {
                     httpsUri += "/";
                 }
 
-                HttpSender.Request.Builder request = applyAuthenticationToRequest(repository, httpSender.get(httpsUri));
+                HttpSender.Request.Builder request = applyAuthenticationToRequest(repository, httpSender.head(httpsUri));
                 MavenRepository normalized = null;
                 try {
                     sendRequest(request.build());
@@ -792,8 +792,7 @@ public class MavenPomDownloader {
                             }
                         }
                     }
-                    if (normalized == null && !(t instanceof HttpSenderResponseException &&
-                                                ((HttpSenderResponseException) t).getBody().contains("Directory listing forbidden"))) {
+                    if (normalized == null) {
                         ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), t);
                     }
                 }
