@@ -140,6 +140,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         private static @Nullable GradleDependencyConfiguration getConfiguration(GradleProject gradleProject, J.MethodInvocation methodInvocation) {
             String methodName = methodInvocation.getSimpleName();
             if (methodName.equals("classpath")) {
+                // Minimize incompatibility with old LSTs missing this field
+                //noinspection ConstantValue
+                if (gradleProject.getBuildscript() == null) {
+                    return null;
+                }
                 return gradleProject.getBuildscript().getConfiguration(methodName);
             } else {
                 return gradleProject.getConfiguration(methodName);

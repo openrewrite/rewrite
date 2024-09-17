@@ -17,7 +17,6 @@ package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.Tree;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
@@ -54,11 +53,11 @@ class FindPluginsTest implements RewriteTest {
               """,
             spec -> spec
               .beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "org.openrewrite.rewrite"))
-              .isNotEmpty()
-              .anySatisfy(p -> {
-                  assertThat(p.getPluginId()).isEqualTo("org.openrewrite.rewrite");
-                  assertThat(p.getVersion()).isEqualTo("6.18.0");
-              }))
+                .isNotEmpty()
+                .anySatisfy(p -> {
+                    assertThat(p.getPluginId()).isEqualTo("org.openrewrite.rewrite");
+                    assertThat(p.getVersion()).isEqualTo("6.18.0");
+                }))
           )
         );
     }
@@ -69,16 +68,13 @@ class FindPluginsTest implements RewriteTest {
           text(
             "stand-in for a kotlin gradle script",
             "~~>stand-in for a kotlin gradle script",
-            spec -> spec.markers(new GradleProject(
-              Tree.randomId(),
-              "group",
-              "name",
-              "version",
-              "path",
-              Collections.singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")),
-              Collections.emptyList(),
-              Collections.emptyList(),
-              Collections.emptyMap())
+            spec -> spec.markers(GradleProject.builder()
+              .group("group")
+              .name("name")
+              .version("version")
+              .path("path")
+              .plugins(Collections.singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
+              .build()
             )
           )
         );
