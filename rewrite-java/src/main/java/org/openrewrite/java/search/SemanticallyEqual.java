@@ -712,10 +712,6 @@ public class SemanticallyEqual {
                         return identifier;
                     }
                 }
-                if (TypeUtils.isWellFormedType(identifier.getType(), seen) && !TypeUtils.isOfType(identifier.getType(), compareTo.getType())) {
-                    isEqual.set(false);
-                    return identifier;
-                }
                 if (!identifier.getSimpleName().equals(compareTo.getSimpleName())) {
                     isEqual.set(false);
                     return identifier;
