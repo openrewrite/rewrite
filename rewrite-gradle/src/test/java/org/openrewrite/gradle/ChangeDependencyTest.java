@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyTest implements RewriteTest {
@@ -443,6 +444,61 @@ class ChangeDependencyTest implements RewriteTest {
                   }
                   """
             )
+        );
+    }
+
+    @Test
+    void relocateDependencyInSubproject() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("javax.servlet", "javax.servlet-api", "jakarta.servlet", "jakarta.servlet-api", "6.1.0", null, null)),
+          buildGradle(
+            """
+              plugins {
+                   id 'java'
+                   id 'org.openrewrite.rewrite' version '6.23.3'
+               }
+                            
+              repositories {
+                  mavenCentral()
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              include("moduleA")
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+              }
+                            
+              repositories {
+                mavenCentral()
+              }
+                           
+              dependencies {
+                compileOnly 'javax.servlet:javax.servlet-api:3.0.1'
+              }    
+              """,
+            """
+              plugins {
+                id 'java'
+              }
+                            
+              repositories {
+                mavenCentral()
+              }
+                            
+              dependencies {
+                compileOnly 'jakarta.servlet:jakarta.servlet-api:6.1.0'
+              }    
+              """,
+            spec -> spec.path("moduleA/build.gradle")
+          )
         );
     }
 }
