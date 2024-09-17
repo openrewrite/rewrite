@@ -82,6 +82,15 @@ public class GradleProject implements Marker, Serializable {
     @Builder.Default
     GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
 
+    public GradleBuildscript getBuildscript() {
+        // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.
+        //noinspection ConstantValue
+        if (buildscript == null) {
+            return new GradleBuildscript(randomId(), emptyList(), emptyMap());
+        }
+        return buildscript;
+    }
+
     /**
      * Get a list of Maven plugin repositories.
      *

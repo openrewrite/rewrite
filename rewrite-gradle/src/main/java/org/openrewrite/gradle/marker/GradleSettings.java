@@ -65,6 +65,15 @@ public class GradleSettings implements Marker, Serializable {
         this(id, pluginRepositories, plugins, featurePreviews, null);
     }
 
+    public GradleBuildscript getBuildscript() {
+        // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.
+        //noinspection ConstantValue
+        if (buildscript == null) {
+            return new GradleBuildscript(randomId(), emptyList(), emptyMap());
+        }
+        return buildscript;
+    }
+
     public @Nullable Boolean isFeatureEnabled(String name) {
         return featurePreviews.get(name).getEnabled();
     }
