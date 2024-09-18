@@ -53,7 +53,6 @@ import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -226,8 +225,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         try {
                             String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                     .select(new GroupArtifact(groupId, artifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
-                            acc.versionPropNameToGA.put(requireNonNull(versionVariableName), ga);
-                            acc.gaToNewVersion.put(ga, requireNonNull(resolvedVersion));
+                            acc.versionPropNameToGA.put(versionVariableName, ga);
+                            // It is fine for this value to be null, record it in the map to avoid future lookups
+                            //noinspection DataFlowIssue
+                            acc.gaToNewVersion.put(ga, resolvedVersion);
                         } catch (MavenDownloadingException e) {
                             acc.gaToNewVersion.put(ga, e);
                             return m;
@@ -458,7 +459,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     .toStringNotation();
                             return literal
                                     .withValue(newGav)
-                                    .withValueSource(requireNonNull(literal.getValueSource()).replace(gav, newGav));
+                                    .withValueSource(literal.getValueSource() == null ? newGav : literal.getValueSource().replace(gav, newGav));
                         } catch (MavenDownloadingException e) {
                             getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, e);
                         }
@@ -481,11 +482,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
                 J.Literal groupLiteral = (J.Literal) groupValue;
                 J.Literal artifactLiteral = (J.Literal) artifactValue;
-                //noinspection DataFlowIssue
-                if (!dependencyMatcher.matches((String) groupLiteral.getValue(), (String) artifactLiteral.getValue())) {
+                if (groupLiteral.getValue() == null || artifactLiteral.getValue() == null || !dependencyMatcher.matches((String) groupLiteral.getValue(), (String) artifactLiteral.getValue())) {
                     return m;
                 }
-                Object scanResult = acc.gaToNewVersion.get(new GroupArtifact((String) requireNonNull(groupLiteral.getValue()), (String) artifactLiteral.getValue()));
+                Object scanResult = acc.gaToNewVersion.get(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()));
                 if (scanResult instanceof Exception) {
                     return Markup.warn(m, (Exception) scanResult);
                 }
@@ -513,7 +513,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     newArgs.add(depArgs.get(1));
                     newArgs.add(versionEntry.withValue(
                             versionLiteral
-                                    .withValueSource(requireNonNull(versionLiteral.getValueSource()).replace(version, selectedVersion))
+                                    .withValueSource(versionLiteral.getValueSource() == null ?
+                                            selectedVersion :
+                                            versionLiteral.getValueSource().replace(version, selectedVersion))
                                     .withValue(selectedVersion)));
                     newArgs.addAll(depArgs.subList(3, depArgs.size()));
 

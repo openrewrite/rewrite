@@ -577,11 +577,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                            
                 <properties>
                     <rewrite-spring.version>4.33.0</rewrite-spring.version>
                 </properties>
-                            
                 <build>
                   <plugins>
                     <plugin>
@@ -605,11 +603,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                            
                 <properties>
                     <rewrite-spring.version>4.33.2</rewrite-spring.version>
                 </properties>
-                            
                 <build>
                   <plugins>
                     <plugin>
@@ -1365,11 +1361,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                            
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                            
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -1381,7 +1375,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
-                            
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -1394,11 +1387,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                            
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                            
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -1410,7 +1401,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
-                            
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -1431,11 +1421,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                            
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                            
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -1447,7 +1435,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
-                            
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -1460,11 +1447,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                            
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                            
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -1476,7 +1461,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
-                            
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -1497,11 +1481,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                            
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                            
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -1513,7 +1495,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
-                            
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -1526,11 +1507,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                            
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                            
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -1542,7 +1521,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
-                            
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -1571,7 +1549,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1583,7 +1560,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1600,7 +1576,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1612,7 +1587,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1637,7 +1611,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1649,7 +1622,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1665,7 +1637,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1677,7 +1648,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1702,7 +1672,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1714,7 +1683,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1730,7 +1698,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1742,7 +1709,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1770,7 +1736,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1782,7 +1747,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
@@ -1802,7 +1766,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1.0.0</version>
-                                    
                     <dependencyManagement>
                       <dependencies>
                         <dependency>
@@ -1814,7 +1777,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                     </dependencyManagement>
-                                    
                     <dependencies>
                       <dependency>
                         <groupId>com.jcraft</groupId>
