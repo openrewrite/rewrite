@@ -19,6 +19,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.internal.StringUtils;
@@ -52,7 +53,7 @@ public class DependencyVersionSelector {
     GradleSettings gradleSettings;
 
     /**
-     * Used to select a version for a new dependency that has no prior version.
+     * Used to select a version for a new dependency that has no prior version, or the caller is not sure what the prior version is.
      *
      * @param ga             The group and artifact of the new dependency.
      * @param configuration  The configuration to select the version for. The configuration influences
@@ -69,11 +70,21 @@ public class DependencyVersionSelector {
                          @Nullable String version,
                          @Nullable String versionPattern,
                          ExecutionContext ctx) throws MavenDownloadingException {
+        String currentVersion = "0";
+        if (gradleProject != null) {
+            GradleDependencyConfiguration gdc = gradleProject.getConfiguration(configuration);
+            if(gdc != null) {
+                Dependency requested = gdc.findRequestedDependency(ga.getGroupId(), ga.getArtifactId());
+                if(requested != null) {
+                    currentVersion = requested.getVersion();
+                }
+            }
+        }
         return select(
-                new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), "0"),
+                new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), currentVersion),
                 configuration,
                 // we don't want to select the latest patch in the 0.x line...
-                "latest.patch".equalsIgnoreCase(version) ? "latest.release" : version,
+                "latest.patch".equalsIgnoreCase(version) && "0".equals(currentVersion) ? "latest.release" : version,
                 versionPattern,
                 ctx
         );
