@@ -16,7 +16,6 @@
 package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
@@ -91,7 +90,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
     @Test
     @DocumentExample("Add a new Gradle wrapper")
-    @Disabled
     void addGradleWrapper() {
         rewriteRun(
           spec -> spec.expectedCyclesThatMakeChanges(1).afterRecipe(run -> {
@@ -128,7 +126,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
     @Test
     @DocumentExample("Update existing Gradle wrapper")
-    @Disabled
     void updateWrapper() {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
@@ -179,7 +176,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
     void updateVersionAndDistribution() {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
@@ -220,7 +216,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
     void updateChecksumAlreadySet() {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
@@ -265,7 +260,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
     void updateMultipleWrappers() {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
@@ -387,7 +381,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
     void allowUpdatingDistributionTypeWhenSameVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("5.6.x", "bin", null, null, null))
@@ -429,7 +422,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
     void defaultsToLatestRelease() {
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper(null, null, null, null, null))
@@ -491,7 +483,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
     void skipWorkIfUpdatedEarlier() {
         rewriteRun(
           spec -> spec.recipeFromYaml(
@@ -719,7 +710,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
     void customDistributionUri() {
         HttpSender customDistributionHost = request -> {
             if (request.getUrl().toString().contains("company.com")) {
@@ -796,7 +786,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
     void updateWrapperInSubDirectory() {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
@@ -850,7 +839,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
     void failRecipeIfBothVersionAndDistributionUriAreProvided() {
         assertThat(new UpdateGradleWrapper("7.4.2", "bin", false, "https://company.com/repo/gradle-7.4.2-bin.zip", null).validate().isInvalid()).isTrue();
     }
