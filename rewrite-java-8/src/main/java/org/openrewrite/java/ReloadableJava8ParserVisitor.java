@@ -1636,7 +1636,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
         int idx = findFirstNonWhitespaceChar(rightPadded.getAfter().getWhitespace());
         if (idx >= 0) {
-            rightPadded = (JRightPadded<J2>) JRightPadded.build(getErroneous(List.of(rightPadded)));
+            rightPadded = (JRightPadded<J2>) JRightPadded.build(getErroneous(Collections.singletonList(rightPadded)));
         }
         if (endPos(t) == cursor && rightPadded.getElement() instanceof J.Erroneous) {
             cursor++;
