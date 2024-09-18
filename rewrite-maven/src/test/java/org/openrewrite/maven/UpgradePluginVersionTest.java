@@ -736,4 +736,250 @@ class UpgradePluginVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void defaultPluginGroupId() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins",
+            "maven-compiler-plugin",
+            "3.11.0",
+            null,
+            null,
+            false
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.10.0</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.11.0</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void testPluginUpgradeWithProfiles() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.jacoco",
+            "jacoco-maven-plugin",
+            "0.8.12",
+            null,
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+                         <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                             <modelVersion>4.0.0</modelVersion>
+                             <parent>
+                                 <groupId>org.springframework.boot</groupId>
+                                 <artifactId>spring-boot-starter-parent</artifactId>
+                                 <version>3.3.3</version>
+                                 <relativePath/> <!-- lookup parent from repository -->
+                             </parent>
+                             <groupId>com.example</groupId>
+                             <artifactId>recipe-test-project</artifactId>
+                             <version>0.0.1-SNAPSHOT</version>
+                             <name>recipe-test-project</name>
+                             <description>recipe-test-project</description>
+                             <url/>
+                             <licenses>
+                                 <license/>
+                             </licenses>
+                             <developers>
+                                 <developer/>
+                             </developers>
+                             <scm>
+                                 <connection/>
+                                 <developerConnection/>
+                                 <tag/>
+                                 <url/>
+                             </scm>
+                             <properties>
+                                 <java.version>21</java.version>
+                                 <jacoco-maven-plugin.version>0.8.7</jacoco-maven-plugin.version>
+                             </properties>
+                             <dependencies>
+                                 <dependency>
+                                     <groupId>org.springframework.boot</groupId>
+                                     <artifactId>spring-boot-starter</artifactId>
+                                 </dependency>
+              
+                                 <dependency>
+                                     <groupId>org.projectlombok</groupId>
+                                     <artifactId>lombok</artifactId>
+                                     <optional>true</optional>
+                                 </dependency>
+                                 <dependency>
+                                     <groupId>org.springframework.boot</groupId>
+                                     <artifactId>spring-boot-starter-test</artifactId>
+                                     <scope>test</scope>
+                                 </dependency>
+                             </dependencies>
+             
+                             <build>
+                                 <plugins>
+                                     <plugin>
+                                         <groupId>org.springframework.boot</groupId>
+                                         <artifactId>spring-boot-maven-plugin</artifactId>
+                                         <configuration>
+                                             <excludes>
+                                                 <exclude>
+                                                     <groupId>org.projectlombok</groupId>
+                                                     <artifactId>lombok</artifactId>
+                                                 </exclude>
+                                             </excludes>
+                                         </configuration>
+                                     </plugin>
+                                     <plugin>
+                                         <groupId>org.jacoco</groupId>
+                                         <artifactId>jacoco-maven-plugin</artifactId>
+                                         <version>${jacoco-maven-plugin.version}</version>
+                                     </plugin>
+                                 </plugins>
+                             </build>
+              
+                             <profiles>
+                                 <profile>
+                                     <id>p1</id>
+                                     <build>
+                                         <plugins>
+                                             <plugin>
+                                                 <groupId>org.jacoco</groupId>
+                                                 <artifactId>jacoco-maven-plugin</artifactId>
+                                                 <version>${jacoco-maven-plugin.version}</version>
+                                             </plugin>
+                                         </plugins>
+                                     </build>
+                                 </profile>
+                             </profiles>
+             
+                         </project>
+              
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+                         <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                             xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                             <modelVersion>4.0.0</modelVersion>
+                             <parent>
+                                 <groupId>org.springframework.boot</groupId>
+                                 <artifactId>spring-boot-starter-parent</artifactId>
+                                 <version>3.3.3</version>
+                                 <relativePath/> <!-- lookup parent from repository -->
+                             </parent>
+                             <groupId>com.example</groupId>
+                             <artifactId>recipe-test-project</artifactId>
+                             <version>0.0.1-SNAPSHOT</version>
+                             <name>recipe-test-project</name>
+                             <description>recipe-test-project</description>
+                             <url/>
+                             <licenses>
+                                 <license/>
+                             </licenses>
+                             <developers>
+                                 <developer/>
+                             </developers>
+                             <scm>
+                                 <connection/>
+                                 <developerConnection/>
+                                 <tag/>
+                                 <url/>
+                             </scm>
+                             <properties>
+                                 <java.version>21</java.version>
+                                 <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
+                             </properties>
+                             <dependencies>
+                                 <dependency>
+                                     <groupId>org.springframework.boot</groupId>
+                                     <artifactId>spring-boot-starter</artifactId>
+                                 </dependency>
+              
+                                 <dependency>
+                                     <groupId>org.projectlombok</groupId>
+                                     <artifactId>lombok</artifactId>
+                                     <optional>true</optional>
+                                 </dependency>
+                                 <dependency>
+                                     <groupId>org.springframework.boot</groupId>
+                                     <artifactId>spring-boot-starter-test</artifactId>
+                                     <scope>test</scope>
+                                 </dependency>
+                             </dependencies>
+             
+                             <build>
+                                 <plugins>
+                                     <plugin>
+                                         <groupId>org.springframework.boot</groupId>
+                                         <artifactId>spring-boot-maven-plugin</artifactId>
+                                         <configuration>
+                                             <excludes>
+                                                 <exclude>
+                                                     <groupId>org.projectlombok</groupId>
+                                                     <artifactId>lombok</artifactId>
+                                                 </exclude>
+                                             </excludes>
+                                         </configuration>
+                                     </plugin>
+                                     <plugin>
+                                         <groupId>org.jacoco</groupId>
+                                         <artifactId>jacoco-maven-plugin</artifactId>
+                                         <version>${jacoco-maven-plugin.version}</version>
+                                     </plugin>
+                                 </plugins>
+                             </build>
+              
+                             <profiles>
+                                 <profile>
+                                     <id>p1</id>
+                                     <build>
+                                         <plugins>
+                                             <plugin>
+                                                 <groupId>org.jacoco</groupId>
+                                                 <artifactId>jacoco-maven-plugin</artifactId>
+                                                 <version>${jacoco-maven-plugin.version}</version>
+                                             </plugin>
+                                         </plugins>
+                                     </build>
+                                 </profile>
+                             </profiles>
+             
+                         </project>
+              
+              """
+          )
+        );
+    }
+
 }
