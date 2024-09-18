@@ -108,11 +108,22 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     final String wrapperUri;
 
+    @Getter
+    @Option(example = "29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda",
+            description = "The SHA-256 checksum of the Gradle distribution. " +
+                          "If specified, the recipe will add the checksum along with the custom distribution URL.",
+            required = false)
+    @Nullable
+    final String distributionChecksum;
+
     @Override
     public Validated<Object> validate() {
         Validated<Object> validated = super.validate();
         if (wrapperUri != null && (version != null || distribution != null)) {
             return Validated.invalid("wrapperUri", wrapperUri, "WrapperUri cannot be used with other parameters");
+        }
+        if (wrapperUri == null && distributionChecksum != null) {
+            return Validated.invalid("distributionChecksum", distributionChecksum, "DistributionChecksum can only be used with wrapperUri");
         }
         if (version != null) {
             validated = validated.and(Semver.validate(version, null));
@@ -279,12 +290,17 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         GradleWrapper gradleWrapper = getGradleWrapper(ctx);
 
         if (acc.addGradleWrapperProperties) {
+            String checksum = gradleWrapper.getDistributionChecksum() == null ? null : gradleWrapper.getDistributionChecksum().getHexValue();
+            if (wrapperUri != null && distributionChecksum != null && checksum == null) {
+                checksum = distributionChecksum;
+            }
+
             //noinspection UnusedProperty
             Properties.File gradleWrapperProperties = new PropertiesParser().parse(
                             "distributionBase=GRADLE_USER_HOME\n" +
                             "distributionPath=wrapper/dists\n" +
                             "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
-                            ((gradleWrapper.getDistributionChecksum() == null) ? "" : "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n") +
+                            (checksum == null ? "" : "distributionSha256Sum=" + checksum + "\n") +
                             "zipStoreBase=GRADLE_USER_HOME\n" +
                             "zipStorePath=wrapper/dists")
                     .findFirst()
