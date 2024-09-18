@@ -75,7 +75,7 @@ public class DependencyVersionSelector {
             GradleDependencyConfiguration gdc = gradleProject.getConfiguration(configuration);
             if(gdc != null) {
                 Dependency requested = gdc.findRequestedDependency(ga.getGroupId(), ga.getArtifactId());
-                if(requested != null) {
+                if(requested != null && requested.getVersion() != null) {
                     currentVersion = requested.getVersion();
                 }
             }
