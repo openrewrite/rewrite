@@ -464,18 +464,6 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             return space;
         }
 
-        @Override
-        public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-            if (marker instanceof SearchResult) {
-                String description = ((SearchResult) marker).getDescription();
-                p.append("~~")
-                        .append(description == null ? "" : "(" + description + ")~~")
-                        .append(">");
-            }
-            //noinspection unchecked
-            return (M) marker;
-        }
-
         private void visitLineBreak(Javadoc.LineBreak lineBreak, PrintOutputCapture<P> p) {
             beforeSyntax(Space.EMPTY, lineBreak.getMarkers(), null, p);
             p.append(lineBreak.getMargin());
