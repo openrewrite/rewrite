@@ -854,8 +854,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
           ),
-          gradlew,
-          gradlewBat,
+          text(GRADLEW_TEXT, spec -> spec.path(WRAPPER_SCRIPT_LOCATION)),
+          text(GRADLEW_BAT_TEXT, spec -> spec.path(WRAPPER_BATCH_LOCATION)),
           gradleWrapperJarQuark
         );
     }
