@@ -738,7 +738,7 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
-    void testPluginUpgradeWithProfiles() {
+    void pluginUpgradeWithProfiles() {
         rewriteRun(
           spec -> spec.recipe(new UpgradePluginVersion(
             "org.jacoco",
