@@ -1,0 +1,29 @@
+#
+# Copyright 2024 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.UpgradeGradle7
+displayName: Upgrade Gradle to 7.x
+description: Upgrade to version 7.x. See the Gradle upgrade guide from [version 6.x to 7.0](https://docs.gradle.org/current/userguide/upgrading_version_6.html) for more information.
+recipeList:
+  - org.openrewrite.gradle.UpdateGradleWrapper:
+      version: 7.x
+      addIfMissing: false
+
+  # https://github.com/gradle/gradle/blob/v6.9.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
+  # https://github.com/gradle/gradle/blob/v7.6.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
+  - org.openrewrite.gradle.RemoveEnableFeaturePreview:
+      previewFeatureName: GRADLE_METADATA
