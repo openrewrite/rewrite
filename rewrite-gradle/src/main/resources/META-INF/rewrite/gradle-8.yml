@@ -15,10 +15,11 @@
 #
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.gradle.UpgradeGradle8
-displayName: Upgrade Gradle to 8.x
-description: Upgrade to version 8.x. See the Gradle upgrade guide from [version 7.x to 8.0](https://docs.gradle.org/current/userguide/upgrading_version_7.html) and [version 8.x to latest](https://docs.gradle.org/current/userguide/upgrading_version_8.html) for more information.
+name: org.openrewrite.gradle.MigrateToGradle8
+displayName: Migrate to Gradle 8 from Gradle 7
+description: Migrate to version 8.x. See the Gradle upgrade guide from [version 7.x to 8.0](https://docs.gradle.org/current/userguide/upgrading_version_7.html) and [version 8.x to latest](https://docs.gradle.org/current/userguide/upgrading_version_8.html) for more information.
 recipeList:
+  - org.openrewrite.gradle.MigrateToGradle7
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 8.x
       addIfMissing: false

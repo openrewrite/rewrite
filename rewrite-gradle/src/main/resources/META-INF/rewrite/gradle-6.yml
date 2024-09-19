@@ -15,10 +15,11 @@
 #
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.gradle.UpgradeGradle6
-displayName: Upgrade Gradle to 6.x
-description: Upgrade to version 6.x. See the Gradle upgrade guide from [version 5.x to 6.0](https://docs.gradle.org/current/userguide/upgrading_version_5.html) for more information.
+name: org.openrewrite.gradle.MigrateToGradle6
+displayName: Migrate to Gradle 6 from Gradle 5
+description: Migrate to version 6.x. See the Gradle upgrade guide from [version 5.x to 6.0](https://docs.gradle.org/current/userguide/upgrading_version_5.html) for more information.
 recipeList:
+  - org.openrewrite.gradle.MigrateToGradle5
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 6.x
       addIfMissing: false

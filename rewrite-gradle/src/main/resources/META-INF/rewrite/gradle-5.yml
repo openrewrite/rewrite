@@ -15,9 +15,9 @@
 #
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.gradle.UpgradeGradle5
-displayName: Upgrade Gradle to 5.x
-description: Upgrade to version 5.x. See the Gradle upgrade guide from [version 4.x to 5.0](https://docs.gradle.org/current/userguide/upgrading_version_4.html) for more information.
+name: org.openrewrite.gradle.MigrateToGradle5
+displayName: Migrate to Gradle 5 from Gradle 4
+description: Migrate to version 5.x. See the Gradle upgrade guide from [version 4.x to 5.0](https://docs.gradle.org/current/userguide/upgrading_version_4.html) for more information.
 recipeList:
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 5.x
