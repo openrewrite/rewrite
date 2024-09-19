@@ -129,7 +129,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
             if (shouldAutoFormat) {
-                return autoFormat(incomingEntry, p, cursor);
+                incomingEntry = autoFormat(incomingEntry, p, cursor);
             }
             return incomingEntry;
         }));

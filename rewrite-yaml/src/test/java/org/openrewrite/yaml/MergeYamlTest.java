@@ -1145,7 +1145,7 @@ class MergeYamlTest implements RewriteTest {
                 //language=yaml
                 """
                   
-                  # new stuff
+                    # new stuff
                   new-property: value
                   """,
                 false,
