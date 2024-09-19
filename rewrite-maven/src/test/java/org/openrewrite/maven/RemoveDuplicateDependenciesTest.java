@@ -411,6 +411,63 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     @Test
+    void removeDuplicatedDependencyWithImportScope() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+              
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.apache.logging.log4j</groupId>
+                              <artifactId>log4j-bom</artifactId>
+                              <version>2.24.0</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.apache.logging.log4j</groupId>
+                              <artifactId>log4j-bom</artifactId>
+                              <version>2.24.0</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+              
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.apache.logging.log4j</groupId>
+                              <artifactId>log4j-bom</artifactId>
+                              <version>2.24.0</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void removeDependencyWithDefaultType() {
         rewriteRun(
           pomXml(
