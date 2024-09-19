@@ -28,13 +28,13 @@ recipeList:
   - org.openrewrite.gradle.ChangeDependencyConfiguration:
       groupId: "*"
       artifactId: "*"
-      configuration: testCompile
-      newConfiguration: testImplementation
+      configuration: runtime
+      newConfiguration: runtimeOnly
   - org.openrewrite.gradle.ChangeDependencyConfiguration:
       groupId: "*"
       artifactId: "*"
-      configuration: runtime
-      newConfiguration: runtimeOnly
+      configuration: testCompile
+      newConfiguration: testImplementation
   - org.openrewrite.gradle.ChangeDependencyConfiguration:
       groupId: "*"
       artifactId: "*"
