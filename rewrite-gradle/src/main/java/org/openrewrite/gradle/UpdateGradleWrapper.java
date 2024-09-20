@@ -223,16 +223,16 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         String currentDistributionUrl = entry.getValue().getText();
 
                         GradleWrapper gradleWrpr = getGradleWrapper(ctx);
-                        if (StringUtils.isBlank(gradleWrpr.getDistributionUrl()) && !StringUtils.isBlank(version) && Semver.validate(version, null)
-                                .getValue() instanceof ExactVersion) {
+                        if (StringUtils.isBlank(gradleWrpr.getDistributionUrl()) && !StringUtils.isBlank(version) &&
+                            Semver.validate(version, null).getValue() instanceof ExactVersion) {
                             String newDownloadUrl = currentDistributionUrl.replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
                                             "$1" + gradleWrapper.getVersion() + "$3");
                             gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));
                         }
                         String wrapperHost = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf("/")) + "/gradle-";
-                        if (StringUtils.isBlank(wrapperUri) && !StringUtils.isBlank(gradleWrpr.getDistributionUrl()) && !gradleWrpr.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
-
+                        if (StringUtils.isBlank(wrapperUri) && !StringUtils.isBlank(gradleWrpr.getDistributionUrl()) &&
+                            !gradleWrpr.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
                             String newDownloadUrl = gradleWrpr.getDistributionUrl()
                                     .replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",

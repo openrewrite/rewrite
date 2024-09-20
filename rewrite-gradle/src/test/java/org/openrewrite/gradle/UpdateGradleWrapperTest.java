@@ -58,7 +58,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     private static final String GRADLEW_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-7.4.2"));
     private static final String GRADLEW_BAT_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("gradlew-7.4.2.bat"));
 
-
     private final SourceSpecs gradlew = text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty));
     private final SourceSpecs gradlewBat = text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty));
     private final SourceSpecs gradleWrapperJarQuark = other("", spec -> spec.path(WRAPPER_JAR_LOCATION));
