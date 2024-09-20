@@ -17,15 +17,7 @@ package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.PathUtils;
-import org.openrewrite.RecipeRun;
-import org.openrewrite.Result;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
@@ -41,12 +33,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
@@ -56,14 +43,9 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.SourceSpecs.dir;
-import static org.openrewrite.test.SourceSpecs.other;
-import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.test.SourceSpecs.*;
 
 @SuppressWarnings("UnusedProperty")
 class UpdateGradleWrapperTest implements RewriteTest {
@@ -631,13 +613,14 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void addWrapperWithCustomDistributionUri() {
         HttpSender customDistributionHost = request -> {
             if (request.getUrl().toString().contains("company.com")) {
-                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {});
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
             }
             return new HttpUrlConnectionSender().send(request);
         };
         HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-                                                                           .setHttpSender(customDistributionHost)
-                                                                           .setLargeFileHttpSender(customDistributionHost);
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
         rewriteRun(
           spec -> spec
             .recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.0.2-bin.zip", null))
@@ -677,13 +660,14 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void addWrapperWithCustomDistributionUriAndDistributionChecksum() {
         HttpSender customDistributionHost = request -> {
             if (request.getUrl().toString().contains("company.com")) {
-                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {});
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
             }
             return new HttpUrlConnectionSender().send(request);
         };
         HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-                                                                           .setHttpSender(customDistributionHost)
-                                                                           .setLargeFileHttpSender(customDistributionHost);
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
         rewriteRun(
           spec -> spec
             .recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.0.2-bin.zip", wrapperJarChecksum))
@@ -693,9 +677,9 @@ class UpdateGradleWrapperTest implements RewriteTest {
                 var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
                 assertThat(gradleWrapperProperties.getSourcePath()).isEqualTo(WRAPPER_PROPERTIES_LOCATION);
                 assertThat(gradleWrapperProperties.getContent().stream()
-                                       .filter(Properties.Entry.class::isInstance)
-                                       .map(Properties.Entry.class::cast)
-                                       .anyMatch(prop -> "distributionSha256Sum".equals(prop.getKey()) && wrapperJarChecksum.equals(prop.getValue().getText()))).isTrue();
+                  .filter(Properties.Entry.class::isInstance)
+                  .map(Properties.Entry.class::cast)
+                  .anyMatch(prop -> "distributionSha256Sum".equals(prop.getKey()) && wrapperJarChecksum.equals(prop.getValue().getText()))).isTrue();
             }),
           buildGradle(
             """
@@ -711,13 +695,14 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void migrateToCustomDistributionUri() {
         HttpSender customDistributionHost = request -> {
             if (request.getUrl().toString().contains("company.com")) {
-                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {});
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
             }
             return new HttpUrlConnectionSender().send(request);
         };
         HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-                                                                           .setHttpSender(customDistributionHost)
-                                                                           .setLargeFileHttpSender(customDistributionHost);
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.10-bin.zip", null))
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
@@ -749,17 +734,18 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void removeShaDuringMigrationToCustomDistributionUri() {
         HttpSender customDistributionHost = request -> {
             if (request.getUrl().toString().contains("company.com")) {
-                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {});
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
             }
             return new HttpUrlConnectionSender().send(request);
         };
         HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-                                                                           .setHttpSender(customDistributionHost)
-                                                                           .setLargeFileHttpSender(customDistributionHost);
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.10-bin.zip", null))
-                      .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
-                      .executionContext(ctx),
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .executionContext(ctx),
           properties(
             """
               distributionBase=GRADLE_USER_HOME
@@ -788,17 +774,18 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void updateWithCustomDistributionUri() {
         HttpSender customDistributionHost = request -> {
             if (request.getUrl().toString().contains("company.com")) {
-                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {});
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
             }
             return new HttpUrlConnectionSender().send(request);
         };
         HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-                                                                           .setHttpSender(customDistributionHost)
-                                                                           .setLargeFileHttpSender(customDistributionHost);
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("8.10", null, null, null, null))
-                      .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
-                      .executionContext(ctx),
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .executionContext(ctx),
           properties(
             """
               distributionBase=GRADLE_USER_HOME
@@ -867,17 +854,18 @@ class UpdateGradleWrapperTest implements RewriteTest {
                 throw new RuntimeException("I'm sorry Dave, I'm afraid I can't do that.");
             }
             if (request.getUrl().toString().contains("company.com")) {
-                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {});
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
             }
             return new HttpUrlConnectionSender().send(request);
         };
         HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-                                                                           .setHttpSender(unhelpfulSender)
-                                                                           .setLargeFileHttpSender(unhelpfulSender);
+          .setHttpSender(unhelpfulSender)
+          .setLargeFileHttpSender(unhelpfulSender);
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("8.10", null, null, null, null))
-                      .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
-                      .executionContext(ctx),
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .executionContext(ctx),
           properties(
             """
               distributionBase=GRADLE_USER_HOME

@@ -22,16 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.FileAttributes;
-import org.openrewrite.Option;
-import org.openrewrite.PathUtils;
-import org.openrewrite.Preconditions;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
@@ -52,25 +43,11 @@ import org.openrewrite.text.PlainText;
 
 import java.net.URI;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION_RELATIVE_PATH;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION_RELATIVE_PATH;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH;
+import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
 @RequiredArgsConstructor
@@ -247,19 +224,19 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
                         GradleWrapper gradleWrpr = getGradleWrapper(ctx);
                         if (StringUtils.isBlank(gradleWrpr.getDistributionUrl()) && !StringUtils.isBlank(version) && Semver.validate(version, null)
-                                                                                                                           .getValue() instanceof ExactVersion) {
+                                .getValue() instanceof ExactVersion) {
                             String newDownloadUrl = currentDistributionUrl.replace("\\", "")
-                                                                          .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
-                                                                                      "$1" + gradleWrapper.getVersion() + "$3");
+                                    .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
+                                            "$1" + gradleWrapper.getVersion() + "$3");
                             gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));
                         }
                         String wrapperHost = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf("/")) + "/gradle-";
                         if (StringUtils.isBlank(wrapperUri) && !StringUtils.isBlank(gradleWrpr.getDistributionUrl()) && !gradleWrpr.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
 
                             String newDownloadUrl = gradleWrpr.getDistributionUrl()
-                                                              .replace("\\", "")
-                                                              .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
-                                                                          wrapperHost + gradleWrapper.getVersion() + "$3");
+                                    .replace("\\", "")
+                                    .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
+                                            wrapperHost + gradleWrapper.getVersion() + "$3");
                             gradleWrapper = new GradleWrapper(gradleWrpr.getVersion(), new DistributionInfos(newDownloadUrl, null, null));
                         }
 
