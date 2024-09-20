@@ -125,7 +125,7 @@ public class RemoveDuplicateDependencies extends Recipe {
             }
 
             private @Nullable DependencyKey getManagedDependencyKey(Xml.Tag tag) {
-                if (tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false)) {
+                if (tag.getChildValue("scope").filter("import"::equalsIgnoreCase).isPresent()) {
                     return DependencyKey.from(tag);
                 }
                 ResolvedManagedDependency resolvedDependency = findManagedDependency(tag);
