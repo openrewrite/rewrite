@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import java.util.Collections;
 
@@ -1286,6 +1287,170 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void removeRedundantVersionsFromPluginsManagedByParentNotSpecifyingGroupId() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-resources-plugin</artifactId>
+                                  <configuration><whatever/></configuration>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """, SourceSpec::skip),
+          mavenProject("child", pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.sample</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                    </parent>
+                    <artifactId>sample</artifactId>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <artifactId>maven-resources-plugin</artifactId>
+                                <version>3.0.0</version>
+                                <configuration>
+                                    <something-else/>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.sample</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                    </parent>
+                    <artifactId>sample</artifactId>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <artifactId>maven-resources-plugin</artifactId>
+                                <configuration>
+                                    <something-else/>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void removeRedundantDmVersionsFromPluginsManagedByParentNotSpecifyingGroupId() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-resources-plugin</artifactId>
+                                  <configuration><whatever/></configuration>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """, SourceSpec::skip),
+          mavenProject("child", pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.sample</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                    </parent>
+                    <artifactId>sample</artifactId>
+                    <build>
+                        <pluginManagement>
+                            <plugins>
+                                <plugin>
+                                    <artifactId>maven-resources-plugin</artifactId>
+                                    <version>3.0.0</version>
+                                    <configuration>
+                                        <something-else/>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </pluginManagement>
+                    </build>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.sample</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                    </parent>
+                    <artifactId>sample</artifactId>
+                    <build>
+                        <pluginManagement>
+                            <plugins>
+                                <plugin>
+                                    <artifactId>maven-resources-plugin</artifactId>
+                                    <configuration>
+                                        <something-else/>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </pluginManagement>
+                    </build>
+                </project>
+                """
+            )
           )
         );
     }

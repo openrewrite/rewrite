@@ -40,6 +40,7 @@ import java.util.Objects;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 
 /**
  * A value object deserialized directly from POM XML
@@ -249,6 +250,7 @@ public class RawPom {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class Plugin {
+        @Nullable
         String groupId;
         String artifactId;
 
@@ -510,9 +512,9 @@ public class RawPom {
         if (rawPlugins != null) {
             plugins = new ArrayList<>(rawPlugins.size());
             for (Plugin rawPlugin : rawPlugins) {
-
+                String pluginGroupId = rawPlugin.getGroupId();
                 plugins.add(new org.openrewrite.maven.tree.Plugin(
-                        rawPlugin.getGroupId(),
+                        pluginGroupId == null ? PLUGIN_DEFAULT_GROUPID : pluginGroupId,
                         rawPlugin.getArtifactId(),
                         rawPlugin.getVersion(),
                         rawPlugin.getExtensions(),
