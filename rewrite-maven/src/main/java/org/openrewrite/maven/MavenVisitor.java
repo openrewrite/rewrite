@@ -31,6 +31,7 @@ import java.util.function.Predicate;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
+import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 
 public class MavenVisitor<P> extends XmlVisitor<P> {
 
@@ -403,9 +404,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         for (Plugin resolvedPlugin : plugins) {
             String reqGroup = resolvedPlugin.getGroupId();
             String reqVersion = resolvedPlugin.getVersion();
-            if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
+            if (reqGroup.equals(tag.getChildValue("groupId").orElse(PLUGIN_DEFAULT_GROUPID))
+                    && resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null))
+                    && (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
                 return resolvedPlugin;
             }
         }
