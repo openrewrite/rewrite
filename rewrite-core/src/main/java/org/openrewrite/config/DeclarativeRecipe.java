@@ -280,6 +280,9 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     private static TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
+        if (recipe.getRecipeList().isEmpty()) {
+            return recipe.getVisitor();
+        }
         List<TreeVisitor<?, ExecutionContext>> conditions = new ArrayList<>();
         conditions.add(recipe.getVisitor());
         for (Recipe r : recipe.getRecipeList()) {
