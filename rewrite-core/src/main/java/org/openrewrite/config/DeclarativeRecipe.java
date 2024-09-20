@@ -286,7 +286,7 @@ public class DeclarativeRecipe extends Recipe {
             conditions.add(r instanceof DeclarativeRecipe ? or((DeclarativeRecipe) r) : r.getVisitor());
         }
         //noinspection unchecked
-        return Preconditions.or(conditions.<TreeVisitor<?, ExecutionContext>>toArray(new TreeVisitor[0]));
+        return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
     }
 
     private static boolean isScanningRecipe(Recipe recipe) {
