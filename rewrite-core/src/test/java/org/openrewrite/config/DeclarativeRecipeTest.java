@@ -186,8 +186,6 @@ class DeclarativeRecipeTest implements RewriteTest {
               - org.openrewrite.DeclarativePrecondition
             recipeList:
               - org.openrewrite.text.ChangeText:
-                 toText: 2
-              - org.openrewrite.text.ChangeText:
                  toText: 3
             ---
             type: specs.openrewrite.org/v1beta/recipe
