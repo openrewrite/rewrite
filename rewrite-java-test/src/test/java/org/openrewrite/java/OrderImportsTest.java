@@ -22,12 +22,14 @@ import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpec;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.addTypesToSourceSet;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.srcMainJava;
+import static org.openrewrite.java.Assertions.version;
 
 class OrderImportsTest implements RewriteTest {
 
