@@ -177,8 +177,8 @@ class DeclarativeRecipeTest implements RewriteTest {
     @Test
     void yamlDeclarativeRecipeAsPrecondition() {
         rewriteRun(
-          spec -> spec.recipeFromYaml("""
-            ---
+          spec -> spec.recipeFromYaml(
+            """
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.PreconditionTest
             description: Test.
@@ -193,7 +193,9 @@ class DeclarativeRecipeTest implements RewriteTest {
             recipeList:
               - org.openrewrite.text.Find:
                   find: 1
-            """, "org.openrewrite.PreconditionTest"),
+            """,
+            "org.openrewrite.PreconditionTest"
+          ),
           text("1", "3"),
           text("2")
         );
@@ -201,28 +203,31 @@ class DeclarativeRecipeTest implements RewriteTest {
 
     @Test
     void orPreconditions() {
-        // example from https://docs.openrewrite.org/reference/yaml-format-reference#creating-or-preconditions-instead-of-and
+        // As documented https://docs.openrewrite.org/reference/yaml-format-reference#creating-or-preconditions-instead-of-and
         rewriteRun(
-          spec -> spec.recipeFromYaml("""
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.sample.DoSomething
-            description: Test.
-            preconditions:
-              - org.sample.FindAnyJson
-            recipeList:
-              - org.openrewrite.text.ChangeText:
-                 toText: 2
-            ---
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.sample.FindAnyJson
-            recipeList:
-              - org.openrewrite.FindSourceFiles:
-                  filePattern: "**/my.json"
-              - org.openrewrite.FindSourceFiles:
-                  filePattern: "**/your.json"
-              - org.openrewrite.FindSourceFiles:
-                  filePattern: "**/our.json"
-            """, "org.sample.DoSomething"),
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.DoSomething
+              description: Test.
+              preconditions:
+                - org.sample.FindAnyJson
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: 2
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.FindAnyJson
+              recipeList:
+                - org.openrewrite.FindSourceFiles:
+                    filePattern: "**/my.json"
+                - org.openrewrite.FindSourceFiles:
+                    filePattern: "**/your.json"
+                - org.openrewrite.FindSourceFiles:
+                    filePattern: "**/our.json"
+              """,
+            "org.sample.DoSomething"
+          ),
           text("1", "2", spec -> spec.path("a/my.json")),
           text("a", spec -> spec.path("a/not-my.json"))
         );
