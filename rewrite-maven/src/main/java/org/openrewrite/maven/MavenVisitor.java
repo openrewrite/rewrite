@@ -404,9 +404,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         for (Plugin resolvedPlugin : plugins) {
             String reqGroup = resolvedPlugin.getGroupId();
             String reqVersion = resolvedPlugin.getVersion();
-            if (reqGroup.equals(tag.getChildValue("groupId").orElse(PLUGIN_DEFAULT_GROUPID))
-                    && resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null))
-                    && (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
+            if (reqGroup.equals(tag.getChildValue("groupId").orElse(PLUGIN_DEFAULT_GROUPID)) &&
+                resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
                 return resolvedPlugin;
             }
         }
