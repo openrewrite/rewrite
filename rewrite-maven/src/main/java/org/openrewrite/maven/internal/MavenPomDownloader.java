@@ -256,15 +256,14 @@ public class MavenPomDownloader {
                 boolean cacheEmptyResult = false;
                 try {
                     String scheme = URI.create(repo.getUri()).getScheme();
-                    String uri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
+                    String baseUri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
                                  requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
                                  gav.getArtifactId() + '/' +
-                                 (gav.getVersion() == null ? "" : gav.getVersion() + '/') +
-                                 "maven-metadata.xml";
+                                 (gav.getVersion() == null ? "" : gav.getVersion() + '/');
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
-                        Path path = Paths.get(URI.create(uri));
+                        Path path = Paths.get(URI.create(baseUri + "maven-metadata-local.xml"));
                         if (Files.exists(path)) {
                             MavenMetadata parsed = MavenMetadata.parse(Files.readAllBytes(path));
                             if (parsed != null) {
@@ -272,7 +271,7 @@ public class MavenPomDownloader {
                             }
                         }
                     } else {
-                        byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri);
+                        byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, baseUri + "maven-metadata.xml");
                         MavenMetadata parsed = MavenMetadata.parse(responseBody);
                         if (parsed != null) {
                             result = Optional.of(parsed);
