@@ -41,7 +41,7 @@ import static org.openrewrite.java.Assertions.java;
 class OperatorWrapTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new OperatorWrap());
+        spec.recipe(new OperatorWrap(null));
     }
 
     private static List<NamedStyles> operatorWrapStyle() {
@@ -118,13 +118,13 @@ class OperatorWrapTest implements RewriteTest {
           java(
             """
               import java.io.Serializable;
-
+              
               class Test {
                   static <T extends Serializable &
                           Comparable<T>> T method0() {
                       return null;
                   }
-
+              
                   static <T extends Serializable> T method1() {
                       return null;
                   }
@@ -132,13 +132,13 @@ class OperatorWrapTest implements RewriteTest {
               """,
             """
               import java.io.Serializable;
-
+              
               class Test {
                   static <T extends Serializable
                           & Comparable<T>> T method0() {
                       return null;
                   }
-
+              
                   static <T extends Serializable> T method1() {
                       return null;
                   }
@@ -157,13 +157,13 @@ class OperatorWrapTest implements RewriteTest {
           java(
             """
               import java.io.Serializable;
-
+              
               class Test {
                   static <T extends Serializable
                           & Comparable<T>> T method0() {
                       return null;
                   }
-
+              
                   static <T extends Serializable> T method1() {
                       return null;
                   }
@@ -171,13 +171,13 @@ class OperatorWrapTest implements RewriteTest {
               """,
             """
               import java.io.Serializable;
-
+              
               class Test {
                   static <T extends Serializable &
                           Comparable<T>> T method0() {
                       return null;
                   }
-
+              
                   static <T extends Serializable> T method1() {
                       return null;
                   }
@@ -442,7 +442,7 @@ class OperatorWrapTest implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   static void methodStream(Stream<Object> stream) {
                       stream.forEach(System.out::
@@ -452,7 +452,7 @@ class OperatorWrapTest implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   static void methodStream(Stream<Object> stream) {
                       stream.forEach(System.out
@@ -473,7 +473,7 @@ class OperatorWrapTest implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   static void methodStream(Stream<Object> stream) {
                       stream.forEach(System.out
@@ -483,7 +483,7 @@ class OperatorWrapTest implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   static void methodStream(Stream<Object> stream) {
                       stream.forEach(System.out::
@@ -623,5 +623,35 @@ class OperatorWrapTest implements RewriteTest {
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
         return spec -> spec.afterRecipe(cu ->
           Assertions.assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
+    }
+
+    @Test
+    void allowOverrideOfDetectedStyle() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new OperatorWrap(OperatorWrapStyle.WrapOption.EOL))
+            .parser(JavaParser.fromJavaVersion().styles(operatorWrapStyle())),
+          java(
+            """
+              class Test {
+                  static void method() {
+                      String s = "aaa" +
+                              "b"
+                              + "c";
+                  }
+              }
+              """,
+            """
+              class Test {
+                  static void method() {
+                      String s = "aaa" +
+                              "b" +
+                              "c";
+                  }
+              }
+              """,
+            autoFormatIsIdempotent()
+          )
+        );
     }
 }
