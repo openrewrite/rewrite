@@ -269,8 +269,8 @@ class WhenTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 K.When when = (K.When)((J.MethodDeclaration)(cu.getStatements().get(0))).getBody().getStatements().get(1);
                 boolean allBranchesHasLiteralBody = when.getBranches().getStatements().stream().map(K.WhenBranch.class::cast).allMatch(
-                  branch -> branch.getBody() instanceof J.Literal
-                            || branch.getBody() instanceof J.Parentheses<?> && ((J.Parentheses<?>) branch.getBody()).getTree() instanceof J.Literal
+                  branch -> branch.getBody() instanceof J.Literal ||
+                            branch.getBody() instanceof J.Parentheses<?> && ((J.Parentheses<?>) branch.getBody()).getTree() instanceof J.Literal
                 );
                 assertThat(allBranchesHasLiteralBody).isTrue();
             })

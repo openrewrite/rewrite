@@ -397,8 +397,8 @@ public interface K extends J {
 
         @Override
         public <J2 extends J> J2 withPrefix(Space space) {
-            return (J2) (annotations.isEmpty() ? withExpression(expression.withPrefix(space))
-                    : withAnnotations(ListUtils.mapFirst(annotations, a -> a.withPrefix(space))));
+            return (J2) (annotations.isEmpty() ? withExpression(expression.withPrefix(space)) :
+                    withAnnotations(ListUtils.mapFirst(annotations, a -> a.withPrefix(space))));
         }
 
         @Override
@@ -1262,8 +1262,8 @@ public interface K extends J {
             }
 
             public FunctionType withParameters(@Nullable JContainer<TypeTree> parameters) {
-                return t.parameters == parameters ? t
-                        : new FunctionType(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.receiver, parameters, t.arrow, t.returnType);
+                return t.parameters == parameters ? t :
+                        new FunctionType(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.receiver, parameters, t.arrow, t.returnType);
             }
         }
     }

@@ -964,8 +964,8 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             JRightPadded<J> lastParam = parameters.get(parameters.size() - 1);
             Space after = lastParam.getAfter();
             trailingComma = lastParam.getMarkers().findFirst(TrailingComma.class).isPresent();
-            lastParamHasSpace = after.getComments().isEmpty() && onlySpacesAndNotEmpty(after.getWhitespace())
-                    || lastParam.getMarkers().findFirst(TrailingComma.class).map(t -> onlySpacesAndNotEmpty(t.getSuffix().getWhitespace())).orElse(false);
+            lastParamHasSpace = after.getComments().isEmpty() && onlySpacesAndNotEmpty(after.getWhitespace()) ||
+                    lastParam.getMarkers().findFirst(TrailingComma.class).map(t -> onlySpacesAndNotEmpty(t.getSuffix().getWhitespace())).orElse(false);
             useSpaceBeforeLambdaArrow &= !trailingComma;
         } else {
             l = l.withArrow(Space.EMPTY);

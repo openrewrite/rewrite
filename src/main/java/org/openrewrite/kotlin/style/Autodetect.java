@@ -439,8 +439,8 @@ public class Autodetect extends NamedStyles {
             // (newline-separated) annotations on some common target are not continuations
             boolean isContinuation = !(expression instanceof J.Annotation && !(
                     // ...but annotations which are *arguments* to other annotations can be continuations
-                    getCursor().getParentTreeCursor().getValue() instanceof J.Annotation
-                    || getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
+                    getCursor().getParentTreeCursor().getValue() instanceof J.Annotation ||
+                    getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
             ));
             countIndents(expression.getPrefix().getWhitespace(), isContinuation, stats);
 

@@ -109,8 +109,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.Case ||
                 tree instanceof J.EnumValueSet ||
                 (tree instanceof J.Ternary && !wrappingStyle.getElvisExpressions().getUseContinuationIndent()) ||
-                (tree instanceof J.FieldAccess || tree instanceof J.MethodInvocation)
-                        && !wrappingStyle.getChainedFunctionCalls().getUseContinuationIndent() ||
+                (tree instanceof J.FieldAccess || tree instanceof J.MethodInvocation) &&
+                        !wrappingStyle.getChainedFunctionCalls().getUseContinuationIndent() ||
                 tree instanceof J.Annotation
         ) {
             getCursor().putMessage("indentType", IndentType.INDENT);
@@ -163,8 +163,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
 
             if ((loc == Space.Location.CLASS_KIND ||
-                    loc == Space.Location.METHOD_DECLARATION_PREFIX)
-                    && value instanceof J.ClassDeclaration) {
+                    loc == Space.Location.METHOD_DECLARATION_PREFIX) &&
+                    value instanceof J.ClassDeclaration) {
                 J.ClassDeclaration c = (J.ClassDeclaration) value;
                 if (!c.getLeadingAnnotations().isEmpty()) {
                     alignToAnnotation = true;

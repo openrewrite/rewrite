@@ -240,10 +240,10 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
         return ListUtils.map(statements,
                 (i, st) -> {
                     Statement element = st.getElement();
-                    if (i == 0
-                            || element.getPrefix().getWhitespace().contains("\n")
-                            || element.getPrefix().getLastWhitespace().contains("\n")
-                            || statements.get(i - 1).getMarkers().findFirst(Semicolon.class).isPresent()) {
+                    if (i == 0 ||
+                            element.getPrefix().getWhitespace().contains("\n") ||
+                            element.getPrefix().getLastWhitespace().contains("\n") ||
+                            statements.get(i - 1).getMarkers().findFirst(Semicolon.class).isPresent()) {
                         return st;
                     }
                     return st.withElement(element.withPrefix(addNewline(element.getPrefix())));

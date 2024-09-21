@@ -38,9 +38,9 @@ public class ReplaceCharToIntWithCode extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace the usage of the deprecated `Char#toInt()` with `Char#code`. "
-               + "Please ensure that your Kotlin version is 1.5 or later to support the `Char#code` property. "
-               + "Note that the current implementation does not perform a Kotlin version check.";
+        return "Replace the usage of the deprecated `Char#toInt()` with `Char#code`. " +
+               "Please ensure that your Kotlin version is 1.5 or later to support the `Char#code` property. " +
+               "Note that the current implementation does not perform a Kotlin version check.";
     }
 
     @Override

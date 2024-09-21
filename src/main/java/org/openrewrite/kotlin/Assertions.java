@@ -207,8 +207,8 @@ public final class Assertions {
     }
 
     private static void assertValidTypes(TypeValidation typeValidation, J sf) {
-        if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations()
-            || typeValidation.constructorInvocations()) {
+        if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations() ||
+            typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
@@ -463,10 +463,10 @@ public final class Assertions {
         }
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
-            return inPackageDeclaration() || inImport() || isClassName()
-                   || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
-                   || isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident)
-                   || isInJavaDoc(ident) || isWhenLabel() || isUseSite();
+            return inPackageDeclaration() || inImport() || isClassName() ||
+                   isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
+                   isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
+                   isInJavaDoc(ident) || isWhenLabel() || isUseSite();
         }
 
         private boolean inPackageDeclaration() {
@@ -494,8 +494,8 @@ public final class Assertions {
 
         private boolean isFieldAccess(J.Identifier ident) {
             Tree value = getCursor().getParentTreeCursor().getValue();
-            return value instanceof J.FieldAccess
-                   && (ident == ((J.FieldAccess) value).getName() ||
+            return value instanceof J.FieldAccess &&
+                   (ident == ((J.FieldAccess) value).getName() ||
                        ident == ((J.FieldAccess) value).getTarget() && !((J.FieldAccess) value).getSimpleName().equals("class"));
         }
 
@@ -515,8 +515,8 @@ public final class Assertions {
         }
 
         private boolean isTypeParameter() {
-            return getCursor().getParent() != null
-                   && getCursor().getParent().getValue() instanceof J.TypeParameter;
+            return getCursor().getParent() != null &&
+                   getCursor().getParent().getValue() instanceof J.TypeParameter;
         }
 
         private boolean isMemberReference(J.Identifier ident) {
@@ -551,8 +551,8 @@ public final class Assertions {
 
         private boolean isAnnotationField(J.Identifier ident) {
             Cursor parent = getCursor().getParent();
-            return parent != null && parent.getValue() instanceof J.Assignment
-                   && (ident == ((J.Assignment) parent.getValue()).getVariable() && getCursor().firstEnclosing(J.Annotation.class) != null);
+            return parent != null && parent.getValue() instanceof J.Assignment &&
+                   (ident == ((J.Assignment) parent.getValue()).getVariable() && getCursor().firstEnclosing(J.Annotation.class) != null);
         }
 
         private boolean isValidated(J.Identifier i) {
