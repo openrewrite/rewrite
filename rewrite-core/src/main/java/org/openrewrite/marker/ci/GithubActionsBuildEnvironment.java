@@ -67,16 +67,16 @@ public class GithubActionsBuildEnvironment implements BuildEnvironment {
         } else {
             gitRef = gitRef.replaceFirst("refs/heads/", "");
         }
-        if (StringUtils.isBlank(ghRef)
-            || StringUtils.isBlank(host)
-            || StringUtils.isBlank(repository)
-            || StringUtils.isBlank(sha)) {
+        if (StringUtils.isBlank(ghRef) ||
+            StringUtils.isBlank(host) ||
+            StringUtils.isBlank(repository) ||
+            StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException(
                     String.format("Invalid GitHub environment with host: %s, branch: %s, " +
                                   "repository: %s, sha: %s", host, ghRef, repository, sha));
         }
 
-        return new GitProvenance(UUID.randomUUID(), host + "/" + getRepository()
-                                                    + ".git", gitRef, getSha(), null, null, emptyList());
+        return new GitProvenance(UUID.randomUUID(), host + "/" + getRepository() +
+                                                    ".git", gitRef, getSha(), null, null, emptyList());
     }
 }

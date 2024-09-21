@@ -128,9 +128,9 @@ public class UpgradePluginVersion extends Recipe {
                         final String versionLookup;
                         if (maybeVersionValue.isPresent()) {
                             String versionValue = maybeVersionValue.get();
-                            versionLookup = versionValue.startsWith("${")
-                                    ? super.getResolutionResult().getPom().getValue(versionValue.trim())
-                                    : versionValue;
+                            versionLookup = versionValue.startsWith("${") ?
+                                    super.getResolutionResult().getPom().getValue(versionValue.trim()) :
+                                    versionValue;
                         } else {
                             versionLookup = "0.0.0";
                         }

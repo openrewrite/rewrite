@@ -157,10 +157,10 @@ public class ChangeDependencyClassifier extends Recipe {
                         }
                         index++;
                     }
-                    if (groupId == null || artifactId == null
-                        || (version == null && !depMatcher.matches(groupId, artifactId))
-                        || (version != null && !depMatcher.matches(groupId, artifactId, version))
-                        || Objects.equals(newClassifier, classifier)) {
+                    if (groupId == null || artifactId == null ||
+                        (version == null && !depMatcher.matches(groupId, artifactId)) ||
+                        (version != null && !depMatcher.matches(groupId, artifactId, version)) ||
+                        Objects.equals(newClassifier, classifier)) {
                         return m;
                     }
 

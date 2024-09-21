@@ -434,9 +434,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         return arg;
                     }
                     Dependency dep = DependencyStringNotationConverter.parse(gav);
-                    if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())
-                        && dep.getVersion() != null
-                        && !dep.getVersion().startsWith("$")) {
+                    if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId()) &&
+                        dep.getVersion() != null &&
+                        !dep.getVersion().startsWith("$")) {
                         Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
                         if (scanResult instanceof Exception) {
                             getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, scanResult);
@@ -472,9 +472,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 m = Markup.warn(m, err);
             }
             List<Expression> depArgs = m.getArguments();
-            if (depArgs.size() >= 3 && depArgs.get(0) instanceof G.MapEntry
-                && depArgs.get(1) instanceof G.MapEntry
-                && depArgs.get(2) instanceof G.MapEntry) {
+            if (depArgs.size() >= 3 && depArgs.get(0) instanceof G.MapEntry &&
+                depArgs.get(1) instanceof G.MapEntry &&
+                depArgs.get(2) instanceof G.MapEntry) {
                 Expression groupValue = ((G.MapEntry) depArgs.get(0)).getValue();
                 Expression artifactValue = ((G.MapEntry) depArgs.get(1)).getValue();
                 if (!(groupValue instanceof J.Literal) || !(artifactValue instanceof J.Literal)) {

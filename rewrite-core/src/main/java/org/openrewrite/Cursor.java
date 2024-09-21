@@ -187,8 +187,8 @@ public class Cursor {
                        .map(t -> t instanceof Tree ?
                                t.getClass().getSimpleName() :
                                t.toString())
-                       .collect(Collectors.joining("->"))
-               + "}";
+                       .collect(Collectors.joining("->")) +
+               "}";
     }
 
     public Cursor dropParentUntil(Predicate<Object> valuePredicate) {

@@ -124,8 +124,8 @@ public class DependencyUseMapNotation extends Recipe {
                 // Supporting all possible GString interpolations is impossible
                 // Supporting all probable GString interpolations is difficult
                 // This focuses on the most common case: When only the version number is interpolated
-                if (g.getStrings().size() != 2 || !(g.getStrings().get(0) instanceof J.Literal)
-                        || !(g.getStrings().get(1) instanceof G.GString.Value)) {
+                if (g.getStrings().size() != 2 || !(g.getStrings().get(0) instanceof J.Literal) ||
+                        !(g.getStrings().get(1) instanceof G.GString.Value)) {
                     return m;
                 }
                 J.Literal arg1 = (J.Literal)g.getStrings().get(0);

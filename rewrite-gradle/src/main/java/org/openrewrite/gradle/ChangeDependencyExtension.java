@@ -146,10 +146,10 @@ public class ChangeDependencyExtension extends Recipe {
                             extension = valueValue;
                         }
                     }
-                    if (groupId == null || artifactId == null
-                        || (version == null && !depMatcher.matches(groupId, artifactId))
-                        || (version != null && !depMatcher.matches(groupId, artifactId, version))
-                        || extension == null) {
+                    if (groupId == null || artifactId == null ||
+                        (version == null && !depMatcher.matches(groupId, artifactId)) ||
+                        (version != null && !depMatcher.matches(groupId, artifactId, version)) ||
+                        extension == null) {
                         return m;
                     }
                     String delimiter = extensionStringDelimiter;

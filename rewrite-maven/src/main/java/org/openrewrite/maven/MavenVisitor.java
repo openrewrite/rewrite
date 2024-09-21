@@ -201,8 +201,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
-        return tag.getChildValue("type").map("pom"::equalsIgnoreCase).orElse(false)
-               && tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
+        return tag.getChildValue("type").map("pom"::equalsIgnoreCase).orElse(false) &&
+               tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
     }
 
     public void maybeUpdateModel() {

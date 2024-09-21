@@ -100,8 +100,8 @@ public class SourceSpecTextBlockIndentation extends Recipe {
                                     }
 
                                     J.Literal withFixedSource = source.withValueSource(fixedSource.toString());
-                                    if (withFixedSource.getPrefix().getComments().isEmpty()
-                                        && withFixedSource.getPrefix().getWhitespace().isEmpty()) {
+                                    if (withFixedSource.getPrefix().getComments().isEmpty() &&
+                                        withFixedSource.getPrefix().getWhitespace().isEmpty()) {
                                         return maybeAutoFormat(withFixedSource, withFixedSource.withPrefix(Space.format("\n")), ctx);
                                     }
                                     return withFixedSource;

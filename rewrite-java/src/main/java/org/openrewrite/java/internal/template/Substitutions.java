@@ -133,8 +133,8 @@ public class Substitutions {
             if (param != null) {
                 type = TypeParameter.toFullyQualifiedName(param);
             } else {
-                if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null
-                    && ((J.NewClass) parameter).getClazz() != null) {
+                if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null &&
+                    ((J.NewClass) parameter).getClazz() != null) {
                     // for anonymous classes get the type from the supertype
                     type = ((J.NewClass) parameter).getClazz().getType();
                 } else if (parameter instanceof TypedTree) {
