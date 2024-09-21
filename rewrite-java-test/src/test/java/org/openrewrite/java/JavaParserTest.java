@@ -103,7 +103,7 @@ class JavaParserTest implements RewriteTest {
           .matches(Files::exists, "File extracted from classpath resources exists on disk")
           .matches(path -> path.endsWith("guava-31.0-jre.jar"),
             "classpathFromResources should return guava-31.0-jre.jar from resources, even when the target " +
-              "directory contains guava-30.0-jre.jar which has the same prefix");
+            "directory contains guava-30.0-jre.jar which has the same prefix");
     }
 
     @Test
@@ -168,59 +168,60 @@ class JavaParserTest implements RewriteTest {
     }
 
     @ParameterizedTest
+    //language=java
     @ValueSource(strings = {
       """
-          package com.example.demo;
-          class FooBar {
-              public void test() {
-                ownerR
-              }
-          }
+        package com.example.demo;
+        class FooBar {
+            public void test() {
+              ownerR
+            }
+        }
         """,
       """
-          package com.example.demo;
-          class FooBar {
-              public void test(int num string msg) {
-                String a; this.ownerR
-                System.out.println();
-              }
-          }
+        package com.example.demo;
+        class FooBar {
+            public void test(int num string msg) {
+              String a; this.ownerR
+              System.out.println();
+            }
+        }
         """,
       """
-          package com.example.demo;
-          class FooBar {
-              public void test(int num string s, int b) {
-                String a; this.ownerR
-                System.out.println();
-              }
-          }
+        package com.example.demo;
+        class FooBar {
+            public void test(int num string s, int b) {
+              String a; this.ownerR
+              System.out.println();
+            }
+        }
         """,
       """
-          package com.example.demo;
-          class FooBar {
-              public void test(int num) {
-                String a; this.ownerR // comment
-                System.out.println();
-              }
-          }
+        package com.example.demo;
+        class FooBar {
+            public void test(int num) {
+              String a; this.ownerR // comment
+              System.out.println();
+            }
+        }
         """,
       """
-          package com.example.demo;
-          class FooBar {
-              public void test(int num) {
-                // comment
-                this.ownerR
-              }
-          }
+        package com.example.demo;
+        class FooBar {
+            public void test(int num) {
+              // comment
+              this.ownerR
+            }
+        }
         """,
       """
-          package com.example.demo;
-          class FooBar {
-              public void test(int param ) {
-                this.ownerR
-                // comment
-              }
-          }
+        package com.example.demo;
+        class FooBar {
+            public void test(int param ) {
+              this.ownerR
+              // comment
+            }
+        }
         """
     })
     void erroneousExpressionStatements(@Language("java") String source) {
@@ -235,38 +236,38 @@ class JavaParserTest implements RewriteTest {
           spec -> spec.recipe(new FindCompileErrors()),
           java(
             """
-                package com.example.demo;
-                class Foo {
-                    /pet
-                    public void test() {
-                    }
-                }
+              package com.example.demo;
+              class Foo {
+                  /pet
+                  public void test() {
+                  }
+              }
               """,
             """
-                package com.example.demo;
-                class Foo {
-                    /*~~>*///*~~>*/pet
-                    public void test() {
-                    }
-                }
+              package com.example.demo;
+              class Foo {
+                  /*~~>*///*~~>*/pet
+                  public void test() {
+                  }
+              }
               """
           ),
           java(
             """
-                package com.example.demo;
-                class Bar {
-                    pet
-                    public void test() {
-                    }
-                }
+              package com.example.demo;
+              class Bar {
+                  pet
+                  public void test() {
+                  }
+              }
               """,
             """
-                package com.example.demo;
-                class Bar {
-                    /*~~>*/pet
-                    public void test() {
-                    }
-                }
+              package com.example.demo;
+              class Bar {
+                  /*~~>*/pet
+                  public void test() {
+                  }
+              }
               """
           )
         );
