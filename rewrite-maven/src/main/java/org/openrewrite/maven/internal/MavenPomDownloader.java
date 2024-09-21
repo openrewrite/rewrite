@@ -505,10 +505,10 @@ public class MavenPomDownloader {
                 // Even poms published to remote repositories still contain relative paths to their parent poms
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote
                 // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
-                if (maybeLocalPom != null
-                    && gav.getGroupId().equals(maybeLocalPom.getGroupId())
-                    && gav.getArtifactId().equals(maybeLocalPom.getArtifactId())
-                    && gav.getVersion().equals(maybeLocalPom.getVersion())) {
+                if (maybeLocalPom != null &&
+                    gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
+                    gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
+                    gav.getVersion().equals(maybeLocalPom.getVersion())) {
                     return maybeLocalPom;
                 }
             }

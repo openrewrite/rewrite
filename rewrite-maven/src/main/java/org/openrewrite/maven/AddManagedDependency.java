@@ -238,9 +238,9 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                         .map(resolvedManagedDep -> {
                             if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
                                 return resolvedManagedDep.getGav().getVersion();
-                            } else if (resolvedManagedDep.getRequestedBom() != null
-                                       && resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId)
-                                       && resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
+                            } else if (resolvedManagedDep.getRequestedBom() != null &&
+                                       resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId) &&
+                                       resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
                                 return resolvedManagedDep.getRequestedBom().getVersion();
                             }
                             return null;

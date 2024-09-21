@@ -151,8 +151,8 @@ public class PathUtils {
             if (!StringUtils.matchesGlob(pathTokens[pathIdxEnd], pattTokens[pattIdxEnd])) {
                 return false;
             }
-            if (pattIdxEnd == (pattTokens.length - 1)
-                && (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
+            if (pattIdxEnd == (pattTokens.length - 1) &&
+                (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
                 return false;
             }
             pattIdxEnd--;
@@ -293,8 +293,8 @@ public class PathUtils {
 
     @SuppressWarnings("SameParameterValue")
     private static boolean isFileSeparator(boolean strict, char ch) {
-        return strict
-                ? ch == File.separatorChar
-                : ch == UNIX_SEPARATOR || ch == WINDOWS_SEPARATOR;
+        return strict ?
+                ch == File.separatorChar :
+                ch == UNIX_SEPARATOR || ch == WINDOWS_SEPARATOR;
     }
 }

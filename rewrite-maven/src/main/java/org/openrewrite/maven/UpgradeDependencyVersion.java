@@ -91,9 +91,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     Boolean overrideManagedVersion;
 
     @Option(displayName = "Retain versions",
-            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed "
-                          + "from dependency management after the changes from this recipe, then it will be retained with an explicit version. "
-                          + "The version can be omitted from the GAV to use the old value from dependency management",
+            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed " +
+                          "from dependency management after the changes from this recipe, then it will be retained with an explicit version. " +
+                          "The version can be omitted from the GAV to use the old value from dependency management",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable

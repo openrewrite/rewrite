@@ -145,8 +145,8 @@ public class RemoveDependency extends Recipe {
                         //noinspection DataFlowIssue
                         return maybeRemoveDependency(m);
                     } else if (firstArgument instanceof J.MethodInvocation &&
-                            (((J.MethodInvocation) firstArgument).getSimpleName().equals("platform")
-                                    || ((J.MethodInvocation) firstArgument).getSimpleName().equals("enforcedPlatform"))) {
+                            (((J.MethodInvocation) firstArgument).getSimpleName().equals("platform") ||
+                                    ((J.MethodInvocation) firstArgument).getSimpleName().equals("enforcedPlatform"))) {
                         J after = maybeRemoveDependency((J.MethodInvocation) firstArgument);
                         if (after == null) {
                             //noinspection DataFlowIssue

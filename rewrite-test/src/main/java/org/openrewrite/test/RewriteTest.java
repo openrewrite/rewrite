@@ -428,8 +428,8 @@ public interface RewriteTest extends SourceSpecs {
                             return "    " + beforePath + " -> " + afterPath;
                         })
                         .collect(Collectors.joining("\n"));
-                fail("Expected a new source file with the source path: " + sourceSpec.getSourcePath()
-                     +"\nAll source file paths, before and after recipe run:\n" + paths);
+                fail("Expected a new source file with the source path: " + sourceSpec.getSourcePath() +
+                     "\nAll source file paths, before and after recipe run:\n" + paths);
             }
 
             // If the source spec has not defined a source path, look for a result with the exact contents. This logic
@@ -579,10 +579,10 @@ public interface RewriteTest extends SourceSpecs {
         newFilesGenerated.assertAll();
 
         Map<Result, Boolean> resultToUnexpected = allResults.stream()
-                .collect(Collectors.toMap(result -> result, result -> result.getBefore() == null
-                                                                      && !(result.getAfter() instanceof Remote)
-                                                                      && !expectedNewResults.contains(result)
-                                                                      && testMethodSpec.afterRecipes.isEmpty()));
+                .collect(Collectors.toMap(result -> result, result -> result.getBefore() == null &&
+                                                                      !(result.getAfter() instanceof Remote) &&
+                                                                      !expectedNewResults.contains(result) &&
+                                                                      testMethodSpec.afterRecipes.isEmpty()));
         if (resultToUnexpected.values().stream().anyMatch(unexpected -> unexpected)) {
             String paths = resultToUnexpected.entrySet().stream()
                     .map(it -> {

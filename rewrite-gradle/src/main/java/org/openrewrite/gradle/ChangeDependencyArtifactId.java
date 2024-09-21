@@ -151,8 +151,8 @@ public class ChangeDependencyArtifactId extends Recipe {
                     if (strings.size() >= 2 &&
                         strings.get(0) instanceof J.Literal) {
                         Dependency dependency = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) strings.get(0)).getValue()));
-                        if (dependency != null && !newArtifactId.equals(dependency.getArtifactId())
-                            && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                        if (dependency != null && !newArtifactId.equals(dependency.getArtifactId()) &&
+                            depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                             Dependency newDependency = dependency.withArtifactId(newArtifactId);
                             updatedDependencies.put(dependency.getGav().asGroupArtifact(), newDependency.getGav().asGroupArtifact());
                             String replacement = newDependency.toStringNotation();
@@ -196,9 +196,9 @@ public class ChangeDependencyArtifactId extends Recipe {
                             version = valueValue;
                         }
                     }
-                    if (groupId == null || artifactId == null
-                        || (version == null && !depMatcher.matches(groupId, artifactId))
-                        || (version != null && !depMatcher.matches(groupId, artifactId, version))) {
+                    if (groupId == null || artifactId == null ||
+                        (version == null && !depMatcher.matches(groupId, artifactId)) ||
+                        (version != null && !depMatcher.matches(groupId, artifactId, version))) {
                         return m;
                     }
                     String delimiter = versionStringDelimiter;
