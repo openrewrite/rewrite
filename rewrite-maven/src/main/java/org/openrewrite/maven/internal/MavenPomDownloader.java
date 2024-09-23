@@ -42,6 +42,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
@@ -391,7 +392,7 @@ public class MavenPomDownloader {
                         versions.add(path.getFileName().toString());
                     }
                 }
-                return new MavenMetadata.Versioning(versions, null, null);
+                return new MavenMetadata.Versioning(versions, null, null, null);
             } catch (IOException e) {
                 throw new MavenDownloadingException("Unable to derive metadata from file repository. " + e.getMessage(), null, gav);
             }
@@ -421,7 +422,7 @@ public class MavenPomDownloader {
             return null;
         }
 
-        return new MavenMetadata.Versioning(versions, null, null);
+        return new MavenMetadata.Versioning(versions, null, null, null);
     }
 
     String hrefToVersion(String href, String rootUri) {
@@ -445,8 +446,13 @@ public class MavenPomDownloader {
                 mergeVersions(m1.getVersioning().getVersions(), m2.getVersioning().getVersions()),
                 Stream.concat(m1.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m1.getVersioning().getSnapshotVersions().stream(),
                         m2.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m2.getVersioning().getSnapshotVersions().stream()).collect(toList()),
-                maxSnapshot(m1.getVersioning().getSnapshot(), m2.getVersioning().getSnapshot())
+                maxSnapshot(m1.getVersioning().getSnapshot(), m2.getVersioning().getSnapshot()),
+                maxLastUpdated(m1.getVersioning().getLastUpdated(), m2.getVersioning().getLastUpdated())
         ));
+    }
+
+    private @Nullable ZonedDateTime maxLastUpdated(@Nullable ZonedDateTime left, @Nullable ZonedDateTime right) {
+        return left == null ? right : right == null ? left : left.compareTo(right) >= 0 ? left : right;
     }
 
     private List<String> mergeVersions(List<String> versions1, List<String> versions2) {
