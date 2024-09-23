@@ -133,17 +133,6 @@ public class MavenRepository implements Serializable {
         this.deriveMetadataIfMissing = deriveMetadataIfMissing;
     }
 
-    public static MavenRepository from(MavenRepository repository, String url) {
-        return new MavenRepository(
-                repository.getId(),
-                url,
-                repository.getReleases(),
-                repository.getSnapshots(),
-                repository.getUsername(),
-                repository.getPassword(),
-                repository.getTimeout());
-    }
-
     public static Builder builder() {
         return new Builder();
     }

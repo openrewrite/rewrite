@@ -788,11 +788,11 @@ public class MavenPomDownloader {
         if (!originalUrl.equals(httpsUri)) {
             reachability = reachable(repository, applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
             if (reachability.isSuccess()) {
-                return MavenRepository.from(repository, originalUrl);
+                return repository.withUri(originalUrl);
             }
             reachability = reachable(repository, applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
             if (reachability.isReachable()) {
-                return MavenRepository.from(repository, originalUrl);
+                return repository.withUri(originalUrl);
             }
         }
         // Won't be null if server is unreachable
