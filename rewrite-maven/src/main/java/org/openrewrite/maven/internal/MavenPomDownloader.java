@@ -779,21 +779,20 @@ public class MavenPomDownloader {
 
         ReachabilityResult reachability = reachable(repository, applyAuthenticationToRequest(repository, request));
         if (reachability.isSuccess()) {
-            return repository.withUri(httpsUri).withKnownToExist(true);
+            return repository.withUri(httpsUri);
         }
         reachability = reachable(repository, applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(httpsUri)));
         if (reachability.isReachable()) {
-            return repository.withUri(httpsUri).withKnownToExist(reachability.isSuccess());
+            return repository.withUri(httpsUri);
         }
-
         if (!originalUrl.equals(httpsUri)) {
             reachability = reachable(repository, applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
             if (reachability.isSuccess()) {
-                return MavenRepository.from(repository, originalUrl).withKnownToExist(true);
+                return MavenRepository.from(repository, originalUrl);
             }
             reachability = reachable(repository, applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
             if (reachability.isReachable()) {
-                return MavenRepository.from(repository, originalUrl).withKnownToExist(reachability.isSuccess());
+                return MavenRepository.from(repository, originalUrl);
             }
         }
         // Won't be null if server is unreachable
