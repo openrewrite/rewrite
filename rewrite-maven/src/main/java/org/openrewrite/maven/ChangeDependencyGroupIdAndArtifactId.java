@@ -168,14 +168,14 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
                 if (isOldDependencyTag && isNewDependencyPresent) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true));
                     maybeUpdateModel();
-                    return tag;
+                    return t;
                 }
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-                if (isOldDependencyTag && !isNewDependencyPresent) {
+                if (isOldDependencyTag) {
                     String groupId = newGroupId;
                     if (groupId != null) {
                         t = changeChildTagValue(t, "groupId", groupId, ctx);
