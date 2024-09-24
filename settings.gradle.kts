@@ -10,24 +10,24 @@ pluginManagement {
 // ---------------------------------------------------------------
 
 val allProjects = listOf(
-        "rewrite-benchmarks",
-        "rewrite-bom",
-        "rewrite-core",
-        "rewrite-gradle",
-        "rewrite-groovy",
-        "rewrite-hcl",
-        "rewrite-java",
-        "rewrite-java-tck",
-        "rewrite-java-test",
-        "rewrite-java-17", // remove this when rewrite recipe gradle plugin moves to 21
-        "rewrite-java-21",
-        "rewrite-json",
-        "rewrite-maven",
-        "rewrite-properties",
-        "rewrite-protobuf",
-        "rewrite-test",
-        "rewrite-xml",
-        "rewrite-yaml",
+    "rewrite-benchmarks",
+    "rewrite-bom",
+    "rewrite-core",
+    "rewrite-gradle",
+    "rewrite-groovy",
+    "rewrite-hcl",
+    "rewrite-java",
+    "rewrite-java-tck",
+    "rewrite-java-test",
+    "rewrite-java-17", // remove this when rewrite recipe gradle plugin moves to 21
+    "rewrite-java-21",
+    "rewrite-json",
+    "rewrite-maven",
+    "rewrite-properties",
+    "rewrite-protobuf",
+    "rewrite-test",
+    "rewrite-xml",
+    "rewrite-yaml",
 )
 
 val includedProjects = file("IDE.properties").let {
@@ -42,7 +42,7 @@ val includedProjects = file("IDE.properties").let {
     }
 }.toSet()
 
-if(!file("IDE.properties").exists() || includedProjects.contains("tools")) {
+if (!file("IDE.properties").exists() || includedProjects.contains("tools")) {
     includeBuild("tools")
 }
 
@@ -52,23 +52,23 @@ gradle.allprojects {
     configurations.all {
         resolutionStrategy.dependencySubstitution {
             allProjects
-                    .minus(includedProjects)
-                    .minus(arrayOf("rewrite-bom"))
-                    .forEach {
-                        substitute(project(":$it"))
-                                .using(module("org.openrewrite:$it:latest.integration"))
-                    }
+                .minus(includedProjects)
+                .minus(arrayOf("rewrite-benchmarks", "rewrite-bom"))
+                .forEach {
+                    substitute(project(":$it"))
+                        .using(module("org.openrewrite:$it:latest.integration"))
+                }
         }
     }
 }
 
 if (System.getProperty("idea.active") == null &&
-        System.getProperty("idea.sync.active") == null) {
+    System.getProperty("idea.sync.active") == null) {
     include(
-            "rewrite-java-8",
-            "rewrite-java-11",
-            "rewrite-java-17",
-            "rewrite-java-21"
+        "rewrite-java-8",
+        "rewrite-java-11",
+        "rewrite-java-17",
+        "rewrite-java-21"
     )
 }
 
