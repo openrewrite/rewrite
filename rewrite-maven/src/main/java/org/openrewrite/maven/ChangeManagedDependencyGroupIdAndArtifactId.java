@@ -105,8 +105,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
-        validated =
-            validated.and(test(
+        validated = validated.and(test(
                 "coordinates",
                 "newGroupId OR newArtifactId must be different from before",
                 this,
@@ -115,7 +114,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     boolean sameArtifactId = isBlank(r.newArtifactId) || Objects.equals(r.oldArtifactId, r.newArtifactId);
                     return !(sameGroupId && sameArtifactId);
                 }
-            ));
+        ));
         return validated;
     }
 
@@ -170,7 +169,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                             }
                             changed = true;
-                        } catch(MavenDownloadingException e) {
+                        } catch (MavenDownloadingException e) {
                             return e.warn(t);
                         }
                     }
