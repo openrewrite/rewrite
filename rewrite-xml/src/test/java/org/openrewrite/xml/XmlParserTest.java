@@ -236,7 +236,7 @@ class XmlParserTest implements RewriteTest {
             """
               <?xml version="1.0" encoding="UTF-8"?>
               <!DOCTYPE configuration >
-
+              
               <configuration scan="true">
                   <root>
                       <level>WARN</level>
@@ -382,14 +382,24 @@ class XmlParserTest implements RewriteTest {
 
     @DisabledOnOs(OS.WINDOWS)
     @ParameterizedTest
-    @ValueSource(strings={"foo.xml", "proj.csproj", "/foo/bar/baz.jsp"})
+    @ValueSource(strings = {
+      "foo.xml",
+      "proj.csproj",
+      "/foo/bar/baz.jsp",
+      "packages.config"
+    })
     void acceptWithValidPaths(String path) {
         assertThat(new XmlParser().accept(Paths.get(path))).isTrue();
     }
 
     @DisabledOnOs(OS.WINDOWS)
     @ParameterizedTest
-    @ValueSource(strings={".xml", "file.cpp", "/foo/bar/baz.xml.txt"})
+    @ValueSource(strings = {
+      ".xml",
+      "foo.xml.",
+      "file.cpp",
+      "/foo/bar/baz.xml.txt"
+    })
     void acceptWithInvalidPaths(String path) {
         assertThat(new XmlParser().accept(Paths.get(path))).isFalse();
     }

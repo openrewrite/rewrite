@@ -111,7 +111,7 @@ public class XmlParser implements Parser {
     public boolean accept(Path path) {
         String p = path.toString();
         int dot = p.lastIndexOf('.');
-        if (dot > 0 && dot < (p.length() - 1)) {
+        if (0 < dot && dot < (p.length() - 1)) {
             if (ACCEPTED_FILE_EXTENSIONS.contains(p.substring(dot + 1))) {
                 return true;
             }
