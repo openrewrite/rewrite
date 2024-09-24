@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
@@ -767,6 +768,25 @@ class MavenPomDownloaderTest {
           .hasMessageContaining("10.0.0.0");
     }
 
+    @CsvSource(textBlock = """
+      https://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
+      https://repo1.maven.org/maven2, https://repo1.maven.org/maven2/
+      http://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
+      
+      https://oss.sonatype.org/content/repositories/snapshots/, https://oss.sonatype.org/content/repositories/snapshots/
+      https://artifactory.moderne.ninja/artifactory/moderne-public/, https://artifactory.moderne.ninja/artifactory/moderne-public/
+      https://repo.maven.apache.org/maven2/, https://repo.maven.apache.org/maven2/
+      https://jitpack.io/, https://jitpack.io/
+      """)
+    @ParameterizedTest
+    void normalizeRepository(String originalUrl, String expectedUrl) throws Throwable {
+        MavenPomDownloader downloader = new MavenPomDownloader(new InMemoryExecutionContext());
+        MavenRepository repository = new MavenRepository("id", originalUrl, null, null, null, null, null);
+        MavenRepository normalized = downloader.normalizeRepository(repository);
+        assertThat(normalized).isNotNull();
+        assertThat(normalized.getUri()).isEqualTo(expectedUrl);
+    }
+
     private static GroupArtifactVersion createArtifact(Path repository) throws IOException {
         Path target = repository.resolve(Paths.get("org", "openrewrite", "rewrite", "1.0.0"));
         Path pom = target.resolve("rewrite-1.0.0.pom");
@@ -787,5 +807,4 @@ class MavenPomDownloaderTest {
         Files.write(jar, "I'm a jar".getBytes()); // empty jars get ignored
         return new GroupArtifactVersion("org.openrewrite", "rewrite", "1.0.0");
     }
-
 }
