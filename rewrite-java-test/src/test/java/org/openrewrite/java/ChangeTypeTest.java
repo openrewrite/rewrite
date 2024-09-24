@@ -68,6 +68,31 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Disabled("A bug fix reported by the community but not yet fixed")
+    @Test
+    void conflictingImports() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "java.util.List", "kotlin.collections.Set", true)),
+          java(
+            """
+              import java.util.*;
+              class Test {
+                  Set<String> s;
+                  List<String> s;
+              }
+              """,
+            """
+              import java.util.*;
+              class Test {
+                  Set<String> s;
+                  kotlin.collections.Set<String> s;
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings({"deprecation", "KotlinRedundantDiagnosticSuppress"})
     @Test
     void starImport() {
@@ -76,7 +101,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import java.util.logging.*;
-
+              
               class Test {
                   static void method() {
                       LoggingMXBean loggingBean = null;
@@ -86,7 +111,7 @@ class ChangeTypeTest implements RewriteTest {
             """
               import java.lang.management.PlatformLoggingMXBean;
               import java.util.logging.*;
-
+              
               class Test {
                   static void method() {
                       PlatformLoggingMXBean loggingBean = null;
@@ -1390,7 +1415,7 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package a.b;
-
+              
               class Original {
               }
               """,
@@ -1775,7 +1800,6 @@ class ChangeTypeTest implements RewriteTest {
           spec -> spec.recipe(new ChangeType("Test.InnerA", "Test.InnerB", true)),
           java(
             """
-
               public class Test {
                   private class InnerA {
                   }
@@ -1887,9 +1911,9 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import org.codehaus.jackson.map.ObjectMapper;
-
+              
               import static org.codehaus.jackson.map.SerializationConfig.Feature.WRAP_ROOT_VALUE;
-
+              
               class A {
                   void test() {
                       ObjectMapper mapper = new ObjectMapper();
@@ -1899,9 +1923,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import com.fasterxml.jackson.databind.ObjectMapper;
-
+              
               import static com.fasterxml.jackson.databind.SerializationFeature.WRAP_ROOT_VALUE;
-
+              
               class A {
                   void test() {
                       ObjectMapper mapper = new ObjectMapper();
@@ -1912,4 +1936,87 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4452")
+    void shouldFullyQualifyWhenNewTypeIsAmbiguous() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "javax.annotation.Nonnull",
+            "org.checkerframework.checker.nullness.qual.NonNull",
+            null)),
+          // language=java
+          java(
+            """
+              import lombok.NonNull;
+              import javax.annotation.Nonnull;
+              import org.immutables.value.Value;
+              
+              @Value.Immutable
+              @Value.Style(passAnnotations = Nonnull.class)
+              interface ConflictingImports {
+                      void lombokMethod(@NonNull final String lombokNonNull){}
+              }
+              """,
+            """
+              import lombok.NonNull;
+              import org.immutables.value.Value;
+              
+              @Value.Immutable
+              @Value.Style(passAnnotations = org.checkerframework.checker.nullness.qual.NonNull.class)
+              interface ConflictingImports {
+                      void lombokMethod(@NonNull final String lombokNonNull){}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotFullyQualifyWhenNewTypeIsAlreadyUsed() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "org.a.A",
+            "org.ab.AB",
+            true)),
+          java(
+            """
+            package org.a;
+
+            public class A {
+              public static String A = "A";
+            }
+            """),
+          java(
+            """
+            package org.ab;
+
+            public class AB {
+              public static String A = "A";
+              public static String B = "B";
+            }
+            """),
+          // language=java
+          java(
+            """
+              import org.a.A;
+              import org.ab.AB;
+
+              class Letters {
+                String a = A.A;
+                String b = AB.B;
+              }
+              """,
+            """
+              import org.ab.AB;
+
+              class Letters {
+                String a = AB.A;
+                String b = AB.B;
+              }
+              """
+          )
+        );
+    }
+
 }

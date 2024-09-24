@@ -107,10 +107,12 @@ class LatestReleaseTest {
     @Test
     void releaseOrLatestKeyword_beatsEverything() {
         assertThat(latestRelease.compare(null, "RELEASE", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3", "RELEASE")).isNegative();
         assertThat(latestRelease.compare(null, "RELEASE", "999.999.999")).isPositive();
         assertThat(latestRelease.compare(null, "RELEASE", "RELEASE")).isZero();
 
         assertThat(latestRelease.compare(null, "LATEST", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3", "LATEST")).isNegative();
         assertThat(latestRelease.compare(null, "LATEST", "999.999.999")).isPositive();
         assertThat(latestRelease.compare(null, "LATEST", "LATEST")).isZero();
 

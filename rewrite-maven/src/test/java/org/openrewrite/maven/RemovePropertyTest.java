@@ -65,14 +65,13 @@ class RemovePropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            sourceSpecs -> {
+            sourceSpecs ->
                 sourceSpecs.afterRecipe(d -> {
                     MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                     Map<String, String> properties = resolution.getPom().getRequested().getProperties();
                     assertThat(properties.get("a.version")).isEqualTo("a");
                     assertThat(properties.get("bla.version")).isNull();
-                });
-            }
+                })
           )
         );
     }
@@ -103,13 +102,12 @@ class RemovePropertyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            sourceSpecs -> {
+            sourceSpecs ->
                 sourceSpecs.afterRecipe(d -> {
                     MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                     Map<String, String> properties = resolution.getPom().getRequested().getProperties();
                     assertThat(properties.isEmpty()).isTrue();
-                });
-            }
+                })
           )
         );
     }

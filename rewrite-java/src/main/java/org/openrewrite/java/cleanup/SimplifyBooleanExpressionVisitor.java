@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.SemanticallyEqual;
@@ -171,17 +171,11 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 }
             } else if (parenthesized instanceof J.Ternary) {
                 J.Ternary ternary = (J.Ternary) parenthesized;
-                Expression negatedCondition = maybeNegate(ternary.getCondition());
-                if (negatedCondition != ternary.getCondition()) {
-                    j = ternary
-                            .withCondition(negatedCondition)
-                            .withPrefix(j.getPrefix());
-                } else {
-                    j = ternary
-                            .withTruePart(ternary.getFalsePart())
-                            .withFalsePart(ternary.getTruePart())
-                            .withPrefix(j.getPrefix());
-                }
+                j = ternary
+                        .withCondition(maybeNegate(ternary.getCondition()))
+                        .withTruePart(ternary.getFalsePart())
+                        .withFalsePart(ternary.getTruePart())
+                        .withPrefix(j.getPrefix());
             } else if (parenthesized instanceof Expression) {
                 j = unpackExpression((Expression) parenthesized, j);
             }
@@ -237,9 +231,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J j = super.visitMethodInvocation(method, executionContext);
         J.MethodInvocation asMethod = (J.MethodInvocation) j;
         Expression select = asMethod.getSelect();
-        if (isEmpty.matches(asMethod)
-            && select instanceof J.Literal
-            && select.getType() == JavaType.Primitive.String) {
+        if (isEmpty.matches(asMethod) &&
+            select instanceof J.Literal &&
+            select.getType() == JavaType.Primitive.String) {
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
         }
         return j;

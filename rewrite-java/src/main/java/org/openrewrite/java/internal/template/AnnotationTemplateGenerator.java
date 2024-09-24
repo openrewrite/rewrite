@@ -18,9 +18,9 @@ package org.openrewrite.java.internal.template;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -101,12 +101,13 @@ public class AnnotationTemplateGenerator {
 
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, Integer integer) {
-                J.Annotation withoutTemplateComment = annotation.withComments(
-                        ListUtils.concatAll(
-                                ListUtils.map(getCursor().getParentOrThrow().<J>getValue().getComments(), this::filterTemplateComment),
-                                ListUtils.map(annotation.getComments(), this::filterTemplateComment)
-                        ));
-                annotations.add(withoutTemplateComment);
+                List<Comment> combinedComments = ListUtils.concatAll(
+                        getCursor().getParentOrThrow().<J>getValue().getComments(),
+                        annotation.getComments());
+                List<Comment> filteredComments = ListUtils.map(combinedComments, this::filterTemplateComment);
+                if (combinedComments != filteredComments) {
+                    annotations.add(annotation.withComments(filteredComments));
+                }
                 return annotation;
             }
         }.visit(cu, 0);

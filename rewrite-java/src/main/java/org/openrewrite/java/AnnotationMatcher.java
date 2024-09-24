@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureLexer;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.tree.Expression;
@@ -84,11 +84,11 @@ public class AnnotationMatcher {
         return matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(annotation.getType()), null);
     }
 
-    public boolean matchesAnnotationOrMetaAnnotation(@Nullable JavaType.FullyQualified fqn) {
+    public boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn) {
         return matchesAnnotationOrMetaAnnotation(fqn, null);
     }
 
-    private boolean matchesAnnotationOrMetaAnnotation(@Nullable JavaType.FullyQualified fqn,
+    private boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn,
                                                       @Nullable Set<String> seenAnnotations) {
         if (fqn != null) {
             if (matcher.matcher(fqn.getFullyQualifiedName()).matches()) {

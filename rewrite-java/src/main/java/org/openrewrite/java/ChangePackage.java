@@ -18,9 +18,9 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
@@ -307,7 +307,7 @@ public class ChangePackage extends Recipe {
             return oldType;
         }
 
-        private @Nullable JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
+        private JavaType.@Nullable Method updateType(JavaType.@Nullable Method oldMethodType) {
             if (oldMethodType != null) {
                 JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
                 if (method != null) {
@@ -330,16 +330,16 @@ public class ChangePackage extends Recipe {
                     newPackageName + packageName.substring(oldPackageName.length()) : newPackageName;
         }
 
-        private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
+        private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
             return fq != null &&
                    (fq.getPackageName().equals(oldPackageName) && !fq.getClassName().isEmpty() ||
                     isTargetRecursivePackageName(fq.getPackageName()));
         }
 
         private boolean isTargetRecursivePackageName(String packageName) {
-            return (recursive == null || recursive)
-                   && packageName.startsWith(oldPackageName + ".")
-                   && !packageName.startsWith(newPackageName);
+            return (recursive == null || recursive) &&
+                   packageName.startsWith(oldPackageName + ".") &&
+                   !packageName.startsWith(newPackageName);
         }
 
     }

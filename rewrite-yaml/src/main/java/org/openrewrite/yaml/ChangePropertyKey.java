@@ -17,11 +17,11 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.search.FindProperty;
 import org.openrewrite.yaml.tree.Yaml;
@@ -110,8 +110,8 @@ public class ChangePropertyKey extends Recipe {
                     .map(e2 -> e2.getKey().getValue())
                     .collect(Collectors.joining("."));
 
-            if (newPropertyKey.startsWith(oldPropertyKey)
-                    && (matches(prop, newPropertyKey) || matches(prop, newPropertyKey + ".*") || childMatchesNewPropertyKey(entry, prop))) {
+            if (newPropertyKey.startsWith(oldPropertyKey) &&
+                    (matches(prop, newPropertyKey) || matches(prop, newPropertyKey + ".*") || childMatchesNewPropertyKey(entry, prop))) {
                 return e;
             }
 
@@ -122,8 +122,8 @@ public class ChangePropertyKey extends Recipe {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
                     String value = propertyEntry.getKey().getValue() + ".";
 
-                    if ((!propertyToTest.startsWith(value ) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext()))
-                        && hasNonExcludedValues(propertyEntry)) {
+                    if ((!propertyToTest.startsWith(value ) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) &&
+                        hasNonExcludedValues(propertyEntry)) {
                         doAfterVisit(new InsertSubpropertyVisitor<>(
                                 propertyEntry,
                                 propertyToTest,
@@ -193,8 +193,8 @@ public class ChangePropertyKey extends Recipe {
 
     private boolean anyMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
         for (String subKey : subKeys) {
-            if (entry.getKey().getValue().equals(subKey)
-                    || entry.getKey().getValue().startsWith(subKey + ".")) {
+            if (entry.getKey().getValue().equals(subKey) ||
+                    entry.getKey().getValue().startsWith(subKey + ".")) {
                 return true;
             }
         }
@@ -203,8 +203,8 @@ public class ChangePropertyKey extends Recipe {
 
     private static boolean noneMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
         for (String subKey : subKeys) {
-            if (entry.getKey().getValue().equals(subKey)
-                    || entry.getKey().getValue().startsWith(subKey + ".")) {
+            if (entry.getKey().getValue().equals(subKey) ||
+                    entry.getKey().getValue().startsWith(subKey + ".")) {
                 return false;
             }
         }

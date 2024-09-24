@@ -15,16 +15,17 @@
  */
 package org.openrewrite.test;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -86,8 +87,7 @@ public class RecipeSpec {
 
     boolean serializationValidation = true;
 
-    @Nullable
-    PrintOutputCapture.MarkerPrinter markerPrinter;
+    PrintOutputCapture.@Nullable MarkerPrinter markerPrinter;
 
     List<UncheckedConsumer<List<SourceFile>>> beforeRecipes = new ArrayList<>();
 
@@ -145,7 +145,8 @@ public class RecipeSpec {
 
     private static Recipe recipeFromInputStream(InputStream yaml, String... activeRecipes) {
         return Environment.builder()
-                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
+                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, Collections.emptyList(),
+                        mapper -> mapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)))
                 .build()
                 .activateRecipes(activeRecipes);
     }

@@ -17,7 +17,7 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.CollidingSourceFiles;
 

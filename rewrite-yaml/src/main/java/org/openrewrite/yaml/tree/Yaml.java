@@ -17,8 +17,8 @@ package org.openrewrite.yaml.tree;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
@@ -90,7 +90,7 @@ public interface Yaml extends Tree {
             return withCharsetName(charset.name());
         }
 
-        List<? extends Document> documents;
+        List<Document> documents;
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -188,6 +188,17 @@ public interface Yaml extends Tree {
                 return new End(randomId(), prefix, Markers.EMPTY, explicit);
             }
         }
+    }
+
+    interface Block extends Yaml {
+        /**
+         * @return A new deep copy of this block with different IDs.
+         */
+        @Override
+        Block copyPaste();
+
+        @Override
+        Block withPrefix(String prefix);
     }
 
     @Value
@@ -479,16 +490,5 @@ public interface Yaml extends Tree {
         public String toString() {
             return "Yaml.Anchor(" + key + ")";
         }
-    }
-
-    interface Block extends Yaml {
-        /**
-         * @return A new deep copy of this block with different IDs.
-         */
-        @Override
-        Block copyPaste();
-
-        @Override
-        Block withPrefix(String prefix);
     }
 }

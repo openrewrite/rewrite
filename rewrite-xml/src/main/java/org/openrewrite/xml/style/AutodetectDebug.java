@@ -15,10 +15,10 @@
  */
 package org.openrewrite.xml.style;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.table.XmlStyleReport;

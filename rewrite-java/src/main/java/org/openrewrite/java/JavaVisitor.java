@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
@@ -57,7 +57,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      *
      * @param clazz The class that will be imported into the compilation unit.
      */
-    public void maybeAddImport(@Nullable JavaType.FullyQualified clazz) {
+    public void maybeAddImport(JavaType.@Nullable FullyQualified clazz) {
         if (clazz != null) {
             maybeAddImport(clazz.getFullyQualifiedName());
         }
@@ -155,7 +155,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         throw new IllegalArgumentException("No JavaSourceFile parent found");
     }
 
-    public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
+    public void maybeRemoveImport(JavaType.@Nullable FullyQualified clazz) {
         if (clazz != null) {
             maybeRemoveImport(clazz.getFullyQualifiedName());
         }

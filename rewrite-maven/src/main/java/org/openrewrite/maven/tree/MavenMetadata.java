@@ -15,19 +15,19 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Value;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
-import org.openrewrite.xml.XmlParser;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -35,14 +35,7 @@ import static java.util.Collections.emptyList;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
 public class MavenMetadata {
-    private static final XmlParser xmlParser = new XmlParser() {
-        @Override
-        public boolean accept(Path path) {
-            return super.accept(path) || path.toString().endsWith(".pom");
-        }
-    };
-
-    public static final MavenMetadata EMPTY = new MavenMetadata(new MavenMetadata.Versioning(emptyList(), emptyList(), null));
+    public static final MavenMetadata EMPTY = new MavenMetadata(new MavenMetadata.Versioning(emptyList(), emptyList(), null, null));
 
     Versioning versioning;
 
@@ -62,10 +55,15 @@ public class MavenMetadata {
         @Nullable
         Snapshot snapshot;
 
+        @Nullable
+        ZonedDateTime lastUpdated;
+
         public Versioning(
                 @JacksonXmlElementWrapper(localName = "versions") List<String> versions,
                 @JacksonXmlElementWrapper(localName = "snapshotVersions") @Nullable List<SnapshotVersion> snapshotVersions,
-                @Nullable Snapshot snapshot) {
+                @Nullable Snapshot snapshot,
+                @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyyMMddHHmmss", timezone = "UTC") @Nullable ZonedDateTime lastUpdated) {
+            this.lastUpdated = lastUpdated;
             this.versions = versions;
             this.snapshotVersions = snapshotVersions;
             this.snapshot = snapshot;
@@ -83,7 +81,11 @@ public class MavenMetadata {
     public static @Nullable MavenMetadata parse(byte[] document) throws IOException {
         MavenMetadata metadata = MavenXmlMapper.readMapper().readValue(document, MavenMetadata.class);
         if (metadata != null && metadata.getVersioning() != null && metadata.getVersioning().getVersions() == null) {
-            return new MavenMetadata(new Versioning(emptyList(), metadata.getVersioning().getSnapshotVersions(), metadata.getVersioning().getSnapshot()));
+            return new MavenMetadata(new Versioning(
+                    emptyList(),
+                    metadata.getVersioning().getSnapshotVersions(),
+                    metadata.getVersioning().getSnapshot(),
+                    metadata.getVersioning().getLastUpdated()));
         }
         return metadata;
     }

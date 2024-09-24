@@ -16,10 +16,10 @@
 package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.utilities.MavenWrapper;
@@ -43,9 +43,15 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.openrewrite.maven.utilities.MavenWrapper.*;
+import static org.openrewrite.maven.utilities.MavenWrapper.ASF_LICENSE_HEADER;
+import static org.openrewrite.maven.utilities.MavenWrapper.WRAPPER_BATCH_LOCATION;
+import static org.openrewrite.maven.utilities.MavenWrapper.WRAPPER_DOWNLOADER_LOCATION;
+import static org.openrewrite.maven.utilities.MavenWrapper.WRAPPER_JAR_LOCATION;
+import static org.openrewrite.maven.utilities.MavenWrapper.WRAPPER_SCRIPT_LOCATION;
 import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.SourceSpecs.*;
+import static org.openrewrite.test.SourceSpecs.dir;
+import static org.openrewrite.test.SourceSpecs.other;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class UpdateMavenWrapperTest implements RewriteTest {
     private final UnaryOperator<@Nullable String> notEmpty = actual -> {

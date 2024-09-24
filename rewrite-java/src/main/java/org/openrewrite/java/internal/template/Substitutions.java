@@ -18,9 +18,9 @@ package org.openrewrite.java.internal.template;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import org.antlr.v4.runtime.*;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
@@ -133,8 +133,8 @@ public class Substitutions {
             if (param != null) {
                 type = TypeParameter.toFullyQualifiedName(param);
             } else {
-                if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null
-                    && ((J.NewClass) parameter).getClazz() != null) {
+                if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null &&
+                    ((J.NewClass) parameter).getClazz() != null) {
                     // for anonymous classes get the type from the supertype
                     type = ((J.NewClass) parameter).getClazz().getType();
                 } else if (parameter instanceof TypedTree) {

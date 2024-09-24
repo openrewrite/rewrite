@@ -16,7 +16,7 @@
 package org.openrewrite.maven.tree;
 
 import lombok.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.List;

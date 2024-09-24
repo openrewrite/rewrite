@@ -21,8 +21,8 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
@@ -65,6 +65,9 @@ public class MethodMatcher {
     private static final Pattern ANY_ARGUMENTS_PATTERN = Pattern.compile(".*");
 
     @Nullable
+    private String targetTypeAspectJ;
+
+    @Nullable
     private Pattern targetTypePattern;
 
     @Nullable
@@ -99,6 +102,7 @@ public class MethodMatcher {
             public Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
                 MethodSignatureParser.TargetTypePatternContext targetTypePatternContext = ctx.targetTypePattern();
                 String pattern = new TypeVisitor().visitTargetTypePattern(targetTypePatternContext);
+                targetTypeAspectJ = pattern;
                 if (isPlainIdentifier(targetTypePatternContext)) {
                     targetType = pattern;
                 } else {
@@ -184,8 +188,8 @@ public class MethodMatcher {
                this.targetTypePattern != null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
     }
 
-    boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
-        return TypeUtils.isOfTypeWithName(
+    boolean matchesTargetType(JavaType.@Nullable FullyQualified type) {
+        return ((type == null || type instanceof JavaType.Unknown) && "*..*".equals(targetTypeAspectJ)) || TypeUtils.isOfTypeWithName(
                 type,
                 matchOverrides,
                 this::matchesTargetTypeName
@@ -215,7 +219,7 @@ public class MethodMatcher {
         return argumentPattern.matcher(joiner.toString()).matches();
     }
 
-    public boolean matches(@Nullable JavaType.Method type) {
+    public boolean matches(JavaType.@Nullable Method type) {
         if (type == null) {
             return false;
         }
@@ -248,8 +252,8 @@ public class MethodMatcher {
 
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
-        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern()))
-                                    || matchesTargetType(enclosing.getType());
+        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern())) ||
+                                    matchesTargetType(enclosing.getType());
         if (!matchesTargetType) {
             return false;
         }
@@ -275,8 +279,8 @@ public class MethodMatcher {
 
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
-        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern()))
-                                    || TypeUtils.isAssignableTo(targetType, enclosing.getType());
+        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern())) ||
+                                    TypeUtils.isAssignableTo(targetType, enclosing.getType());
         if (!matchesTargetType) {
             return false;
         }
@@ -316,7 +320,7 @@ public class MethodMatcher {
      * Using matchUnknownTypes can improve Visitor resiliency for an AST with missing type information, but
      * also increases the risk of false-positive matches on unrelated MethodInvocation instances.
      */
-    public boolean matches(@Nullable J.MethodInvocation method, boolean matchUnknownTypes) {
+    public boolean matches(J.@Nullable MethodInvocation method, boolean matchUnknownTypes) {
         if (method == null) {
             return false;
         }
@@ -333,9 +337,9 @@ public class MethodMatcher {
             return false;
         }
 
-        if (method.getSelect() != null
-            && method.getSelect() instanceof J.Identifier
-            && !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
+        if (method.getSelect() != null &&
+            method.getSelect() instanceof J.Identifier &&
+            !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
         }
 
@@ -362,9 +366,9 @@ public class MethodMatcher {
         StringJoiner joiner = new StringJoiner(",");
         for (Expression expr : method.getArguments()) {
             final JavaType exprType = expr.getType();
-            String s = exprType == null
-                    ? JavaType.Unknown.getInstance().getFullyQualifiedName()
-                    : typePattern(exprType);
+            String s = exprType == null ?
+                    JavaType.Unknown.getInstance().getFullyQualifiedName() :
+                    typePattern(exprType);
             joiner.add(s);
         }
         return joiner.toString();
@@ -389,7 +393,7 @@ public class MethodMatcher {
         Expression target = fieldAccess.getTarget();
         if (target instanceof J.Identifier) {
             return targetType != null && targetType.equals(((J.Identifier) target).getSimpleName()) ||
-                    targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
+                   targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
         } else if (target instanceof J.FieldAccess) {
             return ((J.FieldAccess) target).isFullyQualifiedClassReference(targetType != null ? targetType : targetTypePattern.pattern());
         }
@@ -442,43 +446,6 @@ public class MethodMatcher {
 }
 
 class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
-    private static final Set<String> COMMON_JAVA_LANG_TYPES =
-            new HashSet<>(Arrays.asList(
-                    "Appendable",
-                    "AutoCloseable",
-                    "Boolean",
-                    "Byte",
-                    "Character",
-                    "CharSequence",
-                    "Class",
-                    "ClassLoader",
-                    "Cloneable",
-                    "Comparable",
-                    "Double",
-                    "Enum",
-                    "Error",
-                    "Exception",
-                    "Float",
-                    "FunctionalInterface",
-                    "Integer",
-                    "Iterable",
-                    "Long",
-                    "Math",
-                    "Number",
-                    "Object",
-                    "Readable",
-                    "Record",
-                    "Runnable",
-                    "Short",
-                    "String",
-                    "StringBuffer",
-                    "StringBuilder",
-                    "System",
-                    "Thread",
-                    "Throwable",
-                    "Void"
-            ));
-
     @Override
     public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
         StringBuilder classNameBuilder = new StringBuilder();
@@ -493,7 +460,7 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
             if (Character.isLowerCase(beforeArr.charAt(0)) && JavaType.Primitive.fromKeyword(beforeArr) != null) {
                 return className;
             } else {
-                if (COMMON_JAVA_LANG_TYPES.contains(beforeArr)) {
+                if (TypeUtils.findQualifiedJavaLangTypeName(beforeArr) != null) {
                     return "java.lang." + className;
                 }
             }

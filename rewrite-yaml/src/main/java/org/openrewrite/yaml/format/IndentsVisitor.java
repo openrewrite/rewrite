@@ -15,9 +15,10 @@
  */
 package org.openrewrite.yaml.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.tree.Yaml;
@@ -73,19 +74,24 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
                 getCursor().getParentOrThrow().putMessage("sequenceEntryIndent", indent);
                 // the +1 is for the '-' character
-                getCursor().getParentOrThrow().putMessage("lastIndent", indent +
-                        firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1);
+                getCursor().getParentOrThrow().putMessage("lastIndent",
+                        indent + firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1);
             } else if (y instanceof Yaml.Mapping.Entry) {
                 y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
                 getCursor().putMessage("lastIndent", indent + style.getIndentSize());
+            } else if (y instanceof Yaml.Document) {
+                y = y.withPrefix(indentComments(y.getPrefix(), 0));
             }
-        } else if (y instanceof Yaml.Mapping.Entry &&
-                getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Sequence.Entry) {
-            // this is a mapping entry that begins a sequence entry and anything below it should be indented further to the right now, e.g.:
-            //
-            // - key:
-            //     value
-            getCursor().putMessage("lastIndent", indent + style.getIndentSize());
+        } else if (y instanceof Yaml.Mapping.Entry) {
+            if (getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Sequence.Entry) {
+                // this is a mapping entry that begins a sequence entry and anything below it should be indented further to the right now, e.g.:
+                //
+                // - key:
+                //     value
+                getCursor().putMessage("lastIndent", indent + style.getIndentSize());
+            } else {
+                y = y.withPrefix(indentComments(y.getPrefix(), indent));
+            }
         }
         return y;
     }
@@ -117,12 +123,27 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         }
 
         int indent = findIndent(prefix);
-
+        prefix = indentComments(prefix, indent);
         if (indent != column) {
             int shift = column - indent;
             prefix = indent(prefix, shift);
         }
 
+        return prefix;
+    }
+
+    private String indentComments(String prefix, int indent) {
+        // If the prefix contains a newline followed by a comment ensure the comment begins at the indentation column
+        if (prefix.contains("#")) {
+            String reindentedComments = prefix.replaceAll("\n\\s*#", "\n" + StringUtils.repeat(" ", indent) + "#");
+            // If a document begins with a comment it might not have a newline before it
+            if (getCursor().getValue() instanceof Yaml.Document) {
+                reindentedComments = prefix.replaceFirst("^\\s*#", "#");
+            }
+            if (!reindentedComments.equals(prefix)) {
+                prefix = reindentedComments;
+            }
+        }
         return prefix;
     }
 
@@ -154,12 +175,13 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     private String firstIndent(Yaml yaml) {
-        AtomicReference<String> indent = new AtomicReference<>();
+        AtomicReference<@Nullable String> indent = new AtomicReference<>();
 
         new YamlIsoVisitor<AtomicReference<String>>() {
             @Override
             public @Nullable Yaml visit(@Nullable Tree tree, AtomicReference<String> indent) {
                 Yaml y = (Yaml) tree;
+                //noinspection ConstantValue
                 if (indent.get() != null) {
                     return y;
                 }

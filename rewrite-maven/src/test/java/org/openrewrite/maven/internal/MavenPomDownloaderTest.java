@@ -18,6 +18,7 @@ package org.openrewrite.maven.internal;
 import okhttp3.mockwebserver.*;
 import org.assertj.core.api.Condition;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -406,17 +406,24 @@ class MavenPomDownloaderTest {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest recordedRequest) {
-                    return recordedRequest.getHeaders().get("Authorization") != null ?
-                      new MockResponse().setResponseCode(200).setBody(
-                        //language=xml
-                        """
-                          <project>
-                              <groupId>org.springframework.cloud</groupId>
-                              <artifactId>spring-cloud-dataflow-build</artifactId>
-                              <version>2.10.0-SNAPSHOT</version>
-                          </project>
-                          """) :
-                      new MockResponse().setResponseCode(401).setBody("");
+                    MockResponse response = new MockResponse();
+                    if (recordedRequest.getHeaders().get("Authorization") != null) {
+                        response.setResponseCode(200);
+                        if (!"HEAD".equalsIgnoreCase(recordedRequest.getMethod())) {
+                            response.setBody(
+                              //language=xml
+                              """
+                                <project>
+                                    <groupId>org.springframework.cloud</groupId>
+                                    <artifactId>spring-cloud-dataflow-build</artifactId>
+                                    <version>2.10.0-SNAPSHOT</version>
+                                </project>
+                                """);
+                        }
+                    } else {
+                        response.setResponseCode(401);
+                    }
+                    return response;
                 }
             });
             mockRepo.start();
@@ -443,17 +450,21 @@ class MavenPomDownloaderTest {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest recordedRequest) {
-                    return recordedRequest.getHeaders().get("Authorization") == null ?
-                      new MockResponse().setResponseCode(200).setBody(
-                        //language=xml
-                        """
-                          <project>
-                              <groupId>org.springframework.cloud</groupId>
-                              <artifactId>spring-cloud-dataflow-build</artifactId>
-                              <version>2.10.0-SNAPSHOT</version>
-                          </project>
-                          """) :
-                      new MockResponse().setResponseCode(401).setBody("");
+                    MockResponse response = new MockResponse();
+                    if (recordedRequest.getHeaders().get("Authorization") != null) {
+                        response.setResponseCode(401);
+                    } else if (recordedRequest.getMethod() == null || !recordedRequest.getMethod().equalsIgnoreCase("HEAD")) {
+                        response.setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>org.springframework.cloud</groupId>
+                                <artifactId>spring-cloud-dataflow-build</artifactId>
+                                <version>2.10.0-SNAPSHOT</version>
+                            </project>
+                            """);
+                    }
+                    return response;
                 }
             });
             mockRepo.start();
@@ -540,11 +551,11 @@ class MavenPomDownloaderTest {
               """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
-                    
+                
                         <groupId>org.openrewrite.test</groupId>
                         <artifactId>foo</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                        
+                
                         <repositories>
                           <repository>
                             <id>snapshot</id>
@@ -561,7 +572,7 @@ class MavenPomDownloaderTest {
                             <url>http://%s:%d</url>
                           </repository>
                         </repositories>
-                        
+                
                         <dependencies>
                             <dependency>
                                 <groupId>org.springframework.cloud</groupId>

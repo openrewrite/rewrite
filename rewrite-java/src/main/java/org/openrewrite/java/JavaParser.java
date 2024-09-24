@@ -20,8 +20,8 @@ import io.github.classgraph.Resource;
 import io.github.classgraph.ResourceList;
 import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
@@ -273,7 +273,7 @@ public interface JavaParser extends Parser {
 
     @Override
     default boolean accept(Path path) {
-        return path.toString().endsWith(".java");
+        return path.toString().endsWith(".java") && !path.endsWith("module-info.java");
     }
 
     /**

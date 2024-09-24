@@ -62,10 +62,10 @@ class JavaTemplateTest4Test implements RewriteTest {
                 .as("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
                 .isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(1))
-                .matches(jt -> jt instanceof JavaType.Parameterized
-                               && ((JavaType.Parameterized) jt).getType().getFullyQualifiedName().equals("java.util.List")
-                               && ((JavaType.Parameterized) jt).getTypeParameters().size() == 1
-                               && TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().get(0)).getFullyQualifiedName().equals("java.lang.String"),
+                .matches(jt -> jt instanceof JavaType.Parameterized &&
+                               ((JavaType.Parameterized) jt).getType().getFullyQualifiedName().equals("java.util.List") &&
+                               ((JavaType.Parameterized) jt).getTypeParameters().size() == 1 &&
+                               TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().get(0)).getFullyQualifiedName().equals("java.lang.String"),
                   "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'"
                 );
               assertThat(m.getName().getType()).isEqualTo(type);

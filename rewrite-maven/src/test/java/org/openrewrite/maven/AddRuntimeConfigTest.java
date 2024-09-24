@@ -20,10 +20,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
-import static org.openrewrite.maven.AddRuntimeConfig.*;
+import static org.openrewrite.maven.AddRuntimeConfig.JVM_CONFIG_FILENAME;
+import static org.openrewrite.maven.AddRuntimeConfig.JVM_CONFIG_PATH;
+import static org.openrewrite.maven.AddRuntimeConfig.MAVEN_CONFIG_FILENAME;
+import static org.openrewrite.maven.AddRuntimeConfig.MAVEN_CONFIG_PATH;
+import static org.openrewrite.maven.AddRuntimeConfig.Separator;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -43,6 +48,32 @@ class AddRuntimeConfigTest implements RewriteTest {
     void createConfigFileWithRuntimeConfigIfFileDoesNotExist() {
         rewriteRun(
           spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
+          POM_XML_SOURCE_SPEC,
+          text(
+            null,
+            "-T=3",
+            spec -> spec.path(MAVEN_CONFIG_PATH)
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4368")
+    void fromYaml() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.test.AddRuntimeConfig
+              description: Test deserialization.
+              recipeList:
+                - org.openrewrite.maven.AddRuntimeConfig:
+                    relativeConfigFileName: maven.config
+                    flag: -T
+                    argument: 3
+                    separator: '='
+              """, "org.test.AddRuntimeConfig"
+          ),
           POM_XML_SOURCE_SPEC,
           text(
             null,
@@ -127,7 +158,7 @@ class AddRuntimeConfigTest implements RewriteTest {
           POM_XML_SOURCE_SPEC,
           text(
             existingConfig,
-            existingConfig + System.lineSeparator() + "-T=3",
+            existingConfig + "\n-T=3",
             spec -> spec.path(MAVEN_CONFIG_PATH)
           )
         );

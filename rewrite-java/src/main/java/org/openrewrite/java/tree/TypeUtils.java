@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.tree;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 
@@ -27,6 +27,42 @@ import java.util.stream.IntStream;
 
 public class TypeUtils {
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
+    private static final Set<String> COMMON_JAVA_LANG_TYPES =
+            new HashSet<>(Arrays.asList(
+                    "Appendable",
+                    "AutoCloseable",
+                    "Boolean",
+                    "Byte",
+                    "Character",
+                    "CharSequence",
+                    "Class",
+                    "ClassLoader",
+                    "Cloneable",
+                    "Comparable",
+                    "Double",
+                    "Enum",
+                    "Error",
+                    "Exception",
+                    "Float",
+                    "FunctionalInterface",
+                    "Integer",
+                    "Iterable",
+                    "Long",
+                    "Math",
+                    "Number",
+                    "Object",
+                    "Readable",
+                    "Record",
+                    "Runnable",
+                    "Short",
+                    "String",
+                    "StringBuffer",
+                    "StringBuilder",
+                    "System",
+                    "Thread",
+                    "Throwable",
+                    "Void"
+            ));
 
     private TypeUtils() {
     }
@@ -34,6 +70,10 @@ public class TypeUtils {
     public static boolean isObject(@Nullable JavaType type) {
         return type instanceof JavaType.FullyQualified &&
                "java.lang.Object".equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
+    }
+
+    public static @Nullable String findQualifiedJavaLangTypeName(String name) {
+        return COMMON_JAVA_LANG_TYPES.contains(name) ? "java.lang." + name : null;
     }
 
     public static boolean isString(@Nullable JavaType type) {
@@ -49,8 +89,8 @@ public class TypeUtils {
 
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
         if (fqn1 != null && fqn2 != null) {
-            return fqn1.equals(fqn2) || fqn1.length() == fqn2.length()
-                                        && toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
+            return fqn1.equals(fqn2) || fqn1.length() == fqn2.length() &&
+                                        toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
         }
         return fqn1 == null && fqn2 == null;
     }
@@ -155,7 +195,7 @@ public class TypeUtils {
      */
     @Incubating(since = "8.1.4")
     public static boolean isOfTypeWithName(
-            @Nullable JavaType.FullyQualified type,
+            JavaType.@Nullable FullyQualified type,
             boolean matchOverride,
             Predicate<String> matcher
     ) {
@@ -227,6 +267,9 @@ public class TypeUtils {
                 }
                 return !(from instanceof JavaType.GenericTypeVariable) && isAssignableTo(toFq.getFullyQualifiedName(), from);
             } else if (to instanceof JavaType.GenericTypeVariable) {
+                if (from instanceof JavaType.GenericTypeVariable && isOfType(to, from)) {
+                    return true;
+                }
                 JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
                 List<JavaType> toBounds = toGeneric.getBounds();
                 if (!toGeneric.getName().equals("?")) {
@@ -407,27 +450,27 @@ public class TypeUtils {
         return false;
     }
 
-    public static @Nullable JavaType.Class asClass(@Nullable JavaType type) {
+    public static JavaType.@Nullable Class asClass(@Nullable JavaType type) {
         return type instanceof JavaType.Class ? (JavaType.Class) type : null;
     }
 
-    public static @Nullable JavaType.Parameterized asParameterized(@Nullable JavaType type) {
+    public static JavaType.@Nullable Parameterized asParameterized(@Nullable JavaType type) {
         return type instanceof JavaType.Parameterized ? (JavaType.Parameterized) type : null;
     }
 
-    public static @Nullable JavaType.Array asArray(@Nullable JavaType type) {
+    public static JavaType.@Nullable Array asArray(@Nullable JavaType type) {
         return type instanceof JavaType.Array ? (JavaType.Array) type : null;
     }
 
-    public static @Nullable JavaType.GenericTypeVariable asGeneric(@Nullable JavaType type) {
+    public static JavaType.@Nullable GenericTypeVariable asGeneric(@Nullable JavaType type) {
         return type instanceof JavaType.GenericTypeVariable ? (JavaType.GenericTypeVariable) type : null;
     }
 
-    public static @Nullable JavaType.Primitive asPrimitive(@Nullable JavaType type) {
+    public static JavaType.@Nullable Primitive asPrimitive(@Nullable JavaType type) {
         return type instanceof JavaType.Primitive ? (JavaType.Primitive) type : null;
     }
 
-    public static @Nullable JavaType.FullyQualified asFullyQualified(@Nullable JavaType type) {
+    public static JavaType.@Nullable FullyQualified asFullyQualified(@Nullable JavaType type) {
         if (type instanceof JavaType.FullyQualified && !(type instanceof JavaType.Unknown)) {
             return (JavaType.FullyQualified) type;
         }
@@ -440,7 +483,7 @@ public class TypeUtils {
      * @return `true` if a superclass or implemented interface declares a non-private method with matching signature.
      * `false` if a match is not found or the method, declaring type, or generic signature is null.
      */
-    public static boolean isOverride(@Nullable JavaType.Method method) {
+    public static boolean isOverride(JavaType.@Nullable Method method) {
         return findOverriddenMethod(method).isPresent();
     }
 
@@ -453,7 +496,7 @@ public class TypeUtils {
      *
      * @return An optional overridden method type declared in the parent.
      */
-    public static Optional<JavaType.Method> findOverriddenMethod(@Nullable JavaType.Method method) {
+    public static Optional<JavaType.Method> findOverriddenMethod(JavaType.@Nullable Method method) {
         if (method == null) {
             return Optional.empty();
         }
@@ -476,7 +519,7 @@ public class TypeUtils {
                 .filter(m -> m.getFlags().contains(Flag.Public) || m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
     }
 
-    public static Optional<JavaType.Method> findDeclaredMethod(@Nullable JavaType.FullyQualified clazz, String name, List<JavaType> argumentTypes) {
+    public static Optional<JavaType.Method> findDeclaredMethod(JavaType.@Nullable FullyQualified clazz, String name, List<JavaType> argumentTypes) {
         if (clazz == null) {
             return Optional.empty();
         }
@@ -557,7 +600,8 @@ public class TypeUtils {
         }
         if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-            return isWellFormedType(parameterized.getType(), seen) && parameterized.getTypeParameters().stream().allMatch(it -> isWellFormedType(it, seen));
+            return isWellFormedType(parameterized.getType(), seen) &&
+                   parameterized.getTypeParameters().stream().allMatch(it -> isWellFormedType(it, seen));
         } else if (type instanceof JavaType.Array) {
             JavaType.Array arr = (JavaType.Array) type;
             return isWellFormedType(arr.getElemType(), seen);
@@ -572,13 +616,14 @@ public class TypeUtils {
             return mc.getThrowableTypes().stream().allMatch(it -> isWellFormedType(it, seen));
         } else if (type instanceof JavaType.Method) {
             JavaType.Method m = (JavaType.Method) type;
-            return isWellFormedType(m.getReturnType(), seen) && isWellFormedType(m.getDeclaringType(), seen) && m.getParameterTypes().stream().allMatch(it -> isWellFormedType(it, seen));
+            return isWellFormedType(m.getReturnType(), seen) &&
+                   isWellFormedType(m.getDeclaringType(), seen) &&
+                   m.getParameterTypes().stream().allMatch(it -> isWellFormedType(it, seen));
         }
-
         return true;
     }
 
-    public static JavaType.FullyQualified unknownIfNull(@Nullable JavaType.FullyQualified t) {
+    public static JavaType.FullyQualified unknownIfNull(JavaType.@Nullable FullyQualified t) {
         if (t == null) {
             return JavaType.Unknown.getInstance();
         }
