@@ -24,34 +24,16 @@ class Groovy2Test implements RewriteTest {
 
     @Test
     void useInt() {
-        rewriteRun(
-          groovy(
-            """
-              def variable = "12345"
-              """
-          )
-        );
+        rewriteRun(groovy("def variable = \"12345\""));
     }
 
     @Test
     void useJavaUtilDate() {
-        rewriteRun(
-          groovy(
-            """
-              def variable = new java.util.Date()
-              """
-          )
-        );
+        rewriteRun(groovy("def variable = new java.util.Date()"));
     }
 
     @Test
     void useStringMultiplicationInParentheses() {
-        rewriteRun(
-          groovy(
-            """
-              def variable = ("#" * 6)
-              """
-          )
-        );
+        rewriteRun(groovy("def variable = (\"#\" * 6)"));
     }
 }
