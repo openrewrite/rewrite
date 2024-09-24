@@ -777,20 +777,20 @@ public class MavenPomDownloader {
                     .withReadTimeout(repository.getTimeout());
         }
 
-        ReachabilityResult reachability = reachable(repository, applyAuthenticationToRequest(repository, request));
+        ReachabilityResult reachability = reachable(applyAuthenticationToRequest(repository, request));
         if (reachability.isSuccess()) {
             return repository.withUri(httpsUri);
         }
-        reachability = reachable(repository, applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(httpsUri)));
+        reachability = reachable(applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(httpsUri)));
         if (reachability.isReachable()) {
             return repository.withUri(httpsUri);
         }
         if (!originalUrl.equals(httpsUri)) {
-            reachability = reachable(repository, applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
+            reachability = reachable(applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
             if (reachability.isSuccess()) {
                 return repository.withUri(originalUrl);
             }
-            reachability = reachable(repository, applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
+            reachability = reachable(applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
             if (reachability.isReachable()) {
                 return repository.withUri(originalUrl);
             }
@@ -824,8 +824,7 @@ public class MavenPomDownloader {
         UNREACHABLE;
     }
 
-    private ReachabilityResult reachable(MavenRepository repository, HttpSender.Request.Builder requestBuilder) {
-        HttpSender.Request.Builder request = applyAuthenticationToRequest(repository, requestBuilder);
+    private ReachabilityResult reachable(HttpSender.Request.Builder request) {
         try {
             sendRequest(request.build());
             return ReachabilityResult.success();
