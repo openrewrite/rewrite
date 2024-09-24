@@ -98,6 +98,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void shouldNotAddNewIfDependencyAlreadyExists() {
         rewriteRun(
@@ -149,6 +150,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void shouldAddNewIfDependencyAlreadyExistsInOlderVersion() {
         rewriteRun(
@@ -205,6 +207,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void shouldNotAddNewIfDependencyAlreadyExistsWithVersion() {
         rewriteRun(
@@ -256,6 +259,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void shouldNotAddNewIfDependencyAlreadyExistsManaged() {
         rewriteRun(
@@ -332,6 +336,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void shouldNotAddNewIfDependencyAlreadyExistsManagedWithVersion() {
         rewriteRun(

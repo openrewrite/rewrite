@@ -127,6 +127,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void removeOldDependencyIfNewAlreadyExists() {
         rewriteRun(
@@ -181,6 +182,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void removeOldDependencyVersionWithPattern() {
         rewriteRun(
