@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
@@ -89,7 +90,10 @@ public class ChangeDependencyExtension extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!dependencyDsl.matches(m) || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
+
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
+
+                if (!((gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m)) && (StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration)))) {
                     return m;
                 }
 
@@ -142,10 +146,10 @@ public class ChangeDependencyExtension extends Recipe {
                             extension = valueValue;
                         }
                     }
-                    if (groupId == null || artifactId == null
-                        || (version == null && !depMatcher.matches(groupId, artifactId))
-                        || (version != null && !depMatcher.matches(groupId, artifactId, version))
-                        || extension == null) {
+                    if (groupId == null || artifactId == null ||
+                        (version == null && !depMatcher.matches(groupId, artifactId)) ||
+                        (version != null && !depMatcher.matches(groupId, artifactId, version)) ||
+                        extension == null) {
                         return m;
                     }
                     String delimiter = extensionStringDelimiter;

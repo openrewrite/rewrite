@@ -26,7 +26,11 @@ public class Semver {
     private Semver() {
     }
 
-    public static boolean isVersion(String version) {
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    public static boolean isVersion(@Nullable String version) {
+        if (version == null) {
+            return false;
+        }
         return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
     }
 

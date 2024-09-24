@@ -75,8 +75,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-                if (fq != null && (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), type)
-                        || TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), owner))) {
+                if (fq != null && (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), type) ||
+                        TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), owner))) {
                     methodsAndFieldsUsed.add(variable.getName());
                 }
             }
@@ -101,8 +101,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
                     if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), type)) {
                         typeUsed = true;
-                    } else if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), owner)
-                            || TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getPackageName(), owner)) {
+                    } else if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), owner) ||
+                            TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getPackageName(), owner)) {
                         if (!originalImports.contains(fullyQualified.getFullyQualifiedName().replace("$", "."))) {
                             otherTypesInPackageUsed.add(fullyQualified.getClassName());
                         }
@@ -132,8 +132,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
-                    } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)
-                            || TypeUtils.fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), type))) {
+                    } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) ||
+                            TypeUtils.fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), type))) {
                         if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                             spaceForNextImport.set(import_.getPrefix());
                             return null;

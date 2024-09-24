@@ -21,7 +21,6 @@ import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 
-import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyMap;
@@ -34,7 +33,7 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private int cyclesThatResultedInChanges = 0;
 
     private Map<SourceFile, SourceFile> lastCycleEdits = emptyMap();
-    private Map<Path, SourceFile> lastCycleGenerated = emptyMap();
+    private Set<SourceFile> lastCycleGenerated = emptySet();
     private Set<SourceFile> lastCycleDeleted = emptySet();
 
     LargeSourceSetCheckingExpectedCycles(int expectedCyclesThatMakeChanges, List<SourceFile> ls) {
@@ -60,17 +59,19 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     public void afterCycle(boolean lastCycle) {
         boolean detectedChangeInThisCycle = false;
         Map<SourceFile, SourceFile> thisCycleEdits = new HashMap<>();
-        Map<Path, SourceFile> thisCycleGenerated = new HashMap<>();
+        Set<SourceFile> thisCycleGenerated = new HashSet<>();
         Set<SourceFile> thisCycleDeleted = new HashSet<>();
 
         for (Result result : getChangeset().getAllResults()) {
             SourceFile before = null; // this source file as it existed after the last cycle
             SourceFile after = result.getAfter();
-            Path sourcePath = result.getAfter() != null ? after.getSourcePath() : result.getBefore().getSourcePath();
 
             if (result.getBefore() == null) {
                 // a source file generated on a prior cycle
-                before = after == null ? null : lastCycleGenerated.get(sourcePath);
+                before = after == null ? null : lastCycleGenerated.stream()
+                        .filter(it -> Objects.equals(it.getId(), result.getAfter().getId()))
+                        .findFirst()
+                        .orElse(null);
             } else {
                 if (after == null && lastCycleDeleted.contains(result.getBefore())) {
                     before = result.getBefore();
@@ -96,7 +97,7 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
                             .isEqualTo(before.printAllTrimmed());
                 }
             } else if (before == null && after != null) {
-                thisCycleGenerated.put(sourcePath, after);
+                thisCycleGenerated.add(after);
                 if (!detectedChangeInThisCycle) {
                     detectedChangeInThisCycle = true;
                     cyclesThatResultedInChanges++;

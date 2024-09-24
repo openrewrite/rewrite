@@ -15,6 +15,9 @@
  */
 package org.openrewrite.gradle.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -22,28 +25,76 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.Serializable;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @With
+@AllArgsConstructor(onConstructor_ = { @JsonCreator})
+@Builder
 public class GradleSettings implements Marker, Serializable {
-    UUID id;
-    List<MavenRepository> pluginRepositories;
-    List<GradlePluginDescriptor> plugins;
-    Map<String, FeaturePreview> featurePreviews;
+
+    @Builder.Default
+    UUID id = randomId();
+
+    @Deprecated
+    @Nullable
+    @Builder.Default
+    List<MavenRepository> pluginRepositories = emptyList();
+
+    @Builder.Default
+    List<GradlePluginDescriptor> plugins = emptyList();
+
+    @Builder.Default
+    Map<String, FeaturePreview> featurePreviews = emptyMap();
+
+    @Builder.Default
+    GradleBuildscript buildscript = GradleBuildscript.builder().build();
+
+    // Backwards compatibility to ease convoluted release process with rewrite-gradle-tooling-model
+    public GradleSettings(
+            UUID id,
+            List<MavenRepository> pluginRepositories,
+            List<GradlePluginDescriptor> plugins,
+            Map<String, FeaturePreview> featurePreviews
+    ) {
+        this(id, pluginRepositories, plugins, featurePreviews, null);
+    }
+
+    public GradleBuildscript getBuildscript() {
+        // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.
+        //noinspection ConstantValue
+        if (buildscript == null) {
+            return new GradleBuildscript(randomId(), emptyList(), emptyMap());
+        }
+        return buildscript;
+    }
 
     public @Nullable Boolean isFeatureEnabled(String name) {
-        // Unclear how enabled status can be determined in latest gradle APIs
-        return null;
+        return featurePreviews.get(name).getEnabled();
     }
 
     public Set<FeaturePreview> getActiveFeatures() {
         return featurePreviews.values().stream()
                 .filter(FeaturePreview::isActive)
                 .collect(Collectors.toSet());
+    }
+
+    /**
+     * Get a list of Maven plugin repositories.
+     *
+     * @return list of Maven plugin repositories
+     * @deprecated Use {@link GradleBuildscript#getMavenRepositories()} instead.
+     */
+    @Deprecated
+    public List<MavenRepository> getPluginRepositories() {
+        if (buildscript != null) {
+            return buildscript.getMavenRepositories();
+        }
+        return pluginRepositories == null ? emptyList() : pluginRepositories;
     }
 }

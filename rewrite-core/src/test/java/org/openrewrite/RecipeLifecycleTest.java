@@ -55,10 +55,11 @@ class RecipeLifecycleTest implements RewriteTest {
         var ctx = new InMemoryExecutionContext();
         ctx.putMessage(Recipe.PANIC, true);
 
+        //noinspection NullableProblems
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
               @Override
-              public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+              public Tree visit(Tree tree, ExecutionContext ctx) {
                   fail("Should never have reached a visit method");
                   return tree;
               }
@@ -82,6 +83,29 @@ class RecipeLifecycleTest implements RewriteTest {
               .containsOnly("test.GeneratingRecipe")),
           text(null, "test", spec -> spec.path("test.txt"))
         );
+    }
+
+    @Test
+    void twoGeneratingRecipesCreateOnlyOneFile() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe
+                displayName: Create twice
+                description: Scanning recipes later in the stack should scan files created by earlier recipes, avoiding duplicate file creation.
+                recipeList:
+                  - org.openrewrite.text.CreateTextFile:
+                      fileContents: first
+                      relativeFileName: test.txt
+                      overwriteExisting: false
+                  - org.openrewrite.text.CreateTextFile:
+                      fileContents: second
+                      relativeFileName: test.txt
+                      overwriteExisting: false
+                """,
+            "test.recipe"
+          ),
+          text(null, "first", spec -> spec.path("test.txt")));
     }
 
     @Value

@@ -30,6 +30,8 @@ import java.util.List;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value
 public class Plugin {
+    // default value as per https://maven.apache.org/xsd/maven-4.0.0.xsd
+    public static final String PLUGIN_DEFAULT_GROUPID = "org.apache.maven.plugins";
 
     String groupId;
     String artifactId;

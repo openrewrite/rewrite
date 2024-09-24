@@ -102,9 +102,9 @@ public class ChangeTagAttribute extends Recipe {
                     return null;
                 }
 
-                String changedValue = oldValue != null
-                        ? (Boolean.TRUE.equals(regex) ? stringValue.replaceAll(oldValue, newValue) : stringValue.replace(oldValue, newValue))
-                        : newValue;
+                String changedValue = oldValue != null ?
+                        (Boolean.TRUE.equals(regex) ? stringValue.replaceAll(oldValue, newValue) : stringValue.replace(oldValue, newValue)) :
+                        newValue;
 
                 return attribute.withValue(
                         new Xml.Attribute.Value(attribute.getId(),

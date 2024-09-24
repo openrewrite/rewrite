@@ -54,9 +54,9 @@ public class OkHttpSender implements HttpSender {
         String methodValue = method.toString();
         if (entity.length > 0) {
             String contentType = request.getRequestHeaders().get("Content-Type");
-            MediaType mediaType = contentType != null
-                    ? MediaType.get(contentType + "; charset=utf-8")
-                    : MEDIA_TYPE_APPLICATION_JSON;
+            MediaType mediaType = contentType != null ?
+                    MediaType.get(contentType + "; charset=utf-8") :
+                    MEDIA_TYPE_APPLICATION_JSON;
             RequestBody body = RequestBody.create(entity, mediaType);
             requestBuilder.method(methodValue, body);
         } else {

@@ -113,16 +113,16 @@ public class ChangePropertyValue extends Recipe {
             return null;
         }
         Yaml.Scalar scalar = (Yaml.Scalar) value;
-        Yaml.Scalar newScalar = scalar.withValue(Boolean.TRUE.equals(regex)
-                ? scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue)
-                : newValue);
+        Yaml.Scalar newScalar = scalar.withValue(Boolean.TRUE.equals(regex) ?
+                scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue) :
+                newValue);
         return scalar.getValue().equals(newScalar.getValue()) ? null : newScalar;
     }
 
     private boolean matchesPropertyKey(String prop) {
-        return !Boolean.FALSE.equals(relaxedBinding)
-                ? NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey)
-                : StringUtils.matchesGlob(prop, propertyKey);
+        return !Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
+                StringUtils.matchesGlob(prop, propertyKey);
     }
 
     private boolean matchesOldValue(Yaml.Block value) {
@@ -131,9 +131,9 @@ public class ChangePropertyValue extends Recipe {
         }
         Yaml.Scalar scalar = (Yaml.Scalar) value;
         return StringUtils.isNullOrEmpty(oldValue) ||
-               (Boolean.TRUE.equals(regex)
-                       ? Pattern.compile(oldValue).matcher(scalar.getValue()).find()
-                       : scalar.getValue().equals(oldValue));
+               (Boolean.TRUE.equals(regex) ?
+                       Pattern.compile(oldValue).matcher(scalar.getValue()).find() :
+                       scalar.getValue().equals(oldValue));
     }
 
     private static String getProperty(Cursor cursor) {

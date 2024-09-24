@@ -19,13 +19,13 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.SelfLoathing;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -5898,16 +5898,16 @@ public interface J extends Tree {
 
             public Cursor getDeclaringScope(Cursor cursor) {
                 return cursor.dropParentUntil(it ->
-                        it instanceof J.Block
-                        || it instanceof J.Lambda
-                        || it instanceof J.MethodDeclaration
-                        || it == Cursor.ROOT_VALUE);
+                        it instanceof J.Block ||
+                        it instanceof J.Lambda ||
+                        it instanceof J.MethodDeclaration ||
+                        it == Cursor.ROOT_VALUE);
             }
 
             public boolean isField(Cursor cursor) {
                 Cursor declaringScope = getDeclaringScope(cursor);
-                return declaringScope.getValue() instanceof J.Block
-                       && declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
+                return declaringScope.getValue() instanceof J.Block &&
+                       declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
             }
 
             public Padding getPadding() {

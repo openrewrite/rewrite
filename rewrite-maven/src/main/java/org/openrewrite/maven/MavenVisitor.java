@@ -31,6 +31,7 @@ import java.util.function.Predicate;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
+import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 
 public class MavenVisitor<P> extends XmlVisitor<P> {
 
@@ -42,8 +43,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
+    static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
-
 
     private transient Xml.@Nullable Document document;
 
@@ -200,8 +201,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
-        return tag.getChildValue("type").map("pom"::equalsIgnoreCase).orElse(false)
-               && tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
+        return tag.getChildValue("type").map("pom"::equalsIgnoreCase).orElse(false) &&
+               tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
     }
 
     public void maybeUpdateModel() {
@@ -219,6 +220,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     public boolean isPluginTag(String groupId, @Nullable String artifactId) {
         return isPluginTag() && hasPluginGroupId(groupId) && hasPluginArtifactId(artifactId);
+    }
+
+    public boolean isManagedPluginTag() {
+        return isTag("plugin") && MANAGED_PLUGIN_MATCHER.matches(getCursor());
     }
 
     private boolean hasPluginGroupId(String groupId) {
@@ -388,16 +393,21 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public @Nullable Plugin findPlugin(Xml.Tag tag) {
-        List<Plugin> plugins = getResolutionResult().getPom().getPlugins();
-        if (plugins != null) {
-            for (Plugin resolvedPlugin : plugins) {
-                String reqGroup = resolvedPlugin.getGroupId();
-                String reqVersion = resolvedPlugin.getVersion();
-                if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                    resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                    (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
-                    return resolvedPlugin;
-                }
+        return findPlugin(tag, getResolutionResult().getPom().getPlugins());
+    }
+
+    public @Nullable Plugin findManagedPlugin(Xml.Tag tag) {
+        return findPlugin(tag, getResolutionResult().getPom().getPluginManagement());
+    }
+
+    private static @Nullable Plugin findPlugin(Xml.Tag tag, List<Plugin> plugins) {
+        for (Plugin resolvedPlugin : plugins) {
+            String reqGroup = resolvedPlugin.getGroupId();
+            String reqVersion = resolvedPlugin.getVersion();
+            if (reqGroup.equals(tag.getChildValue("groupId").orElse(PLUGIN_DEFAULT_GROUPID)) &&
+                resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
+                return resolvedPlugin;
             }
         }
         return null;
