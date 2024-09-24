@@ -15,9 +15,9 @@
  */
 package org.openrewrite.maven;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
@@ -141,7 +141,15 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     public MavenRepository getLocalRepository() {
-        return getMessage(MAVEN_LOCAL_REPOSITORY, MAVEN_LOCAL_DEFAULT);
+        MavenRepository configuredProperty = getMessage(MAVEN_LOCAL_REPOSITORY);
+        if (configuredProperty != null) {
+            return configuredProperty;
+        }
+        MavenSettings settings = getSettings();
+        if (settings != null) {
+            return settings.getMavenLocal();
+        }
+        return MAVEN_LOCAL_DEFAULT;
     }
 
     public MavenExecutionContextView setAddLocalRepository(boolean useLocalRepository) {

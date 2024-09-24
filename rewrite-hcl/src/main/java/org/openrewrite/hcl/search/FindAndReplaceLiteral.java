@@ -17,13 +17,13 @@ package org.openrewrite.hcl.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.tree.Hcl;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.AlreadyReplaced;
 
 import java.util.Objects;
@@ -43,8 +43,8 @@ public class FindAndReplaceLiteral extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find and replace literal values in HCL files. This recipe parses the source files on which it runs as HCL, "
-               + "meaning you can execute HCL language-specific recipes before and after this recipe in a single recipe run.";
+        return "Find and replace literal values in HCL files. This recipe parses the source files on which it runs as HCL, " +
+               "meaning you can execute HCL language-specific recipes before and after this recipe in a single recipe run.";
     }
 
     @Option(displayName = "Find", description = "The literal to find (and replace)", example = "blacklist")

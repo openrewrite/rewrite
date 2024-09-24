@@ -16,9 +16,9 @@
 package org.openrewrite.properties;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.tree.ParseError;
@@ -113,7 +113,7 @@ public class PropertiesParser implements Parser {
         );
     }
 
-    private @Nullable Properties.Content extractContent(String line, StringBuilder prefix) {
+    private Properties.@Nullable Content extractContent(String line, StringBuilder prefix) {
         Properties.Content content = null;
         if (line.trim().startsWith("#") || line.trim().startsWith("!")) {
             Properties.Comment.Delimiter delimiter = line.trim().startsWith("#") ?

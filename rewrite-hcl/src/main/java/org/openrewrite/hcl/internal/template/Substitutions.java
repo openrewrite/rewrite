@@ -16,11 +16,11 @@
 package org.openrewrite.hcl.internal.template;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;

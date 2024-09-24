@@ -16,6 +16,7 @@
 package org.openrewrite.java.isolated;
 
 
+import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
@@ -26,12 +27,12 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.CompactConstructor;
@@ -2136,7 +2137,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return annotations;
     }
 
-    Space formatWithCommentTree(String prefix, JCTree tree, @Nullable DCTree.DCDocComment commentTree) {
+    Space formatWithCommentTree(String prefix, JCTree tree, @Nullable DocCommentTree commentTree) {
         Space fmt = format(prefix);
         if (commentTree != null) {
             List<Comment> comments = fmt.getComments();

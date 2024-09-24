@@ -16,17 +16,21 @@
 package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.java.Assertions.srcMainJava;
+import static org.openrewrite.java.Assertions.srcTestJava;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -1276,6 +1280,186 @@ class AddDependencyTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>"""
+          )
+        );
+    }
+
+    @Test
+    void dependencyThatIsTransitivelyProvidedWithWrongScopeShouldBeAdded() {
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion()
+              .dependsOn(
+                """
+                  package main.java.checkerframework.checker.nullness.qual;
+                  public @interface NonNull {}
+                  """
+              )
+            )
+            .recipes(
+              new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
+                null, null, null, "main.java.checkerframework..*", null, null, null, null,
+                true),
+              new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
+            ),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencies>
+                        <!-- Has transitive dependency on org.checkerframework:checker-qual -->
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>31.1-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              srcMainJava(
+                java(
+                  """
+                    import main.java.checkerframework.checker.nullness.qual.NonNull;
+                    class Foo {}
+                    """,
+                  """
+                    import org.checkerframework.checker.nullness.qual.NonNull;
+                    class Foo {}
+                    """
+                )
+              ),
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>31.1-jre</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.checkerframework</groupId>
+                              <artifactId>checker-qual</artifactId>
+                              <version>3.44.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>31.1-jre</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void dependencyThatIsTransitivelyProvidedWithCorrectScopeShouldNotBeAdded() {
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion()
+              .dependsOn(
+                """
+                  package main.java.checkerframework.checker.nullness.qual;
+                  public @interface NonNull {}
+                  """
+              )
+            )
+            .recipes(
+              new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
+                null, null, null, "main.java.checkerframework..*", null, null, null, null,
+                true),
+              new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
+            ),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencies>
+                        <!-- Has transitive dependency on org.checkerframework:checker-qual -->
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>31.1-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              srcTestJava(
+                java(
+                  """
+                    import main.java.checkerframework.checker.nullness.qual.NonNull;
+                    class Foo {}
+                    """,
+                  """
+                    import org.checkerframework.checker.nullness.qual.NonNull;
+                    class Foo {}
+                    """
+                )
+              ),
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>31.1-jre</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
           )
         );
     }

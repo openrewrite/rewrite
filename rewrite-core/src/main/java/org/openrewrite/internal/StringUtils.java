@@ -15,8 +15,8 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -466,8 +466,8 @@ public class StringUtils {
             if (ch == '*') {
                 break;
             }
-            if (ch != '?'
-                && different(caseSensitive, ch, str.charAt(strIdxStart))) {
+            if (ch != '?' &&
+                different(caseSensitive, ch, str.charAt(strIdxStart))) {
                 return false; // Character mismatch
             }
             patIdxStart++;
@@ -554,9 +554,9 @@ public class StringUtils {
     }
 
     private static boolean different(boolean caseSensitive, char ch, char other) {
-        return caseSensitive
-                ? ch != other
-                : Character.toUpperCase(ch) != Character.toUpperCase(other);
+        return caseSensitive ?
+                ch != other :
+                Character.toUpperCase(ch) != Character.toUpperCase(other);
     }
 
     public static String indent(String text) {

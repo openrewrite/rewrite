@@ -17,11 +17,11 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -125,6 +125,9 @@ public class RemoveDuplicateDependencies extends Recipe {
             }
 
             private @Nullable DependencyKey getManagedDependencyKey(Xml.Tag tag) {
+                if (tag.getChildValue("scope").filter("import"::equalsIgnoreCase).isPresent()) {
+                    return DependencyKey.from(tag);
+                }
                 ResolvedManagedDependency resolvedDependency = findManagedDependency(tag);
                 return resolvedDependency != null ? DependencyKey.from(resolvedDependency) : null;
             }
@@ -150,6 +153,17 @@ public class RemoveDuplicateDependencies extends Recipe {
 
         public static DependencyKey from(ResolvedManagedDependency dependency) {
             return new DependencyKey(dependency.getGroupId(), dependency.getArtifactId(), dependency.getType(), dependency.getClassifier(), Scope.Compile);
+        }
+
+        public static @Nullable DependencyKey from(Xml.Tag tag) {
+            return tag.getChildValue("artifactId").map(artifactId ->
+                    new DependencyKey(
+                            tag.getChildValue("groupId").orElse(null),
+                            artifactId,
+                            tag.getChildValue("type").orElse("jar"),
+                            tag.getChildValue("classifier").orElse(null),
+                            tag.getChildValue("scope").map(Scope::fromName).orElse(Scope.Compile)
+                    )).orElse(null);
         }
     }
 }

@@ -17,12 +17,13 @@ package org.openrewrite.gradle.trait;
 
 import lombok.Getter;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.Dependency;
@@ -30,6 +31,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.trait.Trait;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -42,17 +44,25 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
     public static class Matcher extends GradleTraitMatcher<GradleDependency> {
         @Nullable
+        protected String configuration;
+
+        @Nullable
         protected String groupId;
 
         @Nullable
         protected String artifactId;
 
-        public Matcher groupId(String groupId) {
+        public Matcher configuration(@Nullable String configuration) {
+            this.configuration = configuration;
+            return this;
+        }
+
+        public Matcher groupId(@Nullable String groupId) {
             this.groupId = groupId;
             return this;
         }
 
-        public Matcher artifactId(String artifactId) {
+        public Matcher artifactId(@Nullable String artifactId) {
             this.artifactId = artifactId;
             return this;
         }
@@ -63,19 +73,27 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             if (object instanceof J.MethodInvocation) {
                 J.MethodInvocation methodInvocation = (J.MethodInvocation) object;
 
+                if (!withinDependenciesBlock(cursor)) {
+                    return null;
+                }
+
                 GradleProject gradleProject = getGradleProject(cursor);
                 if (gradleProject == null) {
                     return null;
                 }
 
-                GradleDependencyConfiguration configuration = gradleProject.getConfiguration(methodInvocation.getSimpleName());
-                if (configuration == null) {
+                GradleDependencyConfiguration gdc = getConfiguration(gradleProject, methodInvocation);
+                if (gdc == null) {
+                    return null;
+                }
+
+                if (!(StringUtils.isBlank(configuration) || methodInvocation.getSimpleName().equals(configuration))) {
                     return null;
                 }
 
                 org.openrewrite.gradle.util.Dependency dependency = null;
                 Expression argument = methodInvocation.getArguments().get(0);
-                if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry) {
+                if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral) {
                     dependency = parseDependency(methodInvocation.getArguments());
                 } else if (argument instanceof J.MethodInvocation &&
                         (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
@@ -87,8 +105,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return null;
                 }
 
-                if (configuration.isCanBeResolved()) {
-                    for (ResolvedDependency resolvedDependency : configuration.getResolved()) {
+                if (gdc.isCanBeResolved()) {
+                    for (ResolvedDependency resolvedDependency : gdc.getResolved()) {
                         if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
                                 (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
                             Dependency req = resolvedDependency.getRequested();
@@ -99,7 +117,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         }
                     }
                 } else {
-                    for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(configuration, true)) {
+                    for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
                         if (transitiveConfiguration.isCanBeResolved()) {
                             for (ResolvedDependency resolvedDependency : transitiveConfiguration.getResolved()) {
                                 if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
@@ -119,7 +137,31 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return null;
         }
 
-        private @Nullable org.openrewrite.gradle.util.Dependency parseDependency(List<Expression> arguments) {
+        private static @Nullable GradleDependencyConfiguration getConfiguration(GradleProject gradleProject, J.MethodInvocation methodInvocation) {
+            String methodName = methodInvocation.getSimpleName();
+            if (methodName.equals("classpath")) {
+                return gradleProject.getBuildscript().getConfiguration(methodName);
+            } else {
+                return gradleProject.getConfiguration(methodName);
+            }
+        }
+
+        private boolean withinDependenciesBlock(Cursor cursor) {
+            Cursor parentCursor = cursor.getParent();
+            while (parentCursor != null) {
+                if (parentCursor.getValue() instanceof J.MethodInvocation) {
+                    J.MethodInvocation m = parentCursor.getValue();
+                    if (m.getSimpleName().equals("dependencies")) {
+                        return true;
+                    }
+                }
+                parentCursor = parentCursor.getParent();
+            }
+
+            return false;
+        }
+
+        private org.openrewrite.gradle.util.@Nullable Dependency parseDependency(List<Expression> arguments) {
             Expression argument = arguments.get(0);
             if (argument instanceof J.Literal) {
                 return DependencyStringNotationConverter.parse((String) ((J.Literal) argument).getValue());
@@ -129,39 +171,49 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
                     return DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
                 }
+            } else if (argument instanceof G.MapLiteral) {
+                List<Expression> mapEntryExpressions = ((G.MapLiteral) argument).getElements()
+                        .stream()
+                        .map(e -> (Expression) e)
+                        .collect(Collectors.toList());
+                return getMapEntriesDependency(mapEntryExpressions);
             } else if (argument instanceof G.MapEntry) {
-                String group = null;
-                String artifact = null;
-
-                for (Expression e : arguments) {
-                    if (!(e instanceof G.MapEntry)) {
-                        continue;
-                    }
-                    G.MapEntry arg = (G.MapEntry) e;
-                    if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                        continue;
-                    }
-                    J.Literal key = (J.Literal) arg.getKey();
-                    J.Literal value = (J.Literal) arg.getValue();
-                    if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                        continue;
-                    }
-                    String keyValue = (String) key.getValue();
-                    if ("group".equals(keyValue)) {
-                        group = (String) value.getValue();
-                    } else if ("name".equals(keyValue)) {
-                        artifact = (String) value.getValue();
-                    }
-                }
-
-                if (group == null || artifact == null) {
-                    return null;
-                }
-
-                return new org.openrewrite.gradle.util.Dependency(group, artifact, null, null, null);
+                return getMapEntriesDependency(arguments);
             }
 
             return null;
+        }
+
+        private static org.openrewrite.gradle.util.@Nullable Dependency getMapEntriesDependency(List<Expression> arguments) {
+            String group = null;
+            String artifact = null;
+
+            for (Expression e : arguments) {
+                if (!(e instanceof G.MapEntry)) {
+                    continue;
+                }
+                G.MapEntry arg = (G.MapEntry) e;
+                if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
+                    continue;
+                }
+                J.Literal key = (J.Literal) arg.getKey();
+                J.Literal value = (J.Literal) arg.getValue();
+                if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+                    continue;
+                }
+                String keyValue = (String) key.getValue();
+                if ("group".equals(keyValue)) {
+                    group = (String) value.getValue();
+                } else if ("name".equals(keyValue)) {
+                    artifact = (String) value.getValue();
+                }
+            }
+
+            if (group == null || artifact == null) {
+                return null;
+            }
+
+            return new org.openrewrite.gradle.util.Dependency(group, artifact, null, null, null);
         }
     }
 }

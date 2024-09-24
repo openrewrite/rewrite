@@ -22,9 +22,9 @@ import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.GitRemote;
 import org.openrewrite.Incubating;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.jgit.lib.*;
@@ -187,7 +187,7 @@ public class GitProvenance implements Marker {
      */
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
                                                                @Nullable BuildEnvironment environment,
-                                                               @Nullable GitRemote.Parser gitRemoteParser) {
+            GitRemote.@Nullable Parser gitRemoteParser) {
         if (gitRemoteParser == null) {
             gitRemoteParser = new GitRemote.Parser();
         }
@@ -195,9 +195,9 @@ public class GitProvenance implements Marker {
             if (environment instanceof JenkinsBuildEnvironment) {
                 JenkinsBuildEnvironment jenkinsBuildEnvironment = (JenkinsBuildEnvironment) environment;
                 try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
-                    String branch = jenkinsBuildEnvironment.getLocalBranch() != null
-                            ? jenkinsBuildEnvironment.getLocalBranch()
-                            : localBranchName(repository, jenkinsBuildEnvironment.getBranch());
+                    String branch = jenkinsBuildEnvironment.getLocalBranch() != null ?
+                            jenkinsBuildEnvironment.getLocalBranch() :
+                            localBranchName(repository, jenkinsBuildEnvironment.getBranch());
                     return fromGitConfig(repository, branch, getChangeset(repository), gitRemoteParser);
                 } catch (IllegalArgumentException | GitAPIException e) {
                     // Silently ignore if the project directory is not a git repository

@@ -15,9 +15,9 @@
  */
 package org.openrewrite.xml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.search.FindTags;
 import org.openrewrite.xml.trait.Namespaced;
 import org.openrewrite.xml.tree.Xml;
@@ -123,8 +123,8 @@ public class XPathMatcher {
                 boolean matchedCondition = false;
 
                 Matcher matcher;
-                if (tagForCondition != null && partWithCondition.endsWith("]")
-                    && (matcher = ELEMENT_WITH_CONDITION_PATTERN.matcher(partWithCondition)).matches()) {
+                if (tagForCondition != null && partWithCondition.endsWith("]") &&
+                    (matcher = ELEMENT_WITH_CONDITION_PATTERN.matcher(partWithCondition)).matches()) {
                     String optionalPartName = matchesElementWithConditionFunction(matcher, tagForCondition, cursor);
                     if (optionalPartName == null) {
                         return false;
@@ -150,16 +150,16 @@ public class XPathMatcher {
                     continue;
                 }
 
-                boolean conditionNotFulfilled = tagForCondition == null
-                                                || (!part.equals(partName) && !tagForCondition.getName().equals(partName));
+                boolean conditionNotFulfilled = tagForCondition == null ||
+                                                (!part.equals(partName) && !tagForCondition.getName().equals(partName));
 
                 int idx = part.indexOf("[");
                 if (idx > 0) {
                     part = part.substring(0, idx);
                 }
-                if (path.size() < i + 1
-                    || (!(path.get(pathIndex).getName().equals(part)) && !"*".equals(part))
-                    || conditionIsBefore && conditionNotFulfilled) {
+                if (path.size() < i + 1 ||
+                    (!(path.get(pathIndex).getName().equals(part)) && !"*".equals(part)) ||
+                    conditionIsBefore && conditionNotFulfilled) {
                     return false;
                 }
             }

@@ -15,13 +15,15 @@
  */
 package org.openrewrite.semver;
 
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
 
 /**
  * Version selector for matching exact version: either explicitly prefixed with "=",
  * or implicit default when no other version selectors match.
  */
+@Getter
 public class ExactVersion extends LatestRelease {
     String version;
 

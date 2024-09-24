@@ -55,14 +55,15 @@ class RawPomTest {
     @Test
     void repositoriesSerializationAndDeserialization() {
         RawPom pom = RawPom.parse(
+          //language=xml
           new ByteArrayInputStream("""
                 <project>
                   `<modelVersion>4.0.0</modelVersion>
-                 
+            
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-                  
+            
                   <repositories>
                     <repository>
                         <id>spring-milestones</id>
@@ -75,6 +76,7 @@ class RawPomTest {
           null
         );
 
+        //noinspection DataFlowIssue
         assertThat(pom.getRepositories()).isNotNull();
         assertThat(pom.getRepositories().getRepositories()).hasSize(1);
     }
@@ -82,10 +84,11 @@ class RawPomTest {
     @Test
     void serializePluginFlags() {
         RawPom pom = RawPom.parse(
+          //language=xml
           new ByteArrayInputStream("""
                 <project>
                     <modelVersion>4.0.0</modelVersion>
-                    
+            
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
@@ -280,7 +283,7 @@ class RawPomTest {
                       <comments>A business-friendly OSS license</comments>
                     </license>
                   </licenses>
-                  
+          
                   <repositories>
                     <repository>
                       <releases>
@@ -299,7 +302,7 @@ class RawPomTest {
                       <layout>default</layout>
                     </repository>
                   </repositories>
-                  
+          
                   <profiles>
                       <profile>
                           <id>java9+</id>
@@ -494,12 +497,12 @@ class RawPomTest {
         @Language("xml") String pomString = """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+          
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <packaging>jar</packaging>
-
+          
                   <build>
                       <plugins>
                           <plugin>

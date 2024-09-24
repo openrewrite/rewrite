@@ -17,8 +17,8 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.table.MethodCalls;
@@ -75,8 +75,8 @@ public class FindMethods extends Recipe {
             public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                 // In an annotation @Example(value = "") the identifier "value" may have a method type
                 J.Identifier i = super.visitIdentifier(identifier, ctx);
-                if(i.getType() instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) i.getType())
-                   && !(getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
+                if(i.getType() instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) i.getType()) &&
+                   !(getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
                     JavaType.Method m = (JavaType.Method) i.getType();
                     JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                     if(javaSourceFile != null) {

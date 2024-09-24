@@ -48,7 +48,7 @@ class JavaSourceSetTest {
           .filter(o -> o.getFullyQualifiedName().startsWith("org.apache.hadoop.hbase.CacheEvictionStats"))
           .findAny();
         assertThat(shaded).isPresent();
-        assertThat(jss.getTypeToGav().get(shaded.get())).isEqualTo("org.apache.hbase:hbase-shaded-client:2.4.11");
+        assertThat(jss.getGavToTypes().get("org.apache.hbase:hbase-shaded-client:2.4.11")).contains(shaded.get());
     }
 
     @Test

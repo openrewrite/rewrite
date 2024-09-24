@@ -18,13 +18,13 @@ package org.openrewrite.yaml;
 import lombok.Getter;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -453,15 +453,15 @@ public class YamlParser implements org.openrewrite.Parser {
         @Nullable
         private final String startBracePrefix;
 
-        @Nullable
-        private final Yaml.Anchor anchor;
+
+        private final Yaml.@Nullable Anchor anchor;
 
         private final List<Yaml.Mapping.Entry> entries = new ArrayList<>();
 
         @Nullable
         private YamlKey key;
 
-        private MappingBuilder(String prefix, @Nullable String startBracePrefix, @Nullable Yaml.Anchor anchor) {
+        private MappingBuilder(String prefix, @Nullable String startBracePrefix, Yaml.@Nullable Anchor anchor) {
             this.prefix = prefix;
             this.startBracePrefix = startBracePrefix;
             this.anchor = anchor;
@@ -507,12 +507,12 @@ public class YamlParser implements org.openrewrite.Parser {
         @Nullable
         private final String startBracketPrefix;
 
-        @Nullable
-        private final Yaml.Anchor anchor;
+
+        private final Yaml.@Nullable Anchor anchor;
 
         private final List<Yaml.Sequence.Entry> entries = new ArrayList<>();
 
-        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, @Nullable Yaml.Anchor anchor) {
+        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, Yaml.@Nullable Anchor anchor) {
             this.prefix = prefix;
             this.startBracketPrefix = startBracketPrefix;
             this.anchor = anchor;

@@ -15,8 +15,8 @@
  */
 package org.openrewrite.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.diff.DiffEntry;
 import org.openrewrite.jgit.diff.DiffFormatter;
 import org.openrewrite.jgit.diff.RawTextComparator;

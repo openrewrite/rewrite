@@ -48,7 +48,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
-import static com.fasterxml.jackson.core.JsonParser.Feature.IGNORE_UNDEFINED;
 import static com.fasterxml.jackson.core.JsonParser.Feature.INCLUDE_SOURCE_IN_LOCATION;
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -98,9 +97,10 @@ class GitProvenanceTest {
 
     @ParameterizedTest
     @CsvSource({
-      "git@gitlab.acme.com:organization/subgroup/repository.git, https://gitlab.acme.com, GitLab, organization/subgroup",
-      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, GitLab, organization/subgroup",
-      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, GitLab, organization/subgroup",
+      "https://github.com/organization/repository, https://github.com, GitHub, organization",
+      "git@gitlab.acme.com/organization/subgroup/repository.git, https://gitlab.acme.com, GitLab, organization/subgroup",
+      "git@gitlab.acme.com/organization/subgroup/repository.git, git@gitlab.acme.com, GitLab, organization/subgroup",
+      "git@gitlab.acme.com:organization/subgroup/repository.git, ssh://git@gitlab.acme.com, GitLab, organization/subgroup",
       "https://dev.azure.com/organization/project/_git/repository, https://dev.azure.com, AzureDevOps, organization/project",
       "https://organization@dev.azure.com/organization/project/_git/repository, https://dev.azure.com, AzureDevOps, organization/project",
       "git@ssh.dev.azure.com:v3/organization/project/repository, git@ssh.dev.azure.com, AzureDevOps, organization/project"

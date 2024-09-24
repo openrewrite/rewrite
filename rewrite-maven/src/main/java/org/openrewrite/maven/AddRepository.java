@@ -19,11 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
@@ -267,9 +267,9 @@ public class AddRepository extends Recipe {
         if (releases == null) {
             return isNoReleases();
         } else {
-            return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null))
-                   && Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null))
-                   && Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
+            return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null)) &&
+                   Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null)) &&
+                   Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
         }
     }
 
@@ -282,9 +282,9 @@ public class AddRepository extends Recipe {
         if (snapshots == null) {
             return isNoSnapshots();
         } else {
-            return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null))
-                   && Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null))
-                   && Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
+            return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null)) &&
+                   Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null)) &&
+                   Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
         }
     }
 

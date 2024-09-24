@@ -165,8 +165,8 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if ((!(PROJECT_MATCHER.matches(getCursor()) || PARENT_MATCHER.matches(getCursor())))
-                    || t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
+                if ((!(PROJECT_MATCHER.matches(getCursor()) || PARENT_MATCHER.matches(getCursor()))) ||
+                    t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
                     return t;
                 }
                 String newVersion = acc.get(new GroupArtifact(

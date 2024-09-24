@@ -19,11 +19,11 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
@@ -421,8 +421,8 @@ public class Autodetect extends NamedStyles {
             // (newline-separated) annotations on some common target are not continuations
             boolean isContinuation = !(expression instanceof J.Annotation && !(
                     // ...but annotations which are *arguments* to other annotations can be continuations
-                    getCursor().getParentTreeCursor().getValue() instanceof J.Annotation
-                    || getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
+                    getCursor().getParentTreeCursor().getValue() instanceof J.Annotation ||
+                    getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
             ));
             countIndents(expression.getPrefix().getWhitespace(), isContinuation, stats);
 

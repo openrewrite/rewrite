@@ -16,8 +16,8 @@
 package org.openrewrite.semver;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
 
 @Value
 public class LatestPatch implements VersionComparator {

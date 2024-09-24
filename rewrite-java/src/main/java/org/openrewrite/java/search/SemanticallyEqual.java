@@ -15,15 +15,13 @@
  */
 package org.openrewrite.java.search;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -59,6 +57,8 @@ public class SemanticallyEqual {
         private final boolean compareMethodArguments;
 
         protected final AtomicBoolean isEqual = new AtomicBoolean(true);
+        private final Deque<Map<String, String>> variableScope = new ArrayDeque<>();
+        private final Set<JavaType> seen = new HashSet<>();
 
         public SemanticallyEqualVisitor(boolean compareMethodArguments) {
             this.compareMethodArguments = compareMethodArguments;
@@ -118,6 +118,29 @@ public class SemanticallyEqual {
                 tree = unwrap(((J.ControlParentheses<?>) tree).getTree());
             }
             return (J) tree;
+        }
+
+        @Override
+        public @Nullable J preVisit(J tree, J j) {
+            if (declaresVariableScope(tree)) {
+                variableScope.push(new HashMap<>());
+            }
+            return tree;
+        }
+
+        @Override
+        public @Nullable J postVisit(J tree, J j) {
+            if (declaresVariableScope(tree)) {
+                variableScope.pop();
+            }
+            return tree;
+        }
+
+        protected boolean declaresVariableScope(J tree) {
+            if (tree instanceof J.Lambda) {
+                return true;
+            }
+            return false;
         }
 
         @Override
@@ -593,8 +616,8 @@ public class SemanticallyEqual {
                         isEqual.set(false);
                         return fieldAccess;
                     }
-                } else if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType())
-                           || !TypeUtils.isOfType(fieldType, compareTo.getName().getFieldType())) {
+                } else if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType()) ||
+                           !TypeUtils.isOfType(fieldType, compareTo.getName().getFieldType())) {
                     isEqual.set(false);
                     return fieldAccess;
                 }
@@ -683,6 +706,12 @@ public class SemanticallyEqual {
                 }
 
                 J.Identifier compareTo = (J.Identifier) j;
+                if (identifier.getFieldType() != null) {
+                    Map<String, String> scope = variableScope.peek();
+                    if (scope != null && scope.containsKey(identifier.getSimpleName()) && scope.get(identifier.getSimpleName()).equals(compareTo.getSimpleName())) {
+                        return identifier;
+                    }
+                }
                 if (!identifier.getSimpleName().equals(compareTo.getSimpleName())) {
                     isEqual.set(false);
                     return identifier;
@@ -784,8 +813,8 @@ public class SemanticallyEqual {
                     isEqual.set(false);
                     return lambda;
                 }
+                visitList(lambda.getParameters().getParameters(), compareTo.getParameters().getParameters());
                 visit(lambda.getBody(), compareTo.getBody());
-                this.visitList(lambda.getParameters().getParameters(), compareTo.getParameters().getParameters());
             }
             return lambda;
         }
@@ -911,7 +940,7 @@ public class SemanticallyEqual {
                     JavaType.FullyQualified methodDeclaringType = method.getMethodType().getDeclaringType();
                     JavaType.FullyQualified compareToDeclaringType = compareTo.getMethodType().getDeclaringType();
                     if (!TypeUtils.isAssignableTo(methodDeclaringType instanceof JavaType.Parameterized ?
-                            ((JavaType.Parameterized) methodDeclaringType).getType() : methodDeclaringType,
+                                    ((JavaType.Parameterized) methodDeclaringType).getType() : methodDeclaringType,
                             compareToDeclaringType instanceof JavaType.Parameterized ?
                                     ((JavaType.Parameterized) compareToDeclaringType).getType() : compareToDeclaringType)) {
                         isEqual.set(false);
@@ -1360,8 +1389,14 @@ public class SemanticallyEqual {
                 }
 
                 J.VariableDeclarations.NamedVariable compareTo = (J.VariableDeclarations.NamedVariable) j;
-                if (!variable.getSimpleName().equals(compareTo.getSimpleName()) ||
-                    !TypeUtils.isOfType(variable.getType(), compareTo.getType()) ||
+                Map<String, String> scope = variableScope.peek();
+                if (scope != null) {
+                    scope.put(variable.getSimpleName(), compareTo.getSimpleName());
+                } else if (!variable.getSimpleName().equals(compareTo.getSimpleName())) {
+                    isEqual.set(false);
+                    return variable;
+                }
+                if (!TypeUtils.isOfType(variable.getType(), compareTo.getType()) ||
                     nullMissMatch(variable.getInitializer(), compareTo.getInitializer())) {
                     isEqual.set(false);
                     return variable;

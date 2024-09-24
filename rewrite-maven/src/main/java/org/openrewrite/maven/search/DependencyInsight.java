@@ -17,9 +17,9 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.Markup;
@@ -56,7 +56,7 @@ public class DependencyInsight extends Recipe {
 
     @Option(displayName = "Scope",
             description = "Match dependencies with the specified scope. All scopes are searched by default.",
-            valid = {"compile", "test", "runtime", "provided"},
+            valid = {"compile", "test", "runtime", "provided", "system"},
             example = "compile",
             required = false)
     @Nullable

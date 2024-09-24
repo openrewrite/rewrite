@@ -21,9 +21,9 @@ import lombok.Getter;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 
 import java.util.*;
@@ -326,8 +326,8 @@ public interface JavaType {
 
         public boolean isAssignableTo(String fullyQualifiedName) {
             return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), fullyQualifiedName) ||
-                   getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName))
-                   || (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
+                   getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName)) ||
+                   (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
         }
 
         public boolean isAssignableFrom(@Nullable JavaType type) {
@@ -1213,7 +1213,7 @@ public interface JavaType {
             return declaringType;
         }
 
-        public @Nullable JavaType.Method getOverride() {
+        public JavaType.@Nullable Method getOverride() {
             if (declaringType instanceof JavaType.Unknown) {
                 return null;
             }

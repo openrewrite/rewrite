@@ -18,7 +18,7 @@ package org.openrewrite.java.tree;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.template.Coordinates;
 
 import java.util.Comparator;

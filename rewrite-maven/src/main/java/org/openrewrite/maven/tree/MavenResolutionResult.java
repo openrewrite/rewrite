@@ -17,8 +17,8 @@ package org.openrewrite.maven.tree;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;

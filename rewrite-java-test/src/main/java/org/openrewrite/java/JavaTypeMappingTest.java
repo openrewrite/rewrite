@@ -25,7 +25,9 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
 
 /**
  * Based on type attribution mappings of [JavaTypeGoat].

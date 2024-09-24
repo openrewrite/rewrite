@@ -17,9 +17,9 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -245,7 +245,7 @@ public class ChangeParentPom extends Recipe {
                 return t;
             }
 
-            private boolean mismatches(@Nullable Xml.Tag relativePath, @Nullable String targetRelativePath) {
+            private boolean mismatches(Xml.@Nullable Tag relativePath, @Nullable String targetRelativePath) {
                 if (relativePath == null) {
                     return targetRelativePath != null;
                 }
@@ -309,8 +309,8 @@ public class ChangeParentPom extends Recipe {
             }
 
             private boolean isGlobalProperty(String propertyName) {
-                return propertyName.startsWith("project.") || propertyName.startsWith("env.")
-                        || propertyName.startsWith("settings.") || propertyName.equals("basedir");
+                return propertyName.startsWith("project.") || propertyName.startsWith("env.") ||
+                        propertyName.startsWith("settings.") || propertyName.equals("basedir");
             }
         }.visit(pomXml, ctx);
         return properties;
@@ -384,8 +384,8 @@ public class ChangeParentPom extends Recipe {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
-            if (isPropertyTag() && key.equals(tag.getName())
-                && !value.equals(tag.getValue().orElse(null))) {
+            if (isPropertyTag() && key.equals(tag.getName()) &&
+                !value.equals(tag.getValue().orElse(null))) {
                 t = (Xml.Tag) new ChangeTagValueVisitor<>(tag, value).visitNonNull(t, ctx);
             }
             return t;
