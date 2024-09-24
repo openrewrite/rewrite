@@ -75,9 +75,9 @@ public class DependencyMatcher {
     }
 
     public boolean matches(@Nullable String groupId, String artifactId, String version) {
-        return StringUtils.matchesGlob(groupId, groupPattern)
-                && StringUtils.matchesGlob(artifactId, artifactPattern)
-                && (versionComparator == null || versionComparator.isValid(null, version));
+        return StringUtils.matchesGlob(groupId, groupPattern) &&
+                StringUtils.matchesGlob(artifactId, artifactPattern) &&
+                (versionComparator == null || versionComparator.isValid(null, version));
     }
 
     public boolean matches(@Nullable String groupId, String artifactId) {

@@ -15,13 +15,19 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.service.ImportService;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -38,9 +44,9 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Any fully qualified references to Java types will be replaced with corresponding simple "
-               + "names and import statements, provided that it doesn't result in "
-               + "any conflicts with other imports or types declared in the local compilation unit.";
+        return "Any fully qualified references to Java types will be replaced with corresponding simple " +
+               "names and import statements, provided that it doesn't result in " +
+               "any conflicts with other imports or types declared in the local compilation unit.";
     }
 
     @Override
@@ -77,7 +83,6 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
         return getVisitor(subtree);
     }
 
-    @NonNull
     private static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope) {
         return new JavaVisitor<ExecutionContext>() {
             final Map<String, JavaType> usedTypes = new HashMap<>();

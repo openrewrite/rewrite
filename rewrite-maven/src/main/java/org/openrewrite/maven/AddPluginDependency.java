@@ -104,15 +104,15 @@ public class AddPluginDependency extends Recipe {
                     dependencies = Xml.Tag.build("<dependencies />").withPrefix("\n");
                     plugins = addToTag(plugins, plugin, dependencies, getCursor().getParentOrThrow());
                 }
-                Xml.Tag newDependencyTag = Xml.Tag.build("<dependency>\n<groupId>" + groupId + "</groupId>\n<artifactId>"
-                                + artifactId + "</artifactId>" + ((version == null) ? "\n" : "\n<version>" + version + "</version>\n") + "</dependency>")
+                Xml.Tag newDependencyTag = Xml.Tag.build("<dependency>\n<groupId>" + groupId + "</groupId>\n<artifactId>" +
+                                artifactId + "</artifactId>" + ((version == null) ? "\n" : "\n<version>" + version + "</version>\n") + "</dependency>")
                         .withPrefix("\n");
 
                 // The dependency being added may already exist and may or may not need its version updated
                 Optional<Xml.Tag> maybeExistingDependency = dependencies.getChildren()
                         .stream()
-                        .filter(it -> groupId.equals(it.getChildValue("groupId").orElse(null))
-                                && artifactId.equals(it.getChildValue("artifactId").orElse(null)))
+                        .filter(it -> groupId.equals(it.getChildValue("groupId").orElse(null)) &&
+                                artifactId.equals(it.getChildValue("artifactId").orElse(null)))
                         .findAny();
                 if (maybeExistingDependency.isPresent() && areEqual(newDependencyTag, maybeExistingDependency.get())) {
                     return plugins;

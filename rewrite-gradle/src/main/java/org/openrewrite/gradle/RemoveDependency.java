@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
@@ -89,7 +90,8 @@ public class RemoveDependency extends Recipe {
 
                 Optional<GradleProject> maybeGp = g.getMarkers().findFirst(GradleProject.class);
                 if (!maybeGp.isPresent()) {
-                    return cu;
+                    // Allow modification of freestanding scripts which do not carry a GradleProject marker
+                    return g;
                 }
 
                 GradleProject gp = maybeGp.get();
@@ -135,14 +137,16 @@ public class RemoveDependency extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                if (dependencyDsl.matches(m) && (StringUtils.isEmpty(configuration) || configuration.equals(m.getSimpleName()))) {
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
+
+                if ((gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m)) && (StringUtils.isEmpty(configuration) || configuration.equals(m.getSimpleName()))) {
                     Expression firstArgument = m.getArguments().get(0);
                     if (firstArgument instanceof J.Literal || firstArgument instanceof G.GString || firstArgument instanceof G.MapEntry) {
                         //noinspection DataFlowIssue
                         return maybeRemoveDependency(m);
                     } else if (firstArgument instanceof J.MethodInvocation &&
-                            (((J.MethodInvocation) firstArgument).getSimpleName().equals("platform")
-                                    || ((J.MethodInvocation) firstArgument).getSimpleName().equals("enforcedPlatform"))) {
+                            (((J.MethodInvocation) firstArgument).getSimpleName().equals("platform") ||
+                                    ((J.MethodInvocation) firstArgument).getSimpleName().equals("enforcedPlatform"))) {
                         J after = maybeRemoveDependency((J.MethodInvocation) firstArgument);
                         if (after == null) {
                             //noinspection DataFlowIssue

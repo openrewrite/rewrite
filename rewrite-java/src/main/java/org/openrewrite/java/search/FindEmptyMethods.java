@@ -95,9 +95,9 @@ public class FindEmptyMethods extends Recipe {
 
             private boolean isInterfaceMethod(J.MethodDeclaration method) {
                 //noinspection ConstantConditions
-                return method.getMethodType().getDeclaringType() != null
-                       && method.getMethodType().getDeclaringType().getKind() == JavaType.FullyQualified.Kind.Interface
-                       && !method.hasModifier(J.Modifier.Type.Default);
+                return method.getMethodType().getDeclaringType() != null &&
+                       method.getMethodType().getDeclaringType().getKind() == JavaType.FullyQualified.Kind.Interface &&
+                       !method.hasModifier(J.Modifier.Type.Default);
             }
 
             private boolean hasSinglePublicNoArgsConstructor(List<Statement> classStatements) {

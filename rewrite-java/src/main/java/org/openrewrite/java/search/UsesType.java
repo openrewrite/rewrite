@@ -114,8 +114,8 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
             return c;
         }
 
-        if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type)
-            || fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
+        if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type) ||
+            fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
             return SearchResult.found(c);
         }
 

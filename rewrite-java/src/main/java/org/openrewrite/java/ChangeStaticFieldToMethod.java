@@ -19,9 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.search.UsesField;
 import org.openrewrite.java.tree.*;
 
@@ -127,8 +127,8 @@ public class ChangeStaticFieldToMethod extends Recipe {
                     method = (J.MethodInvocation) newArray.getInitializer().get(0);
                 }
                 if (method == null || method.getMethodType() == null) {
-                    throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class ["
-                                                       + newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
+                    throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class [" +
+                                                       newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
                 }
                 if (tree.getType() != null) {
                     JavaType.Method mt = method.getMethodType().withReturnType(tree.getType());

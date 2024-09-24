@@ -42,6 +42,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
@@ -256,15 +257,14 @@ public class MavenPomDownloader {
                 boolean cacheEmptyResult = false;
                 try {
                     String scheme = URI.create(repo.getUri()).getScheme();
-                    String uri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
+                    String baseUri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
                                  requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
                                  gav.getArtifactId() + '/' +
-                                 (gav.getVersion() == null ? "" : gav.getVersion() + '/') +
-                                 "maven-metadata.xml";
+                                 (gav.getVersion() == null ? "" : gav.getVersion() + '/');
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
-                        Path path = Paths.get(URI.create(uri));
+                        Path path = Paths.get(URI.create(baseUri + "maven-metadata-local.xml"));
                         if (Files.exists(path)) {
                             MavenMetadata parsed = MavenMetadata.parse(Files.readAllBytes(path));
                             if (parsed != null) {
@@ -272,7 +272,7 @@ public class MavenPomDownloader {
                             }
                         }
                     } else {
-                        byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri);
+                        byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, baseUri + "maven-metadata.xml");
                         MavenMetadata parsed = MavenMetadata.parse(responseBody);
                         if (parsed != null) {
                             result = Optional.of(parsed);
@@ -392,7 +392,7 @@ public class MavenPomDownloader {
                         versions.add(path.getFileName().toString());
                     }
                 }
-                return new MavenMetadata.Versioning(versions, null, null);
+                return new MavenMetadata.Versioning(versions, null, null, null);
             } catch (IOException e) {
                 throw new MavenDownloadingException("Unable to derive metadata from file repository. " + e.getMessage(), null, gav);
             }
@@ -422,7 +422,7 @@ public class MavenPomDownloader {
             return null;
         }
 
-        return new MavenMetadata.Versioning(versions, null, null);
+        return new MavenMetadata.Versioning(versions, null, null, null);
     }
 
     String hrefToVersion(String href, String rootUri) {
@@ -446,8 +446,13 @@ public class MavenPomDownloader {
                 mergeVersions(m1.getVersioning().getVersions(), m2.getVersioning().getVersions()),
                 Stream.concat(m1.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m1.getVersioning().getSnapshotVersions().stream(),
                         m2.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m2.getVersioning().getSnapshotVersions().stream()).collect(toList()),
-                maxSnapshot(m1.getVersioning().getSnapshot(), m2.getVersioning().getSnapshot())
+                maxSnapshot(m1.getVersioning().getSnapshot(), m2.getVersioning().getSnapshot()),
+                maxLastUpdated(m1.getVersioning().getLastUpdated(), m2.getVersioning().getLastUpdated())
         ));
+    }
+
+    private @Nullable ZonedDateTime maxLastUpdated(@Nullable ZonedDateTime left, @Nullable ZonedDateTime right) {
+        return left == null ? right : right == null ? left : left.compareTo(right) >= 0 ? left : right;
     }
 
     private List<String> mergeVersions(List<String> versions1, List<String> versions2) {
@@ -520,10 +525,10 @@ public class MavenPomDownloader {
                 // Even poms published to remote repositories still contain relative paths to their parent poms
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote
                 // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
-                if (maybeLocalPom != null
-                    && gav.getGroupId().equals(maybeLocalPom.getGroupId())
-                    && gav.getArtifactId().equals(maybeLocalPom.getArtifactId())
-                    && gav.getVersion().equals(maybeLocalPom.getVersion())) {
+                if (maybeLocalPom != null &&
+                    gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
+                    gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
+                    gav.getVersion().equals(maybeLocalPom.getVersion())) {
                     return maybeLocalPom;
                 }
             }
@@ -765,7 +770,7 @@ public class MavenPomDownloader {
                     httpsUri += "/";
                 }
 
-                HttpSender.Request.Builder request = applyAuthenticationToRequest(repository, httpSender.get(httpsUri));
+                HttpSender.Request.Builder request = applyAuthenticationToRequest(repository, httpSender.head(httpsUri));
                 MavenRepository normalized = null;
                 try {
                     sendRequest(request.build());
@@ -807,8 +812,7 @@ public class MavenPomDownloader {
                             }
                         }
                     }
-                    if (normalized == null && !(t instanceof HttpSenderResponseException &&
-                                                ((HttpSenderResponseException) t).getBody().contains("Directory listing forbidden"))) {
+                    if (normalized == null) {
                         ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), t);
                     }
                 }

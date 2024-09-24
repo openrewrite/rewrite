@@ -16,12 +16,19 @@
 package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.file.Paths;
+
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
@@ -229,7 +236,7 @@ class XmlParserTest implements RewriteTest {
             """
               <?xml version="1.0" encoding="UTF-8"?>
               <!DOCTYPE configuration >
-
+              
               <configuration scan="true">
                   <root>
                       <level>WARN</level>
@@ -371,5 +378,29 @@ class XmlParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @DisabledOnOs(OS.WINDOWS)
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "foo.xml",
+      "proj.csproj",
+      "/foo/bar/baz.jsp",
+      "packages.config"
+    })
+    void acceptWithValidPaths(String path) {
+        assertThat(new XmlParser().accept(Paths.get(path))).isTrue();
+    }
+
+    @DisabledOnOs(OS.WINDOWS)
+    @ParameterizedTest
+    @ValueSource(strings = {
+      ".xml",
+      "foo.xml.",
+      "file.cpp",
+      "/foo/bar/baz.xml.txt"
+    })
+    void acceptWithInvalidPaths(String path) {
+        assertThat(new XmlParser().accept(Paths.get(path))).isFalse();
     }
 }

@@ -252,8 +252,8 @@ public class MethodMatcher {
 
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
-        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern()))
-                                    || matchesTargetType(enclosing.getType());
+        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern())) ||
+                                    matchesTargetType(enclosing.getType());
         if (!matchesTargetType) {
             return false;
         }
@@ -279,8 +279,8 @@ public class MethodMatcher {
 
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
-        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern()))
-                                    || TypeUtils.isAssignableTo(targetType, enclosing.getType());
+        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern())) ||
+                                    TypeUtils.isAssignableTo(targetType, enclosing.getType());
         if (!matchesTargetType) {
             return false;
         }
@@ -337,9 +337,9 @@ public class MethodMatcher {
             return false;
         }
 
-        if (method.getSelect() != null
-            && method.getSelect() instanceof J.Identifier
-            && !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
+        if (method.getSelect() != null &&
+            method.getSelect() instanceof J.Identifier &&
+            !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
         }
 
@@ -366,9 +366,9 @@ public class MethodMatcher {
         StringJoiner joiner = new StringJoiner(",");
         for (Expression expr : method.getArguments()) {
             final JavaType exprType = expr.getType();
-            String s = exprType == null
-                    ? JavaType.Unknown.getInstance().getFullyQualifiedName()
-                    : typePattern(exprType);
+            String s = exprType == null ?
+                    JavaType.Unknown.getInstance().getFullyQualifiedName() :
+                    typePattern(exprType);
             joiner.add(s);
         }
         return joiner.toString();
@@ -446,43 +446,6 @@ public class MethodMatcher {
 }
 
 class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
-    private static final Set<String> COMMON_JAVA_LANG_TYPES =
-            new HashSet<>(Arrays.asList(
-                    "Appendable",
-                    "AutoCloseable",
-                    "Boolean",
-                    "Byte",
-                    "Character",
-                    "CharSequence",
-                    "Class",
-                    "ClassLoader",
-                    "Cloneable",
-                    "Comparable",
-                    "Double",
-                    "Enum",
-                    "Error",
-                    "Exception",
-                    "Float",
-                    "FunctionalInterface",
-                    "Integer",
-                    "Iterable",
-                    "Long",
-                    "Math",
-                    "Number",
-                    "Object",
-                    "Readable",
-                    "Record",
-                    "Runnable",
-                    "Short",
-                    "String",
-                    "StringBuffer",
-                    "StringBuilder",
-                    "System",
-                    "Thread",
-                    "Throwable",
-                    "Void"
-            ));
-
     @Override
     public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
         StringBuilder classNameBuilder = new StringBuilder();
@@ -497,7 +460,7 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
             if (Character.isLowerCase(beforeArr.charAt(0)) && JavaType.Primitive.fromKeyword(beforeArr) != null) {
                 return className;
             } else {
-                if (COMMON_JAVA_LANG_TYPES.contains(beforeArr)) {
+                if (TypeUtils.findQualifiedJavaLangTypeName(beforeArr) != null) {
                     return "java.lang." + className;
                 }
             }

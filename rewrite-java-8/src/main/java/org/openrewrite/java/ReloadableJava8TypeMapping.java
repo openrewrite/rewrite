@@ -35,7 +35,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
 
 @RequiredArgsConstructor
 class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {

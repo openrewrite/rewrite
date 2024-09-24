@@ -86,6 +86,9 @@ public class Pom {
     String name;
 
     @Nullable
+    Prerequisites prerequisites;
+
+    @Nullable
     String packaging;
 
     @Builder.Default

@@ -337,9 +337,9 @@ public class ChangePackage extends Recipe {
         }
 
         private boolean isTargetRecursivePackageName(String packageName) {
-            return (recursive == null || recursive)
-                   && packageName.startsWith(oldPackageName + ".")
-                   && !packageName.startsWith(newPackageName);
+            return (recursive == null || recursive) &&
+                   packageName.startsWith(oldPackageName + ".") &&
+                   !packageName.startsWith(newPackageName);
         }
 
     }

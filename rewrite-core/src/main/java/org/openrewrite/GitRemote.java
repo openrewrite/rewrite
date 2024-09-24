@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.Value;
+import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.jgit.transport.URIish;
@@ -38,13 +39,57 @@ public class GitRemote {
 
     String repositoryName;
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        GitRemote gitRemote = (GitRemote) o;
+        return service == gitRemote.service &&
+               StringUtils.equalsIgnoreCase(url, gitRemote.url) &&
+               StringUtils.equalsIgnoreCase(origin, gitRemote.origin) &&
+               StringUtils.equalsIgnoreCase(path, gitRemote.path) &&
+               StringUtils.equalsIgnoreCase(organization, gitRemote.organization) &&
+               StringUtils.equalsIgnoreCase(repositoryName, gitRemote.repositoryName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(service,
+                url == null ? null : url.toLowerCase(Locale.ENGLISH),
+                origin == null ? null : origin.toLowerCase(Locale.ENGLISH),
+                path == null ? null : path.toLowerCase(Locale.ENGLISH),
+                organization == null ? null : organization.toLowerCase(Locale.ENGLISH),
+                repositoryName == null ? null : repositoryName.toLowerCase(Locale.ENGLISH));
+    }
+
     public enum Service {
         GitHub,
         GitLab,
         Bitbucket,
         BitbucketCloud,
         AzureDevOps,
-        Unknown
+        Unknown;
+
+        public static Service forName(String serviceName) {
+            switch (serviceName.toLowerCase(Locale.ENGLISH).replaceAll("[-_ ]", "")) {
+                case "github":
+                    return GitHub;
+                case "gitlab":
+                    return GitLab;
+                case "bitbucket":
+                    return Bitbucket;
+                case "bitbucketcloud":
+                    return BitbucketCloud;
+                case "azuredevops":
+                    return AzureDevOps;
+                default:
+                    return Unknown;
+            }
+        }
     }
 
     public static class Parser {
@@ -80,7 +125,10 @@ public class GitRemote {
                 selectedBaseUrl = URI.create(protocol + "://" + stripProtocol(remote.origin));
             } else {
                 selectedBaseUrl = servers.stream()
-                        .filter(server -> server.allOrigins().contains(stripProtocol(remote.origin)))
+                        .filter(server -> server.allOrigins()
+                                .stream()
+                                .anyMatch(origin -> origin.equalsIgnoreCase(stripProtocol(remote.origin)))
+                        )
                         .flatMap(server -> server.getUris().stream())
                         .filter(uri -> uri.getScheme().equals(protocol))
                         .findFirst()
@@ -156,7 +204,7 @@ public class GitRemote {
         }
 
         public RemoteServer findRemoteServer(String origin) {
-            return servers.stream().filter(server -> server.origin.equals(origin))
+            return servers.stream().filter(server -> server.origin.equalsIgnoreCase(origin))
                     .findFirst()
                     .orElseGet(() -> {
                         URI normalizedUri = normalize(origin);
@@ -166,7 +214,7 @@ public class GitRemote {
         }
 
         private void add(RemoteServer server) {
-            if (server.service != Service.Unknown || servers.stream().noneMatch(s -> s.origin.equals(server.origin))) {
+            if (server.service != Service.Unknown || servers.stream().noneMatch(s -> s.origin.equalsIgnoreCase(server.origin))) {
                 servers.add(server);
             }
         }
@@ -179,15 +227,15 @@ public class GitRemote {
 
             switch (match.service) {
                 case AzureDevOps:
-                    if (match.matchedUri.getHost().equals("ssh.dev.azure.com")) {
-                        repositoryPath = repositoryPath.replaceFirst("v3/", "");
+                    if (match.matchedUri.getHost().equalsIgnoreCase("ssh.dev.azure.com")) {
+                        repositoryPath = repositoryPath.replaceFirst("(?i)v3/", "");
                     } else {
-                        repositoryPath = repositoryPath.replaceFirst("/_git/", "/");
+                        repositoryPath = repositoryPath.replaceFirst("(?i)/_git/", "/");
                     }
                     break;
                 case Bitbucket:
                     if (url.startsWith("http")) {
-                        repositoryPath = repositoryPath.replaceFirst("scm/", "");
+                        repositoryPath = repositoryPath.replaceFirst("(?i)scm/", "");
                     }
                     break;
             }
@@ -222,7 +270,9 @@ public class GitRemote {
             String uri = normalizedUri.toString();
             String contextPath = origin.getPath();
             String path = normalizedUri.getPath();
-            if (!normalizedUri.getHost().equals(origin.getHost()) || normalizedUri.getPort() != origin.getPort() || !path.startsWith(contextPath)) {
+            if (!normalizedUri.getHost().equalsIgnoreCase(origin.getHost()) ||
+                normalizedUri.getPort() != origin.getPort() ||
+                !path.toLowerCase(Locale.ENGLISH).startsWith(contextPath.toLowerCase(Locale.ENGLISH))) {
                 throw new IllegalArgumentException("Origin: " + origin + " does not match the clone url: " + uri);
             }
             return path.substring(contextPath.length())
@@ -264,7 +314,7 @@ public class GitRemote {
                 String maybePort = maybePort(uri.getPort(), scheme);
 
                 String path = uri.getPath().replaceFirst("/$", "")
-                        .replaceFirst("\\.git$", "")
+                        .replaceFirst("(?i)\\.git$", "")
                         .replaceFirst("^/", "");
                 return URI.create((scheme + "://" + host + maybePort + "/" + path).replaceFirst("/$", ""));
             } catch (URISyntaxException e) {
@@ -310,8 +360,10 @@ public class GitRemote {
         }
 
         private GitRemote.Parser.@Nullable RemoteServerMatch match(URI normalizedUri) {
+            String lowerCaseNormalizedUri = normalizedUri.toString().toLowerCase(Locale.ENGLISH);
             for (URI uri : uris) {
-                if (normalizedUri.toString().startsWith(Parser.normalize(uri.toString()).toString())) {
+                String normalizedServerUri = Parser.normalize(uri.toString()).toString().toLowerCase(Locale.ENGLISH);
+                if (lowerCaseNormalizedUri.startsWith(normalizedServerUri)) {
                     return new Parser.RemoteServerMatch(service, origin, uri);
                 }
             }
