@@ -1812,15 +1812,16 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     private Space statementDelim(@Nullable Tree t) {
         switch (t.getKind()) {
+            case CONTINUE:
+            case RETURN:
+            case BREAK:
             case ASSERT:
             case ASSIGNMENT:
-            case BREAK:
-            case CONTINUE:
             case DO_WHILE_LOOP:
             case METHOD_INVOCATION:
             case NEW_CLASS:
-            case RETURN:
             case THROW:
+                return sourceBefore(";");
             case EXPRESSION_STATEMENT:
                 ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
                 if (expTree instanceof ErroneousTree) {
