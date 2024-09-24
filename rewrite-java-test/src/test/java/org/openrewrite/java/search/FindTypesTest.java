@@ -425,4 +425,36 @@ class FindTypesTest implements RewriteTest {
           java(a1)
         );
     }
+
+    @Test
+    void javadocComment() {
+
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes("java.lang.String", true)),
+          java(
+            """
+                    public class A {               
+                      /** 
+                        * JavaDoc comment with {{@link String#trim()}}
+                        * JavaDoc comment with String#trim()
+                        */
+                      public static String replaceFoo(String string) {
+                        return string.replaceAll("foo", "bar");
+                      }
+                    }
+                    """,
+            """
+                    public class A {               
+                      /**
+                        * JavaDoc comment with {{@link ~~>String#trim()}}
+                        * JavaDoc comment with String#trim()
+                        */
+                      public static /*~~>*/String replaceFoo(/*~~>*/String string) {
+                        return string.replaceAll("foo", "bar");
+                      }
+                    }
+                    """
+          )
+        );
+    }
 }

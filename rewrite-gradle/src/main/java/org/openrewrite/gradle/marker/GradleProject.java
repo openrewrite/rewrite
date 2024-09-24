@@ -17,6 +17,7 @@ package org.openrewrite.gradle.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -25,6 +26,10 @@ import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.Serializable;
 import java.util.*;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static org.openrewrite.Tree.randomId;
 
 
 /**
@@ -35,52 +40,55 @@ import java.util.*;
 @SuppressWarnings("unused")
 @Value
 @AllArgsConstructor(onConstructor_ = { @JsonCreator })
+@Builder
 public class GradleProject implements Marker, Serializable {
+
     @With
-    UUID id;
+    @Builder.Default
+    UUID id = randomId();
 
     @With
     @Nullable
     String group;
 
     @With
-    String name;
+    @Builder.Default
+    String name = "";
 
     @With
     @Nullable
     String version;
 
     @With
-    String path;
+    @Builder.Default
+    String path = "";
 
     @With
-    List<GradlePluginDescriptor> plugins;
+    @Builder.Default
+    List<GradlePluginDescriptor> plugins = emptyList();
 
     @With
-    List<MavenRepository> mavenRepositories;
+    @Builder.Default
+    List<MavenRepository> mavenRepositories = emptyList();
 
     @With
     @Deprecated
     @Nullable
     List<MavenRepository> mavenPluginRepositories;
 
-    Map<String, GradleDependencyConfiguration> nameToConfiguration;
+    @Builder.Default
+    Map<String, GradleDependencyConfiguration> nameToConfiguration = emptyMap();
 
-    GradleBuildscript buildscript;
+    @Builder.Default
+    GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
 
-    // Backwards compatibility to ease convoluted release process with rewrite-gradle-tooling-model
-    public GradleProject(
-            UUID id,
-            String group,
-            String name,
-            String version,
-            String path,
-            List<GradlePluginDescriptor> plugins,
-            List<MavenRepository> mavenRepositories,
-            List<MavenRepository> mavenPluginRepositories,
-            Map<String, GradleDependencyConfiguration> nameToConfiguration
-    ) {
-        this(id, group, name, version, path, plugins, mavenRepositories, mavenPluginRepositories, nameToConfiguration, null);
+    public GradleBuildscript getBuildscript() {
+        // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.
+        //noinspection ConstantValue
+        if (buildscript == null) {
+            return new GradleBuildscript(randomId(), emptyList(), emptyMap());
+        }
+        return buildscript;
     }
 
     /**
@@ -91,10 +99,11 @@ public class GradleProject implements Marker, Serializable {
      */
     @Deprecated
     public List<MavenRepository> getMavenPluginRepositories() {
+        //noinspection ConstantValue
         if (buildscript != null) {
             return buildscript.getMavenRepositories();
         }
-        return mavenPluginRepositories == null ? Collections.emptyList() : mavenPluginRepositories;
+        return mavenPluginRepositories == null ? emptyList() : mavenPluginRepositories;
     }
 
     public @Nullable GradleDependencyConfiguration getConfiguration(String name) {

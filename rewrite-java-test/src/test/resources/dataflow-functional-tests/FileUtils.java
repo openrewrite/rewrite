@@ -1719,10 +1719,10 @@ public class FileUtils {
         if (directory.exists()) {
             if (!directory.isDirectory()) {
                 String message =
-                        "File "
-                        + directory
-                        + " exists and is "
-                        + "not a directory. Unable to create directory.";
+                        "File " +
+                        directory +
+                        " exists and is " +
+                        "not a directory. Unable to create directory.";
                 throw new IOException(message);
             }
         } else {
@@ -1823,8 +1823,8 @@ public class FileUtils {
             throw new IllegalArgumentException("No specified reference file");
         }
         if (!reference.exists()) {
-            throw new IllegalArgumentException("The reference file '"
-                                               + reference + "' doesn't exist");
+            throw new IllegalArgumentException("The reference file '" +
+                                               reference + "' doesn't exist");
         }
         return isFileNewer(file, reference.lastModified());
     }
@@ -1890,8 +1890,8 @@ public class FileUtils {
             throw new IllegalArgumentException("No specified reference file");
         }
         if (!reference.exists()) {
-            throw new IllegalArgumentException("The reference file '"
-                                               + reference + "' doesn't exist");
+            throw new IllegalArgumentException("The reference file '" +
+                                               reference + "' doesn't exist");
         }
         return isFileOlder(file, reference.lastModified());
     }

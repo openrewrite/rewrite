@@ -17,6 +17,7 @@ package org.openrewrite.gradle.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -27,19 +28,32 @@ import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static org.openrewrite.Tree.randomId;
+
 @Value
 @With
 @AllArgsConstructor(onConstructor_ = { @JsonCreator})
+@Builder
 public class GradleSettings implements Marker, Serializable {
-    UUID id;
+
+    @Builder.Default
+    UUID id = randomId();
 
     @Deprecated
     @Nullable
-    List<MavenRepository> pluginRepositories;
+    @Builder.Default
+    List<MavenRepository> pluginRepositories = emptyList();
 
-    List<GradlePluginDescriptor> plugins;
-    Map<String, FeaturePreview> featurePreviews;
-    GradleBuildscript buildscript;
+    @Builder.Default
+    List<GradlePluginDescriptor> plugins = emptyList();
+
+    @Builder.Default
+    Map<String, FeaturePreview> featurePreviews = emptyMap();
+
+    @Builder.Default
+    GradleBuildscript buildscript = GradleBuildscript.builder().build();
 
     // Backwards compatibility to ease convoluted release process with rewrite-gradle-tooling-model
     public GradleSettings(
@@ -49,6 +63,15 @@ public class GradleSettings implements Marker, Serializable {
             Map<String, FeaturePreview> featurePreviews
     ) {
         this(id, pluginRepositories, plugins, featurePreviews, null);
+    }
+
+    public GradleBuildscript getBuildscript() {
+        // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.
+        //noinspection ConstantValue
+        if (buildscript == null) {
+            return new GradleBuildscript(randomId(), emptyList(), emptyMap());
+        }
+        return buildscript;
     }
 
     public @Nullable Boolean isFeatureEnabled(String name) {
@@ -72,6 +95,6 @@ public class GradleSettings implements Marker, Serializable {
         if (buildscript != null) {
             return buildscript.getMavenRepositories();
         }
-        return pluginRepositories == null ? Collections.emptyList() : pluginRepositories;
+        return pluginRepositories == null ? emptyList() : pluginRepositories;
     }
 }

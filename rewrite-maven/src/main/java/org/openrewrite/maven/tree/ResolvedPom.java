@@ -301,6 +301,10 @@ public class ResolvedPom {
             case "project.parent.version":
             case "parent.version":
                 return requested.getParent() != null ? requested.getParent().getVersion() : null;
+            case "prerequisites.maven":
+            case "pom.prerequisites.maven":
+            case "project.prerequisites.maven":
+                return requested.getPrerequisites() == null ? null : requested.getPrerequisites().getMaven();
         }
 
         return System.getProperty(property);
@@ -513,8 +517,8 @@ public class ResolvedPom {
                     for (Dependency incReqDep : incomingRequestedDependencies) {
                         boolean found = false;
                         for (Dependency reqDep : requestedDependencies) {
-                            if (reqDep.getGav().getGroupId().equals(incReqDep.getGav().getGroupId())
-                                && reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
+                            if (reqDep.getGav().getGroupId().equals(incReqDep.getGav().getGroupId()) &&
+                                reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
                                 found = true;
                                 break;
                             }
@@ -827,9 +831,9 @@ public class ResolvedPom {
             for (int i = 1; i < pomAncestry.size(); i++) { // skip current pom
                 Pom pom = pomAncestry.get(i);
                 ResolvedGroupArtifactVersion alreadyResolvedGav = pom.getGav();
-                if (alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId())
-                    && alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId())
-                    && alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
+                if (alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId()) &&
+                    alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId()) &&
+                    alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
                     return true;
                 }
             }

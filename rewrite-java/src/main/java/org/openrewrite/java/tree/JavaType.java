@@ -326,8 +326,8 @@ public interface JavaType {
 
         public boolean isAssignableTo(String fullyQualifiedName) {
             return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), fullyQualifiedName) ||
-                   getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName))
-                   || (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
+                   getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName)) ||
+                   (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
         }
 
         public boolean isAssignableFrom(@Nullable JavaType type) {

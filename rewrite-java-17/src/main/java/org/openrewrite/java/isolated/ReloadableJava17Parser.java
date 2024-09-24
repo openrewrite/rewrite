@@ -331,8 +331,8 @@ public class ReloadableJava17Parser implements JavaParser {
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
             if (StandardLocation.CLASS_PATH.equals(location)) {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
-                return classByteClasspath.isEmpty() ? listed
-                        : Stream.concat(classByteClasspath.stream()
+                return classByteClasspath.isEmpty() ? listed :
+                        Stream.concat(classByteClasspath.stream()
                                 .filter(jfo -> jfo.getPackage().equals(packageName)),
                         StreamSupport.stream(listed.spliterator(), false)
                 ).collect(toList());

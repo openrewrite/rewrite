@@ -494,8 +494,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     return null;
                 }
             } else if (WRAPPER_SHA_256_SUM_KEY.equals(entry.getKey())) {
-                if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript
-                        && Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
+                if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript &&
+                        Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
                     Properties.Value value = entry.getValue();
                     Checksum wrapperJarChecksum = mavenWrapper.getWrapperChecksum();
                     if (wrapperJarChecksum != null && !wrapperJarChecksum.getHexValue().equals(value.getText())) {

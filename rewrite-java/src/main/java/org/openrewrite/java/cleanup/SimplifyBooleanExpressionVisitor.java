@@ -231,9 +231,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J j = super.visitMethodInvocation(method, executionContext);
         J.MethodInvocation asMethod = (J.MethodInvocation) j;
         Expression select = asMethod.getSelect();
-        if (isEmpty.matches(asMethod)
-            && select instanceof J.Literal
-            && select.getType() == JavaType.Primitive.String) {
+        if (isEmpty.matches(asMethod) &&
+            select instanceof J.Literal &&
+            select.getType() == JavaType.Primitive.String) {
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
         }
         return j;

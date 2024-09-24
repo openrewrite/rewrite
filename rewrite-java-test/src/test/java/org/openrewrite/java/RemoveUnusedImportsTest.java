@@ -22,6 +22,7 @@ import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
 import static java.util.Collections.emptySet;
@@ -1380,22 +1381,24 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import java.util.*;
 
               import static java.util.Collections.emptyList;
+              import static java.util.Collections.singletonList;
 
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = new HashSet<>();
-                 List<String> l = singletonList("a","b","c");
+                 List<String> l = singletonList("a");
               }
               """,
             """
               import java.util.*;
 
               import static java.util.Collections.emptyList;
+              import static java.util.Collections.singletonList;
 
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = new HashSet<>();
-                 List<String> l = singletonList("a","b","c");
+                 List<String> l = singletonList("a");
               }
               """
           )
@@ -1449,7 +1452,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
-                 List<String> l = singletonList("c","b","a");
+                 List<String> l = singletonList("c");
                  Iterator<Short> i = emptyIterator();
               }
               """,
@@ -1461,7 +1464,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
-                 List<String> l = singletonList("c","b","a");
+                 List<String> l = singletonList("c");
                  Iterator<Short> i = emptyIterator();
               }
               """
@@ -1837,6 +1840,257 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import a.A;
 
               record B(@A String a) {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticAmbiguousImport() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              package org.a;
+              public class Abc {
+                public static String A = "A";
+                public static String B = "B";
+                public static String C = "C";
+                public static String ALL = "%s%s%s".formatted(A, B, C);
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package org.b;
+              public class Def {
+                public static String D = "D";
+                public static String E = "E";
+                public static String F = "F";
+                public static String ALL = "%s%s%s".formatted(D, E, F);
+              }
+              """,
+            SourceSpec::skip
+          ),
+          // No change when removal would cause ambiguity
+          java(
+            """
+              package org.test;
+
+              import static org.a.Abc.*;
+              import static org.a.Abc.ALL;
+              import static org.b.Def.*;
+
+              public class Foo {
+                private String abc = ALL;
+                private String a = A;
+                private String b = B;
+                private String c = C;
+                private String d = D;
+                private String e = E;
+                private String f = F;
+              }
+              """
+          ),
+          // Do still remove unambiguous imports
+          java(
+            """
+              package org.test;
+
+              import static org.a.Abc.*;
+              import static org.a.Abc.A;
+              import static org.a.Abc.ALL;
+              import static org.b.Def.*;
+
+              public class Bar {
+                private String abc = ALL;
+                private String a = A;
+                private String b = B;
+                private String c = C;
+                private String d = D;
+                private String e = E;
+                private String f = F;
+              }
+              """,
+            """
+              package org.test;
+
+              import static org.a.Abc.*;
+              import static org.a.Abc.ALL;
+              import static org.b.Def.*;
+
+              public class Bar {
+                private String abc = ALL;
+                private String a = A;
+                private String b = B;
+                private String c = C;
+                private String d = D;
+                private String e = E;
+                private String f = F;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3283")
+    @Test
+    void nestedImport() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+
+              public interface J {
+                  final class One implements J {}
+                  final class Two implements J {}
+                  final class Three implements J {}
+                  final class Four implements J {}
+                  final class Five implements J {}
+                  final class Six implements J {}
+              }
+              """
+          ),
+          java(
+            """
+              package bar;
+
+              import foo.J;
+              import foo.J.*;
+
+              class Quz {
+                void test() {
+                  J j = null;
+                  One one = null;
+                  Two two = null;
+                  Three three = null;
+                  Four four = null;
+                  Five five = null;
+                  Six six = null;
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3283")
+    @Test
+    void nestedImportStaticInnerClass() {
+        rewriteRun(
+          java(
+            """
+              package com.a.b.c;
+              public final class ParentBaseClass {
+                public static abstract class BaseImplClass {
+                   void foo() {
+                    }
+                }
+              }
+              """
+          ),
+          java(
+            """
+              import com.a.b.c.ParentBaseClass.*;
+              public class MyClass extends BaseImplClass {
+                 @Override
+                 public void foo() {
+                 }
+              }
+              """,
+            """
+              import com.a.b.c.ParentBaseClass.BaseImplClass;
+              public class MyClass extends BaseImplClass {
+                 @Override
+                 public void foo() {
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainExplicitImportWhenConflictingClassInSamePackage() {
+        rewriteRun(
+          java(
+            """
+              package com.a;
+
+              class ConflictingClass {
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.b;
+
+              public class ConflictingClass {
+                  public ConflictingClass() {
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.c;
+
+              import com.b.ConflictingClass;
+
+              public class ImplProvider {
+                  static ConflictingClass getImpl(){
+                      return new ConflictingClass();
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.a;
+
+              import com.b.ConflictingClass;
+              import com.c.ImplProvider;
+
+              class CImpl {
+                  ConflictingClass impl = ImplProvider.getImpl();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticNestedInnerClass() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              package a;
+              
+              public class A {
+                  public final class B {}
+                  public static class C {}
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              import a.*;
+              
+              public class Foo {
+                  A method(A.B ab, A.C ac) {}
+              }
+              """,
+            """
+              import a.A;
+              
+              public class Foo {
+                  A method(A.B ab, A.C ac) {}
+              }
               """
           )
         );

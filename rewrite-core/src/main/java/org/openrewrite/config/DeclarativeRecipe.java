@@ -270,13 +270,26 @@ public class DeclarativeRecipe extends Recipe {
                         getName() + " declares the ScanningRecipe " + precondition.getName() + " as a precondition." +
                         "ScanningRecipe cannot be used as Preconditions.");
             }
-            andPreconditions.add(precondition::getVisitor);
+            andPreconditions.add(() -> orVisitors(precondition));
         }
         PreconditionBellwether bellwether = new PreconditionBellwether(Preconditions.and(andPreconditions.toArray(new Supplier[]{})));
         List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
         recipeListWithBellwether.add(bellwether);
         recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, recipeList));
         return recipeListWithBellwether;
+    }
+
+    private static TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
+        if (recipe.getRecipeList().isEmpty()) {
+            return recipe.getVisitor();
+        }
+        List<TreeVisitor<?, ExecutionContext>> conditions = new ArrayList<>();
+        conditions.add(recipe.getVisitor());
+        for (Recipe r : recipe.getRecipeList()) {
+            conditions.add(orVisitors(r));
+        }
+        //noinspection unchecked
+        return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
     }
 
     private static boolean isScanningRecipe(Recipe recipe) {

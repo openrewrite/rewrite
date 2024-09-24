@@ -15,6 +15,8 @@
  */
 package org.openrewrite.gradle.marker;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -26,12 +28,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static org.openrewrite.Tree.randomId;
+
 @Value
 @With
+@Builder
+@AllArgsConstructor
 public class GradleBuildscript implements Serializable {
-    UUID id;
-    List<MavenRepository> mavenRepositories;
-    Map<String, GradleDependencyConfiguration> nameToConfiguration;
+
+    @Builder.Default
+    UUID id = randomId();
+
+    @Builder.Default
+    List<MavenRepository> mavenRepositories = emptyList();
+
+    @Builder.Default
+    Map<String, GradleDependencyConfiguration> nameToConfiguration = emptyMap();
 
     public @Nullable GradleDependencyConfiguration getConfiguration(String name) {
         return nameToConfiguration.get(name);

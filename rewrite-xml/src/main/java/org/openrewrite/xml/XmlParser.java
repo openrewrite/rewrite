@@ -18,8 +18,10 @@ package org.openrewrite.xml;
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -30,9 +32,43 @@ import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public class XmlParser implements Parser {
+    private static final Set<String> ACCEPTED_FILE_EXTENSIONS = new HashSet<>(Arrays.asList(
+            "xml",
+            "wsdl",
+            "xhtml",
+            "xsd",
+            "xsl",
+            "xslt",
+            "xmi",
+            "tld",
+            "xjb",
+            "jsp",
+            // Datastage file formats that are all xml under the hood
+            "det",
+            "pjb",
+            "qjb",
+            "sjb",
+            "prt",
+            "srt",
+            "psc",
+            "ssc",
+            "tbd",
+            "tfm",
+            "dqs",
+            "stp",
+            "dcn",
+            "pst",
+            // .NET project files
+            "csproj",
+            "vbproj",
+            "fsproj"));
+
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
@@ -74,34 +110,13 @@ public class XmlParser implements Parser {
     @Override
     public boolean accept(Path path) {
         String p = path.toString();
-        return p.endsWith(".xml") ||
-               p.endsWith(".wsdl") ||
-               p.endsWith(".xhtml") ||
-               p.endsWith(".xsd") ||
-               p.endsWith(".xsl") ||
-               p.endsWith(".xslt") ||
-               p.endsWith(".xmi") ||
-               p.endsWith(".tld") ||
-               p.endsWith(".xjb") ||
-               p.endsWith(".jsp") ||
-               // Datastage file formats that are all xml under the hood
-               p.endsWith(".det") ||
-               p.endsWith(".pjb") ||
-               p.endsWith(".qjb") ||
-               p.endsWith(".sjb") ||
-               p.endsWith(".prt") ||
-               p.endsWith(".srt") ||
-               p.endsWith(".psc") ||
-               p.endsWith(".ssc") ||
-               p.endsWith(".tbd") ||
-               p.endsWith(".tfm") ||
-               p.endsWith(".dqs") ||
-               p.endsWith(".stp") ||
-               p.endsWith(".dcn") ||
-               p.endsWith(".pst") ||
-               // C# project files
-               p.endsWith(".csproj") ||
-               path.endsWith("packages.config");
+        int dot = p.lastIndexOf('.');
+        if (0 < dot && dot < (p.length() - 1)) {
+            if (ACCEPTED_FILE_EXTENSIONS.contains(p.substring(dot + 1))) {
+                return true;
+            }
+        }
+        return path.endsWith("packages.config");
     }
 
     @Override
