@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-    <suppress until="2024-09-12">
+    <suppress until="2024-10-12">
         <notes><![CDATA[
         file name: okio-jvm-2.8.0.jar
         sev: HIGH
@@ -9,7 +9,7 @@
         <packageUrl regex="true">^pkg:maven/com\.squareup\.okio/okio@.*$</packageUrl>
         <cve>CVE-2023-3635</cve>
     </suppress>
-    <suppress until="2024-09-12">
+    <suppress until="2024-10-12">
         <notes><![CDATA[
         file name: develocity-gradle-plugin-3.17.6.jar: junit-platform-engine-1.10.3.jar
         sev: CRITICAL
@@ -19,7 +19,7 @@
         <cve>CVE-2023-45163</cve>
         <cve>CVE-2023-5964</cve>
     </suppress>
-    <suppress until="2024-09-12">
+    <suppress until="2024-10-12">
         <notes><![CDATA[
         file name: gradle-enterprise-gradle-plugin-3.17.6.jar
         ]]></notes>
