@@ -529,7 +529,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    void preferExistingDistributionSource() {
+    void getExactVersionWithPatternFromGradleServices() {
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("8.0.x", null, null, null, null))
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
@@ -770,6 +770,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2651")
     void updateWithCustomDistributionUri() {
         HttpSender customDistributionHost = request -> {
             if (request.getUrl().toString().contains("company.com")) {
