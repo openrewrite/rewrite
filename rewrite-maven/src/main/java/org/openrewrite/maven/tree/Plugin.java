@@ -21,6 +21,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AccessLevel;
 import lombok.Value;
 import lombok.experimental.FieldDefaults;
+
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 
@@ -33,6 +35,7 @@ public class Plugin {
     // default value as per https://maven.apache.org/xsd/maven-4.0.0.xsd
     public static final String PLUGIN_DEFAULT_GROUPID = "org.apache.maven.plugins";
 
+    @Nullable
     String groupId;
     String artifactId;
 
@@ -50,6 +53,11 @@ public class Plugin {
 
     List<Dependency> dependencies;
     List<Execution> executions;
+
+    @NonNull
+    public String getGroupId() {
+        return groupId == null ? PLUGIN_DEFAULT_GROUPID : groupId;
+    }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
