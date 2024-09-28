@@ -92,18 +92,8 @@ public class XPathMatcher {
                     if (index < 0) {
                         return false;
                     }
-                    if (part.startsWith("@")) { // is attribute selector
-                        partWithCondition = part;
-                        tagForCondition = i > 0 ? path.get(i - 1) : path.get(i);
-                    } else { // is element selector
-                        if (part.charAt(index + 1) == '@') { // is Attribute condition
-                            partWithCondition = part;
-                            tagForCondition = path.get(i);
-                        } else if (part.contains("(") && part.contains(")")) { // is function condition
-                            partWithCondition = part;
-                            tagForCondition = path.get(i);
-                        }
-                    }
+                    partWithCondition = part;
+                    tagForCondition = path.get(pathIndex);
                 } else if (i < path.size() && i > 0 && parts[i - 1].endsWith("]")) {
                     String partBefore = parts[i - 1];
                     int index = partBefore.indexOf("[");
@@ -117,6 +107,7 @@ public class XPathMatcher {
                     }
                 } else if (part.endsWith(")")) { // is xpath method
                     // TODO: implement other xpath methods
+                    throw new UnsupportedOperationException("XPath methods are not supported");
                 }
 
                 String partName;
@@ -164,31 +155,41 @@ public class XPathMatcher {
                 }
             }
 
-            return startsWithSlash || path.size() - pathIndex <= 1;
+            // we have matched the whole XPath, and it does not start with the root
+            return true;
         } else {
             Collections.reverse(path);
 
             // Deal with the two forward slashes in the expression; works, but I'm not proud of it.
-            if (expression.contains("//") && !expression.contains("://") && Arrays.stream(parts).anyMatch(StringUtils::isBlank)) {
+            if (expression.contains("//") && Arrays.stream(parts).anyMatch(StringUtils::isBlank)) {
                 int blankPartIndex = Arrays.asList(parts).indexOf("");
                 int doubleSlashIndex = expression.indexOf("//");
 
-                if (path.size() > blankPartIndex && path.size() >= parts.length - 1) {
+                if (path.size() > blankPartIndex && path.size() >= parts.length - (parts[parts.length - 1].startsWith("@") ? 2 : 1)) {
                     String newExpression;
-                    if (Objects.equals(path.get(blankPartIndex).getName(), parts[blankPartIndex + 1])) {
+                    Xml.Tag blankPartTag = path.get(blankPartIndex);
+                    String part = parts[blankPartIndex + 1];
+                    Matcher matcher = ELEMENT_WITH_CONDITION_PATTERN.matcher(part);
+                    if (matcher.matches() ?
+                            matchesElementWithConditionFunction(matcher, blankPartTag, cursor) != null :
+                            Objects.equals(blankPartTag.getName(), part)) {
                         newExpression = String.format(
                                 "%s/%s",
                                 expression.substring(0, doubleSlashIndex),
                                 expression.substring(doubleSlashIndex + 2)
                         );
-                    } else {
-                        newExpression = String.format(
-                                "%s/%s/%s",
-                                expression.substring(0, doubleSlashIndex),
-                                path.get(blankPartIndex).getName(),
-                                expression.substring(doubleSlashIndex + 2)
-                        );
+                        if (new XPathMatcher(newExpression).matches(cursor)) {
+                            return true;
+                        }
+                        // fall-through: maybe we can skip this element and match further down
                     }
+                    newExpression = String.format(
+                            // the // here allows to skip several levels of nested elements
+                            "%s/%s//%s",
+                            expression.substring(0, doubleSlashIndex),
+                            blankPartTag.getName(),
+                            expression.substring(doubleSlashIndex + 2)
+                    );
                     return new XPathMatcher(newExpression).matches(cursor);
                 }
             }
@@ -235,6 +236,15 @@ public class XPathMatcher {
         }
     }
 
+    /**
+     * Checks that the given {@code tag} matches the XPath part represented by {@code matcher}.
+     *
+     * @param matcher an XPath part matcher for {@link #ELEMENT_WITH_CONDITION_PATTERN}
+     * @param tag     a tag to match
+     * @param cursor  the cursor we are trying to match
+     * @return the element name specified before the condition of the part
+     * (either {@code tag.getName()}, {@code "*"} or an attribute name) or {@code null} if the tag did not match
+     */
     private @Nullable String matchesElementWithConditionFunction(Matcher matcher, Xml.Tag tag, Cursor cursor) {
         boolean isAttributeElement = matcher.group(1) != null;
         String element = matcher.group(2);
