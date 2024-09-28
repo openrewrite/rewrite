@@ -118,7 +118,13 @@ class XPathMatcherTest {
         assertThat(match("/dependencies/dependency", xmlDoc)).isTrue();
         assertThat(match("/dependencies/*/artifactId", xmlDoc)).isTrue();
         assertThat(match("/dependencies/*", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency//groupId", xmlDoc)).isTrue();
+
+        // negative matches
         assertThat(match("/dependencies/dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dependency//dne", xmlDoc)).isFalse();
     }
 
     @Test
@@ -127,6 +133,17 @@ class XPathMatcherTest {
         assertThat(match("/dependencies/dependency/artifactId/@scope", xmlDoc)).isTrue();
         assertThat(match("/dependencies/dependency/artifactId/@*", xmlDoc)).isTrue();
         assertThat(match("/dependencies/dependency/groupId/@*", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dependency//@scope", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency//artifactId//@scope", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency//@*", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency//artifactId//@*", xmlDoc)).isTrue();
+
+        // negative matches
+        assertThat(match("/dependencies/dependency/artifactId/@dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies/dependency/artifactId/@dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dependency//@dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dependency//artifactId//@dne", xmlDoc)).isFalse();
+
     }
 
     @Test
@@ -136,8 +153,6 @@ class XPathMatcherTest {
         assertThat(match("//dependency", xmlDoc)).isTrue();
         assertThat(match("dependency/*", xmlDoc)).isTrue();
         assertThat(match("dne", xmlDoc)).isFalse();
-        assertThat(match("/dependencies//dependency", xmlDoc)).isTrue();
-        assertThat(match("/dependencies//dependency/groupId", xmlDoc)).isTrue();
     }
 
     @Test
@@ -211,6 +226,7 @@ class XPathMatcherTest {
         // skip 2+ levels with //
         assertThat(match("/project/build//plugin/configuration/source", pomXml2)).isTrue();
         assertThat(match("/project//configuration/source", pomXml2)).isTrue();
+        assertThat(match("/project//plugin//source", pomXml2)).isTrue();
     }
 
     private final SourceFile attributeXml = new XmlParser().parse(

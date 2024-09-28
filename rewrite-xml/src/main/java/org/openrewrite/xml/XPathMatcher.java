@@ -48,12 +48,14 @@ public class XPathMatcher {
     private final boolean startsWithSlash;
     private final boolean startsWithDoubleSlash;
     private final String[] parts;
+    private final long tagMatchingParts;
 
     public XPathMatcher(String expression) {
         this.expression = expression;
         startsWithSlash = expression.startsWith("/");
         startsWithDoubleSlash = expression.startsWith("//");
         parts = splitOnXPathSeparator(expression.substring(startsWithDoubleSlash ? 2 : startsWithSlash ? 1 : 0));
+        tagMatchingParts = Arrays.stream(parts).filter(part -> !part.isEmpty() && !part.startsWith("@")).count();
     }
 
     private String[] splitOnXPathSeparator(String input) {
@@ -165,25 +167,19 @@ public class XPathMatcher {
                 int blankPartIndex = Arrays.asList(parts).indexOf("");
                 int doubleSlashIndex = expression.indexOf("//");
 
-                if (path.size() > blankPartIndex && path.size() >= parts.length - (parts[parts.length - 1].startsWith("@") ? 2 : 1)) {
-                    String newExpression;
+                if (path.size() > blankPartIndex && path.size() >= tagMatchingParts) {
                     Xml.Tag blankPartTag = path.get(blankPartIndex);
                     String part = parts[blankPartIndex + 1];
                     Matcher matcher = ELEMENT_WITH_CONDITION_PATTERN.matcher(part);
                     if (matcher.matches() ?
                             matchesElementWithConditionFunction(matcher, blankPartTag, cursor) != null :
                             Objects.equals(blankPartTag.getName(), part)) {
-                        newExpression = String.format(
-                                "%s/%s",
-                                expression.substring(0, doubleSlashIndex),
-                                expression.substring(doubleSlashIndex + 2)
-                        );
-                        if (new XPathMatcher(newExpression).matches(cursor)) {
+                        if (matchesWithoutDoubleSlashesAt(cursor, doubleSlashIndex)) {
                             return true;
                         }
                         // fall-through: maybe we can skip this element and match further down
                     }
-                    newExpression = String.format(
+                    String newExpression = String.format(
                             // the // here allows to skip several levels of nested elements
                             "%s/%s//%s",
                             expression.substring(0, doubleSlashIndex),
@@ -191,10 +187,12 @@ public class XPathMatcher {
                             expression.substring(doubleSlashIndex + 2)
                     );
                     return new XPathMatcher(newExpression).matches(cursor);
+                } else if (path.size() == tagMatchingParts) {
+                    return matchesWithoutDoubleSlashesAt(cursor, doubleSlashIndex);
                 }
             }
 
-            if (parts.length > path.size() + 1) {
+            if (tagMatchingParts > path.size()) {
                 return false;
             }
 
@@ -234,6 +232,15 @@ public class XPathMatcher {
 
             return cursor.getValue() instanceof Xml.Tag && path.size() == parts.length;
         }
+    }
+
+    private boolean matchesWithoutDoubleSlashesAt(Cursor cursor, int doubleSlashIndex) {
+        String newExpression = String.format(
+                "%s/%s",
+                expression.substring(0, doubleSlashIndex),
+                expression.substring(doubleSlashIndex + 2)
+        );
+        return new XPathMatcher(newExpression).matches(cursor);
     }
 
     /**
