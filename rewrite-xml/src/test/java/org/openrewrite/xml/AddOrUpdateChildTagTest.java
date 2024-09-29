@@ -16,17 +16,23 @@
 package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
 class AddOrUpdateChildTagTest implements RewriteTest {
-    @Test
-    void addsTagEverywhereWhenAbsent() {
+    @ParameterizedTest
+    @NullSource
+    @CsvSource({"true", "false"})
+    void addsTagEverywhereWhenAbsent(Boolean replaceExisting) {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
                         "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +
                         "//configuration",
-                        "<skip>true</skip>")),
+                        "<skip>true</skip>",
+                        replaceExisting)),
                 xml(
                         """
                                 <?xml version="1.0" encoding="UTF-8"?>
@@ -180,12 +186,15 @@ class AddOrUpdateChildTagTest implements RewriteTest {
         );
     }
 
-    @Test
-    void updateTagEverywhere() {
+    @ParameterizedTest
+    @NullSource
+    @CsvSource("true")
+    void updateTagEverywhere(Boolean replaceExisting) {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
                         "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +
                         "//configuration",
-                        "<skip>true</skip>")),
+                        "<skip>true</skip>",
+                        replaceExisting)),
                 xml(
                         """
                                 <?xml version="1.0" encoding="UTF-8"?>
@@ -328,11 +337,94 @@ class AddOrUpdateChildTagTest implements RewriteTest {
     }
 
     @Test
-    void dontTouchAnythingElse() {
+    void dontUpdateIfReplaceIsDisabled() {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
                         "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +
                         "//configuration",
-                        "<skip>true</skip>")),
+                        "<skip>true</skip>",
+                        false)),
+                xml(
+                        """
+                                <?xml version="1.0" encoding="UTF-8"?>
+                                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                                         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                                    <modelVersion>4.0.0</modelVersion>
+                                    <groupId>com.example</groupId>
+                                    <artifactId>my-project</artifactId>
+                                    <version>1.0</version>
+                                
+                                    <build>
+                                        <pluginManagement>
+                                            <plugins>
+                                                <plugin>
+                                                    <groupId>org.apache.maven.plugins</groupId>
+                                                    <artifactId>maven-resources-plugin</artifactId>
+                                                    <version>3.3.1</version>
+                                                    <configuration>
+                                                        <encoding>UTF-8</encoding>
+                                                        <skip>false</skip>
+                                                    </configuration>
+                                                </plugin>
+                                            </plugins>
+                                        </pluginManagement>
+                                        <plugins>
+                                            <plugin>
+                                                <groupId>org.apache.maven.plugins</groupId>
+                                                <artifactId>maven-resources-plugin</artifactId>
+                                                <version>3.3.1</version>
+                                                <configuration>
+                                                    <encoding>UTF-8</encoding>
+                                                    <skip>false</skip>
+                                                </configuration>
+                                            </plugin>
+                                        </plugins>
+                                    </build>
+                                    <profiles>
+                                        <profile>
+                                            <id>profile1</id>
+                                            <build>
+                                                <pluginManagement>
+                                                    <plugins>
+                                                        <plugin>
+                                                            <groupId>org.apache.maven.plugins</groupId>
+                                                            <artifactId>maven-resources-plugin</artifactId>
+                                                            <version>3.3.1</version>
+                                                            <configuration>
+                                                                <encoding>UTF-8</encoding>
+                                                                <skip>false</skip>
+                                                            </configuration>
+                                                        </plugin>
+                                                    </plugins>
+                                                </pluginManagement>
+                                                <plugins>
+                                                    <plugin>
+                                                        <groupId>org.apache.maven.plugins</groupId>
+                                                        <artifactId>maven-resources-plugin</artifactId>
+                                                        <version>3.3.1</version>
+                                                        <configuration>
+                                                            <encoding>UTF-8</encoding>
+                                                            <skip>false</skip>
+                                                        </configuration>
+                                                    </plugin>
+                                                </plugins>
+                                            </build>
+                                        </profile>
+                                    </profiles>
+                                </project>
+                                """
+                )
+        );
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @CsvSource({"true", "false"})
+    void dontTouchAnythingElse(Boolean replaceExisting) {
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
+                        "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +
+                        "//configuration",
+                        "<skip>true</skip>",
+                        replaceExisting)),
                 xml(
                         """
                         <?xml version="1.0" encoding="UTF-8"?>

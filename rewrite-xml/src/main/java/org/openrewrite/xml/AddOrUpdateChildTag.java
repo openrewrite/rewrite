@@ -18,6 +18,7 @@ package org.openrewrite.xml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.xml.tree.Xml;
 
@@ -37,6 +38,12 @@ public class AddOrUpdateChildTag extends Recipe {
     @Language("xml")
     String newChildTag;
 
+    @Option(displayName = "Replace existing child",
+            description = "Set to `false` to not replace the child tag if it already exists. Defaults to true.",
+            required = false)
+    @Nullable
+    Boolean replaceExisting;
+
     @Override
     public String getDisplayName() {
         return "Add or update child tag";
@@ -45,7 +52,7 @@ public class AddOrUpdateChildTag extends Recipe {
     @Override
     public String getDescription() {
         return "Adds or updates a child element below the parent(s) matching the provided `parentXPath` expression. " +
-               "If a child with the same name exists, it will be replaced, otherwise a new child will be added. " +
+               "If a child with the same name already exists, it will be replaced by default. Otherwise, a new child will be added. " +
                "This ensures idempotent behaviour.";
     }
 
@@ -71,7 +78,9 @@ public class AddOrUpdateChildTag extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (xPathMatcher.matches(getCursor())) {
                     Xml.Tag newChild = Xml.Tag.build(newChildTag);
-                    return AddOrUpdateChild.addOrUpdateChild(tag, newChild, getCursor().getParentOrThrow());
+                    if (replaceExisting == null || replaceExisting || !tag.getChild(newChild.getName()).isPresent()) {
+                        return AddOrUpdateChild.addOrUpdateChild(tag, newChild, getCursor().getParentOrThrow());
+                    }
                 }
                 return super.visitTag(tag, ctx);
             }
