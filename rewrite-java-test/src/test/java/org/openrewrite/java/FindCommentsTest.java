@@ -80,4 +80,25 @@ class FindCommentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findInLiteralSource() {
+        rewriteRun(
+          spec -> spec.recipe(new FindComments(Arrays.asList("0xff", "254"))),
+          java(
+            """
+              class Test {
+                  int i1 = 0xff;
+                  int i2 = 0xfe;
+              }
+              """,
+            """
+              class Test {
+                  int i1 = /*~~>*/0xff;
+                  int i2 = /*~~>*/0xfe;
+              }
+              """
+          )
+        );
+    }
 }
