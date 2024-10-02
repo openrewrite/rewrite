@@ -22,6 +22,7 @@ import org.openrewrite.java.search.FindComments;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Arrays;
+import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -53,6 +54,29 @@ class FindCommentsTest implements RewriteTest {
                   int n = /*~~>*/123;
                   String s = /*~~>*/"test";
                   String s = /*~~>*/"mytest";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findInJavadoc() {
+        rewriteRun(
+          spec -> spec.recipe(new FindComments(List.of("foo"))),
+          java(
+            """
+              /** Example with a {@code foo} in Javadoc.
+              *   Here another foo.
+              */
+              class Test {
+              }
+              """,
+            """
+              /** Example with a {@code ~~>foo} in Javadoc.
+              *~~>   Here another foo.
+              */
+              class Test {
               }
               """
           )
