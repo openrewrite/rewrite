@@ -125,4 +125,22 @@ class FindCommentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findInComment(){
+        rewriteRun(
+          spec -> spec.recipe(new FindComments(List.of("foo"))),
+          java("""
+              // Example comment with foo
+              class Test {
+              }
+              """
+            , """
+              /*~~>*/// Example comment with foo
+              class Test {
+              }
+              """
+          )
+        );
+    }
 }
