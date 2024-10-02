@@ -99,10 +99,12 @@ public class FindComments extends Recipe {
                     return literal;
                 }
 
-                assert literal.getValue() != null;
-                if (compiledPatterns.stream().anyMatch(p -> p
-                        .matcher(literal.getValue().toString()).find())) {
-                    return SearchResult.found(literal);
+                for (Pattern p : compiledPatterns) {
+                    if (literal.getValue() != null && p.matcher(literal.getValue().toString()).find()) {
+                        return SearchResult.found(literal);
+                    } else if (literal.getValueSource() != null && p.matcher(literal.getValueSource()).find()) {
+                        return SearchResult.found(literal);
+                    }
                 }
 
                 return literal;
