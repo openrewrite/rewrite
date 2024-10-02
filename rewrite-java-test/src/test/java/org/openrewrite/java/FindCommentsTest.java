@@ -130,7 +130,8 @@ class FindCommentsTest implements RewriteTest {
     void findInComment(){
         rewriteRun(
           spec -> spec.recipe(new FindComments(List.of("foo"))),
-          java("""
+          java(
+                """
               // Example comment with foo
               class Test {
               }
