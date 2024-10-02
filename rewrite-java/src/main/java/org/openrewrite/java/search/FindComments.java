@@ -17,13 +17,12 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TextComment;
+import org.openrewrite.java.JavadocVisitor;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.List;
@@ -78,16 +77,31 @@ public class FindComments extends Recipe {
                 .collect(Collectors.toList());
 
         return new JavaIsoVisitor<ExecutionContext>() {
+
+            private final JavadocVisitor<ExecutionContext> javadocVisitor = new JavadocVisitor<ExecutionContext>(this) {
+                @Override
+                public Javadoc visitText(Javadoc.Text text, ExecutionContext ctx) {
+                    return match(text, text.getText());
+                }
+            };
+
+            @Override
+            protected JavadocVisitor<ExecutionContext> getJavadocVisitor() {
+                return javadocVisitor;
+            }
+
             @Override
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
                 return space.withComments(ListUtils.map(space.getComments(), comment -> {
-                    if(comment instanceof TextComment) {
+                    if (comment instanceof TextComment) {
                         for (Pattern p : compiledPatterns) {
                             if (p.matcher(((TextComment) comment).getText()).find()) {
                                 return comment.withMarkers(comment.getMarkers().
                                         computeByType(new SearchResult(randomId(), null), (s1, s2) -> s1 == null ? s2 : s1));
                             }
                         }
+                    } else if (comment instanceof Javadoc.DocComment) {
+                        return (Comment) getJavadocVisitor().visitDocComment((Javadoc.DocComment) comment, ctx);
                     }
                     return comment;
                 }));
@@ -99,15 +113,26 @@ public class FindComments extends Recipe {
                     return literal;
                 }
 
+                J.Literal matched = literal.getValue() != null ? match(literal, literal.getValue().toString()) : literal;
+                if (matched != literal) {
+                    return matched;
+                }
+
+                return match(literal, literal.getValueSource());
+            }
+
+            private <T extends Tree> T match(T t, @Nullable String value) {
+                if (value == null) {
+                    return t;
+                }
+
                 for (Pattern p : compiledPatterns) {
-                    if (literal.getValue() != null && p.matcher(literal.getValue().toString()).find()) {
-                        return SearchResult.found(literal);
-                    } else if (literal.getValueSource() != null && p.matcher(literal.getValueSource()).find()) {
-                        return SearchResult.found(literal);
+                    if (p.matcher(value).find()) {
+                        return SearchResult.found(t);
                     }
                 }
 
-                return literal;
+                return t;
             }
         };
     }
