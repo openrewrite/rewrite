@@ -177,6 +177,16 @@ public interface Parser {
             return new Input(sourcePath, null, () -> new ByteArrayInputStream(source.getBytes(charset)), true);
         }
 
+        public static Input fromFile(Path sourcePath) {
+            return new Input(sourcePath, FileAttributes.fromPath(sourcePath), () -> {
+                try {
+                    return Files.newInputStream(sourcePath);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }, false);
+        }
+
         @SuppressWarnings("unused")
         public static Input fromResource(String resource) {
             return new Input(

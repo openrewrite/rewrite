@@ -32,7 +32,6 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.Base64;
@@ -938,8 +937,7 @@ class MavenParserTest implements RewriteTest {
             var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
                 throw new RuntimeException(t);
             }));
-            var settings = MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () ->
-              new ByteArrayInputStream(
+            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
                 //language=xml
                 """
                       <settings>
@@ -959,8 +957,8 @@ class MavenParserTest implements RewriteTest {
                               </server>
                           </servers>
                       </settings>
-                  """.formatted(mockRepo.getHostName(), mockRepo.getPort(), username, password).getBytes()
-              )), ctx);
+                  """.formatted(mockRepo.getHostName(), mockRepo.getPort(), username, password)
+              ), ctx);
             ctx.setMavenSettings(settings);
 
             var maven = MavenParser.builder().build().parse(
