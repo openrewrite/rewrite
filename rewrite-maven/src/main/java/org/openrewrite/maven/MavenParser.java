@@ -117,9 +117,17 @@ public class MavenParser implements Parser {
                 }
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
             } catch (MavenDownloadingExceptions e) {
-                String message = e.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
-                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e, message))));
-                ctx.getOnError().accept(e);
+                if (e.getExceptions().size() == 1) {
+                    // If there is only a single MavenDownloadingException, report just that as no additional debugging value is gleaned from its wrapper
+                    MavenDownloadingException e2 = e.getExceptions().get(0);
+                    String message = e2.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
+                    parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e2, message))));
+                    ctx.getOnError().accept(e2);
+                } else {
+                    String message = e.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
+                    parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e, message))));
+                    ctx.getOnError().accept(e);
+                }
             } catch (MavenDownloadingException e) {
                 String message = e.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e, message))));

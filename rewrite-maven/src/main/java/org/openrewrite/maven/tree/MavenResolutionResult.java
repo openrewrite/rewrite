@@ -68,6 +68,7 @@ public class MavenResolutionResult implements Marker {
 
     public List<String> getActiveProfiles() {
         // for backwards compatibility with ASTs that were serialized before activeProfiles was added
+        //noinspection ConstantValue
         return activeProfiles == null ? emptyList() : activeProfiles;
     }
 
@@ -173,7 +174,8 @@ public class MavenResolutionResult implements Marker {
                 dependencies.put(scope, pom.resolveDependencies(scope, downloader, ctx));
             } catch (MavenDownloadingExceptions e) {
                 for (MavenDownloadingException exception : e.getExceptions()) {
-                    if (exceptionsInLowerScopes.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
+                    if (exceptionsInLowerScopes.computeIfAbsent(new GroupArtifact(
+                            exception.getRoot().getGroupId() == null ? "" : exception.getRoot().getGroupId(),
                             exception.getRoot().getArtifactId()), ga -> new HashSet<>()).add(exception.getFailedOn())) {
                         exceptions = MavenDownloadingExceptions.append(exceptions, exception);
                     }
