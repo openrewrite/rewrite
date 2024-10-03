@@ -47,8 +47,7 @@ public class EncodingDetectingInputStream extends InputStream {
     boolean maybeFourByteSequence = false;
 
     public EncodingDetectingInputStream(InputStream inputStream) {
-        this.inputStream = inputStream;
-        this.charset = null;
+        this(inputStream, null);
     }
 
     public EncodingDetectingInputStream(InputStream inputStream, @Nullable Charset charset) {
@@ -68,8 +67,13 @@ public class EncodingDetectingInputStream extends InputStream {
     public int read() throws IOException {
         int read;
         if (!bomChecked) {
-            read = checkAndSkipUtf8Bom();
-            if (charsetBomMarked) {
+            if (charset == null || charset == StandardCharsets.UTF_8) {
+                read = checkAndSkipUtf8Bom();
+                if (charsetBomMarked) {
+                    read = inputStream.read();
+                }
+            } else {
+                bomChecked = true;
                 read = inputStream.read();
             }
         } else {
@@ -90,6 +94,22 @@ public class EncodingDetectingInputStream extends InputStream {
             guessCharset(read);
         }
         return read;
+    }
+
+    @Override
+    public int read(byte[] b, int off, int len) throws IOException {
+        if (charset == null) {
+            // we need to read the bytes one-by-one to determine the encoding
+            return super.read(b, off, len);
+        } else if (charset == StandardCharsets.UTF_8 && !bomChecked) {
+            int read = checkAndSkipUtf8Bom();
+            if (!charsetBomMarked) {
+                b[off++] = (byte) read;
+            }
+            return (charsetBomMarked ? 0 : 1) + inputStream.read(b, off, len - 1);
+        } else {
+            return inputStream.read(b, off, len);
+        }
     }
 
     private void guessCharset(int aByte) {
@@ -143,7 +163,7 @@ public class EncodingDetectingInputStream extends InputStream {
             byte[] buffer = new byte[4096];
             int n;
             // Note that `is` is this, so the BOM will be checked in `read()`
-            while ((n = is.read(buffer)) != -1) {
+            while ((n = is.read(buffer, 0, buffer.length)) != -1) {
                 bos.write(buffer, 0, n);
             }
 
