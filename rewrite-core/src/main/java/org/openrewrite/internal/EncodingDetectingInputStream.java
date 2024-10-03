@@ -103,7 +103,9 @@ public class EncodingDetectingInputStream extends InputStream {
             return super.read(b, off, len);
         } else if (charset == StandardCharsets.UTF_8 && !bomChecked) {
             int read = checkAndSkipUtf8Bom();
-            if (!charsetBomMarked) {
+            if (read == -1) {
+                return -1;
+            } else if (!charsetBomMarked) {
                 b[off++] = (byte) read;
             }
             read = inputStream.read(b, off, len - 1);

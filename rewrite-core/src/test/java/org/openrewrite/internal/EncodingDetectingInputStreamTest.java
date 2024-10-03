@@ -40,6 +40,15 @@ class EncodingDetectingInputStreamTest {
     }
 
     @Test
+    void emptyUtf8() throws IOException {
+        String str = "";
+        try (EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(str.getBytes(UTF_8)))) {
+            assertThat(is.readFully()).isEqualTo(str);
+            assertThat(is.isCharsetBomMarked()).isFalse();
+        }
+    }
+
+    @Test
     void singleCharUtf8() throws IOException {
         String str = "1";
         try (EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(str.getBytes(UTF_8)))) {
