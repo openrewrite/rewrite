@@ -465,7 +465,8 @@ public class BlockStatementTemplateGenerator {
             J.MethodInvocation m = (J.MethodInvocation) j;
             if (m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 before.insert(0, "__M__.any(");
-                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                J enclosing = cursor.getParentOrThrow().firstEnclosing(J.class);
+                if (enclosing instanceof J.Block || enclosing instanceof J.If || enclosing instanceof J.If.Else) {
                     after.append(");");
                 } else {
                     after.append(")");

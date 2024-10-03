@@ -6249,7 +6249,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     @With
-    final class Erroneous implements J, Statement {
+    final class Erroneous implements Statement, Expression {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -6266,6 +6266,16 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitErroneous(this, p);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return JavaType.Unknown.getInstance();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) this;
         }
 
         @Override
