@@ -33,8 +33,9 @@ class EncodingDetectingInputStreamTest {
 
     @Test
     void detectUTF8Bom() throws IOException {
-        String bom = "\uFEFF";
-        try (EncodingDetectingInputStream is = read(bom, UTF_8)) {
+        String str = "\uFEFF";
+        try (EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(str.getBytes(UTF_8)))) {
+            assertThat(is.readFully()).isEqualTo("");
             assertThat(is.isCharsetBomMarked()).isTrue();
         }
     }
