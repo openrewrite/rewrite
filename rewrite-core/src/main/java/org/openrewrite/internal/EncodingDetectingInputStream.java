@@ -106,7 +106,8 @@ public class EncodingDetectingInputStream extends InputStream {
             if (!charsetBomMarked) {
                 b[off++] = (byte) read;
             }
-            return (charsetBomMarked ? 0 : 1) + inputStream.read(b, off, len - 1);
+            read = inputStream.read(b, off, len - 1);
+            return read == -1 ? charsetBomMarked ? -1 : 1 : (charsetBomMarked ? 0 : 1) + read;
         } else {
             return inputStream.read(b, off, len);
         }
