@@ -18,6 +18,7 @@ package org.openrewrite.java.style;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
@@ -166,16 +167,10 @@ public class Autodetect extends NamedStyles {
         private int multilineAlignedToFirstArgument = 0;
         private int multilineNotAlignedToFirstArgument = 0;
 
+        @Getter
         private int depth = 0;
+        @Getter
         private int continuationDepth = 1;
-
-        public int getDepth() {
-            return depth;
-        }
-
-        public int getContinuationDepth() {
-            return continuationDepth;
-        }
 
         public void incrementDepth() {
             depth++;
@@ -878,9 +873,9 @@ public class Autodetect extends NamedStyles {
             for (List<ImportAttributes> imports : importsBySourceFile) {
                 Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
 
-                importLayoutStatistics.staticAtBotCount += (imports.size() > 0 &&
+                importLayoutStatistics.staticAtBotCount += (!imports.isEmpty() &&
                                                             imports.get(imports.size() - 1).isStatic()) ? 1 : 0;
-                importLayoutStatistics.staticAtTopCount += (imports.size() > 0 &&
+                importLayoutStatistics.staticAtTopCount += (!imports.isEmpty() &&
                                                             imports.get(0).isStatic()) ? 1 : 0;
 
                 boolean staticBlock = false;

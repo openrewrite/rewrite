@@ -58,7 +58,6 @@ public class GroovyParser implements Parser {
     @Nullable
     private final Collection<Path> classpath;
 
-    private final List<NamedStyles> styles;
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
     private final List<Consumer<CompilerConfiguration>> compilerCustomizers;
@@ -288,7 +287,7 @@ public class GroovyParser implements Parser {
 
         @Override
         public GroovyParser build() {
-            return new GroovyParser(resolvedClasspath(), styles, logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
+            return new GroovyParser(resolvedClasspath(), logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
         }
 
         @Override
