@@ -78,13 +78,11 @@ public interface Parser {
 
     default Stream<SourceFile> parse(ExecutionContext ctx, String... sources) {
         return parseInputs(
-                Arrays.stream(sources).map(source ->
-                        new Input(
-                                sourcePathFromSourceText(Paths.get(Long.toString(System.nanoTime())), source), null,
-                                () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
-                                true
-                        )
-                ).collect(toList()),
+                Arrays.stream(sources)
+                        .map(source ->
+                                Input.fromString(
+                                        sourcePathFromSourceText(Paths.get(Long.toString(System.nanoTime())), source), source)
+                        ).collect(toList()),
                 null,
                 ctx
         );
@@ -204,11 +202,8 @@ public interface Parser {
         public static List<Input> fromResource(String resource, String delimiter, @Nullable Charset charset) {
             Charset resourceCharset = charset == null ? StandardCharsets.UTF_8 : charset;
             return Arrays.stream(StringUtils.readFully(Objects.requireNonNull(Input.class.getResourceAsStream(resource)), resourceCharset).split(delimiter))
-                    .map(source -> new Parser.Input(
-                            Paths.get(Long.toString(System.nanoTime())), null,
-                            () -> new ByteArrayInputStream(source.getBytes(resourceCharset)),
-                            true
-                    ))
+                    .map(source -> Parser.Input.fromString(
+                            Paths.get(Long.toString(System.nanoTime())), source))
                     .collect(toList());
         }
 
