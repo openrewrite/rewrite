@@ -709,4 +709,52 @@ class OrderImportsTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * This style should only reorder the imports but it indents the `extends` keyword as well.
+     * Context is: I'm trying to enforce a custom order of imports, so I don't want this style to do anything else.
+     */
+    @Issue("https://github.com/openrewrite/rewrite/issues/4165")
+    @Test
+    void shouldNotIndentExtends() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
+            singletonList(
+              new NamedStyles(
+                randomId(),
+                "it.does.more.than.JustOrderImports",
+                "custom style",
+                null,
+                emptySet(),
+                singletonList(
+                  ImportLayoutStyle.builder()
+                    .importAllOthers()
+                    .blankLine()
+                    .importStaticAllOthers()
+                    .build()
+                )
+              )
+            ))),
+          java("class BaseClass {}"),
+          java(
+            """              
+              import static org.junit.jupiter.api.Assertions.*;
+
+              import java.io.*;
+              class Test
+                  extends BaseClass {
+              }
+              """,
+            """
+              import java.io.*;
+              
+              import static org.junit.jupiter.api.Assertions.*;
+              
+              class Test
+                  extends BaseClass {
+              }
+              """
+          )
+        );
+    }
 }
