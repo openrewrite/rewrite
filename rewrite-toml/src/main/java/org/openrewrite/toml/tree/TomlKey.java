@@ -15,5 +15,5 @@
  */
 package org.openrewrite.toml.tree;
 
-public interface TValue extends Toml {
+public interface TomlKey extends Toml {
 }

@@ -15,5 +15,5 @@
  */
 package org.openrewrite.toml.tree;
 
-public interface Expression extends Toml {
+public interface TomlValue extends Toml {
 }
