@@ -40,6 +40,15 @@ class EncodingDetectingInputStreamTest {
     }
 
     @Test
+    void skipUTF8Bom() throws IOException {
+        String bom = "\uFEFFhello";
+        try (EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bom.getBytes(UTF_8)))) {
+            assertThat(is.readFully()).isEqualTo("hello");
+            assertThat(is.isCharsetBomMarked()).isTrue();
+        }
+    }
+
+    @Test
     void isUtf8() throws IOException {
         List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
         for (String accent : accents) {
