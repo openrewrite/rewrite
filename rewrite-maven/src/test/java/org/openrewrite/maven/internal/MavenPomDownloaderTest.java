@@ -35,7 +35,6 @@ import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.tree.*;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
@@ -46,10 +45,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonList;
-import static java.util.Collections.singletonMap;
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -94,7 +90,7 @@ class MavenPomDownloaderTest {
     @Test
     void centralIdOverridesDefaultRepository() {
         var ctx = MavenExecutionContextView.view(this.ctx);
-        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -116,8 +112,8 @@ class MavenPomDownloaderTest {
                 <activeProfile>central</activeProfile>
               </activeProfiles>
             </settings>
-            """.getBytes()
-        )), ctx));
+            """
+        ), ctx));
 
         // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
         for (MavenRepository repository : ctx.getRepositories()) {
@@ -196,7 +192,7 @@ class MavenPomDownloaderTest {
     @Test
     void mirrorsOverrideRepositoriesInPom() {
         var ctx = MavenExecutionContextView.view(this.ctx);
-        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -211,8 +207,8 @@ class MavenPomDownloaderTest {
                 </mirror>
               </mirrors>
             </settings>
-            """.getBytes()
-        )), ctx));
+            """
+        ), ctx));
 
         Path pomPath = Paths.get("pom.xml");
         Pom pom = Pom.builder()

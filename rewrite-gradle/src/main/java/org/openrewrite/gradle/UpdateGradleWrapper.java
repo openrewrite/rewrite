@@ -97,7 +97,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     final Boolean addIfMissing;
 
     @Getter
-    @Option(example = "https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip", displayName = "Wrapper URI",
+    @Option(example = "https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip",
+            displayName = "Wrapper URI",
             description = "The URI of the Gradle wrapper distribution. " +
                           "Lookup of available versions still requires access to https://services.gradle.org " +
                           "When this is specified the exact literal values supplied for `version` and `distribution` " +
@@ -109,6 +110,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     @Getter
     @Option(example = "29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda",
+            displayName = "SHA-256 checksum",
             description = "The SHA-256 checksum of the Gradle distribution. " +
                           "If specified, the recipe will add the checksum along with the custom distribution URL.",
             required = false)

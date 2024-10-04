@@ -16,11 +16,11 @@
 package org.openrewrite.java.isolated;
 
 
+import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -2139,7 +2139,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return annotations;
     }
 
-    Space formatWithCommentTree(String prefix, JCTree tree, DCTree.@Nullable DCDocComment commentTree) {
+    Space formatWithCommentTree(String prefix, JCTree tree, @Nullable DocCommentTree commentTree) {
         Space fmt = format(prefix);
         if (commentTree != null) {
             List<Comment> comments = fmt.getComments();
