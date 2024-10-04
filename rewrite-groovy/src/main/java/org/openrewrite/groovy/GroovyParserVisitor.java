@@ -1205,6 +1205,9 @@ public class GroovyParserVisitor {
                         text = "";
                     }
                     jType = JavaType.Primitive.Null;
+                } else if (expression instanceof AnnotationConstantExpression) {
+                    classVisitor.visitAnnotation((AnnotationNode) value);
+                    return ((Expression) classVisitor.queue.poll()).withPrefix(fmt);
                 } else {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
