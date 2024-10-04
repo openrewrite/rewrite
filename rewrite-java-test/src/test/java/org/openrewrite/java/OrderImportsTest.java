@@ -19,9 +19,12 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.Arrays;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -711,8 +714,9 @@ class OrderImportsTest implements RewriteTest {
     }
 
     /**
-     * This style should only reorder the imports but it indents the `extends` keyword as well.
-     * Context is: I'm trying to enforce a custom order of imports, so I don't want this style to do anything else.
+     * With only an ImportLayoutStyle and no TabAndIndentsStyle the recipe indents the `extends` keyword as well.
+     * This test verifies that TabAndIndentsStyle can be configured (with continuationIndent <= -2) so that it leaves
+     * the code following the imports as it is.
      */
     @Issue("https://github.com/openrewrite/rewrite/issues/4165")
     @Test
@@ -722,16 +726,17 @@ class OrderImportsTest implements RewriteTest {
             singletonList(
               new NamedStyles(
                 randomId(),
-                "it.does.more.than.JustOrderImports",
-                "custom style",
-                null,
+                "it.will.only.OrderImports",
+                "Order imports by custom style",
+                "This style defines the order of imports and nothing else",
                 emptySet(),
-                singletonList(
+                Arrays.asList(
                   ImportLayoutStyle.builder()
                     .importAllOthers()
                     .blankLine()
                     .importStaticAllOthers()
-                    .build()
+                    .build(),
+                  new TabsAndIndentsStyle(false, -2, -2, -2, false, null)
                 )
               )
             ))),
@@ -743,6 +748,10 @@ class OrderImportsTest implements RewriteTest {
               import java.io.*;
               class Test
                   extends BaseClass {
+
+                   int foo;//nonstandard indentation
+
+              \tint ba;//tabbed indentation
               }
               """,
             """
@@ -752,6 +761,10 @@ class OrderImportsTest implements RewriteTest {
               
               class Test
                   extends BaseClass {
+
+                   int foo;//nonstandard indentation
+
+              \tint ba;//tabbed indentation
               }
               """
           )
