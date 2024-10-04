@@ -715,7 +715,7 @@ class OrderImportsTest implements RewriteTest {
 
     /**
      * With only an ImportLayoutStyle and no TabAndIndentsStyle the recipe indents the `extends` keyword as well.
-     * This test verifies that TabAndIndentsStyle can be configured (with continuationIndent <= -2) so that it leaves
+     * This test verifies that TabAndIndentsStyle can be configured (with continuationIndent ≤ -2) so that it leaves
      * the code following the imports as it is.
      */
     @Issue("https://github.com/openrewrite/rewrite/issues/4165")
@@ -736,7 +736,7 @@ class OrderImportsTest implements RewriteTest {
                     .blankLine()
                     .importStaticAllOthers()
                     .build(),
-                  new TabsAndIndentsStyle(false, -2, -2, -2, false, null)
+                  new TabsAndIndentsStyle(false, -2, -2, null, false, null)
                 )
               )
             ))),
