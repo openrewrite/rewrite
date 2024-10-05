@@ -47,7 +47,6 @@ public interface JavaType {
     JavaType[] EMPTY_JAVA_TYPE_ARRAY = new JavaType[0];
 
     // TODO: To be removed with OpenRewrite 9
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     default @Nullable Integer getManagedReference() {
         return null;
     }
