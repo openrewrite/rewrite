@@ -742,7 +742,7 @@ class OrderImportsTest implements RewriteTest {
             ))),
           java("class BaseClass {}"),
           java(
-            """              
+            """
               import static org.junit.jupiter.api.Assertions.*;
 
               import java.io.*;
@@ -756,15 +756,48 @@ class OrderImportsTest implements RewriteTest {
               """,
             """
               import java.io.*;
-              
+
               import static org.junit.jupiter.api.Assertions.*;
-              
+
               class Test
                   extends BaseClass {
 
                    int foo;//nonstandard indentation
 
               \tint ba;//tabbed indentation
+              }
+              """
+          ),
+          java(
+            """
+              import com.fasterxml.jackson.core.*;
+              
+              import com.fasterxml.jackson.databind.*;
+              
+              public class CollectionDeserializer {
+    
+                  void a()
+                  {
+                  }    
+                  /**
+                   * JavaDoc without a gap.
+                   */
+                  class B {}
+              }
+              """,
+            """
+              import com.fasterxml.jackson.core.*;
+              import com.fasterxml.jackson.databind.*;
+              
+              public class CollectionDeserializer {
+    
+                  void a()
+                  {
+                  }    
+                  /**
+                   * JavaDoc without a gap.
+                   */
+                  class B {}
               }
               """
           )
