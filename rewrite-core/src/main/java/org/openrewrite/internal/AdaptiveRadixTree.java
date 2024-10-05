@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.internal;
 
 import org.jspecify.annotations.Nullable;
@@ -38,12 +53,12 @@ public class AdaptiveRadixTree<V> {
         root = null;
     }
 
-    public V search(String key) {
+    public @Nullable V search(String key) {
         Node.LeafNode<V> entry = getEntry(key);
         return (entry == null ? null : entry.getValue());
     }
 
-    private Node.LeafNode<V> getEntry(String key) {
+    private Node.@Nullable LeafNode<V> getEntry(String key) {
         if (root == null) { // empty tree
             return null;
         }
@@ -52,8 +67,8 @@ public class AdaptiveRadixTree<V> {
     }
 
     // Arrays.equals() only available in Java 9+
-    private static boolean equals(byte[] a, int aFromIndex, int aToIndex,
-                                  byte[] b, int bFromIndex, int bToIndex) {
+    private static boolean equals(byte @Nullable [] a, int aFromIndex, int aToIndex,
+                                  byte @Nullable [] b, int bFromIndex, int bToIndex) {
         // Check for null arrays
         if (a == null || b == null) {
             return a == b; // Both are null or one is null
@@ -74,12 +89,12 @@ public class AdaptiveRadixTree<V> {
         return true;
     }
 
-    private Node.LeafNode<V> getEntry(Node node, byte[] key) {
+    private Node.@Nullable LeafNode<V> getEntry(Node node, byte[] key) {
         int depth = 0;
         boolean skippedPrefix = false;
         while (true) {
             if (node instanceof Node.LeafNode) {
-                Node.LeafNode<V> leaf = (Node.LeafNode<V>) node;
+                @SuppressWarnings("unchecked") Node.LeafNode<V> leaf = (Node.LeafNode<V>) node;
                 byte[] leafBytes = leaf.getKeyBytes();
                 int startFrom = skippedPrefix ? 0 : depth;
                 if (equals(leafBytes, startFrom, leafBytes.length, key, startFrom, key.length)) {
@@ -111,6 +126,7 @@ public class AdaptiveRadixTree<V> {
             if (depth == key.length) {
                 nextNode = innerNode.getLeaf();
                 if (!skippedPrefix) {
+                    //noinspection unchecked
                     return (Node.LeafNode<V>) nextNode;
                 }
             } else {
@@ -125,7 +141,7 @@ public class AdaptiveRadixTree<V> {
         }
     }
 
-    void replace(int depth, byte[] key, Node.InnerNode prevDepth, Node replaceWith) {
+    void replace(int depth, byte[] key, Node.@Nullable InnerNode prevDepth, Node replaceWith) {
         if (prevDepth == null) {
             root = replaceWith;
         } else {
@@ -161,7 +177,7 @@ public class AdaptiveRadixTree<V> {
             }
 
             if (keyBytes.length == newDepth) {
-                Node.LeafNode<V> leaf = (Node.LeafNode<V>) innerNode.getLeaf();
+                @SuppressWarnings("unchecked") Node.LeafNode<V> leaf = (Node.LeafNode<V>) innerNode.getLeaf();
                 leaf.setValue(value);
                 return;
             }
@@ -249,7 +265,7 @@ public class AdaptiveRadixTree<V> {
         }
     }
 
-    private int matchCompressedPath(Node.InnerNode node, byte[] keyBytes, V value, int depth, Node.InnerNode prevDepth) {
+    private int matchCompressedPath(Node.InnerNode node, byte[] keyBytes, V value, int depth, Node.@Nullable InnerNode prevDepth) {
         int lcp = 0;
         int end = Math.min(keyBytes.length - depth, Math.min(node.prefixLen, Node.InnerNode.PESSIMISTIC_PATH_COMPRESSION_LIMIT));
         // match pessimistic compressed path
@@ -380,7 +396,8 @@ public class AdaptiveRadixTree<V> {
             return unsigned(b);
         }
 
-        abstract Node first();
+        abstract @Nullable Node first();
+
         abstract @Nullable Node firstOrLeaf();
 
         abstract Node copy();
@@ -390,7 +407,7 @@ public class AdaptiveRadixTree<V> {
             final byte[] prefixKeys = new byte[PESSIMISTIC_PATH_COMPRESSION_LIMIT];
             int prefixLen;
             short noOfChildren;
-            final Node[] child;
+            final @Nullable Node[] child;
 
             InnerNode(int size) {
                 child = new Node[size + 1];
@@ -414,13 +431,9 @@ public class AdaptiveRadixTree<V> {
                 this.noOfChildren = from.noOfChildren;
                 this.child = new Node[from.child.length];
                 for (int i = 0; i < child.length; i++) {
-                    this.child[i] = from.child[i].copy();
+                    Node fromChild = from.child[i];
+                    this.child[i] = fromChild == null ? null : fromChild.copy();
                 }
-            }
-
-            @Override
-            protected Object clone() throws CloneNotSupportedException {
-                return super.clone();
             }
 
             public void setLeaf(LeafNode<?> leaf) {
@@ -436,11 +449,12 @@ public class AdaptiveRadixTree<V> {
             }
 
             @Override
-            public Node firstOrLeaf() {
+            public @Nullable Node firstOrLeaf() {
                 return hasLeaf() ? getLeaf() : first();
             }
 
             Node[] getChild() {
+                //noinspection NullableProblems
                 return child;
             }
 
@@ -448,9 +462,10 @@ public class AdaptiveRadixTree<V> {
                 return noOfChildren;
             }
 
-            abstract Node findChild(byte partialKey);
+            abstract @Nullable Node findChild(byte partialKey);
 
             abstract void addChild(byte partialKey, Node child);
+
             abstract void replace(byte partialKey, Node newChild);
 
             abstract InnerNode grow();
@@ -488,12 +503,12 @@ public class AdaptiveRadixTree<V> {
             }
 
             @Override
-            public Node first() {
+            public @Nullable Node first() {
                 return null;
             }
 
             @Override
-            public Node firstOrLeaf() {
+            public @Nullable Node firstOrLeaf() {
                 return null;
             }
 
@@ -525,7 +540,7 @@ public class AdaptiveRadixTree<V> {
             }
 
             @Override
-            public Node findChild(byte partialKey) {
+            public @Nullable Node findChild(byte partialKey) {
                 partialKey = unsigned(partialKey);
                 // paper does simple loop over because it's a tiny array of size 4
                 for (int i = 0; i < noOfChildren; i++) {
@@ -572,7 +587,7 @@ public class AdaptiveRadixTree<V> {
             }
 
             @Override
-            public Node first() {
+            public @Nullable Node first() {
                 return child[0];
             }
 
@@ -609,11 +624,11 @@ public class AdaptiveRadixTree<V> {
             }
 
             @Override
-            public Node findChild(byte partialKey) {
+            public @Nullable Node findChild(byte partialKey) {
                 // TODO: use simple loop to see if -XX:+SuperWord applies SIMD JVM instrinsics
                 partialKey = unsigned(partialKey);
-                for(int i = 0; i < noOfChildren; i++){
-                    if(keys[i] == partialKey){
+                for (int i = 0; i < noOfChildren; i++) {
+                    if (keys[i] == partialKey) {
                         return child[i];
                     }
                 }
@@ -650,7 +665,7 @@ public class AdaptiveRadixTree<V> {
             }
 
             @Override
-            public Node first() {
+            public @Nullable Node first() {
                 return child[0];
             }
 
@@ -704,7 +719,7 @@ public class AdaptiveRadixTree<V> {
             }
 
             @Override
-            public Node findChild(byte partialKey) {
+            public @Nullable Node findChild(byte partialKey) {
                 byte index = keyIndex[Byte.toUnsignedInt(partialKey)];
                 if (index == ABSENT) {
                     return null;
@@ -737,9 +752,9 @@ public class AdaptiveRadixTree<V> {
             }
 
             @Override
-            public Node first() {
+            public @Nullable Node first() {
                 int i = 0;
-                while(keyIndex[i] == ABSENT)i++;
+                while (keyIndex[i] == ABSENT) i++;
                 return child[keyIndex[i]];
             }
 
@@ -784,7 +799,7 @@ public class AdaptiveRadixTree<V> {
             }
 
             @Override
-            public Node findChild(byte partialKey) {
+            public @Nullable Node findChild(byte partialKey) {
                 // We treat the 8 bits as unsigned int since we've got 256 slots
                 int index = Byte.toUnsignedInt(partialKey);
                 return child[index];
@@ -812,9 +827,9 @@ public class AdaptiveRadixTree<V> {
             }
 
             @Override
-            public Node first() {
+            public @Nullable Node first() {
                 int i = 0;
-                while(child[i] == null)i++;
+                while (child[i] == null) i++;
                 return child[i];
             }
 
