@@ -20,20 +20,20 @@ import org.openrewrite.internal.AdaptiveRadixTree;
 
 public class AdaptiveRadixJavaTypeCache extends JavaTypeCache {
 
-    public AdaptiveRadixJavaTypeCache() {
-
-    }
     AdaptiveRadixTree<Object> typeCache = new AdaptiveRadixTree<>();
 
+    @Override
     public <T> @Nullable T get(String signature) {
         //noinspection unchecked
         return (T) typeCache.search(signature);
     }
 
+    @Override
     public void put(String signature, Object o) {
         typeCache.insert(signature, o);
     }
 
+    @Override
     public void clear() {
         typeCache.clear();
     }
