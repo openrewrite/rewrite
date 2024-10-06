@@ -25,10 +25,17 @@ public class RemoveContentVisitor<P> extends XmlVisitor<P> {
 
     private final Content scope;
     private final boolean removeEmptyAncestors;
+    private final boolean removePrecedingComment;
 
+    @Deprecated
     public RemoveContentVisitor(Content tag, boolean removeEmptyAncestors) {
+        this(tag, removeEmptyAncestors, false);
+    }
+
+    public RemoveContentVisitor(Content tag, boolean removeEmptyAncestors, boolean removePrecedingComment) {
         this.scope = tag;
         this.removeEmptyAncestors = removeEmptyAncestors;
+        this.removePrecedingComment = removePrecedingComment;
     }
 
     @Override
@@ -39,13 +46,20 @@ public class RemoveContentVisitor<P> extends XmlVisitor<P> {
             for (Content content : t.getContent()) {
                 if (scope.isScope(content)) {
                     List<Content> contents = new ArrayList<>(t.getContent());
-                    contents.remove(content);
+                    int indexOf = contents.indexOf(content);
+                    contents.remove(indexOf);
+
+                    if (removePrecedingComment) {
+                        if (0 < indexOf && contents.get(indexOf - 1) instanceof Xml.Comment) {
+                            doAfterVisit(new RemoveContentVisitor<>(contents.get(indexOf - 1), true, removePrecedingComment));
+                        }
+                    }
 
                     if (removeEmptyAncestors && contents.isEmpty() && t.getAttributes().isEmpty()) {
                         if (getCursor().getParentOrThrow().getValue() instanceof Xml.Document) {
                             return t.withContent(null).withClosing(null);
                         } else {
-                            doAfterVisit(new RemoveContentVisitor<>(t, true));
+                            doAfterVisit(new RemoveContentVisitor<>(t, true, removePrecedingComment));
                         }
                     } else {
                         return t.withContent(contents);

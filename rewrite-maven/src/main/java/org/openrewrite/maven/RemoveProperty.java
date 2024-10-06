@@ -52,7 +52,7 @@ public class RemoveProperty extends Recipe {
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isPropertyTag() && propertyName.equals(tag.getName())) {
-                doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                 maybeUpdateModel();
             }
             return super.visitTag(tag, ctx);
