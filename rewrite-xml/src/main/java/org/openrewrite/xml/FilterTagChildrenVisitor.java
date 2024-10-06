@@ -67,8 +67,8 @@ public class FilterTagChildrenVisitor<T> extends XmlVisitor<T> {
      */
     public static Xml.Tag filterChildren(Xml.Tag parentScope, Xml.Tag parent, Predicate<Content> childTest) {
         //noinspection ConstantConditions
-        return (Xml.Tag) new FilterTagChildrenVisitor<Void>(parent, childTest)
-                .visitNonNull(parentScope, null);
+        return (Xml.Tag) new FilterTagChildrenVisitor<Integer>(parent, childTest)
+                .visitNonNull(parentScope, 0);
     }
 
     /**

@@ -79,7 +79,7 @@ public class RemoveManagedDependency extends Recipe {
                 Scope checkScope = scope != null ? Scope.fromName(scope) : null;
                 boolean isBomImport = tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
                 if (isBomImport || findManagedDependency(tag, checkScope) != null) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                     maybeUpdateModel();
                 }
             }
