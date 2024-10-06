@@ -800,6 +800,25 @@ class OrderImportsTest implements RewriteTest {
                   class B {}
               }
               """
+          ),
+          java(
+            """
+              import java.lang.annotation.Target;
+              
+              import com.fasterxml.jackson.annotation.JsonInclude;
+              import com.fasterxml.jackson.databind.ser.VirtualBeanPropertyWriter;
+              
+              @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE })
+              public @interface JsonAppend {}
+              """,
+            """
+              import com.fasterxml.jackson.annotation.JsonInclude;
+              import com.fasterxml.jackson.databind.ser.VirtualBeanPropertyWriter;
+              import java.lang.annotation.Target;
+              
+              @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE })
+              public @interface JsonAppend {}
+              """
           )
         );
     }
