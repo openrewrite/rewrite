@@ -27,11 +27,6 @@ public class RemoveContentVisitor<P> extends XmlVisitor<P> {
     private final boolean removeEmptyAncestors;
     private final boolean removePrecedingComment;
 
-    @Deprecated
-    public RemoveContentVisitor(Content tag, boolean removeEmptyAncestors) {
-        this(tag, removeEmptyAncestors, false);
-    }
-
     public RemoveContentVisitor(Content tag, boolean removeEmptyAncestors, boolean removePrecedingComment) {
         this.scope = tag;
         this.removeEmptyAncestors = removeEmptyAncestors;
