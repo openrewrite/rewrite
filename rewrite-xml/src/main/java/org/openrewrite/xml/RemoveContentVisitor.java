@@ -49,10 +49,8 @@ public class RemoveContentVisitor<P> extends XmlVisitor<P> {
                     int indexOf = contents.indexOf(content);
                     contents.remove(indexOf);
 
-                    if (removePrecedingComment) {
-                        if (0 < indexOf && contents.get(indexOf - 1) instanceof Xml.Comment) {
-                            doAfterVisit(new RemoveContentVisitor<>(contents.get(indexOf - 1), true, removePrecedingComment));
-                        }
+                    if (removePrecedingComment && 0 < indexOf && contents.get(indexOf - 1) instanceof Xml.Comment) {
+                        doAfterVisit(new RemoveContentVisitor<>(contents.get(indexOf - 1), true, removePrecedingComment));
                     }
 
                     if (removeEmptyAncestors && contents.isEmpty() && t.getAttributes().isEmpty()) {
