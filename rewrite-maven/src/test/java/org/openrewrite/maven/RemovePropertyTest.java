@@ -111,4 +111,48 @@ class RemovePropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removePropertyWithComment() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                 
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <properties>
+                  <a.version>a</a.version>
+                  <!-- I should remove this property -->
+                  <bla.version>b</bla.version>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                 
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <properties>
+                  <a.version>a</a.version>
+                </properties>
+              </project>
+              """,
+            sourceSpecs ->
+              sourceSpecs.afterRecipe(d -> {
+                  MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  Map<String, String> properties = resolution.getPom().getRequested().getProperties();
+                  assertThat(properties.get("a.version")).isEqualTo("a");
+                  assertThat(properties.get("bla.version")).isNull();
+              })
+          )
+        );
+    }
+
 }
