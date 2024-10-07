@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.style;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
@@ -69,7 +70,7 @@ public class Autodetect extends NamedStyles {
         private final FindTrailingCommaVisitor findTrailingComma = new FindTrailingCommaVisitor();
 
         public void sample(SourceFile cu) {
-            if (cu instanceof JavaSourceFile) {
+            if (cu instanceof K.CompilationUnit) {
                 findImportLayout.visitNonNull(cu, 0);
                 findIndent.visitNonNull(cu, indentStatistics);
                 findSpaces.visitNonNull(cu, spacesStatistics);
@@ -174,16 +175,11 @@ public class Autodetect extends NamedStyles {
         private int multilineAlignedToFirstArgument = 0;
         private int multilineNotAlignedToFirstArgument = 0;
 
+        @Getter
         private int depth = 0;
+
+        @Getter
         private int continuationDepth = 1;
-
-        public int getDepth() {
-            return depth;
-        }
-
-        public int getContinuationDepth() {
-            return continuationDepth;
-        }
 
         public void incrementDepth() {
             depth++;
@@ -621,13 +617,9 @@ public class Autodetect extends NamedStyles {
 
                         // Add static imports at the top if it's the standard.
                         boolean addNewLine = false;
-                        addNewLine = false;
 
                         // There are no non-static imports, add a block of all other import.
                         if (!insertAllOthers) {
-                            if (addNewLine) {
-                                builder = builder.blankLine();
-                            }
 
                             builder = builder.importAllOthers();
                             // Add java/javax if they're missing from the block that is being used as a template.
@@ -1145,7 +1137,7 @@ public class Autodetect extends NamedStyles {
         public J.Lambda visitLambda(J.Lambda lambda, SpacesStatistics stats) {
             List<J> parameters = lambda.getParameters().getParameters();
             if (parameters.size() > 1) {
-                List<JRightPadded<J>> paddedParameters = lambda.getParameters().getPadding().getParams();
+                List<JRightPadded<J>> paddedParameters = lambda.getParameters().getPadding().getParameters();
                 for (int i = 0; i < paddedParameters.size() - 1; i++) {
                     stats.beforeComma += hasSpace(paddedParameters.get(i).getAfter());
                 }
