@@ -33,7 +33,7 @@ public class NoMutableStaticFieldsInRecipes extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove mutable static fields from Recipe classes to discourage their use";
+        return "Remove mutable static fields from Recipe classes to discourage their use.";
     }
 
     @Override
