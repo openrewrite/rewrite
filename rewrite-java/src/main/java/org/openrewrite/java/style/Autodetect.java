@@ -65,7 +65,8 @@ public class Autodetect extends NamedStyles {
         private final FindLineFormatJavaVisitor findLineFormat = new FindLineFormatJavaVisitor();
 
         public void sample(SourceFile cu) {
-            if(cu instanceof JavaSourceFile) {
+            // only sample Java sources (extending languages need their own auto-detection)
+            if (cu instanceof J.CompilationUnit) {
                 findImportLayout.visitNonNull(cu, 0);
                 findIndent.visitNonNull(cu, indentStatistics);
                 findSpaces.visitNonNull(cu, spacesStatistics);
