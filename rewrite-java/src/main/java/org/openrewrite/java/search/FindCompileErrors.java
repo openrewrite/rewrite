@@ -19,10 +19,13 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.table.CompileErrors;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
 public class FindCompileErrors extends Recipe {
+
+    transient CompileErrors report = new CompileErrors(this);
 
     @Override
     public String getDisplayName() {
@@ -39,6 +42,18 @@ public class FindCompileErrors extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Erroneous visitErroneous(J.Erroneous erroneous, ExecutionContext ctx) {
+
+                J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
+                String sourceFile = cu != null ? cu.getSourcePath().toString() : "Unknown source file";
+
+                String code = erroneous.print();
+
+                report.insertRow(ctx, new CompileErrors.Row(
+                        sourceFile,
+                        code
+                ));
+
+                super.visitErroneous(erroneous, ctx);
                 return SearchResult.found(erroneous);
             }
         };
