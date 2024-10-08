@@ -65,8 +65,7 @@ public class Autodetect extends NamedStyles {
         private final FindLineFormatJavaVisitor findLineFormat = new FindLineFormatJavaVisitor();
 
         public void sample(SourceFile cu) {
-            // only sample Java sources (extending languages need their own auto-detection)
-            if (cu instanceof J.CompilationUnit) {
+            if (cu instanceof JavaSourceFile) {
                 findImportLayout.visitNonNull(cu, 0);
                 findIndent.visitNonNull(cu, indentStatistics);
                 findSpaces.visitNonNull(cu, spacesStatistics);
@@ -428,6 +427,12 @@ public class Autodetect extends NamedStyles {
         @SuppressWarnings("CommentedOutCode")
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, IndentStatistics stats) {
+            for (Expression argument : m.getArguments()) {
+                if (argument instanceof J.Lambda) {
+                    visit((((J.Lambda) argument).getBody()), stats);
+                }
+            }
+
             Set<Expression> statementExpressions = getCursor().getNearestMessage("STATEMENT_EXPRESSION", emptySet());
             if (statementExpressions.contains(m)) {
                 visitStatement(m, stats);
