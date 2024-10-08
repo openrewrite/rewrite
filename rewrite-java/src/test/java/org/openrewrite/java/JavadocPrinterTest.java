@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Javadoc;
@@ -29,6 +30,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavadocPrinterTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findInJavadoc() {
         rewriteRun(
