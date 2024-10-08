@@ -82,6 +82,23 @@ public class Autodetect extends NamedStyles {
                     wrappingAndBracesStatistics.getWrappingAndBracesStyle(),
                     generalFormatStatistics.getFormatStyle()));
         }
+
+        public TabsAndIndentsStyle getTabsAndIndentsStyle() {
+            return indentStatistics.getTabsAndIndentsStyle();
+        }
+
+        public ImportLayoutStyle getImportLayoutStyle(){
+            return findImportLayout.aggregate().getImportLayoutStyle();
+        }
+        public SpacesStyle getSpacesStyle(){
+            return spacesStatistics.getSpacesStyle();
+        }
+        public WrappingAndBracesStyle getWrappingAndBracesStyle(){
+            return wrappingAndBracesStatistics.getWrappingAndBracesStyle();
+        }
+        public GeneralFormatStyle getFormatStyle(){
+            return generalFormatStatistics.getFormatStyle();
+        }
     }
 
     private static class GeneralFormatStatistics {

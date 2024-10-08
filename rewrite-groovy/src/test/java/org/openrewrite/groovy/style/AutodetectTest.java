@@ -46,6 +46,8 @@ class AutodetectTest implements RewriteTest {
         var detector = Autodetect.detector();
         parse.forEach(detector::sample);
         var styles = detector.build();
+        assertThat(styles.getName()).isEqualTo("org.openrewrite.groovy.Autodetect");
+
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);

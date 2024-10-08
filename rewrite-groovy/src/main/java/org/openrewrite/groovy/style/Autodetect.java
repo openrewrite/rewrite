@@ -16,9 +16,13 @@
 package org.openrewrite.groovy.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.UUID;
 
@@ -34,7 +38,27 @@ public class Autodetect extends NamedStyles {
                 emptySet(), styles);
     }
 
-    public static org.openrewrite.java.style.Autodetect.Detector detector() {
-        return new org.openrewrite.java.style.Autodetect.Detector();
+
+    public static Detector detector() {
+        return new Detector();
+    }
+
+    public static class Detector {
+        org.openrewrite.java.style.Autodetect.Detector javaDetector = new org.openrewrite.java.style.Autodetect.Detector();
+
+        public void sample(SourceFile cu) {
+            if (cu instanceof G.CompilationUnit) {
+                javaDetector.sample(cu);
+            }
+        }
+
+        public Autodetect build() {
+            return new Autodetect(Tree.randomId(), Arrays.asList(
+                    javaDetector.getTabsAndIndentsStyle(),
+                    javaDetector.getImportLayoutStyle(),
+                    javaDetector.getSpacesStyle(),
+                    javaDetector.getWrappingAndBracesStyle(),
+                    javaDetector.getFormatStyle()));
+        }
     }
 }
