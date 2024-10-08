@@ -428,6 +428,12 @@ public class Autodetect extends NamedStyles {
         @SuppressWarnings("CommentedOutCode")
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, IndentStatistics stats) {
+            for (Expression argument : m.getArguments()) {
+                if (argument instanceof J.Lambda) {
+                    visit((((J.Lambda) argument).getBody()), stats);
+                }
+            }
+
             Set<Expression> statementExpressions = getCursor().getNearestMessage("STATEMENT_EXPRESSION", emptySet());
             if (statementExpressions.contains(m)) {
                 visitStatement(m, stats);
