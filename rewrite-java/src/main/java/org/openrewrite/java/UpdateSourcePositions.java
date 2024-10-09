@@ -64,19 +64,6 @@ public class UpdateSourcePositions extends Recipe {
 
                 return t;
             }
-
-            @Override
-            public J visitModifier(J.Modifier modifier, PrintOutputCapture<ExecutionContext> p) {
-                PositionPrintOutputCapture prefix = new PositionPrintOutputCapture(ppoc.pos, ppoc.line, ppoc.column);
-                spacePrinter.visitSpace(modifier.getPrefix(), Space.Location.ANY, prefix);
-
-                Range.Position startPosition = new Range.Position(prefix.pos, prefix.line, prefix.column);
-                super.visitModifier(modifier, p);
-                Range.Position endPosition = new Range.Position(ppoc.pos, ppoc.line, ppoc.column);
-                positionMap.put(modifier, new Range(randomId(), startPosition, endPosition));
-                return modifier;
-            }
-
         };
 
         return new JavaVisitor<ExecutionContext>() {
