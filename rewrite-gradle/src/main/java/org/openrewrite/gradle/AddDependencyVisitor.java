@@ -199,7 +199,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                                 }
                                 return resolved;
                             }),
-                            new ResolvedDependency(null, resolvedGav, newRequested, transitiveDependencies,
+                            new ResolvedDependency(null, resolvedGav, newRequested, transitiveDependencies, emptyList(),
                                     emptyList(), "jar", classifier, null, 0, null)));
                 }
                 newNameToConfiguration.put(newGdc.getName(), newGdc);

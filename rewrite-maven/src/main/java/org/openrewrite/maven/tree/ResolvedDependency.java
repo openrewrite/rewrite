@@ -52,6 +52,10 @@ public class ResolvedDependency implements Serializable {
     @EqualsAndHashCode.Exclude
     List<ResolvedDependency> dependencies;
 
+    @NonFinal
+    @EqualsAndHashCode.Exclude
+    List<GroupArtifactVersion> omitDependencies;
+
     List<License> licenses;
 
     @Nullable
@@ -79,6 +83,10 @@ public class ResolvedDependency implements Serializable {
      */
     void unsafeSetDependencies(List<ResolvedDependency> dependencies) {
         this.dependencies = dependencies;
+    }
+
+    void unsafeSetOmitDependencies(List<GroupArtifactVersion> omitDependencies) {
+        this.omitDependencies = omitDependencies;
     }
 
     void unsafeSetEffectiveExclusions(List<GroupArtifact> effectiveExclusions) {
@@ -137,6 +145,40 @@ public class ResolvedDependency implements Serializable {
                     }
                 }
                 return found;
+            }
+        }
+        return null;
+    }
+
+    public @Nullable ResolvedDependency findDependencyWithOmit(String groupId, String artifactId) {
+        return findDependencyWithOmit0(groupId, artifactId, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private @Nullable ResolvedDependency findDependencyWithOmit0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
+        if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
+            return this;
+        } else if (!visited.add(this)) {
+            return null;
+        }
+        outer:
+        for (ResolvedDependency dependency : dependencies) {
+            ResolvedDependency found = dependency.findDependencyWithOmit0(groupId, artifactId, visited);
+            if (found != null) {
+                if (getRequested().getExclusions() != null) {
+                    for (GroupArtifact exclusion : getRequested().getExclusions()) {
+                        if (matchesGlob(found.getGroupId(), exclusion.getGroupId()) &&
+                                matchesGlob(found.getArtifactId(), exclusion.getArtifactId())) {
+                            continue outer;
+                        }
+                    }
+                }
+                return found;
+            }
+        }
+
+        for (GroupArtifactVersion omit : omitDependencies) {
+            if (matchesGlob(omit.getGroupId(), groupId) && matchesGlob(omit.getArtifactId(), artifactId)) {
+                return this;
             }
         }
         return null;
