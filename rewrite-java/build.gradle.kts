@@ -42,8 +42,6 @@ dependencies {
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 
-    implementation("io.github.fastfilter:fastfilter:latest.release")
-
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
 
