@@ -65,14 +65,19 @@ public class Autodetect extends NamedStyles {
         private final FindLineFormatJavaVisitor findLineFormat = new FindLineFormatJavaVisitor();
 
         public void sample(SourceFile cu) {
-            // only sample Java sources (extending languages need their own auto-detection)
+            // only sample Java sources; extending languages need their own `Autodetect.Detector`
+            // and can call `sampleJava()` from their `sample()` method if that helps
             if (cu instanceof J.CompilationUnit) {
-                findImportLayout.visitNonNull(cu, 0);
-                findIndent.visitNonNull(cu, indentStatistics);
-                findSpaces.visitNonNull(cu, spacesStatistics);
-                findWrappingAndBraces.visitNonNull(cu, wrappingAndBracesStatistics);
-                findLineFormat.visitNonNull(cu, generalFormatStatistics);
+                sampleJava((JavaSourceFile) cu);
             }
+        }
+
+        public void sampleJava(JavaSourceFile cu) {
+            findImportLayout.visitNonNull(cu, 0);
+            findIndent.visitNonNull(cu, indentStatistics);
+            findSpaces.visitNonNull(cu, spacesStatistics);
+            findWrappingAndBraces.visitNonNull(cu, wrappingAndBracesStatistics);
+            findLineFormat.visitNonNull(cu, generalFormatStatistics);
         }
 
         public Autodetect build() {
@@ -82,6 +87,23 @@ public class Autodetect extends NamedStyles {
                     spacesStatistics.getSpacesStyle(),
                     wrappingAndBracesStatistics.getWrappingAndBracesStyle(),
                     generalFormatStatistics.getFormatStyle()));
+        }
+
+        public TabsAndIndentsStyle getTabsAndIndentsStyle() {
+            return indentStatistics.getTabsAndIndentsStyle();
+        }
+
+        public ImportLayoutStyle getImportLayoutStyle(){
+            return findImportLayout.aggregate().getImportLayoutStyle();
+        }
+        public SpacesStyle getSpacesStyle(){
+            return spacesStatistics.getSpacesStyle();
+        }
+        public WrappingAndBracesStyle getWrappingAndBracesStyle(){
+            return wrappingAndBracesStatistics.getWrappingAndBracesStyle();
+        }
+        public GeneralFormatStyle getFormatStyle(){
+            return generalFormatStatistics.getFormatStyle();
         }
     }
 
@@ -428,6 +450,12 @@ public class Autodetect extends NamedStyles {
         @SuppressWarnings("CommentedOutCode")
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, IndentStatistics stats) {
+            for (Expression argument : m.getArguments()) {
+                if (argument instanceof J.Lambda) {
+                    visit((((J.Lambda) argument).getBody()), stats);
+                }
+            }
+
             Set<Expression> statementExpressions = getCursor().getNearestMessage("STATEMENT_EXPRESSION", emptySet());
             if (statementExpressions.contains(m)) {
                 visitStatement(m, stats);

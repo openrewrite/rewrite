@@ -878,7 +878,7 @@ public class ResolvedPom {
                         continue;
                     }
 
-                    GroupArtifact ga = new GroupArtifact(d.getGroupId(), d.getArtifactId());
+                    GroupArtifact ga = new GroupArtifact(d.getGroupId() == null ? "" : d.getGroupId(), d.getArtifactId());
                     VersionRequirement existingRequirement = requirements.get(ga);
                     if (existingRequirement == null) {
                         VersionRequirement newRequirement = VersionRequirement.fromVersion(d.getVersion(), depth);
@@ -953,6 +953,7 @@ public class ResolvedPom {
 
                     // build link between the including dependency and this one
                     ResolvedDependency includedBy = dd.getDependent();
+                    //noinspection ConstantValue
                     if (includedBy != null) {
                         if (includedBy.getDependencies().isEmpty()) {
                             includedBy.unsafeSetDependencies(new ArrayList<>());
@@ -971,11 +972,10 @@ public class ResolvedPom {
                         if (d2.getGroupId() == null) {
                             d2 = d2.withGav(d2.getGav().withGroupId(resolvedPom.getGroupId()));
                         }
-                        String optional = resolvedPom.getValue(d2.getOptional());
-                        if (optional != null && Boolean.parseBoolean(optional.trim())) {
-                            continue;
-                        }
+
+                        //noinspection ConstantValue
                         if (d.getExclusions() != null) {
+                            d2 = d2.withExclusions(ListUtils.concatAll(d2.getExclusions(), d.getExclusions()));
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
                                     matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
@@ -986,6 +986,11 @@ public class ResolvedPom {
                                     continue nextDependency;
                                 }
                             }
+                        }
+
+                        String optional = resolvedPom.getValue(d2.getOptional());
+                        if (optional != null && Boolean.parseBoolean(optional.trim())) {
+                            continue;
                         }
 
                         Scope d2Scope = getDependencyScope(d2, resolvedPom);
@@ -1021,10 +1026,10 @@ public class ResolvedPom {
 
     private Scope getDependencyScope(Dependency d2, ResolvedPom containingPom) {
         Scope scopeInContainingPom;
+        //noinspection ConstantConditions
         if (d2.getScope() != null) {
             scopeInContainingPom = Scope.fromName(getValue(d2.getScope()));
         } else {
-            //noinspection ConstantConditions
             scopeInContainingPom = containingPom.getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
                     getValue(d2.getClassifier()));
             if (scopeInContainingPom == null) {

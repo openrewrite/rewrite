@@ -15,10 +15,11 @@
  */
 package org.openrewrite;
 
-import java.time.Duration;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
