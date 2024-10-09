@@ -47,7 +47,7 @@ public class Autodetect extends NamedStyles {
 
         public void sample(SourceFile cu) {
             if (cu instanceof G.CompilationUnit) {
-                javaDetector.sample(cu);
+                javaDetector.sampleJava((G.CompilationUnit) cu);
             }
         }
 
