@@ -66,7 +66,7 @@ public class UpdateSourcePositions extends Recipe {
             }
 
             @Override
-            protected void visitModifier(J.Modifier modifier, PrintOutputCapture<ExecutionContext> p) {
+            public J visitModifier(J.Modifier modifier, PrintOutputCapture<ExecutionContext> p) {
                 PositionPrintOutputCapture prefix = new PositionPrintOutputCapture(ppoc.pos, ppoc.line, ppoc.column);
                 spacePrinter.visitSpace(modifier.getPrefix(), Space.Location.ANY, prefix);
 
@@ -74,6 +74,7 @@ public class UpdateSourcePositions extends Recipe {
                 super.visitModifier(modifier, p);
                 Range.Position endPosition = new Range.Position(ppoc.pos, ppoc.line, ppoc.column);
                 positionMap.put(modifier, new Range(randomId(), startPosition, endPosition));
+                return modifier;
             }
 
         };
