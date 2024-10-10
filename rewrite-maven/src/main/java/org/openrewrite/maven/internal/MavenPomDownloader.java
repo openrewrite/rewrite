@@ -333,7 +333,7 @@ public class MavenPomDownloader {
         }
 
         long nanos = sample.stop(timer.tags("outcome", "success").register(Metrics.globalRegistry));
-        if (ctx.getOnDownloaded() != null) {
+        if (ctx.getOnDownloaded() != null && !attemptedUris.isEmpty()) {
             ctx.getOnDownloaded().accept(
                     URI.create(attemptedUris.get(attemptedUris.size() - 1)),
                     Duration.ofNanos(nanos));
