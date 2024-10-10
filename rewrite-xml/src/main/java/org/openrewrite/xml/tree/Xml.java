@@ -676,10 +676,10 @@ public interface Xml extends Tree {
         Ident name;
         String documentDeclaration;
         // Override lombok default getter to avoid backwards compatibility problems with old LSTs
-        public getDocumentDeclaration() {
+        public String getDocumentDeclaration() {
             //noinspection ConstantValue
             if ( documentDeclaration == null) {
-                return "DOCTYPE"
+                return "DOCTYPE";
             }
             return documentDeclaration;
         }
