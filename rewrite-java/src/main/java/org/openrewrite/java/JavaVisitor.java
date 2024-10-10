@@ -1421,6 +1421,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 JContainer.build(before, js, container.getMarkers());
     }
 
+    public J visitErroneous(J.Erroneous erroneous, P p) {
+        J.Erroneous u = erroneous;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        return u;
+    }
+
     /**
      * Check if a child AST element is in the same lexical scope as that of the AST element associated with the base
      * cursor. (i.e.: Are the variables and declarations visible in the base scope also visible to the child AST

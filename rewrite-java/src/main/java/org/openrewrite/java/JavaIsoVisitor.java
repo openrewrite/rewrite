@@ -359,4 +359,10 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     public J.Yield visitYield(J.Yield yield, P p) {
         return (J.Yield) super.visitYield(yield, p);
     }
+
+    @Override
+    public J.Erroneous visitErroneous(J.Erroneous erroneous, P p) {
+        return (J.Erroneous) super.visitErroneous(erroneous, p);
+    }
+
 }
