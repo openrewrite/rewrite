@@ -675,6 +675,14 @@ public interface Xml extends Tree {
         Markers markers;
         Ident name;
         String documentDeclaration;
+        // Override lombok default getter to avoid backwards compatibility problems with old LSTs
+        public getDocumentDeclaration() {
+            //noinspection ConstantValue
+            if ( documentDeclaration == null) {
+                return "DOCTYPE"
+            }
+            return documentDeclaration;
+        }
 
         @Nullable
         Ident externalId;
