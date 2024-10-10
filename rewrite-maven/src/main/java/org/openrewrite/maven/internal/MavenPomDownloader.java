@@ -259,9 +259,9 @@ public class MavenPomDownloader {
                 try {
                     String scheme = URI.create(repo.getUri()).getScheme();
                     String baseUri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                                 requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
-                                 gav.getArtifactId() + '/' +
-                                 (gav.getVersion() == null ? "" : gav.getVersion() + '/');
+                                     requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
+                                     gav.getArtifactId() + '/' +
+                                     (gav.getVersion() == null ? "" : gav.getVersion() + '/');
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
@@ -777,10 +777,6 @@ public class MavenPomDownloader {
         }
 
         HttpSender.Request.Builder request = httpSender.options(httpsUri);
-        if (repository.getTimeout() != null) {
-            request = request.withConnectTimeout(repository.getTimeout())
-                    .withReadTimeout(repository.getTimeout());
-        }
 
         ReachabilityResult reachability = reachable(applyAuthenticationToRequest(repository, request));
         if (reachability.isSuccess()) {
@@ -851,9 +847,7 @@ public class MavenPomDownloader {
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         try {
-            HttpSender.Request.Builder request = httpSender.get(uriString)
-                    .withConnectTimeout(repo.getTimeout())
-                    .withReadTimeout(repo.getTimeout());
+            HttpSender.Request.Builder request = httpSender.get(uriString);
             return sendRequest(applyAuthenticationToRequest(repo, request).build());
         } catch (HttpSenderResponseException e) {
             if (hasCredentials(repo) && e.isClientSideException()) {
@@ -888,6 +882,8 @@ public class MavenPomDownloader {
      */
     private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
         if (mavenSettings != null && mavenSettings.getServers() != null) {
+            request.withConnectTimeout(repository.getTimeout() == null ? Duration.ofSeconds(10) : repository.getTimeout());
+            request.withReadTimeout(repository.getTimeout() == null ? Duration.ofSeconds(30) : repository.getTimeout());
             for (MavenSettings.Server server : mavenSettings.getServers().getServers()) {
                 if (server.getId().equals(repository.getId()) && server.getConfiguration() != null) {
                     MavenSettings.ServerConfiguration configuration = server.getConfiguration();
