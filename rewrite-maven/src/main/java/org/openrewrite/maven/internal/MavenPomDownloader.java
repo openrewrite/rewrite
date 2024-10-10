@@ -333,11 +333,7 @@ public class MavenPomDownloader {
         }
 
         long nanos = sample.stop(timer.tags("outcome", "success").register(Metrics.globalRegistry));
-        if (ctx.getOnDownloaded() != null && !attemptedUris.isEmpty()) {
-            ctx.getOnDownloaded().accept(
-                    URI.create(attemptedUris.get(attemptedUris.size() - 1)),
-                    Duration.ofNanos(nanos));
-        }
+        ctx.getResolutionListener().downloadMetadataSuccess(mavenMetadata, containingPom, Duration.ofNanos(nanos));
         return mavenMetadata;
     }
 
@@ -584,7 +580,7 @@ public class MavenPomDownloader {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                             }
                             mavenCache.putPom(resolvedGav, pom);
-                            ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom);
+                            ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom, Duration.ZERO);
                             sample.stop(timer.tags("outcome", "from maven local").register(Metrics.globalRegistry));
                             return pom;
                         }
@@ -606,12 +602,9 @@ public class MavenPomDownloader {
                             pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                         }
                         mavenCache.putPom(resolvedGav, pom);
-                        ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom);
-                        sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
                         long nanos = sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
-                        if (ctx.getOnDownloaded() != null) {
-                            ctx.getOnDownloaded().accept(uri, Duration.ofNanos(nanos));
-                        }
+                        ctx.getResolutionListener()
+                                .downloadSuccess(resolvedGav, containingPom, Duration.ofNanos(nanos));
                         return pom;
                     } catch (HttpSenderResponseException e) {
                         repositoryResponses.put(repo, e.getMessage());
