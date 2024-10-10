@@ -19,8 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 
-import java.net.URI;
-import java.time.Duration;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -65,11 +63,5 @@ public class WatchableExecutionContext implements ExecutionContext {
     @Override
     public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
         return delegate.getOnTimeout();
-    }
-
-    @Override
-    @Nullable
-    public BiConsumer<URI, Duration> getOnDownload() {
-        return delegate.getOnDownload();
     }
 }

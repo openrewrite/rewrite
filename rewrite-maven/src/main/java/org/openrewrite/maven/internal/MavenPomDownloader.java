@@ -333,8 +333,8 @@ public class MavenPomDownloader {
         }
 
         long nanos = sample.stop(timer.tags("outcome", "success").register(Metrics.globalRegistry));
-        if (ctx.getOnDownload() != null) {
-            ctx.getOnDownload().accept(
+        if (ctx.getOnDownloaded() != null) {
+            ctx.getOnDownloaded().accept(
                     URI.create(attemptedUris.get(attemptedUris.size() - 1)),
                     Duration.ofNanos(nanos));
         }
@@ -609,8 +609,8 @@ public class MavenPomDownloader {
                         ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom);
                         sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
                         long nanos = sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
-                        if (ctx.getOnDownload() != null) {
-                            ctx.getOnDownload().accept(uri, Duration.ofNanos(nanos));
+                        if (ctx.getOnDownloaded() != null) {
+                            ctx.getOnDownloaded().accept(uri, Duration.ofNanos(nanos));
                         }
                         return pom;
                     } catch (HttpSenderResponseException e) {

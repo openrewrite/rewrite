@@ -18,8 +18,6 @@ package org.openrewrite;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.scheduling.RecipeRunCycle;
 
-import java.net.URI;
-import java.time.Duration;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -101,10 +99,6 @@ public interface ExecutionContext {
     Consumer<Throwable> getOnError();
 
     BiConsumer<Throwable, ExecutionContext> getOnTimeout();
-
-    default @Nullable BiConsumer<URI, Duration> getOnDownload() {
-        return null;
-    }
 
     default int getCycle() {
         return getCycleDetails().getCycle();

@@ -23,8 +23,10 @@ import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -47,6 +49,9 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
+
+    @Nullable
+    private  BiConsumer<URI, Duration> onDownloaded;
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -236,6 +241,15 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public @Nullable MavenSettings getSettings() {
         return getMessage(MAVEN_SETTINGS, null);
+    }
+
+    @Nullable
+    public BiConsumer<URI, Duration> getOnDownloaded() {
+        return onDownloaded;
+    }
+
+    public void setOnDownloaded(BiConsumer<URI, Duration> onDownloaded) {
+        this.onDownloaded = onDownloaded;
     }
 
     private static List<String> mapActiveProfiles(MavenSettings settings, String... activeProfiles) {
