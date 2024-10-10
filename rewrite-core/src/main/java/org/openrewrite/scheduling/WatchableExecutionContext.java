@@ -68,8 +68,7 @@ public class WatchableExecutionContext implements ExecutionContext {
     }
 
     @Override
-    @Nullable
-    public BiConsumer<URI, Duration> getOnDownload() {
+    public @Nullable BiConsumer<URI, Duration> getOnDownload() {
         return delegate.getOnDownload();
     }
 }
