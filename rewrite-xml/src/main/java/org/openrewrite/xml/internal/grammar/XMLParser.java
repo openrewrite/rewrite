@@ -59,9 +59,8 @@ public class XMLParser extends Parser {
 	private static String[] makeLiteralNames() {
 		return new String[] {
 			null, null, null, null, null, null, null, null, "'?'", null, "'<'", null, 
-			null, null, null, null, null, "'DOCTYPE'", null, null, null, null, null, 
-			null, null, null, null, null, null, "'/>'", null, "'%@'", "'%'", "'/'", 
-			"'='"
+			null, null, null, null, null, null, null, null, null, null, null, null, 
+			null, null, null, null, null, "'/>'", null, "'%@'", "'%'", "'/'", "'='"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();

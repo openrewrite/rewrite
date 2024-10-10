@@ -76,6 +76,23 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void lowerCaseDocType() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!doctype html>
+              <html lang="en">
+                <body>
+                  <h2><s:property value="messageStore.message" /></h2>
+                </body>
+              </html>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2189")
     @Test
     void specialCharacters() {

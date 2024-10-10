@@ -155,7 +155,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, PrintOutputCapture<P> p) {
         beforeSyntax(docTypeDecl, p);
-        p.append("<!DOCTYPE");
+        p.append("<!" + docTypeDecl.getDocumentDeclaration());
         visit(docTypeDecl.getName(), p);
         visit(docTypeDecl.getExternalId(), p);
         visit(docTypeDecl.getInternalSubset(), p);

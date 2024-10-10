@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.apache.commons.text.StringEscapeUtils;
@@ -32,7 +33,10 @@ import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -650,6 +654,7 @@ public interface Xml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(onConstructor_ = { @JsonCreator })
     @With
     class DocTypeDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
@@ -669,6 +674,15 @@ public interface Xml extends Tree {
 
         Markers markers;
         Ident name;
+        String documentDeclaration;
+        // Override lombok default getter to avoid backwards compatibility problems with old LSTs
+        public String getDocumentDeclaration() {
+            //noinspection ConstantValue
+            if ( documentDeclaration == null) {
+                return "DOCTYPE";
+            }
+            return documentDeclaration;
+        }
 
         @Nullable
         Ident externalId;
@@ -682,6 +696,18 @@ public interface Xml extends Tree {
          * Space before '&gt;'.
          */
         String beforeTagDelimiterPrefix;
+
+        public DocTypeDecl(UUID id, String prefix, Markers markers, Ident name, Ident externalId, List<Ident> internalSubset, ExternalSubsets externalSubsets, String beforeTagDelimiterPrefix) {
+            this(id,
+                    prefix,
+                    markers,
+                    name,
+                    "DOCTYPE",
+                    externalId,
+                    internalSubset,
+                    externalSubsets,
+                    beforeTagDelimiterPrefix);
+        }
 
         @Value
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
