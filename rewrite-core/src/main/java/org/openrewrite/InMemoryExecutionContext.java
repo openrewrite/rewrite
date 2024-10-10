@@ -95,8 +95,7 @@ public class InMemoryExecutionContext implements ExecutionContext {
     }
 
     @Override
-    @Nullable
-    public BiConsumer<URI, Duration> getOnDownload() {
+    public @Nullable BiConsumer<URI, Duration> getOnDownload() {
         return onDownload;
     }
 }
