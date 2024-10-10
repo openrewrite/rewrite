@@ -4015,6 +4015,11 @@ public interface J extends Tree {
         @Getter
         List<Annotation> annotations;
 
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitModifier(this, p);
+        }
+
         /**
          * @deprecated Use {@link #Modifier(UUID, Space, Markers, String, Type, List)} instead.
          */
