@@ -22,6 +22,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.WithProfiles;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
@@ -48,7 +49,7 @@ import static org.openrewrite.internal.ListUtils.concatAll;
 @With
 @Builder
 @AllArgsConstructor
-public class Pom {
+public class Pom implements WithProfiles<Profile> {
 
     private static final List<String> JAR_PACKAGING_TYPES = Arrays.asList("jar", "bundle");
 
@@ -107,13 +108,18 @@ public class Pom {
     List<License> licenses = emptyList();
 
     @Builder.Default
-    List<Profile> profiles = emptyList();
+    List<org.openrewrite.maven.tree.Profile> profiles = emptyList();
 
     @Builder.Default
     List<Plugin> plugins = emptyList();
 
     @Builder.Default
     List<Plugin> pluginManagement = emptyList();
+
+    @Override
+    public List<org.openrewrite.maven.tree.Profile> listProfiles() {
+        return profiles;
+    }
 
     public String getGroupId() {
         return gav.getGroupId();

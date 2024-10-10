@@ -391,20 +391,12 @@ public class ResolvedPom {
         private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
-            //Resolve properties
-            for (Profile profile : pom.getProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    mergeProperties(profile.getProperties(), pom);
-                }
+            //Resolve properties and repositories
+            for (final Profile profile : pom.activeProfiles(activeProfiles)) {
+                mergeProperties(profile.getProperties(), pom);
+                mergeRepositories(profile.getRepositories());
             }
             mergeProperties(pom.getProperties(), pom);
-
-            //Resolve repositories (which may rely on properties ^^^)
-            for (Profile profile : pom.getProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    mergeRepositories(profile.getRepositories());
-                }
-            }
             mergeRepositories(pom.getRepositories());
 
             if (pom.getParent() != null) {
@@ -425,11 +417,9 @@ public class ResolvedPom {
         private void resolveParentDependenciesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
-            for (Profile profile : pom.getProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    mergeDependencyManagement(profile.getDependencyManagement(), pomAncestry);
-                    mergeRequestedDependencies(profile.getDependencies());
-                }
+            for (Profile profile : pom.activeProfiles(activeProfiles)) {
+                mergeDependencyManagement(profile.getDependencyManagement(), pomAncestry);
+                mergeRequestedDependencies(profile.getDependencies());
             }
 
             mergeDependencyManagement(pom.getDependencyManagement(), pomAncestry);
@@ -457,11 +447,9 @@ public class ResolvedPom {
         private void resolveParentPluginsRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
-            for (Profile profile : pom.getProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    mergePluginManagement(profile.getPluginManagement());
-                    mergePlugins(profile.getPlugins());
-                }
+            for (Profile profile : pom.activeProfiles(activeProfiles)) {
+                mergePluginManagement(profile.getPluginManagement());
+                mergePlugins(profile.getPlugins());
             }
 
             mergePluginManagement(pom.getPluginManagement());
