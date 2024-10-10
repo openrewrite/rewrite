@@ -778,20 +778,20 @@ public class MavenPomDownloader {
 
         HttpSender.Request.Builder request = httpSender.options(httpsUri);
 
-        ReachabilityResult reachability = reachable(applyAuthenticationToRequest(repository, request));
+        ReachabilityResult reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request));
         if (reachability.isSuccess()) {
             return repository.withUri(httpsUri);
         }
-        reachability = reachable(applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(httpsUri)));
+        reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(httpsUri)));
         if (reachability.isReachable()) {
             return repository.withUri(httpsUri);
         }
         if (!originalUrl.equals(httpsUri)) {
-            reachability = reachable(applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
+            reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
             if (reachability.isSuccess()) {
                 return repository.withUri(originalUrl);
             }
-            reachability = reachable(applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
+            reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
             if (reachability.isReachable()) {
                 return repository.withUri(originalUrl);
             }
@@ -848,7 +848,7 @@ public class MavenPomDownloader {
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         try {
             HttpSender.Request.Builder request = httpSender.get(uriString);
-            return sendRequest(applyAuthenticationToRequest(repo, request).build());
+            return sendRequest(applyAuthenticationAndTimeoutToRequest(repo, request).build());
         } catch (HttpSenderResponseException e) {
             if (hasCredentials(repo) && e.isClientSideException()) {
                 return retryRequestAnonymously(uriString, e);
@@ -880,7 +880,7 @@ public class MavenPomDownloader {
     /**
      * Returns a request builder with Authorization header set if the provided repository specifies credentials
      */
-    private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
+    private HttpSender.Request.Builder applyAuthenticationAndTimeoutToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
         if (mavenSettings != null && mavenSettings.getServers() != null) {
             request.withConnectTimeout(repository.getTimeout() == null ? Duration.ofSeconds(10) : repository.getTimeout());
             request.withReadTimeout(repository.getTimeout() == null ? Duration.ofSeconds(30) : repository.getTimeout());
