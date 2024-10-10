@@ -243,9 +243,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_SETTINGS, null);
     }
 
-    @Nullable
-    public BiConsumer<URI, Duration> getOnDownloaded() {
-        return onDownloaded;
+    public @Nullable BiConsumer<URI, Duration> getOnDownloaded() {
     }
 
     public void setOnDownloaded(BiConsumer<URI, Duration> onDownloaded) {
