@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.jspecify.annotations.Nullable;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,6 +28,8 @@ public class InMemoryExecutionContext implements ExecutionContext {
     private final Map<String, Object> messages = new ConcurrentHashMap<>();
     private final Consumer<Throwable> onError;
     private final BiConsumer<Throwable, ExecutionContext> onTimeout;
+    @Nullable
+    private final BiConsumer<URI, Duration> onDownload;
 
     public InMemoryExecutionContext() {
         this(
@@ -44,9 +47,19 @@ public class InMemoryExecutionContext implements ExecutionContext {
         });
     }
 
-    public InMemoryExecutionContext(Consumer<Throwable> onError, Duration runTimeout, BiConsumer<Throwable, ExecutionContext> onTimeout) {
+    public InMemoryExecutionContext(Consumer<Throwable> onError,
+                                    Duration runTimeout,
+                                    BiConsumer<Throwable, ExecutionContext> onTimeout) {
+        this(onError, runTimeout, onTimeout, null);
+    }
+
+    public InMemoryExecutionContext(Consumer<Throwable> onError,
+                                    Duration runTimeout,
+                                    BiConsumer<Throwable, ExecutionContext> onTimeout,
+                                    @Nullable BiConsumer<URI, Duration> onDownload) {
         this.onError = onError;
         this.onTimeout = onTimeout;
+        this.onDownload = onDownload;
         putMessage(ExecutionContext.RUN_TIMEOUT, runTimeout);
     }
 
@@ -79,5 +92,11 @@ public class InMemoryExecutionContext implements ExecutionContext {
     @Override
     public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
         return onTimeout;
+    }
+
+    @Override
+    @Nullable
+    public BiConsumer<URI, Duration> getOnDownload() {
+        return onDownload;
     }
 }
