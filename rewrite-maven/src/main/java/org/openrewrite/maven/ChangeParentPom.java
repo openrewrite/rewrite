@@ -281,7 +281,7 @@ public class ChangeParentPom extends Recipe {
         });
     }
 
-    private static Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
+    private static final Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
     private static Map<String, String> getPropertiesInUse(Xml.Document pomXml, ExecutionContext ctx) {
         Map<String, String> properties = new HashMap<>();

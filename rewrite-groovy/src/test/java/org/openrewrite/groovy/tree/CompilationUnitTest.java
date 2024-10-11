@@ -58,9 +58,9 @@ class CompilationUnitTest implements RewriteTest {
           groovy(
             """
               #!/usr/bin/env groovy
-                           
+              
               def a = 'hello'
-               """
+              """
           )
         );
     }

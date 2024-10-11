@@ -15,9 +15,6 @@
  */
 package org.openrewrite;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
@@ -25,15 +22,8 @@ import org.openrewrite.marker.Markers;
 
 import java.util.UUID;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
-@JsonPropertyOrder({"@c"}) // serialize type info first
-@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c", include = JsonTypeInfo.As.PROPERTY)
 public interface Tree {
-    @SuppressWarnings("unused")
-    @JsonProperty("@c")
-    default String getJacksonPolymorphicTypeTag() {
-        return getClass().getName();
-    }
 
     static UUID randomId() {
         //noinspection ConstantConditions

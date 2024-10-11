@@ -18,6 +18,7 @@ package org.openrewrite;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeRunException;
@@ -35,6 +36,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -48,7 +50,7 @@ import static java.util.Collections.emptyList;
  * @param <T> The type of tree.
  * @param <P> An input object that is passed to every visit method.
  */
-public abstract class TreeVisitor<T extends Tree, P> {
+public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     private static final String STOP_AFTER_PRE_VISIT = "__org.openrewrite.stopVisitor__";
 
     Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
@@ -69,7 +71,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         };
     }
 
-    private List<TreeVisitor<?, P>> afterVisit;
+    private @Nullable List<TreeVisitor<?, P>> afterVisit;
 
     private int visitCount;
     private final DistributionSummary visitCountSummary = DistributionSummary.builder("rewrite.visitor.visit.method.count").description("Visit methods called per source file visited.").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry);
@@ -79,6 +81,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public void setCursor(@Nullable Cursor cursor) {
+        assert cursor != null;
         this.cursor = cursor;
     }
 
@@ -126,7 +129,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         if (!(old instanceof Tree)) {
             throw new IllegalArgumentException("To update the cursor, it must currently be positioned at a Tree instance");
         }
-        if (!((Tree) old).getId().equals(currentValue.getId())) {
+        if (!((Tree) old).getId().equals(requireNonNull(currentValue).getId())) {
             throw new IllegalArgumentException("Updating the cursor in place is only supported for mutations on a Tree instance " +
                                                "that maintain the same ID after the mutation.");
         }
@@ -134,15 +137,21 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return cursor;
     }
 
-    public @Nullable T preVisit(T tree, P p) {
+    public @Nullable T preVisit(@NonNull T tree, P p) {
         return defaultValue(tree, p);
     }
 
-    public @Nullable T postVisit(T tree, P p) {
+    public @Nullable T postVisit(@NonNull T tree, P p) {
         return defaultValue(tree, p);
     }
 
     public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
+        if (parent.getValue() instanceof Tree && ((Tree) parent.getValue()).isScope(tree)) {
+            throw new IllegalArgumentException(
+                    "The `parent` cursor must not point to the same `tree` as the tree to be visited. " +
+                    "This usually indicates that you have used getCursor() where getCursor().getParent() is appropriate."
+            );
+        }
         this.cursor = parent;
         return visit(tree, p);
     }
@@ -156,18 +165,13 @@ public abstract class TreeVisitor<T extends Tree, P> {
      * @param p    A state object that passes through the visitor.
      * @return A non-null tree.
      */
-    public T visitNonNull(Tree tree, P p) {
+    public @NonNull T visitNonNull(Tree tree, P p) {
         T t = visit(tree, p);
         assert t != null;
         return t;
     }
 
-    public T visitNonNull(Tree tree, P p, Cursor parent) {
-        if (parent.getValue() instanceof Tree && ((Tree) parent.getValue()).isScope(tree)) {
-            throw new IllegalArgumentException(
-                    "The `parent` cursor must not point to the same `tree` as the tree to be visited"
-            );
-        }
+    public @NonNull T visitNonNull(Tree tree, P p, Cursor parent) {
         T t = visit(tree, p, parent);
         assert t != null;
         return t;
@@ -266,11 +270,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
                 if (t != null && afterVisit != null) {
                     for (TreeVisitor<?, P> v : afterVisit) {
-                        if (v != null) {
-                             v.setCursor(getCursor());
-                            //noinspection unchecked
-                            t = (T) v.visit(t, p);
-                        }
+                         v.setCursor(getCursor());
+                        //noinspection unchecked
+                        t = (T) v.visit(t, p);
                     }
                 }
 

@@ -219,10 +219,8 @@ public class RawPom {
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Data
-    @AllArgsConstructor
     public static class Build {
 
-        @NonFinal
         @Nullable
         @JacksonXmlElementWrapper(localName = "plugins")
         @JacksonXmlProperty(localName = "plugin")
@@ -231,16 +229,12 @@ public class RawPom {
         @Nullable
         @JacksonXmlProperty(localName = "pluginManagement")
         PluginManagement pluginManagement;
-
-        public Build() {
-            plugins = null;
-            pluginManagement = null;
-        }
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Data
     public static class PluginManagement {
+
         @Nullable
         @JacksonXmlElementWrapper(localName = "plugins")
         @JacksonXmlProperty(localName = "plugin")

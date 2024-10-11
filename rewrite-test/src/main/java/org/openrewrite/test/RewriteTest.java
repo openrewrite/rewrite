@@ -32,7 +32,9 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -628,7 +630,9 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
-        return new InMemoryExecutionContext(t -> fail("Failed to parse sources or run recipe", t));
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> fail("Failed to parse sources or run recipe", t));
+        ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
+        return ctx;
     }
 
     @Override
