@@ -77,16 +77,6 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public Xml visitMetadata(Xml.Metadata xmlDecl, PrintOutputCapture<P> p) {
-        beforeSyntax(xmlDecl, p);
-        visit(xmlDecl.getAttributes(), p);
-        p.append(xmlDecl.getBeforeTagDelimiterPrefix())
-                .append(">");
-        afterSyntax(xmlDecl, p);
-        return xmlDecl;
-    }
-
-    @Override
     public Xml visitTagClosing(Xml.Tag.Closing closing, PrintOutputCapture<P> p) {
         beforeSyntax(closing, p);
         p.append("</")

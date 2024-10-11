@@ -136,20 +136,6 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     prefix,
                     Markers.EMPTY,
                     comment.getText().substring("<!--".length(), comment.getText().length() - "-->".length())));
-        } else if (ctx.metadata() != null) {
-            return convert(ctx.metadata(), (metadata, prefix) -> {
-                        String name = "";//convert(ctx.SPECIAL_OPEN_XML(), (n, p) -> n.getText()).substring(2);
-                        List<Xml.Attribute> attributes = metadata.attribute().stream()
-                                .map(this::visitAttribute)
-                                .collect(toList());
-                        return new Xml.Metadata(
-                                randomId(),
-                                prefix,
-                                Markers.EMPTY,
-                                attributes,
-                                prefix(ctx.getStop()));
-                    }
-            );
         }
 
         return super.visitContent(ctx);

@@ -73,16 +73,6 @@ public interface XMLParserListener extends ParseTreeListener {
 	 */
 	void exitDoctypedecl(XMLParser.DoctypedeclContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link XMLParser#metadata}.
-	 * @param ctx the parse tree
-	 */
-	void enterMetadata(XMLParser.MetadataContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link XMLParser#metadata}.
-	 * @param ctx the parse tree
-	 */
-	void exitMetadata(XMLParser.MetadataContext ctx);
-	/**
 	 * Enter a parse tree produced by {@link XMLParser#intsubset}.
 	 * @param ctx the parse tree
 	 */
