@@ -56,6 +56,12 @@ public interface XMLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitDoctypedecl(XMLParser.DoctypedeclContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link XMLParser#metadata}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitMetadata(XMLParser.MetadataContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link XMLParser#intsubset}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

@@ -77,6 +77,10 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         return x.withAttributes(ListUtils.map(x.getAttributes(), a -> visitAndCast(a, p)));
     }
 
+    public Xml visitMetadata(Xml.Metadata metadata, P p) {
+        return metadata.withMarkers(visitMarkers(metadata.getMarkers(), p));
+    }
+
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction processingInstruction, P p) {
         Xml.ProcessingInstruction pi = processingInstruction.withMarkers(visitMarkers(processingInstruction.getMarkers(), p));
         pi = pi.withProcessingInstructions(visitAndCast(pi.getProcessingInstructions(), p));
