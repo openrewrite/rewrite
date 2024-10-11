@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -164,7 +165,13 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
                             if (versionTag.isPresent()) {
-                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, newArtifactId, versionTag.get().getValue().orElse(null));
+                                String resolvedArtifactId = newArtifactId;
+                                if (resolvedArtifactId.contains("${")) {
+                                    ResolvedPom pom = getResolutionResult().getPom();
+                                    Map<String, String> properties = pom.getProperties();
+                                    resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(newArtifactId, properties::get);
+                                }
+                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, versionTag.get().getValue().orElse(null));
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                             }
                             changed = true;
