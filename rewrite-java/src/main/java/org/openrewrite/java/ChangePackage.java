@@ -231,14 +231,15 @@ public class ChangePackage extends Recipe {
 
                     for (J.Import anImport : sf.getImports()) {
                         if (anImport.getPackageName().equals(changingTo) && !anImport.isStatic()) {
-                            sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(anImport.getTypeName(), true).visit(sf, ctx, getCursor());
-                            assert sf != null;
+                            sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(anImport.getTypeName(), true)
+                                    .visitNonNull(sf, ctx, getCursor().getParentTreeCursor());
                         }
                     }
                 }
 
                 j = sf;
             }
+            //noinspection DataFlowIssue
             return j;
         }
 
@@ -265,6 +266,7 @@ public class ChangePackage extends Recipe {
                 }));
 
                 if (isTargetFullyQualifiedType(pt)) {
+                    //noinspection DataFlowIssue
                     pt = pt.withType((JavaType.FullyQualified) updateType(pt.getType()));
                 }
 
@@ -274,6 +276,7 @@ public class ChangePackage extends Recipe {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(JavaType.buildType(getNewPackageName(original.getPackageName()) + "." + original.getClassName()));
+                    //noinspection DataFlowIssue
                     oldNameToChangedType.put(oldType, fq);
                     oldNameToChangedType.put(fq, fq);
                     return fq;
@@ -293,12 +296,14 @@ public class ChangePackage extends Recipe {
             } else if (oldType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) oldType;
                 variable = variable.withOwner(updateType(variable.getOwner()));
+                //noinspection DataFlowIssue
                 variable = variable.withType(updateType(variable.getType()));
                 oldNameToChangedType.put(oldType, variable);
                 oldNameToChangedType.put(variable, variable);
                 return variable;
             } else if (oldType instanceof JavaType.Array) {
                 JavaType.Array array = (JavaType.Array) oldType;
+                //noinspection DataFlowIssue
                 array = array.withElemType(updateType(array.getElemType()));
                 oldNameToChangedType.put(oldType, array);
                 oldNameToChangedType.put(array, array);
@@ -315,6 +320,7 @@ public class ChangePackage extends Recipe {
                 }
 
                 method = oldMethodType;
+                //noinspection DataFlowIssue
                 method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
                         .withReturnType(updateType(method.getReturnType()))
                         .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType));

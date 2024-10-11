@@ -107,7 +107,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               }
               """,
             """
-              import /*~~>*/java.util.List;
+              import java.util.List;
               class Test {
                   List<Object> o;
                   List<String> s;
