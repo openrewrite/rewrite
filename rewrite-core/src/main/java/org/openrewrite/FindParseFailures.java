@@ -76,7 +76,7 @@ public class FindParseFailures extends Recipe {
                                 return tree;
                             }
 
-                            String snippet = tree instanceof SourceFile ? null : tree.printTrimmed(getCursor());
+                            String snippet = tree instanceof SourceFile ? null : tree.printTrimmed(getCursor().getParentTreeCursor());
                             if (snippet != null && maxSnippetLength != null && snippet.length() > maxSnippetLength) {
                                 snippet = snippet.substring(0, maxSnippetLength);
                             }
