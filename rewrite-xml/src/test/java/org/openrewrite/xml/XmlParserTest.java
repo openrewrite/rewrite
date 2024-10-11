@@ -63,7 +63,7 @@ class XmlParserTest implements RewriteTest {
               <%@ taglib prefix="s" uri="/struts-tags" %>
               <html lang="en">
                 <head>
-                  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+                  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
                   <title>Hello World!</title>
                 </head>
                 <body>
@@ -88,6 +88,39 @@ class XmlParserTest implements RewriteTest {
                   <h2><s:property value="messageStore.message" /></h2>
                 </body>
               </html>
+              """
+          )
+        );
+    }
+
+    @Test
+    void htmlWithMetadatatField() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html>
+                  <head>
+                    <meta charset="UTF-8">
+                    <meta name="description" content="Free Web tutorials">
+                    <title>Hello World!</title>
+                  </head>
+              </html>
+              """
+          )
+        );
+    }
+
+    @Test
+    void htmlWithAttributesWithoutValues() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <body>
+                  <script async style="width:640px;height:360px"></script>
+              </body>
               """
           )
         );

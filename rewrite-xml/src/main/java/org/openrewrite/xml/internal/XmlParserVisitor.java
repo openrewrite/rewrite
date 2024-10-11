@@ -136,6 +136,20 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     prefix,
                     Markers.EMPTY,
                     comment.getText().substring("<!--".length(), comment.getText().length() - "-->".length())));
+        } else if (ctx.metadata() != null) {
+            return convert(ctx.metadata(), (metadata, prefix) -> {
+                        String name = "";//convert(ctx.SPECIAL_OPEN_XML(), (n, p) -> n.getText()).substring(2);
+                        List<Xml.Attribute> attributes = metadata.attribute().stream()
+                                .map(this::visitAttribute)
+                                .collect(toList());
+                        return new Xml.Metadata(
+                                randomId(),
+                                prefix,
+                                Markers.EMPTY,
+                                attributes,
+                                prefix(ctx.getStop()));
+                    }
+            );
         }
 
         return super.visitContent(ctx);
@@ -292,17 +306,21 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return convert(ctx, (c, prefix) -> {
             Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
 
-            String beforeEquals = convert(c.EQUALS(), (e, p) -> p);
+            Xml.Attribute.Value value = null;
+            String beforeEquals = null;
+            if (c.EQUALS() != null) {
+                beforeEquals = convert(c.EQUALS(), (e, p) -> p);
 
-            Xml.Attribute.Value value = convert(c.STRING(), (v, p) -> new Xml.Attribute.Value(
-                            randomId(),
-                            p,
-                            Markers.EMPTY,
-                            v.getText().startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
-                            v.getText().substring(1, c.STRING().getText().length() - 1)
-                    )
-            );
+                value = convert(c.STRING(), (v, p) -> new Xml.Attribute.Value(
+                                randomId(),
+                                p,
+                                Markers.EMPTY,
+                                v.getText().startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
+                                v.getText().substring(1, c.STRING().getText().length() - 1)
+                        )
+                );
 
+            }
             return new Xml.Attribute(randomId(), prefix, Markers.EMPTY, key, beforeEquals, value);
         });
     }
