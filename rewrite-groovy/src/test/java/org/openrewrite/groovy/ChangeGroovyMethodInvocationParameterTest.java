@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
@@ -6,73 +21,61 @@ import org.openrewrite.test.RewriteTest;
 class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
 
     @Test
-    public void givenGroovyFile_whenMultiParamSet_thenChangeToNewValue() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("jdkVersion", "Eclipse Temurin 17.0.11")),
+    public void givenGroovyFile_whenParamSet_thenChangeToNewValue() {
+        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("param", "newValue")),
           //language=groovy
           Assertions.groovy("""
-                    releaseJob(
-                                    mavenVersion: 'Maven 3.9.5',
-                                    jdkVersion: "RedHat OpenJDK 11.0 latest",
-                                    gitUrl: 'github.com/openrewrite/rewrite.git',
-                                    baseDirectory: '.',
-                                    buildsToKeep: '5'
+                    method(
+                                    param: 'oldValue'
                     )
             """, """
-                    releaseJob(
-                                    mavenVersion: 'Maven 3.9.5',
-                                    jdkVersion: 'Eclipse Temurin 17.0.11',
-                                    gitUrl: 'github.com/openrewrite/rewrite.git',
-                                    baseDirectory: '.',
-                                    buildsToKeep: '5'
+                    method(
+                                    param: 'newValue'
                     )
             """));
     }
 
     @Test
-    public void givenGroovyFile_whenSingleParamSet_thenChangeToNewValue() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("mavenVersion", "Maven 3.9.6")),
+    public void givenGroovyFile_whenNewValueEqualsOldValue_thenChangeNothing() {
+        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("param", "value")),
           //language=groovy
           Assertions.groovy("""
-                    releaseJob(
-                                    mavenVersion: 'Maven 3.9.5'
-                    )
-            """, """
-                    releaseJob(
-                                    mavenVersion: 'Maven 3.9.5'
+                    method(
+                                    param: 'value'
                     )
             """));
     }
 
     @Test
-    public void givenGroovyFile_whenSingleParamSet_thenChangeToNewValueUsingGStrings() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("mavenVersion", "Maven 3.9.6")),
+    public void givenGroovyFile_whenSingleParamSetWithGString_thenChangeToNewValue() {
+        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("param", "newValue")),
           //language=groovy
           Assertions.groovy("""
-                    releaseJob(
-                                    mavenVersion: "Maven 3.9.5"
+                    method(
+                                    param: "oldValue"
                     )
             """, """
-                    releaseJob(
-                                    mavenVersion: "Maven 3.9.6"
+                    method(
+                                    param: "newValue"
                     )
             """));
     }
 
     @Test
-    public void givenGroovyFile_whenSingleParamSet_thenChangeToNewValueUsingTemplating() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("jdkVersion", "Eclipse Temurin 17.0.11")), Assertions.groovy("""
-                  job(
-                                  mavenVersion: 'Maven 3.9.5'
+    public void givenGroovyFile_whenTwoMethods_thenOnlyChangeOne() {
+        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("param", "newValue")), Assertions.groovy("""
+                  method1(
+                                  param: "oldValue"
                   )
-                   releaseJob(
-                                  mavenVersion: 'Maven 3.9.5'
+                   method2(
+                                  param: "oldValue"
                   )
           """, """
-                  job(
-                                  mavenVersion: 'Maven 3.9.5'
+                  method1(
+                                  param: "oldValue"
                   )
-                  releaseJob(
-                                  mavenVersion: 'Maven 3.9.6'
+                  method2(
+                                  param: "newValue"
                   )
           """));
     }
