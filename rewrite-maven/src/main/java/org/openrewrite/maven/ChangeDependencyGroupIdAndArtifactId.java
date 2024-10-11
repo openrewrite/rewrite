@@ -171,7 +171,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
                 if (isOldDependencyTag && isNewDependencyPresent) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                     maybeUpdateModel();
                     return t;
                 }

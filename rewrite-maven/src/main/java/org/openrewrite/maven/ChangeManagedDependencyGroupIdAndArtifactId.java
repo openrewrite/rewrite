@@ -147,7 +147,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
 
                 Xml.Tag t = super.visitTag(tag, ctx);
-
                 if (isManagedDependencyTag(oldGroupId, oldArtifactId)) {
                     Optional<Xml.Tag> groupIdTag = t.getChild("groupId");
                     boolean changed = false;
@@ -177,7 +176,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         maybeUpdateModel();
                         doAfterVisit(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
                         if (isNewDependencyPresent) {
-                            doAfterVisit(new RemoveContentVisitor<>(t, true));
+                            doAfterVisit(new RemoveContentVisitor<>(t, true, true));
                             maybeUpdateModel();
                         }
                     }
