@@ -496,9 +496,24 @@ public class MavenPomDownloader {
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                gav.getArtifactId().equals(projectPom.getArtifactId()) &&
-                (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion())))) {
-                return projectPom;
+                gav.getArtifactId().equals(projectPom.getArtifactId())){
+                if (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion()))) {
+                    return projectPom;
+                }
+                Parent parent = projectPom.getParent();
+                while (parent != null){
+                    for (Pom project : projectPoms.values()) {
+                        if (parent.getGroupId().equals(project.getGroupId()) && parent.getArtifactId().equals(project.getArtifactId())){
+                            if (projectPom.getVersion().equals(project.getValue(gav.getVersion()))){
+                                return projectPom;
+                            }
+                            parent = project.getParent();
+                            if (parent == null){
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         }
 
