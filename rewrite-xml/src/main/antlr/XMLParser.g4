@@ -51,6 +51,10 @@ doctypedecl
     :   DTD_OPEN DOCTYPE Name externalid STRING* (DTD_SUBSET_OPEN intsubset DTD_SUBSET_CLOSE)? DTD_CLOSE
     ;
 
+metadata
+    :  OPEN META attribute* CLOSE
+    ;
+
 intsubset
     :   (markupdecl | declSep)* ;
 
@@ -73,7 +77,7 @@ processinginstruction
     ;
 
 content
-    :   (element | reference | processinginstruction | CDATA | COMMENT | chardata) ;
+    :   (metadata | element | reference | processinginstruction | CDATA | COMMENT | chardata ) ;
 
 element
     :   OPEN Name attribute* CLOSE content* OPEN '/' Name CLOSE

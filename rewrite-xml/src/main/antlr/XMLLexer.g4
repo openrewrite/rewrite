@@ -121,6 +121,7 @@ S              :  [ \t\r\n]               -> skip ;
 // JSP extension to the XML spec
 DIRECTIVE_OPEN : '%@' ;
 DIRECTIVE_CLOSE: '%';
+META options { caseInsensitive = true; }         :  'meta' ;
 
 SLASH          :  '/' ;
 EQUALS         :  '=' ;

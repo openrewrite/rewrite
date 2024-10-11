@@ -235,6 +235,40 @@ public interface Xml extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
+    class Metadata implements Xml, Content,
+            Misc {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        String prefixUnsafe;
+
+        @Override
+        public Metadata withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        @Override
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
+
+        Markers markers;
+        List<Attribute> attributes;
+
+        /**
+         * Space before '&gt;'
+         */
+        String beforeTagDelimiterPrefix;
+
+        @Override
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+            return v.visitMetadata(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     class ProcessingInstruction implements Xml, Content, Misc {
         @EqualsAndHashCode.Include
         UUID id;
