@@ -22,9 +22,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -103,8 +105,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
-        validated =
-            validated.and(test(
+        validated = validated.and(test(
                 "coordinates",
                 "newGroupId OR newArtifactId must be different from before",
                 this,
@@ -113,7 +114,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     boolean sameArtifactId = isBlank(r.newArtifactId) || Objects.equals(r.oldArtifactId, r.newArtifactId);
                     return !(sameGroupId && sameArtifactId);
                 }
-            ));
+        ));
         return validated;
     }
 
@@ -134,6 +135,14 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
             @Nullable
             private Collection<String> availableVersions;
+            private boolean isNewDependencyPresent;
+
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                isNewDependencyPresent = checkIfNewDependencyPresents(newGroupId, newArtifactId, newVersion);
+                return super.visitDocument(document, ctx);
+            }
+
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
 
@@ -160,16 +169,43 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                             }
                             changed = true;
-                        } catch(MavenDownloadingException e) {
+                        } catch (MavenDownloadingException e) {
                             return e.warn(t);
                         }
                     }
                     if (changed) {
                         maybeUpdateModel();
                         doAfterVisit(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
+                        if (isNewDependencyPresent) {
+                            doAfterVisit(new RemoveContentVisitor<>(t, true));
+                            maybeUpdateModel();
+                        }
                     }
                 }
                 return t;
+            }
+
+            private boolean checkIfNewDependencyPresents(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
+                if ((groupId == null) || (artifactId == null)) {
+                    return false;
+                }
+                ResolvedManagedDependency managedDependency = findManagedDependency(groupId, artifactId);
+                if (managedDependency != null) {
+                    return compareVersions(version, managedDependency.getVersion());
+                } else {
+                    return false;
+                }
+            }
+
+            private boolean compareVersions(@Nullable String targetVersion, @Nullable String foundVersion) {
+                if (targetVersion == null) {
+                    return true;
+                }
+                if ((versionComparator != null) && (foundVersion != null)) {
+                    return versionComparator.isValid(targetVersion, foundVersion);
+                } else {
+                    return targetVersion.equals(foundVersion);
+                }
             }
 
             @SuppressWarnings("ConstantConditions")
