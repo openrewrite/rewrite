@@ -415,28 +415,20 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
              */
             @Nullable
             private String getRequestedGroupIdForArtifact(String artifactId) {
-                return getResolutionResult().getPom().getRequested().getDependencyManagement().stream()
-                        .map(d -> {
-                            if (d instanceof ManagedDependency.Imported) {
-                                ManagedDependency.Imported imported = (ManagedDependency.Imported) d;
-                                return imported.getGav();
-                            } else if (d instanceof ManagedDependency.Defined) {
-                                ManagedDependency.Defined defined = (ManagedDependency.Defined) d;
-                                return defined.getGav();
-                            } else {
-                                return null;
-                            }
-                        })
-                        .filter(gav -> {
-                            if (gav != null) {
-                                return artifactId.equals(gav.getArtifactId());
-                            }
-                            return false;
-                        })
-                        .findFirst()
-                        .map(GroupArtifactVersion::getVersion)
-                        .orElse(null);
-
+                for (ManagedDependency managedDependency : getResolutionResult().getPom().getRequested().getDependencyManagement()) {
+                    if (managedDependency instanceof ManagedDependency.Imported) {
+                        ManagedDependency.Imported imported = (ManagedDependency.Imported) managedDependency;
+                        if (artifactId.equals(imported.getGav().getArtifactId())) {
+                            return imported.getGav().getVersion();
+                        }
+                    } else if (managedDependency instanceof ManagedDependency.Defined) {
+                        ManagedDependency.Defined defined = (ManagedDependency.Defined) managedDependency;
+                        if (artifactId.equals(defined.getGav().getArtifactId())) {
+                            return defined.getGav().getVersion();
+                        }
+                    }
+                }
+                return null;
             }
         };
     }
