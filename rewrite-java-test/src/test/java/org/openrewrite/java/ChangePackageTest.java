@@ -128,13 +128,11 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-                            
               class A {
               }
               """,
             """
               import org.openrewrite.test.Test;
-                            
               class A {
               }
               """,
@@ -154,7 +152,6 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-                            
               public class A {
                   Test a;
                   Test b;
@@ -163,7 +160,6 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import org.openrewrite.test.Test;
-                            
               public class A {
                   Test a;
                   Test b;
@@ -186,14 +182,12 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-                            
               public class A {
                   void method() {
                       Test a = test(null);
                       Test b = test(null);
                       Test c = test(null);
                   }
-                  
                   Test test(Test test) {
                       return test;
                   }
@@ -201,14 +195,12 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import org.openrewrite.test.Test;
-                            
               public class A {
                   void method() {
                       Test a = test(null);
                       Test b = test(null);
                       Test c = test(null);
                   }
-                  
                   Test test(Test test) {
                       return test;
                   }
@@ -241,9 +233,7 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package org.foo;
-                            
               import org.openrewrite.Test;
-                            
               public class Example {
                   public static Test method(Test test) {
                       return test;
@@ -252,9 +242,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               package org.foo;
-                            
               import org.openrewrite.test.Test;
-                            
               public class Example {
                   public static Test method(Test test) {
                       return test;
@@ -266,7 +254,6 @@ class ChangePackageTest implements RewriteTest {
             """
               import org.openrewrite.Test;
               import org.foo.Example;
-                            
               public class A {
                   Test local = Example.method(null);
               }
@@ -274,7 +261,6 @@ class ChangePackageTest implements RewriteTest {
             """
               import org.openrewrite.test.Test;
               import org.foo.Example;
-                            
               public class A {
                   Test local = Example.method(null);
               }
@@ -297,14 +283,12 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-                            
               public class A {
                   Test a;
               }
               """,
             """
               import org.openrewrite.test.Test;
-                            
               public class A {
                   Test a;
               }
@@ -593,7 +577,6 @@ class ChangePackageTest implements RewriteTest {
             """
               import org.openrewrite.Test;
               import java.util.List;
-                            
               class A {
                   List<Test> list;
               }
@@ -601,7 +584,6 @@ class ChangePackageTest implements RewriteTest {
             """
               import org.openrewrite.test.Test;
               import java.util.List;
-                            
               class A {
                   List<Test> list;
               }
@@ -614,7 +596,6 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("ClassExplicitlyAnnotation")
     @Test
     void classTypeParameter() {
         rewriteRun(
@@ -633,13 +614,11 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-                            
               class A<T extends Test> {
               }
               """,
             """
               import org.openrewrite.test.Test;
-                            
               class A<T extends Test> {
               }
               """,
@@ -651,7 +630,6 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("ClassExplicitlyAnnotation")
     @Test
     void boundedGenericType() {
         rewriteRun(
@@ -659,7 +637,6 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-                            
               public class A {
                   <T extends Test> T method(T t) {
                       return t;
@@ -668,7 +645,6 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import org.openrewrite.test.Test;
-                            
               public class A {
                   <T extends Test> T method(T t) {
                       return t;
@@ -689,12 +665,10 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-                            
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-                            
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {}
@@ -789,12 +763,10 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme;
-                            
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-                            
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
@@ -841,12 +813,10 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme;
-                            
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-                            
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
@@ -891,12 +861,10 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme;
-                            
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-                            
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
@@ -959,14 +927,12 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-                            
               public class A {
                   Test[][] multiDimensionalArray;
               }
               """,
             """
               import org.openrewrite.test.Test;
-                            
               public class A {
                   Test[][] multiDimensionalArray;
               }
@@ -1012,13 +978,11 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-                            
               public class Mi implements org.openrewrite.Oi {
               }
               """,
             """
               package org.openrewrite.test;
-                            
               public class Mi implements org.openrewrite.test.Oi {
               }
               """
@@ -1037,7 +1001,6 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme.product;
-
               public class RunnableFactory {
                   public static Runnable getRunnable() {
                       return null;
@@ -1048,9 +1011,7 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme.project;
-
               import com.acme.product.RunnableFactory;
-                            
               public class StaticImportWorker {
                   public void work() {
                       RunnableFactory.getRunnable().run();
@@ -1059,7 +1020,6 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               package com.acme.product;
-                            
               public class StaticImportWorker {
                   public void work() {
                       RunnableFactory.getRunnable().run();
@@ -1082,7 +1042,6 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme.product;
-
               public class RunnableFactory {
                   public static Runnable getRunnable() {
                       return null;
@@ -1093,9 +1052,7 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme.project.other;
-
               import com.acme.product.RunnableFactory;
-                            
               public class StaticImportWorker {
                   public void work() {
                       RunnableFactory.getRunnable().run();
@@ -1104,9 +1061,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               package com.acme.product.other;
-                            
               import com.acme.product.RunnableFactory;
-                            
               public class StaticImportWorker {
                   public void work() {
                       RunnableFactory.getRunnable().run();
@@ -1402,7 +1357,6 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-                            
               public class A {
                   Test method(Object obj) {
                       return (Test) obj;
@@ -1411,7 +1365,6 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import org.openrewrite.test.Test;
-                            
               public class A {
                   Test method(Object obj) {
                       return (Test) obj;
@@ -1519,19 +1472,15 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme.product;
-                            
               public class OuterClass {
                   public static class InnerClass {
-                            
                   }
               }
               """,
             """
               package com.acme.product.v2;
-                            
               public class OuterClass {
                   public static class InnerClass {
-                            
                   }
               }
               """
@@ -1539,15 +1488,12 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package de;
-                            
               import com.acme.product.OuterClass.InnerClass;
               import com.acme.product.OuterClass;
-                            
               public class UseInnerClass {
                   public String work() {
                       return new InnerClass().toString();
                   }
-                            
                   public String work2() {
                       return new OuterClass().toString();
                   }
@@ -1555,15 +1501,12 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               package de;
-
               import com.acme.product.v2.OuterClass.InnerClass;
               import com.acme.product.v2.OuterClass;
-                            
               public class UseInnerClass {
                   public String work() {
                       return new InnerClass().toString();
                   }
-                            
                   public String work2() {
                       return new OuterClass().toString();
                   }
@@ -1580,15 +1523,12 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package a.b;
-                            
               import java.util.List;
-                            
               class Test {
               }
               """,
             """
               import java.util.List;
-                            
               class Test {
               }
               """
@@ -1608,7 +1548,6 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package a.b;
-                            
               class Test {
               }
               """,
@@ -1633,13 +1572,11 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package x;
-                            
               class A {
               }
               """,
             """
               package y;
-                            
               class A {
               }
               """
@@ -1660,13 +1597,11 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package x.y.z;
-                            
               class A {
               }
               """,
             """
               package x;
-                            
               class A {
               }
               """
@@ -1727,12 +1662,10 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-                          
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-                          
               @Target(ElementType.PACKAGE)
               @Retention(RetentionPolicy.RUNTIME)
               public @interface MyAnnotation {
@@ -1744,7 +1677,6 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-                          
               public enum MyEnum {
                   FOO,
                   BAR

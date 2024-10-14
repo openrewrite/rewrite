@@ -1675,6 +1675,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 t instanceof JCBreak ||
                 t instanceof JCContinue ||
                 t instanceof JCDoWhileLoop ||
+                t instanceof JCImport ||
                 t instanceof JCMethodInvocation ||
                 t instanceof JCNewClass ||
                 t instanceof JCReturn ||

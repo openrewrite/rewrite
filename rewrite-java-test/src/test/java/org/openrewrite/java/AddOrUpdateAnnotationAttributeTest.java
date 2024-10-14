@@ -492,4 +492,180 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void arrayInAnnotationAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "newTest",
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(array = {"oldTest"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(array = {"newTest"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInputMoreThanOneInAnnotationAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "newTest1,newTest2",
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(array = {"oldTest"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addArrayInputInAnnotationAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "newTest1,newTest2",
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeArrayInputInAnnotationAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            null,
+            null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addOtherAttributeInArrayAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "string",
+            "test",
+            null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+                  String string() default "";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(string = "test", array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
 }
