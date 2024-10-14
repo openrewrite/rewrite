@@ -413,8 +413,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
              *
              * @return The groupd if for the requested artifact id or null
              */
-            @Nullable
-            private String getRequestedGroupIdForArtifact(String artifactId) {
+            private @Nullable String getRequestedGroupIdForArtifact(String artifactId) {
                 for (ManagedDependency managedDependency : getResolutionResult().getPom().getRequested().getDependencyManagement()) {
                     if (managedDependency instanceof ManagedDependency.Imported) {
                         ManagedDependency.Imported imported = (ManagedDependency.Imported) managedDependency;
