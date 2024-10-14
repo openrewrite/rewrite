@@ -370,6 +370,9 @@ public interface RewriteTest extends SourceSpecs {
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
         }
 
+        CursorValidatingExecutionContextView.view(recipeCtx)
+                .setValidateCursorAcyclic(TypeValidation.before(testMethodSpec, testClassSpec)
+                .cursorAcyclic());
         RecipeRun recipeRun = recipe.run(
                 lss,
                 recipeCtx,
