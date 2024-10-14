@@ -15,7 +15,7 @@
  */
 package org.openrewrite.groovy;
 
-
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.J;
@@ -26,28 +26,30 @@ import org.openrewrite.marker.Markers;
 import java.util.UUID;
 
 public class ChangeGroovyMethodInvocationParameter extends Recipe {
+
+    @Option
+    public String methodName;
+
     @Option
     public String key;
 
     @Option
     public String value;
 
-    public ChangeGroovyMethodInvocationParameter() {
-    }
-
-    public ChangeGroovyMethodInvocationParameter(String key, String value) {
+    public ChangeGroovyMethodInvocationParameter(final String methodName, final String key, final String value) {
+        this.methodName = methodName;
         this.key = key;
         this.value = value;
     }
 
     @Override
     public @NlsRewrite.DisplayName String getDisplayName() {
-        return "Change groovy a  parameter";
+        return "Change a groovy parameter";
     }
 
     @Override
     public @NlsRewrite.Description String getDescription() {
-        return "It updates the value of a given parameter on all groovy method invocations.";
+        return "Changes the value of a given parameter in a given groovy method invocation.";
     }
 
     @Override
@@ -57,16 +59,32 @@ public class ChangeGroovyMethodInvocationParameter extends Recipe {
             public J visitMapEntry(G.MapEntry mapEntry, ExecutionContext executionContext) {
                 mapEntry = (G.MapEntry) super.visitMapEntry(mapEntry, executionContext);
 
-                if (mapEntry.getValue().toString().equals("'" + value + "'")) {
+                if (!isInTargetMethod()) {
+                    return mapEntry;
+                }
+
+                if (mapEntry.getValue().toString().equals(value)) {
                     return mapEntry;
                 }
 
                 if (mapEntry.getKey().toString().equals(key)) {
-                    final J.Literal valueLiteral = new J.Literal(UUID.randomUUID(), Space.SINGLE_SPACE, Markers.EMPTY, "'" + value + "'", "'" + value + "'", null, JavaType.Primitive.String);
-                    return mapEntry.withValue(valueLiteral);
+                    return replaceValue(mapEntry);
                 }
 
                 return mapEntry;
+            }
+
+            private boolean isInTargetMethod() {
+                return getCursor().firstEnclosingOrThrow(J.MethodInvocation.class).getSimpleName().equals(methodName);
+            }
+
+            private G.@NotNull MapEntry replaceValue(final G.MapEntry mapEntry) {
+                final char quote = extractQuoting(mapEntry);
+                return mapEntry.withValue(new J.Literal(UUID.randomUUID(), Space.SINGLE_SPACE, Markers.EMPTY, value, String.format("%c%s%c", quote, value, quote), null, JavaType.Primitive.String));
+            }
+
+            private char extractQuoting(final G.MapEntry mapEntry) {
+                return mapEntry.getValue().printTrimmed(getCursor()).charAt(0);
             }
         };
     }

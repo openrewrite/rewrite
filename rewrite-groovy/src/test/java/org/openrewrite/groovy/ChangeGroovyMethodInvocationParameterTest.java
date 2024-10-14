@@ -21,8 +21,8 @@ import org.openrewrite.test.RewriteTest;
 class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
 
     @Test
-    public void givenGroovyFile_whenParamSet_thenChangeToNewValue() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("param", "newValue")),
+    void givenGroovyFile_whenParamSet_thenChangeToNewValue() {
+        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method", "param", "newValue")),
           //language=groovy
           Assertions.groovy("""
                     method(
@@ -36,8 +36,8 @@ class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
     }
 
     @Test
-    public void givenGroovyFile_whenNewValueEqualsOldValue_thenChangeNothing() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("param", "value")),
+    void givenGroovyFile_whenNewValueEqualsOldValue_thenChangeNothing() {
+        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method", "param", "value")),
           //language=groovy
           Assertions.groovy("""
                     method(
@@ -47,8 +47,8 @@ class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
     }
 
     @Test
-    public void givenGroovyFile_whenSingleParamSetWithGString_thenChangeToNewValue() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("param", "newValue")),
+    void givenGroovyFile_whenSingleParamSetWithGString_thenChangeToNewValue() {
+        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method", "param", "newValue")),
           //language=groovy
           Assertions.groovy("""
                     method(
@@ -62,12 +62,12 @@ class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
     }
 
     @Test
-    public void givenGroovyFile_whenTwoMethods_thenOnlyChangeOne() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("param", "newValue")), Assertions.groovy("""
+    void givenGroovyFile_whenTwoMethods_thenOnlyChangeOne() {
+        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method2", "param", "newValue")), Assertions.groovy("""
                   method1(
                                   param: "oldValue"
                   )
-                   method2(
+                  method2(
                                   param: "oldValue"
                   )
           """, """
