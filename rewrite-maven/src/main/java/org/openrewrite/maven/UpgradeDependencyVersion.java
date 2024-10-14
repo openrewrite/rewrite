@@ -301,9 +301,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             ResolvedManagedDependency dm = findManagedDependency(t);
                             // if a managed dependency is expressed as a property, change the property value
                             if (dm != null &&
-                                    dm.getRequested().getVersion() != null &&
-                                    dm.getRequested().getVersion().startsWith("${") &&
-                                    !implicitlyDefinedVersionProperties.contains(dm.getRequested().getVersion())) {
+                                dm.getRequested().getVersion() != null &&
+                                dm.getRequested().getVersion().startsWith("${") &&
+                                !implicitlyDefinedVersionProperties.contains(dm.getRequested().getVersion())) {
                                 doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
                                         dm.getRequested().getVersion().length() - 1),
                                         newerVersion, overrideManagedVersion, false).getVisitor());
@@ -342,7 +342,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             if (!accumulator.projectArtifacts.contains(new GroupArtifact(group, artifactId))) {
                                 ResolvedGroupArtifactVersion bom = dm.getBomGav();
                                 if (Objects.equals(group, bom.getGroupId()) &&
-                                        Objects.equals(artifactId, bom.getArtifactId())) {
+                                    Objects.equals(artifactId, bom.getArtifactId())) {
                                     return upgradeVersion(ctx, t, requireNonNull(dm.getRequestedBom()).getVersion(), bom.getGroupId(), bom.getArtifactId(), bom.getVersion());
                                 }
                             }
