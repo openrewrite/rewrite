@@ -70,15 +70,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors)",
+                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors)",
             example = "29.X")
     String newVersion;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'newVersion' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'newVersion' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -92,8 +92,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Option(displayName = "Retain versions",
             description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed " +
-                    "from dependency management after the changes from this recipe, then it will be retained with an explicit version. " +
-                    "The version can be omitted from the GAV to use the old value from dependency management",
+                          "from dependency management after the changes from this recipe, then it will be retained with an explicit version. " +
+                          "The version can be omitted from the GAV to use the old value from dependency management",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable
@@ -122,7 +122,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Override
     public String getDescription() {
         return "Upgrade the version of a dependency by specifying a group and (optionally) an artifact using Node Semver " +
-                "advanced range selectors, allowing more precise control over version updates to patch or minor releases.";
+               "advanced range selectors, allowing more precise control over version updates to patch or minor releases.";
     }
 
     @Override
@@ -158,7 +158,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 if (version.isPresent()) {
                                     String requestedVersion = d.getRequested().getVersion();
                                     if (requestedVersion != null && requestedVersion.startsWith("${") &&
-                                            !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
+                                        !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
                                         String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
                                         if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
                                             storeParentPomProperty(getResolutionResult().getParent(), propertyName, newerVersion);
@@ -214,7 +214,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         Path pomSourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
                         for (PomProperty pomProperty : accumulator.pomProperties) {
                             if (pomProperty.pomFilePath.equals(pomSourcePath) &&
-                                    pomProperty.propertyName.equals(tag.getName())) {
+                                pomProperty.propertyName.equals(tag.getName())) {
                                 Optional<String> value = tag.getValue();
                                 if (!value.isPresent() || !value.get().equals(pomProperty.propertyValue)) {
                                     doAfterVisit(new ChangeTagValueVisitor<>(tag, pomProperty.propertyValue));
@@ -329,9 +329,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     String artifactId = managedDependency.getArtifactId();
                     String version = managedDependency.getVersion();
                     if (version != null &&
-                            !accumulator.projectArtifacts.contains(new GroupArtifact(groupId, artifactId)) &&
-                            matchesGlob(groupId, UpgradeDependencyVersion.this.groupId) &&
-                            matchesGlob(artifactId, UpgradeDependencyVersion.this.artifactId)) {
+                        !accumulator.projectArtifacts.contains(new GroupArtifact(groupId, artifactId)) &&
+                        matchesGlob(groupId, UpgradeDependencyVersion.this.groupId) &&
+                        matchesGlob(artifactId, UpgradeDependencyVersion.this.artifactId)) {
                         return upgradeVersion(ctx, t, managedDependency.getRequested().getVersion(), groupId, artifactId, version);
                     }
                 } else {
