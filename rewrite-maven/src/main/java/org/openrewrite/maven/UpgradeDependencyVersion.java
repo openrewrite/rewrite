@@ -408,11 +408,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         versionComparator, ctx);
             }
 
-            /**
-             * Gets the requested group id for the provided artifact id from the pom
-             *
-             * @return The groupd if for the requested artifact id or null
-             */
             private @Nullable String getRequestedGroupIdForArtifact(String artifactId) {
                 for (ManagedDependency managedDependency : getResolutionResult().getPom().getRequested().getDependencyManagement()) {
                     if (managedDependency instanceof ManagedDependency.Imported) {
