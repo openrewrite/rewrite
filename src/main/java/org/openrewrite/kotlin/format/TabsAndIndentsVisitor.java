@@ -171,8 +171,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 }
             }
 
-            if (loc == Space.Location.MODIFIER_PREFIX && value instanceof J.MethodDeclaration) {
-                J.MethodDeclaration m = getCursor().getValue();
+            if (loc == Space.Location.MODIFIER_PREFIX && value instanceof J.Modifier && parent.getValue() instanceof J.MethodDeclaration) {
+                J.MethodDeclaration m = parent.getValue();
                 if (!m.getLeadingAnnotations().isEmpty()) {
                     alignToAnnotation = true;
                 }
