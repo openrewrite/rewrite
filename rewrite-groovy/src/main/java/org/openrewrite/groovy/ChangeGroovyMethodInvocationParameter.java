@@ -53,8 +53,8 @@ public class ChangeGroovyMethodInvocationParameter extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new GroovyIsoVisitor<ExecutionContext>() {
             @Override
-            public J visitMapEntry(G.MapEntry mapEntry, ExecutionContext executionContext) {
-                mapEntry = (G.MapEntry) super.visitMapEntry(mapEntry, executionContext);
+            public J visitMapEntry(G.MapEntry mapEntry, ExecutionContext ctx) {
+                mapEntry = (G.MapEntry) super.visitMapEntry(mapEntry, ctx);
 
                 if (!isInTargetMethod()) {
                     return mapEntry;
