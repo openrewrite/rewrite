@@ -116,12 +116,16 @@ public class AddPlugin extends Recipe {
             if (filePattern != null) {
                 return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, ctx);
             }
-            Optional<MavenResolutionResult> mvnResult = sourceFile.getMarkers().findFirst(MavenResolutionResult.class);
-            if (mvnResult.isPresent()) {
-                if (!Boolean.TRUE.equals(addToRootPom) || mvnResult.get().getParent() == null) {
-                    return super.isAcceptable(sourceFile, ctx);
-                } else {
-                    return false;
+            if (!Boolean.TRUE.equals(addToRootPom)) {
+                return super.isAcceptable(sourceFile, ctx);
+            } else {
+                Optional<MavenResolutionResult> mvnResult = sourceFile.getMarkers().findFirst(MavenResolutionResult.class);
+                if (mvnResult.isPresent()) {
+                    if (mvnResult.get().getParent() == null) {
+                        return super.isAcceptable(sourceFile, ctx);
+                    } else {
+                        return false;
+                    }
                 }
             }
             return super.isAcceptable(sourceFile, ctx);

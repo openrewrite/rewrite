@@ -419,7 +419,7 @@ class AddPluginTest implements RewriteTest {
     }
 
     @Test
-    void addPluginOnlyToNonRootPom() {
+    void addPluginOnlyToAllPomsExplicitly() {
         rewriteRun(
           spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null, false)),
           pomXml(
