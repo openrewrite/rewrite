@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.J;
