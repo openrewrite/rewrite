@@ -40,10 +40,11 @@ class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
     void givenGroovyFile_whenNewValueEqualsOldValue_thenChangeNothing() {
         rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method", "param", "value")),
           //language=groovy
-          Assertions.groovy("""
-                    method(
-                                    param: 'value'
-                    )
+          Assertions.groovy(
+                """
+            method(
+                            param: 'value'
+            )
             """));
     }
 
