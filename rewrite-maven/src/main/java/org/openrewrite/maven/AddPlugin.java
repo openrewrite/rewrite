@@ -20,6 +20,7 @@ import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
@@ -74,13 +75,19 @@ public class AddPlugin extends Recipe {
 
     @Option(displayName = "File pattern",
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
-                    "Multiple patterns may be specified, separated by a semicolon `;`. " +
-                    "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
-                    "When not set, all source files are searched. ",
+                          "Multiple patterns may be specified, separated by a semicolon `;`. " +
+                          "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
+                          "When not set, all source files are searched. ",
             required = false,
             example = "**/*-parent/grpc-*/pom.xml")
     @Nullable
     String filePattern;
+
+    @Option(displayName = "Add to the root pom",
+            description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
+            required = false)
+    @Nullable
+    Boolean addToRootPom;
 
     @Override
     public String getDisplayName() {
@@ -109,6 +116,14 @@ public class AddPlugin extends Recipe {
             if (filePattern != null) {
                 return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, ctx);
             }
+            Optional<MavenResolutionResult> mvnResult = sourceFile.getMarkers().findFirst(MavenResolutionResult.class);
+            if (mvnResult.isPresent()) {
+                if (!Boolean.TRUE.equals(addToRootPom) || mvnResult.get().getParent() == null) {
+                    return super.isAcceptable(sourceFile, ctx);
+                } else {
+                    return false;
+                }
+            }
             return super.isAcceptable(sourceFile, ctx);
         }
 
@@ -129,7 +144,7 @@ public class AddPlugin extends Recipe {
             if (BUILD_MATCHER.matches(getCursor())) {
                 Optional<Xml.Tag> maybePlugins = t.getChild("plugins");
                 Xml.Tag plugins;
-                if(maybePlugins.isPresent()) {
+                if (maybePlugins.isPresent()) {
                     plugins = maybePlugins.get();
                 } else {
                     t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build("<plugins/>")).visitNonNull(t, ctx, getCursor().getParentOrThrow());
@@ -140,8 +155,8 @@ public class AddPlugin extends Recipe {
                 Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
                         .filter(plugin ->
                                 "plugin".equals(plugin.getName()) &&
-                                        groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
-                                        artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
+                                groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
+                                artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
                         )
                         .findAny();
 
@@ -154,13 +169,13 @@ public class AddPlugin extends Recipe {
                     }
                 } else {
                     Xml.Tag pluginTag = Xml.Tag.build("<plugin>\n" +
-                            "<groupId>" + groupId + "</groupId>\n" +
-                            "<artifactId>" + artifactId + "</artifactId>\n" +
-                            (version != null ? "<version>" + version + "</version>\n" : "") +
-                            (executions != null ? executions.trim() + "\n" : "") +
-                            (configuration != null ? configuration.trim() + "\n" : "") +
-                            (dependencies != null ? dependencies.trim() + "\n" : "") +
-                            "</plugin>");
+                                                      "<groupId>" + groupId + "</groupId>\n" +
+                                                      "<artifactId>" + artifactId + "</artifactId>\n" +
+                                                      (version != null ? "<version>" + version + "</version>\n" : "") +
+                                                      (executions != null ? executions.trim() + "\n" : "") +
+                                                      (configuration != null ? configuration.trim() + "\n" : "") +
+                                                      (dependencies != null ? dependencies.trim() + "\n" : "") +
+                                                      "</plugin>");
                     t = (Xml.Tag) new AddToTagVisitor<>(plugins, pluginTag).visitNonNull(t, ctx, getCursor().getParentOrThrow());
                 }
             }
