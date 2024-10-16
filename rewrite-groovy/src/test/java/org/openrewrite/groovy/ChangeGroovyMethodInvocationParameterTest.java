@@ -29,10 +29,10 @@ class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
             method(
                             param: 'oldValue'
             )
+            """, """
             method(
                             param: 'newValue'
             )
-                    )
             """));
     }
 
@@ -57,30 +57,31 @@ class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
             method(
                             param: "oldValue"
             )
+            """, """
             method(
                             param: "newValue"
             )
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method2", "param", "newValue")), Assertions.groovy(
+            """));
+        }
+
+    @Test
+    void givenGroovyFile_whenTwoMethods_thenOnlyChangeOne() {
+        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method2", "param", "newValue")),
+          Assertions.groovy(
                 """
-          method1(
+            method1(
                           param: "oldValue"
-          )
-          method2(
+            )
+            method2(
                           param: "oldValue"
-          )
-          method1(
+            )
+          """, """
+            method1(
                           param: "oldValue"
-          )
-          method2(
+            )
+            method2(
                           param: "newValue"
-          )
-}
-                  method1(
-                                  param: "oldValue"
-                  )
-                  method2(
-                                  param: "newValue"
-                  )
+            )
           """));
     }
 }

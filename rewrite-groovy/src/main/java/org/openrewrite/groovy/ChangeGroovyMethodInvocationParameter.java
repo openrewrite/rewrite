@@ -76,8 +76,8 @@ public class ChangeGroovyMethodInvocationParameter extends Recipe {
             }
 
             private G. MapEntry replaceValue(final G.MapEntry mapEntry) {
+                char quote = extractQuoting(mapEntry);
                 return mapEntry.withValue(new J.Literal(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, value, String.format("%c%s%c", quote, value, quote), null, JavaType.Primitive.String));
-                return mapEntry.withValue(new J.Literal(UUID.randomUUID(), Space.SINGLE_SPACE, Markers.EMPTY, value, String.format("%c%s%c", quote, value, quote), null, JavaType.Primitive.String));
             }
 
             private char extractQuoting(final G.MapEntry mapEntry) {
