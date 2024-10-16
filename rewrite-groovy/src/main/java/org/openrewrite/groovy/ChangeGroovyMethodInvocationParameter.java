@@ -22,8 +22,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.UUID;
-
 public class ChangeGroovyMethodInvocationParameter extends Recipe {
 
     @Option
