@@ -171,7 +171,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                     Map<String, String> properties = pom.getProperties();
                                     resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(newArtifactId, properties::get);
                                 }
-                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, versionTag.get().getValue().orElse(null));
+                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                             }
                             changed = true;

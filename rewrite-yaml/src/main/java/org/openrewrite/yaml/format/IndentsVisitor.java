@@ -97,7 +97,8 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     private boolean isUnindentedTopLevel() {
-        return getCursor().getParentOrThrow().getValue() instanceof Yaml.Document ||
+        return getCursor().getValue() instanceof Yaml.Documents ||
+                getCursor().getParentOrThrow().getValue() instanceof Yaml.Document ||
                 getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
     }
 
@@ -123,10 +124,12 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         }
 
         int indent = findIndent(prefix);
-        prefix = indentComments(prefix, indent);
         if (indent != column) {
             int shift = column - indent;
             prefix = indent(prefix, shift);
+            prefix = indentComments(prefix, shift);
+        } else {
+            prefix = indentComments(prefix, indent);
         }
 
         return prefix;
