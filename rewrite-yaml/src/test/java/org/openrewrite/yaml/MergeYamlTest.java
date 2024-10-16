@@ -1168,4 +1168,37 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commentInList() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$.groups",
+              //language=yaml
+              """
+                
+                # comment
+                - id: 3
+                """,
+              false,
+              "id",
+              null
+            )),
+          yaml(
+            """
+              groups:
+                - id: 1
+                - id: 2
+              """,
+            """
+              groups:
+                - id: 1
+                - id: 2
+                # comment
+                - id: 3
+              """
+          )
+        );
+    }
 }
