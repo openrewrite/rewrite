@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,6 +39,7 @@ public class CreateFileVisitor extends TreeVisitor<Tree, ExecutionContext> {
         SourceFile sourceFile = (SourceFile) requireNonNull(tree);
         if (relativeFileName.equals(sourceFile.getSourcePath())) {
             shouldCreate.set(false);
+            SearchResult.found(sourceFile);
         }
         return sourceFile;
     }
