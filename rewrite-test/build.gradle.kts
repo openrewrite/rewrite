@@ -3,10 +3,11 @@ plugins {
 }
 
 dependencies {
+    api(platform("org.junit:junit-bom:latest.release"))
     api(project(":rewrite-core"))
     compileOnly("io.micrometer:micrometer-core:latest.release")
-    api("org.junit.jupiter:junit-jupiter-api:latest.release")
-    api("org.junit.jupiter:junit-jupiter-params:latest.release")
+    api("org.junit.jupiter:junit-jupiter-api")
+    api("org.junit.jupiter:junit-jupiter-params")
 
     implementation("org.assertj:assertj-core:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv")
