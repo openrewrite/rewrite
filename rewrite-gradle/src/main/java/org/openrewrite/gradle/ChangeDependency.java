@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -36,9 +37,11 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 
@@ -156,7 +159,10 @@ public class ChangeDependency extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new GroovyIsoVisitor<ExecutionContext>() {
-            final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
+            final DependencyMatcher oldDepMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
+            final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
+            final DependencyMatcher newDepMatcher = new DependencyMatcher(newGroupId, newArtifactId, versionComparator);
+            boolean isNewDependencyPresent;
 
             GradleProject gradleProject;
 
@@ -168,12 +174,27 @@ public class ChangeDependency extends Recipe {
                 }
 
                 gradleProject = maybeGp.get();
+                isNewDependencyPresent = checkForNewDependencyPresence(gradleProject, newDepMatcher);
 
                 G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
                 if (g != cu) {
                     g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject)));
                 }
                 return g;
+            }
+
+            private boolean checkForNewDependencyPresence(GradleProject gp, DependencyMatcher dependencyMatcher) {
+                boolean isPresent = false;
+                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
+                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
+                    List<ResolvedDependency> resolvedDependencies = gdc.getDirectResolved();
+                    isPresent = resolvedDependencies.stream()
+                            .anyMatch(r -> dependencyMatcher.matches(r.getGroupId(), r.getArtifactId(), r.getVersion()));
+                    if (isPresent) {
+                        break;
+                    }
+                }
+                return isPresent;
             }
 
             @Override
@@ -198,13 +219,17 @@ public class ChangeDependency extends Recipe {
                 return m;
             }
 
+            @NullMarked
             private J.MethodInvocation updateDependency(J.MethodInvocation m, ExecutionContext ctx) {
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency original = DependencyStringNotationConverter.parse(gav);
-                        if (original != null && depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
+                        if (original != null && oldDepMatcher.matches(original.getGroupId(), original.getArtifactId())) {
+                            if (isNewDependencyPresent) {
+                                return null;
+                            }
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
@@ -238,7 +263,10 @@ public class ChangeDependency extends Recipe {
 
                         J.Literal literal = (J.Literal) strings.get(0);
                         Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
-                        if (original != null && depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
+                        if (original != null && oldDepMatcher.matches(original.getGroupId(), original.getArtifactId())) {
+                            if (isNewDependencyPresent) {
+                                return null;
+                            }
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
@@ -307,8 +335,11 @@ public class ChangeDependency extends Recipe {
                     if (groupId == null || artifactId == null) {
                         return m;
                     }
-                    if (!depMatcher.matches(groupId, artifactId)) {
+                    if (!oldDepMatcher.matches(groupId, artifactId)) {
                         return m;
+                    }
+                    if (isNewDependencyPresent && oldDepMatcher.matches(groupId, artifactId)) {
+                        return null;
                     }
                     String updatedGroupId = groupId;
                     if (!StringUtils.isBlank(newGroupId) && !updatedGroupId.equals(newGroupId)) {
@@ -364,7 +395,7 @@ public class ChangeDependency extends Recipe {
                 for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
                     GradleDependencyConfiguration newGdc = gdc;
                     newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
+                        if (oldDepMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
                             GroupArtifactVersion gav = requested.getGav();
                             if (newGroupId != null) {
                                 gav = gav.withGroupId(newGroupId);
@@ -379,7 +410,7 @@ public class ChangeDependency extends Recipe {
                         return requested;
                     }));
                     newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
-                        if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
+                        if (oldDepMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                             ResolvedGroupArtifactVersion gav = resolved.getGav();
                             if (newGroupId != null) {
                                 gav = gav.withGroupId(newGroupId);
