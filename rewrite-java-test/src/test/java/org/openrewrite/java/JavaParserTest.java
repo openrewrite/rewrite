@@ -25,6 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.search.FindCompileErrors;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -154,15 +155,121 @@ class JavaParserTest implements RewriteTest {
         rewriteRun(
           java(
             source,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my","example","PublicClass.java")))
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my", "example", "PublicClass.java")))
           )
         );
     }
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1895")
-    void moduleInfo(){
+    void moduleInfo() {
         // Ignored until properly handled: https://github.com/openrewrite/rewrite/issues/4054#issuecomment-2267605739
         assertFalse(JavaParser.fromJavaVersion().build().accept(Path.of("src/main/java/foo/module-info.java")));
+    }
+
+    @ParameterizedTest
+    //language=java
+    @ValueSource(strings = {
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test() {
+              ownerR
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int num string msg) {
+              String a; this.ownerR
+              System.out.println();
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int num string s, int b) {
+              String a; this.ownerR
+              System.out.println();
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int num) {
+              String a; this.ownerR // comment
+              System.out.println();
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int num) {
+              // comment
+              this.ownerR
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int param ) {
+              this.ownerR
+              // comment
+            }
+        }
+        """
+    })
+    void erroneousExpressionStatements(@Language("java") String source) {
+        rewriteRun(
+          java(source)
+        );
+    }
+
+    @Test
+    void erroneousVariableDeclarations() {
+        rewriteRun(
+          spec -> spec.recipe(new FindCompileErrors()),
+          java(
+            """
+              package com.example.demo;
+              class Foo {
+                  /pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Foo {
+                  /*~~>*///*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Bar {
+                  pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Bar {
+                  /*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          )
+        );
     }
 }

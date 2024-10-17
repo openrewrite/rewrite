@@ -30,9 +30,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParsingException;
+import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.marker.OmitParentheses;
@@ -194,6 +196,16 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 convert(node.getVariable()),
                 padLeft(sourceBefore("="), convert(node.getExpression())),
                 typeMapping.type(node));
+    }
+
+    @Override
+    public J visitErroneous(ErroneousTree node, Space fmt) {
+        String erroneousNode = source.substring(((JCTree) node).getStartPosition(), ((JCTree) node).getEndPosition(endPosTable));
+        return new J.Erroneous(
+                randomId(),
+                fmt,
+                Markers.EMPTY,
+                erroneousNode);
     }
 
     @Override
@@ -1518,6 +1530,22 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitVariable(VariableTree node, Space fmt) {
+        JCTree.JCVariableDecl jcVariableDecl = (JCTree.JCVariableDecl) node;
+        if ("<error>".equals(jcVariableDecl.getName().toString())) {
+            int startPos = jcVariableDecl.getStartPosition();
+            int endPos = jcVariableDecl.getEndPosition(endPosTable);
+
+            if (startPos == endPos) {
+                endPos = startPos + 1; // For cases where the error node is a single character like "/"
+            }
+            String erroneousNode = source.substring(startPos, endPos);
+            return new J.Erroneous(
+                    randomId(),
+                    fmt,
+                    Markers.EMPTY,
+                    erroneousNode
+            );
+        }
         return hasFlag(node.getModifiers(), Flags.ENUM) ?
                 visitEnumVariable(node, fmt) :
                 visitVariables(singletonList(node), fmt); // method arguments cannot be multi-declarations
@@ -1698,8 +1726,36 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         J2 j = convert(t);
         @SuppressWarnings("ConstantConditions") JRightPadded<J2> rightPadded = j == null ? null :
                 new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
-        cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
+        int idx = findFirstNonWhitespaceChar(rightPadded.getAfter().getWhitespace());
+        if (idx >= 0) {
+            rightPadded = (JRightPadded<J2>) JRightPadded.build(getErroneous(List.of(rightPadded)));
+        }
+        if (endPos(t) == cursor && rightPadded.getElement() instanceof J.Erroneous) {
+            cursor++;
+        } else {
+            cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
+        }
         return rightPadded;
+    }
+
+    private <J2 extends J> J.Erroneous getErroneous(List<JRightPadded<J2>> converted) {
+        PrintOutputCapture p = new PrintOutputCapture<>(0);
+        new JavaPrinter<>().visitContainer(JContainer.build(EMPTY, converted, Markers.EMPTY), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p);
+        return new J.Erroneous(
+                org.openrewrite.Tree.randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                p.getOut()
+        );
+    }
+
+    private static int findFirstNonWhitespaceChar(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (!Character.isWhitespace(s.charAt(i))) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private long lineNumber(Tree tree) {
@@ -1756,25 +1812,50 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     private Space statementDelim(@Nullable Tree t) {
         switch (t.getKind()) {
+            case CONTINUE:
+            case RETURN:
+            case BREAK:
             case ASSERT:
             case ASSIGNMENT:
-            case BREAK:
-            case CONTINUE:
             case DO_WHILE_LOOP:
             case IMPORT:
             case METHOD_INVOCATION:
             case NEW_CLASS:
-            case RETURN:
             case THROW:
+                return sourceBefore(";");
             case EXPRESSION_STATEMENT:
+                ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
+                if (expTree instanceof ErroneousTree) {
+                    return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable),((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
+                } else {
+                    return sourceBefore(";");
+                }
             case VARIABLE:
+                JCTree.JCVariableDecl varTree = (JCTree.JCVariableDecl) t;
+                if ("<error>".contentEquals(varTree.getName())) {
+                    int start = varTree.vartype.getEndPosition(endPosTable);
+                    int end = varTree.getEndPosition(endPosTable);
+                    String whitespace = source.substring(start, end);
+                    if (whitespace.contains("\n")) {
+                        return EMPTY;
+                    } else {
+                        return Space.build(source.substring(start, end), Collections.emptyList());
+                    }
+                }
+                return sourceBefore(";");
             case YIELD:
                 return sourceBefore(";");
             case LABELED_STATEMENT:
                 return statementDelim(((JCLabeledStatement) t).getStatement());
             case METHOD:
                 JCMethodDecl m = (JCMethodDecl) t;
-                return sourceBefore(m.body == null || m.defaultValue != null ? ";" : "");
+                if (m.body == null || m.defaultValue != null) {
+                    String suffix = source.substring(cursor, positionOfNext(";", null));
+                    int idx = findFirstNonWhitespaceChar(suffix);
+                    return sourceBefore(idx >= 0 ? "" : ";");
+                } else {
+                    return sourceBefore("");
+                }
             default:
                 return t instanceof JCAssignOp || t instanceof JCUnary ? sourceBefore(";") : EMPTY;
         }
@@ -1799,6 +1880,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         List<JRightPadded<Statement>> converted = new ArrayList<>(treesGroupedByStartPosition.size());
         for (List<? extends Tree> treeGroup : treesGroupedByStartPosition.values()) {
             if (treeGroup.size() == 1) {
+                Tree t = treeGroup.get(0);
+                int startPosition = ((JCTree) t).getStartPosition();
+                if (cursor > startPosition)
+                    continue;
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
