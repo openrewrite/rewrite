@@ -99,7 +99,8 @@ public class ExcludeDependency extends Recipe {
                 ResolvedDependency dependency = findDependency(tag, scope);
                 if (dependency != null &&
                     !(matchesGlob(dependency.getGroupId(), groupId) && matchesGlob(dependency.getArtifactId(), artifactId)) &&
-                    dependency.findDependency(groupId, artifactId) != null) {
+                    dependency.findDependencyWithOmit(groupId, artifactId) != null) {
+                    boolean needUpdate = false;
                     Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                     if (maybeExclusions.isPresent()) {
                         Xml.Tag exclusions = maybeExclusions.get();
@@ -116,6 +117,7 @@ public class ExcludeDependency extends Recipe {
                                                   "</exclusion>"))
                                     .visitNonNull(exclusions, ctx, getCursor());
                             tag = tag.withContent(ListUtils.map((List<Content>) tag.getContent(), t -> t == exclusions ? newExclusions : t));
+                            needUpdate = true;
                         }
                     } else {
                         tag = (Xml.Tag) new AddToTagVisitor<>(tag,
@@ -127,8 +129,11 @@ public class ExcludeDependency extends Recipe {
                                               "</exclusion>\n" +
                                               "</exclusions>"))
                                 .visitNonNull(tag, ctx, getCursor().getParentOrThrow());
+                        needUpdate = true;
                     }
-                    maybeUpdateModel();
+                    if (needUpdate) {
+                        maybeUpdateModel();
+                    }
                 }
                 return tag;
             }

@@ -910,6 +910,13 @@ public class ResolvedPom {
                         } else if (contains(dependencies, ga, d.getClassifier())) {
                             // we've already resolved this previously and the requirement didn't change,
                             // so just skip and continue on
+                            ResolvedDependency includedBy = dd.getDependent();
+                            if (includedBy != null) {
+                                if (includedBy.getOmitDependencies().isEmpty()) {
+                                    includedBy.unsafeSetOmitDependencies(new ArrayList<>());
+                                }
+                                includedBy.getOmitDependencies().add(new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion()));
+                            }
                             continue;
                         }
                     }
@@ -932,7 +939,7 @@ public class ResolvedPom {
                     }
 
                     ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
-                            resolvedPom.getGav(), dd.getDependency(), emptyList(),
+                            resolvedPom.getGav(), dd.getDependency(), emptyList(), emptyList(),
                             resolvedPom.getRequested().getLicenses(),
                             resolvedPom.getValue(dd.getDependency().getType()),
                             resolvedPom.getValue(dd.getDependency().getClassifier()),
