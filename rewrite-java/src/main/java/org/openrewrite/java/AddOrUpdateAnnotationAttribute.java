@@ -75,6 +75,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext ctx) {
+                J.Annotation original = a;
                 if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
                     return a;
                 }
@@ -214,7 +215,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         a = a.withArguments(newArgs);
                     }
                     if (foundOrSetAttributeWithDesiredValue.get()) {
-                        a = autoFormat(a, ctx);
+                        a = maybeAutoFormat(original, a, ctx);
                         return a;
                     }
                     // There was no existing value to update, so add a new value into the argument list
@@ -226,7 +227,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue))
                             .getArguments().get(0);
                     a = a.withArguments(ListUtils.concat(as, a.getArguments()));
-                    a = autoFormat(a, ctx);
+                    a = maybeAutoFormat(original, a, ctx);
                 }
 
                 return a;
