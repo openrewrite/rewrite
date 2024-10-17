@@ -83,12 +83,6 @@ public class AddPlugin extends Recipe {
     @Nullable
     String filePattern;
 
-    @Option(displayName = "Add to the root pom",
-            description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
-            required = false)
-    @Nullable
-    Boolean addToRootPom;
-
     @Override
     public String getDisplayName() {
         return "Add Maven plugin";
@@ -116,12 +110,12 @@ public class AddPlugin extends Recipe {
             if (filePattern != null) {
                 return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, ctx);
             }
-            if (Boolean.TRUE.equals(addToRootPom)) {
-                Optional<MavenResolutionResult> mvnResult = sourceFile.getMarkers().findFirst(MavenResolutionResult.class);
-                if (mvnResult.isPresent() && mvnResult.get().getParent() != null) {
-                    return false;
-                }
+
+            MavenResolutionResult mrr = sourceFile.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
+            if (mrr == null || mrr.parentPomIsProjectPom()) {
+                return false;
             }
+
             return super.isAcceptable(sourceFile, ctx);
         }
 

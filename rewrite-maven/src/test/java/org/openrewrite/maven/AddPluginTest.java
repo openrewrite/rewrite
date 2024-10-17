@@ -27,7 +27,7 @@ class AddPluginTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0", null, null, null, null, null));
+        spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0", null, null, null, null));
     }
 
     @DocumentExample
@@ -36,7 +36,7 @@ class AddPluginTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0",
             "<configuration>\n<activeRecipes>\n<recipe>io.moderne.FindTest</recipe>\n</activeRecipes>\n</configuration>",
-            null, null, null, null)),
+            null, null, null)),
           pomXml(
             """
               <project>
@@ -82,7 +82,7 @@ class AddPluginTest implements RewriteTest {
                           <version>1.0.0</version>
                       </dependency>
                   </dependencies>
-              """, null, null, null)),
+              """, null, null)),
           pomXml(
             """
               <project>
@@ -138,7 +138,7 @@ class AddPluginTest implements RewriteTest {
                       </configuration>
                     </execution>
                   </executions>
-              """, null, null)),
+              """, null)),
           pomXml(
             """
               <project>
@@ -256,7 +256,7 @@ class AddPluginTest implements RewriteTest {
     @Test
     void addPluginWithoutVersion() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, null, null)),
+          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, null)),
           pomXml(
             """
               <project>
@@ -287,7 +287,7 @@ class AddPluginTest implements RewriteTest {
     @Test
     void addPluginWithMatchingFilePattern() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, "dir/pom.xml", null)),
+          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, "dir/pom.xml")),
           pomXml(
             """
               <project>
@@ -319,7 +319,7 @@ class AddPluginTest implements RewriteTest {
     @Test
     void addPluginWithNonMatchingFilePattern() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, "dir/pom.xml", null)),
+          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, "dir/pom.xml")),
           pomXml(
             """
               <project>
@@ -336,7 +336,7 @@ class AddPluginTest implements RewriteTest {
     @Test
     void addPluginWithExistingPlugin() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null, null)),
+          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
           pomXml(
             """
               <project>
@@ -366,7 +366,7 @@ class AddPluginTest implements RewriteTest {
     @Test
     void addPluginOnlyToRootPom() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null, true)),
+          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
           pomXml(
             """
               <project>
@@ -421,7 +421,7 @@ class AddPluginTest implements RewriteTest {
     @Test
     void addPluginOnlyToRootPomWithParent() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null, true)),
+          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
           pomXml(
             """
               <project>
@@ -476,82 +476,6 @@ class AddPluginTest implements RewriteTest {
                   </parent>
                   <build>
                     <plugins>
-                    </plugins>
-                  </build>
-                </project>
-                """))
-        );
-    }
-
-    @Test
-    void addPluginOnlyToAllPomsExplicitly() {
-        rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null, false)),
-          pomXml(
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <build>
-                  <plugins>
-                  </plugins>
-                </build>
-              </project>
-              """,
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <build>
-                  <plugins>
-                    <plugin>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-maven-plugin</artifactId>
-                      <version>3.1.5</version>
-                    </plugin>
-                  </plugins>
-                </build>
-              </project>
-              """,
-            spec -> spec.path("pom.xml")
-          ),
-          mavenProject("my-app-child",
-            pomXml(
-              """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app-child</artifactId>
-                  <version>1</version>
-                  <parent>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </parent>
-                  <build>
-                    <plugins>
-                    </plugins>
-                  </build>
-                </project>
-                """,
-              """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app-child</artifactId>
-                  <version>1</version>
-                  <parent>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </parent>
-                  <build>
-                    <plugins>
-                      <plugin>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-maven-plugin</artifactId>
-                        <version>3.1.5</version>
-                      </plugin>
                     </plugins>
                   </build>
                 </project>
