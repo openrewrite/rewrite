@@ -18,6 +18,7 @@ package org.openrewrite.maven.tree;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.maven.WithProfiles;
 
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,7 @@ import java.util.Map;
  */
 @Value
 @With
-public class Profile {
+public class Profile implements WithProfiles.Profile {
     @Nullable
     String id;
 
@@ -43,8 +44,4 @@ public class Profile {
 
     List<Plugin> plugins;
     List<Plugin> pluginManagement;
-
-    public boolean isActive(Iterable<String> activeProfiles) {
-        return ProfileActivation.isActive(id, activeProfiles, activation);
-    }
 }
