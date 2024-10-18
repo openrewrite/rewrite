@@ -118,6 +118,9 @@ public class RawPom {
     @Nullable
     Profiles profiles;
 
+    @Nullable
+    Modules modules;
+
     public static RawPom parse(InputStream inputStream, @Nullable String snapshotVersion) {
         try {
             RawPom pom = MavenXmlMapper.readMapper().readValue(inputStream, RawPom.class);
@@ -214,6 +217,19 @@ public class RawPom {
 
         public Profiles(@JacksonXmlProperty(localName = "profile") List<Profile> profiles) {
             this.profiles = profiles;
+        }
+    }
+
+    @Getter
+    public static class Modules {
+        private final List<String> modules;
+
+        public Modules() {
+            this.modules = emptyList();
+        }
+
+        public Modules(@JacksonXmlProperty(localName = "module") List<String> modules) {
+            this.modules = modules;
         }
     }
 
@@ -346,9 +362,9 @@ public class RawPom {
     }
 
     public @Nullable String getVersion() {
-        if(version == null) {
-            if(currentVersion == null) {
-                if(parent == null) {
+        if (version == null) {
+            if (currentVersion == null) {
+                if (parent == null) {
                     return null;
                 } else {
                     return parent.getVersion();
@@ -382,8 +398,9 @@ public class RawPom {
                 .packaging(packaging)
                 .properties(getProperties() == null ? emptyMap() : getProperties())
                 .licenses(mapLicenses(getLicenses()))
-                .profiles(mapProfiles(getProfiles()));
-        if(StringUtils.isBlank(pomVersion)) {
+                .profiles(mapProfiles(getProfiles()))
+                .modules(getModules() == null ? emptyList() : getModules().getModules());
+        if (StringUtils.isBlank(pomVersion)) {
             builder.dependencies(mapRequestedDependencies(getDependencies()))
                     .dependencyManagement(mapDependencyManagement(getDependencyManagement()))
                     .repositories(mapRepositories(getRepositories()))
