@@ -18,11 +18,11 @@ package org.openrewrite.groovy;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
+class ChangeNamedStringParameterValueOfMethodInvocationTest implements RewriteTest {
 
     @Test
     void givenGroovyFile_whenParamSet_thenChangeToNewValue() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method", "param", "newValue")),
+        rewriteRun(spec -> spec.recipe(new ChangeStringValueOfNamedParameterInMethodInvocation("method", "param", "newValue")),
           //language=groovy
           Assertions.groovy(
                 """
@@ -38,7 +38,7 @@ class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
 
     @Test
     void givenGroovyFile_whenNewValueEqualsOldValue_thenChangeNothing() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method", "param", "value")),
+        rewriteRun(spec -> spec.recipe(new ChangeStringValueOfNamedParameterInMethodInvocation("method", "param", "value")),
           //language=groovy
           Assertions.groovy(
                 """
@@ -50,7 +50,7 @@ class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
 
     @Test
     void givenGroovyFile_whenSingleParamSetWithGString_thenChangeToNewValue() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method", "param", "newValue")),
+        rewriteRun(spec -> spec.recipe(new ChangeStringValueOfNamedParameterInMethodInvocation("method", "param", "newValue")),
           //language=groovy
           Assertions.groovy(
                 """
@@ -65,8 +65,28 @@ class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
         }
 
     @Test
+    void givenGroovyFile_whenMethodWithMultipleParameters_thenChangeOnlySelectedToNewValue() {
+        rewriteRun(spec -> spec.recipe(new ChangeStringValueOfNamedParameterInMethodInvocation("method", "param2", "newValue")),
+          //language=groovy
+          Assertions.groovy(
+                """
+            method(
+                            param1: "oldValue",
+                            param2: "oldValue",
+                            param3: "oldValue"
+            )
+            """, """
+            method(
+                            param1: "oldValue",
+                            param2: "newValue",
+                            param3: "oldValue"
+            )
+            """));
+        }
+
+    @Test
     void givenGroovyFile_whenTwoMethods_thenOnlyChangeOne() {
-        rewriteRun(spec -> spec.recipe(new ChangeGroovyMethodInvocationParameter("method2", "param", "newValue")),
+        rewriteRun(spec -> spec.recipe(new ChangeStringValueOfNamedParameterInMethodInvocation("method2", "param", "newValue")),
           Assertions.groovy(
                 """
             method1(
@@ -82,6 +102,26 @@ class ChangeGroovyMethodInvocationParameterTest implements RewriteTest {
             method2(
                           param: "newValue"
             )
+          """));
+    }
+
+    @Test
+    void givenGroovyFile_whenParameterWithOtherDatatype_thenDontChange() {
+        rewriteRun(spec -> spec.recipe(new ChangeStringValueOfNamedParameterInMethodInvocation("method", "param", "newValue")),
+          Assertions.groovy(
+                """
+            method(
+                          param: 1
+            )
+          """));
+    }
+
+    @Test
+    void givenGroovyFile_whenMethodWithoutParameters_thenDontChange() {
+        rewriteRun(spec -> spec.recipe(new ChangeStringValueOfNamedParameterInMethodInvocation("method2", "param", "newValue")),
+          Assertions.groovy(
+                """
+            method()
           """));
     }
 }

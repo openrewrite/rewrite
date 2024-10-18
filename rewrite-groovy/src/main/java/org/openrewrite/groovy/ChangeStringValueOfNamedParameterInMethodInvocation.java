@@ -22,7 +22,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-public class ChangeGroovyMethodInvocationParameter extends Recipe {
+public class ChangeStringValueOfNamedParameterInMethodInvocation extends Recipe {
 
     @Option
     public String methodName;
@@ -33,7 +33,7 @@ public class ChangeGroovyMethodInvocationParameter extends Recipe {
     @Option
     public String value;
 
-    public ChangeGroovyMethodInvocationParameter(final String methodName, final String key, final String value) {
+    public ChangeStringValueOfNamedParameterInMethodInvocation(final String methodName, final String key, final String value) {
         this.methodName = methodName;
         this.key = key;
         this.value = value;
@@ -41,12 +41,12 @@ public class ChangeGroovyMethodInvocationParameter extends Recipe {
 
     @Override
     public @NlsRewrite.DisplayName String getDisplayName() {
-        return "Change a groovy parameter";
+        return "Change the value of a groovy named string parameter of a method invocation";
     }
 
     @Override
     public @NlsRewrite.Description String getDescription() {
-        return "Changes the value of a given parameter in a given groovy method invocation.";
+        return "Changes the value of a given parameter in a given groovy method invocation, supporting Strings and GStrings.";
     }
 
     @Override
@@ -60,23 +60,27 @@ public class ChangeGroovyMethodInvocationParameter extends Recipe {
                     return mapEntry;
                 }
 
+                char quote = extractQuoting(mapEntry);
+                if (quote != '\'' && extractQuoting(mapEntry) != '"') {
+                    return mapEntry;
+                }
+
+                if (!mapEntry.getKey().toString().equals(key)) {
+                    return mapEntry;
+                }
+
                 if (mapEntry.getValue().toString().equals(value)) {
                     return mapEntry;
                 }
 
-                if (mapEntry.getKey().toString().equals(key)) {
-                    return replaceValue(mapEntry);
-                }
-
-                return mapEntry;
+                return replaceValue(mapEntry, quote);
             }
 
             private boolean isInTargetMethod() {
                 return getCursor().firstEnclosingOrThrow(J.MethodInvocation.class).getSimpleName().equals(methodName);
             }
 
-            private G. MapEntry replaceValue(final G.MapEntry mapEntry) {
-                char quote = extractQuoting(mapEntry);
+            private G. MapEntry replaceValue(final G.MapEntry mapEntry, char quote) {
                 return mapEntry.withValue(new J.Literal(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, value, String.format("%c%s%c", quote, value, quote), null, JavaType.Primitive.String));
             }
 
