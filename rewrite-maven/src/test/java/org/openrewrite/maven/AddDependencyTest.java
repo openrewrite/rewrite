@@ -1055,9 +1055,6 @@ class AddDependencyTest implements RewriteTest {
             )
           ),
           mavenProject("project1",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
             pomXml(
               """
                 <project>
@@ -1461,6 +1458,187 @@ class AddDependencyTest implements RewriteTest {
               )
             )
           )
+        );
+    }
+
+    @Test
+    void addDependencyToParentPomWhenAggregatingPomIsNotParent() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency(
+            "org.hamcrest",
+            "hamcrest-junit",
+            "2.0.0.0",
+            null,
+            "test",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true)),
+          mavenProject("my-app-aggregate",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-aggregate</artifactId>
+                  <version>1</version>
+                  <modules>
+                    <module>project-parent</module>
+                    <module>project-child</module>
+                  </modules>
+                </project>
+                """)),
+          mavenProject("project-parent",
+            pomXml(
+              """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app-parent</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.1.5</version>
+                </parent>
+              </project>
+              """,
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-parent</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.1.5</version>
+                  </parent>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.hamcrest</groupId>
+                      <artifactId>hamcrest-junit</artifactId>
+                      <version>2.0.0.0</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """)
+          ),
+          mavenProject("my-app-child",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-child</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                </project>
+                """))
+        );
+    }
+
+    @Test
+    void addDependencyToAggregatingPomWhenAggregatingPomIsParent() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency(
+            "org.hamcrest",
+            "hamcrest-junit",
+            "2.0.0.0",
+            null,
+            "test",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true)),
+          mavenProject("my-app-aggregate",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-aggregate</artifactId>
+                  <version>1</version>
+                  <modules>
+                    <module>project-parent</module>
+                    <module>project-child</module>
+                  </modules>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-aggregate</artifactId>
+                  <version>1</version>
+                  <modules>
+                    <module>project-parent</module>
+                    <module>project-child</module>
+                  </modules>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.hamcrest</groupId>
+                      <artifactId>hamcrest-junit</artifactId>
+                      <version>2.0.0.0</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """)),
+          mavenProject("project-parent",
+            pomXml(
+              """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app-parent</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.1.5</version>
+                </parent>
+              </project>
+              """,
+              """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app-parent</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.1.5</version>
+                </parent>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.hamcrest</groupId>
+                    <artifactId>hamcrest-junit</artifactId>
+                    <version>2.0.0.0</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """)
+          ),
+          mavenProject("my-app-child",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-child</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app-aggregate</artifactId>
+                    <version>1</version>
+                  </parent>
+                </project>
+                """))
         );
     }
 

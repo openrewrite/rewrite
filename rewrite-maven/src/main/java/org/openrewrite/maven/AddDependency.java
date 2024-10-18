@@ -29,7 +29,10 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -180,17 +183,17 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         acc.usingType = true;
                         JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
                         JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
-                        if(javaProject != null && javaSourceSet != null) {
+                        if (javaProject != null && javaSourceSet != null) {
                             acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
                                     scope /* a `compile` scope dependency will also be available in test source set */ :
                                     "test".equals(javaSourceSet.getName()) ? "test" : "compile"
                             );
                         }
                     }
-                } else if(tree instanceof Xml.Document) {
+                } else if (tree instanceof Xml.Document) {
                     Xml.Document doc = (Xml.Document) tree;
                     MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
-                    if(mrr == null) {
+                    if (mrr == null) {
                         return sourceFile;
                     }
                     acc.pomsDefinedInCurrentRepository.add(mrr.getPom().getGav());
@@ -235,7 +238,15 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
                 }
 
-                if(onlyIfUsing == null && getResolutionResult().getParent() != null && acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav())) {
+                if (onlyIfUsing == null && getResolutionResult().getParent() != null && acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav())) {
+                    return maven;
+                }
+
+                //
+                if (!getResolutionResult().getPom().getModules().isEmpty()
+                    && (getResolutionResult().getModules().isEmpty()
+                        || getResolutionResult().getModules().stream().map(MavenResolutionResult::getPom).map(ResolvedPom::getGav).map(ResolvedGroupArtifactVersion::getArtifactId).noneMatch(art -> getResolutionResult().getPom().getModules().contains(art))
+                    )) {
                     return maven;
                 }
 
