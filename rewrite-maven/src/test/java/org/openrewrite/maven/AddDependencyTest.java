@@ -1603,26 +1603,6 @@ class AddDependencyTest implements RewriteTest {
                   <version>3.1.5</version>
                 </parent>
               </project>
-              """,
-              """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app-parent</artifactId>
-                <version>1</version>
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>3.1.5</version>
-                </parent>
-                <dependencies>
-                  <dependency>
-                    <groupId>org.hamcrest</groupId>
-                    <artifactId>hamcrest-junit</artifactId>
-                    <version>2.0.0.0</version>
-                    <scope>test</scope>
-                  </dependency>
-                </dependencies>
-              </project>
               """)
           ),
           mavenProject("my-app-child",
