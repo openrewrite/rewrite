@@ -362,9 +362,9 @@ public class RawPom {
     }
 
     public @Nullable String getVersion() {
-        if(version == null) {
-            if(currentVersion == null) {
-                if(parent == null) {
+        if (version == null) {
+            if (currentVersion == null) {
+                if (parent == null) {
                     return null;
                 } else {
                     return parent.getVersion();
@@ -400,7 +400,7 @@ public class RawPom {
                 .licenses(mapLicenses(getLicenses()))
                 .profiles(mapProfiles(getProfiles()))
                 .modules(getModules() == null ? emptyList() : getModules().getModules());
-        if(StringUtils.isBlank(pomVersion)) {
+        if (StringUtils.isBlank(pomVersion)) {
             builder.dependencies(mapRequestedDependencies(getDependencies()))
                     .dependencyManagement(mapDependencyManagement(getDependencyManagement()))
                     .repositories(mapRepositories(getRepositories()))
