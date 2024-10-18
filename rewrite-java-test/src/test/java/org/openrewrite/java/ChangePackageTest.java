@@ -71,6 +71,56 @@ class ChangePackageTest implements RewriteTest {
               class Test {
               }
               """
+          ),
+          java(
+            """
+              package org.openrewrite.internal.one;
+              import org.openrewrite.internal.two.*;
+              class Test {
+              
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nonRecursiveShouldIgnoreNestedWildcardImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "com.sun.net.ssl",
+            "javax.net.ssl",
+            false)),
+          //language=java
+          java(
+            """
+              import com.sun.net.ssl.internal.*;
+              import com.sun.net.ssl.HostnameVerifier;
+              class Foo {
+                  com.sun.net.ssl.HostnameVerifier hv;
+              }
+              """,
+            """
+              import com.sun.net.ssl.internal.*;
+              import javax.net.ssl.HostnameVerifier;
+              class Foo {
+                  javax.net.ssl.HostnameVerifier hv;
+              }
+              """
+          ),
+          java(
+            """
+              import com.sun.net.ssl.internal.*;
+              class Bar {
+                  com.sun.net.ssl.HostnameVerifier hv;
+              }
+              """,
+            """
+              import com.sun.net.ssl.internal.*;
+              class Bar {
+                  javax.net.ssl.HostnameVerifier hv;
+              }
+              """
           )
         );
     }
@@ -322,7 +372,7 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    void renamePackageRecursive() {
+    void renamePackageRecursiveByDefault() {
         rewriteRun(
           java(
             """
@@ -1111,7 +1161,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void typeInNestedPackageInheritingFromTypeInBasePackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("java.util", "util", null)),
+          spec -> spec.recipe(new ChangePackage("java.util", "util", false)),
           java(
             """
               import java.util.concurrent.ConcurrentHashMap;
