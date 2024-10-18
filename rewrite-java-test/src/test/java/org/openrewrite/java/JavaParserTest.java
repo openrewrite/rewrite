@@ -165,4 +165,18 @@ class JavaParserTest implements RewriteTest {
         // Ignored until properly handled: https://github.com/openrewrite/rewrite/issues/4054#issuecomment-2267605739
         assertFalse(JavaParser.fromJavaVersion().build().accept(Path.of("src/main/java/foo/module-info.java")));
     }
+
+    @Test
+    void methodDeclarationWithSemicolonParsesCorrectly() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                public static void myMethod() {
+                };
+              }
+              """
+          )
+        );
+    }
 }
