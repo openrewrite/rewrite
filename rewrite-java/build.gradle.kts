@@ -45,7 +45,7 @@ dependencies {
         isTransitive = false
     }
     compileOnly(project(":rewrite-test"))
-    compileOnly("org.junit.jupiter:junit-jupiter-api:latest.release")
+    compileOnly("org.junit.jupiter:junit-jupiter-api")
     compileOnly("org.assertj:assertj-core:latest.release")
     implementation("org.apache.commons:commons-lang3:latest.release")
     implementation("org.apache.commons:commons-text:latest.release")
