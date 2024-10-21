@@ -24,12 +24,14 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.xml.marker.JavaType;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
 
@@ -393,6 +395,41 @@ class XmlParserTest implements RewriteTest {
               &#13;
               </text></message>
               """
+          )
+        );
+    }
+
+    @Test
+    void springXmlMarkers() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xmlns="http://www.springframework.org/schema/beans"
+                  xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+                <bean id="testBean" class="org.springframework.beans.TestBean" scope="prototype">
+                  <property name="age" value="10"/>
+                  <property name="sibling">
+                      <bean class="org.springframework.beans.TestBean">
+                          <property name="age" value="11" class="java.lang.Integer"/>
+                          <property name="someName">
+                              <value>java.lang.String</value>
+                          </property>
+                      </bean>
+                  </property>
+                </bean>
+              </beans>
+              """,
+            spec -> spec.afterRecipe(after -> {
+                Xml.Tag testBean = ((Xml.Tag)after.getRoot().getContent().get(0));
+                assertTrue(testBean.getAttributes().get(1).getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
+                Xml.Tag unnamedBeanInSiblingProperty = ((Xml.Tag)((Xml.Tag)testBean.getContent().get(1)).getContent().get(0));
+                assertTrue(unnamedBeanInSiblingProperty.getAttributes().get(0).getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
+                Xml.Tag ageProperty = ((Xml.Tag)unnamedBeanInSiblingProperty.getContent().get(0));
+                assertTrue(ageProperty.getAttributes().get(2).getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
+                Xml.Tag someNameValue = (Xml.Tag) ((Xml.Tag)unnamedBeanInSiblingProperty.getContent().get(1)).getContent().get(0);
+                assertTrue(someNameValue.getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
+            })
           )
         );
     }
