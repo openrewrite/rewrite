@@ -18,8 +18,11 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.mavenProject;
@@ -230,176 +233,331 @@ class ChangeParentPomTest implements RewriteTest {
 
     @RepeatedTest(10)
     void multiModuleRelativePath() {
-      ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.6.7", null, "", null, false);
-      rewriteRun(
-        spec -> spec.recipe(recipe),
-        mavenProject("parent",
-          pomXml(
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>org.sample</groupId>
-                <artifactId>sample</artifactId>
-                <version>1.0.0</version>
-                
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.5.0</version>
-                </parent>
-                
-                <modules>
-                  <module>module1</module>
-                  <module>module2</module>
-                </modules>
-              </project>
-              """,
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>org.sample</groupId>
-                <artifactId>sample</artifactId>
-                <version>1.0.0</version>
-
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.6.7</version>
-                  <relativePath />
-                </parent>
-
-                <modules>
-                  <module>module1</module>
-                  <module>module2</module>
-                </modules>
-              </project>
-              """
-          ),
-          mavenProject("module1",
+        ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.6.7", null, "", null, false);
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          mavenProject("parent",
             pomXml(
               """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
                   <parent>
-                    <groupId>org.sample</groupId>
-                    <artifactId>sample</artifactId>
-                    <version>1.0.0</version>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.0</version>
                   </parent>
-                  <artifactId>module1</artifactId>
+                
+                  <modules>
+                    <module>module1</module>
+                    <module>module2</module>
+                  </modules>
                 </project>
-                """
-            )),
-          mavenProject("module2",
-            pomXml(
+                """,
               """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
                   <parent>
-                    <groupId>org.sample</groupId>
-                    <artifactId>sample</artifactId>
-                    <version>1.0.0</version>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.6.7</version>
+                    <relativePath />
                   </parent>
-                  <artifactId>module2</artifactId>
+                
+                  <modules>
+                    <module>module1</module>
+                    <module>module2</module>
+                  </modules>
                 </project>
                 """
+            ),
+            mavenProject("module1",
+              pomXml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """
+              )),
+            mavenProject("module2",
+              pomXml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """
+              )
             )
           )
-        )
-      );
-  }
+        );
+    }
 
-  @RepeatedTest(10)
-  void multiModuleRelativePathChangeChildrens() {
-    ChangeParentPom recipe = new ChangeParentPom("org.sample", "org.springframework.boot", "sample", "spring-boot-starter-parent", "2.5.0", null, "", null, true);
-    rewriteRun(
-      spec -> spec.recipe(recipe),
-      mavenProject("parent",
-        pomXml(
-          """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-              <modelVersion>4.0.0</modelVersion>
-              <groupId>org.sample</groupId>
-              <artifactId>sample</artifactId>
-              <version>1.0.0</version>
-              
-              <parent>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-parent</artifactId>
-                <version>2.5.0</version>
-              </parent>
-              
-              <modules>
-                <module>module1</module>
-                <module>module2</module>
-              </modules>
-            </project>
-            """
-        ),
-        mavenProject("module1",
-          pomXml(
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                <modelVersion>4.0.0</modelVersion>
-                <parent>
-                  <groupId>org.sample</groupId>
-                  <artifactId>sample</artifactId>
-                  <version>1.0.0</version>
-                </parent>
-                <artifactId>module1</artifactId>
-              </project>
-              """,
+    @RepeatedTest(10)
+    void multiModuleRelativePathChangeChildren() {
+        ChangeParentPom recipe = new ChangeParentPom("org.sample", "org.springframework.boot", "sample", "spring-boot-starter-parent", "2.5.0", null, "", null, true);
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          mavenProject("parent",
+            pomXml(
               """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>2.5.0</version>
-                    <relativePath />
-                  </parent>
-                  <artifactId>module1</artifactId>
-                </project>
-                """
-          )),
-        mavenProject("module2",
-          pomXml(
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                <modelVersion>4.0.0</modelVersion>
-                <parent>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
-                </parent>
-                <artifactId>module2</artifactId>
-              </project>
-              """,
-              """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                  <modelVersion>4.0.0</modelVersion>
+                
                   <parent>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-parent</artifactId>
                     <version>2.5.0</version>
-                    <relativePath />
                   </parent>
-                  <artifactId>module2</artifactId>
+                
+                  <modules>
+                    <module>module1</module>
+                    <module>module2</module>
+                  </modules>
                 </project>
                 """
+            ),
+            mavenProject("module1",
+              pomXml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.5.0</version>
+                      <relativePath />
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """
+              )),
+            mavenProject("module2",
+              pomXml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """,
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.5.0</version>
+                      <relativePath />
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """
+              )
+            )
           )
-        )
-      )
-    );
-}
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+      "../pom.xml,'',,<relativePath />", // self-closing tag gets added
+      "../pom.xml,,<relativePath>../pom.xml</relativePath>,<relativePath>../pom.xml</relativePath>", // no change, targetRelativePath is null
+      "../pom.xml,../../pom.xml,,<relativePath>../../pom.xml</relativePath>", // tag gets added
+      "../pom.xml,../../pom.xml,<relativePath>../pom.xml</relativePath>,<relativePath>../../pom.xml</relativePath>", // tag gets updated
+      "../*,'',,<relativePath />", // self-closing tag gets added
+      "../*,,<relativePath>../pom.xml</relativePath>,<relativePath>../pom.xml</relativePath>", // no change, targetRelativePath is null
+      "../*,../../pom.xml,,<relativePath>../../pom.xml</relativePath>", // tag gets added
+      "../*,../../pom.xml,<relativePath>../pom.xml</relativePath>,<relativePath>../../pom.xml</relativePath>", // tag gets updated
+      "../../pom.xml,'',<relativePath>../../pom.xml</relativePath>,<relativePath />", // tag converted to self-closing
+      "'','',<relativePath></relativePath>,<relativePath></relativePath>", // matches but new = old, left untouched
+      "'','',<relativePath/>,<relativePath/>", // matches but new = old, left untouched
+      "'','../pom.xml',<relativePath></relativePath>,<relativePath>../pom.xml</relativePath>", // tag gets updated
+      "'','../pom.xml',<relativePath/>,<relativePath>../pom.xml</relativePath>", // tag gets expanded and updated
+    })
+    void multiModuleChangeChildrenBasedOnRelativePath(String oldRelativePath, String newRelativePath, String oldRelativePathTag, String expectedNewRelativePathTag) {
+        ChangeParentPom recipe = new ChangeParentPom(
+          "org.sample", "org.springframework.boot",
+          "sample", "spring-boot-starter-parent",
+          "2.5.0",
+          oldRelativePath, newRelativePath,
+          null,
+          true);
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          mavenProject("parent",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.0</version>
+                  </parent>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <modules>
+                    <module>module1</module>
+                    <module>module2</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("module1",
+              pomXml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>%s
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """.formatted(StringUtils.isBlank(oldRelativePathTag) ? "" : "\n    " + oldRelativePathTag),
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.5.0</version>%s
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """.formatted(StringUtils.isBlank(expectedNewRelativePathTag) ? "" : "\n    " + expectedNewRelativePathTag)
+              )
+            ),
+            mavenProject("module2",
+              // “control” module: same parent gav but different relativePath should not be affected
+              pomXml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>..</relativePath>
+                    </parent>
+                    <artifactId>module3</artifactId>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+      "../pom.xml,<relativePath />", // self-closing means empty string
+      "../pom.xml,<relativePath>../../pom.xml</relativePath>", // different value
+      "..,,", // absent tag means '../pom.xml' not '..'
+    })
+    void multiModuleRelativePathNotMatching(String oldRelativePath, String oldRelativePathTag) {
+        ChangeParentPom recipe = new ChangeParentPom(
+          "org.sample", "org.springframework.boot",
+          "sample", "spring-boot-starter-parent",
+          "2.5.0",
+          oldRelativePath, "invalid",
+          null,
+          true);
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          mavenProject("parent",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.0</version>
+                  </parent>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <modules>
+                    <module>module1</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("module1",
+              pomXml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>%s
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """.formatted(StringUtils.isBlank(oldRelativePathTag) ? "" : "\n    " + oldRelativePathTag)
+              )
+            )
+          )
+        );
+    }
 
     @Test
     void upgradeVersion() {
