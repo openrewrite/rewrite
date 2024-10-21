@@ -17,16 +17,21 @@ package org.openrewrite.maven;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.tls.HandshakeCertificates;
+import okhttp3.tls.HeldCertificate;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
+import org.openrewrite.ipc.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
@@ -34,10 +39,11 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.tree.ParseError;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
-import java.util.stream.StreamSupport;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -906,13 +912,23 @@ class MavenParserTest implements RewriteTest {
         var username = "admin";
         var password = "password";
         try (MockWebServer mockRepo = new MockWebServer()) {
+            // TLS server setup based on https://github.com/square/okhttp/blob/master/okhttp-tls/README.md
+            String localhost = InetAddress.getByName("localhost").getCanonicalHostName();
+            HeldCertificate localhostCertificate = new HeldCertificate.Builder()
+              .addSubjectAlternativeName(localhost)
+              .build();
+            HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+              .heldCertificate(localhostCertificate)
+              .build();
+            mockRepo.useHttps(serverCertificates.sslSocketFactory(), false);
+
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
                     MockResponse resp = new MockResponse();
-                    if (StreamSupport.stream(request.getHeaders().spliterator(), false)
-                      .noneMatch(it -> it.getFirst().equals("Authorization") &&
-                                       it.getSecond().equals("Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes())))) {
+                    if (!Objects.equals(
+                      request.getHeader("Authorization"),
+                      "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))) {
                         return resp.setResponseCode(401);
                     } else {
                         if (!"HEAD".equalsIgnoreCase(request.getMethod())) {
@@ -935,7 +951,7 @@ class MavenParserTest implements RewriteTest {
             });
 
             mockRepo.start();
-            var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
+            var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
                 throw new RuntimeException(t);
             }));
             var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
@@ -959,8 +975,17 @@ class MavenParserTest implements RewriteTest {
                     </servers>
                 </settings>
                 """.formatted(mockRepo.getHostName(), mockRepo.getPort(), username, password)
-            ), ctx);
-            ctx.setMavenSettings(settings);
+            ), mavenCtx);
+            mavenCtx.setMavenSettings(settings);
+
+            // TLS client setup (just make it trust the self-signed certificate)
+            HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+              .addTrustedCertificate(localhostCertificate.certificate())
+              .build();
+            OkHttpClient client = new OkHttpClient.Builder()
+              .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+              .build();
+            var ctx = new HttpSenderExecutionContextView(mavenCtx).setHttpSender(new OkHttpSender(client));
 
             var maven = MavenParser.builder().build().parse(
               ctx,
