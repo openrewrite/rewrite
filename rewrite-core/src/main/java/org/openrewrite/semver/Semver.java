@@ -34,6 +34,14 @@ public class Semver {
         return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
     }
 
+    /**
+     * Validates the given version against an optional pattern
+     *
+     * @param toVersion       the version to validate. Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used.
+     * @param metadataPattern optional metadata appended to the version. Allows version selection to be extended beyond the original Node Semver semantics. So for example,
+     *                        Setting 'version' to "25-29" can be paired with a metadata pattern of "-jre" to select Guava 29.0-jre
+     * @return the validation result
+     */
     public static Validated<VersionComparator> validate(String toVersion, @Nullable String metadataPattern) {
         return Validated.<VersionComparator, String>testNone(
                 "metadataPattern",
