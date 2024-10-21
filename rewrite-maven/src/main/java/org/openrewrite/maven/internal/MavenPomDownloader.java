@@ -55,7 +55,6 @@ import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
-@SuppressWarnings("OptionalAssignedToNull")
 public class MavenPomDownloader {
     private static final RetryPolicy<Object> retryPolicy = RetryPolicy.builder()
             .handle(SocketTimeoutException.class, TimeoutException.class)
@@ -333,7 +332,8 @@ public class MavenPomDownloader {
                     .setRepositoryResponses(repositoryResponses);
         }
 
-        sample.stop(timer.tags("outcome", "success").register(Metrics.globalRegistry));
+        long nanos = sample.stop(timer.tags("outcome", "success").register(Metrics.globalRegistry));
+        ctx.getResolutionListener().downloadMetadataSuccess(mavenMetadata, containingPom, Duration.ofNanos(nanos));
         return mavenMetadata;
     }
 
@@ -595,7 +595,7 @@ public class MavenPomDownloader {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                             }
                             mavenCache.putPom(resolvedGav, pom);
-                            ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom);
+                            ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom, Duration.ZERO);
                             sample.stop(timer.tags("outcome", "from maven local").register(Metrics.globalRegistry));
                             return pom;
                         }
@@ -617,8 +617,9 @@ public class MavenPomDownloader {
                             pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                         }
                         mavenCache.putPom(resolvedGav, pom);
-                        ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom);
-                        sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
+                        long nanos = sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
+                        ctx.getResolutionListener()
+                                .downloadSuccess(resolvedGav, containingPom, Duration.ofNanos(nanos));
                         return pom;
                     } catch (HttpSenderResponseException e) {
                         repositoryResponses.put(repo, e.getMessage());
