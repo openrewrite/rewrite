@@ -38,6 +38,7 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = false)
 public class EqualsMethodUsage extends Recipe {
 
+    @SuppressWarnings("ALL")
     private static J.@Nullable Binary equalsBinaryTemplate;
 
     @Override
