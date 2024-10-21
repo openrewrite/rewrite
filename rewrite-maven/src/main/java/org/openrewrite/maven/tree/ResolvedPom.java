@@ -69,11 +69,11 @@ public class ResolvedPom {
     Iterable<String> activeProfiles;
 
     public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList());
+        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
@@ -83,6 +83,7 @@ public class ResolvedPom {
         this.requestedDependencies = requestedDependencies;
         this.plugins = plugins;
         this.pluginManagement = pluginManagement;
+        this.subprojects = subprojects;
     }
 
     @NonFinal
@@ -112,6 +113,10 @@ public class ResolvedPom {
     @NonFinal
     @Builder.Default
     List<Plugin> pluginManagement = emptyList();
+
+    @NonFinal
+    @Builder.Default
+    List<String> subprojects = emptyList();
 
 
     /**
@@ -169,6 +174,7 @@ public class ResolvedPom {
                 emptyMap(),
                 emptyList(),
                 initialRepositories,
+                emptyList(),
                 emptyList(),
                 emptyList(),
                 emptyList(),
@@ -926,7 +932,7 @@ public class ResolvedPom {
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
                         resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList());
+                                emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
