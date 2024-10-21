@@ -116,17 +116,18 @@ public class ChangePropertyValue extends Recipe {
                     scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue) :
                     newValue);
             return scalar.getValue().equals(newScalar.getValue()) ? null : newScalar;
-        } else if (value instanceof Yaml.Sequence) {
+        }
+        if (value instanceof Yaml.Sequence) {
             Yaml.Sequence sequence = (Yaml.Sequence) value;
-            Yaml.Sequence newSequence = sequence.withEntries(ListUtils.map(sequence.getEntries(), entry -> {
+            return sequence.withEntries(ListUtils.map(sequence.getEntries(), entry -> {
                 if (matchesOldValue(entry.getBlock())) {
                     Yaml.Block updatedValue = updateValue(entry.getBlock());
-                    return updatedValue != null ? entry.withBlock(updatedValue) : entry;
-                } else {
-                    return entry;
+                    if (updatedValue != null) {
+                        return entry.withBlock(updatedValue);
+                    }
                 }
+                return entry;
             }));
-            return sequence == newSequence ? null : newSequence;
         }
         return null;
     }
@@ -145,8 +146,11 @@ public class ChangePropertyValue extends Recipe {
                            Pattern.compile(oldValue).matcher(scalar.getValue()).find() :
                            scalar.getValue().equals(oldValue));
         } else if (value instanceof Yaml.Sequence) {
-            Yaml.Sequence sequence = (Yaml.Sequence) value;
-            return sequence.getEntries().stream().anyMatch(entry -> matchesOldValue(entry.getBlock()));
+            for (Yaml.Sequence.Entry entry : ((Yaml.Sequence) value).getEntries()) {
+                if (matchesOldValue(entry.getBlock())) {
+                    return true;
+                }
+            }
         }
         return false;
     }
