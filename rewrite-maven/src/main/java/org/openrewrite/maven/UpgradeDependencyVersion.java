@@ -382,11 +382,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
             public @Nullable TreeVisitor<Xml, ExecutionContext> upgradeVersion(ExecutionContext ctx, Xml.Tag tag, @Nullable String requestedVersion, String groupId, String artifactId, String version2) throws MavenDownloadingException {
                 String newerVersion = findNewerVersion(groupId, artifactId, version2, ctx);
+                String requestedGroupId = getRequestedGroupIdForArtifact(artifactId);
                 if (newerVersion == null) {
                     return null;
                 } else if (requestedVersion != null && requestedVersion.startsWith("${")) {
                     //noinspection unchecked
                     return (TreeVisitor<Xml, ExecutionContext>) new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false)
+                            .getVisitor();
+                } else if (requestedVersion != null && requestedGroupId != null && requestedGroupId.startsWith("${")) {
+                    //noinspection unchecked
+                    return (TreeVisitor<Xml, ExecutionContext>) new ChangePropertyValue(requestedGroupId.substring(2, requestedGroupId.length() - 1), newerVersion, overrideManagedVersion, false)
                             .getVisitor();
                 } else {
                     Xml.Tag childVersionTag = tag.getChild("version").orElse(null);
@@ -401,6 +406,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     throws MavenDownloadingException {
                 return MavenDependency.findNewerVersion(groupId, artifactId, version, getResolutionResult(), metadataFailures,
                         versionComparator, ctx);
+            }
+
+            private @Nullable String getRequestedGroupIdForArtifact(String artifactId) {
+                for (ManagedDependency managedDependency : getResolutionResult().getPom().getRequested().getDependencyManagement()) {
+                    if (managedDependency instanceof ManagedDependency.Imported) {
+                        ManagedDependency.Imported imported = (ManagedDependency.Imported) managedDependency;
+                        if (artifactId.equals(imported.getGav().getArtifactId())) {
+                            return imported.getGav().getVersion();
+                        }
+                    } else if (managedDependency instanceof ManagedDependency.Defined) {
+                        ManagedDependency.Defined defined = (ManagedDependency.Defined) managedDependency;
+                        if (artifactId.equals(defined.getGav().getArtifactId())) {
+                            return defined.getGav().getVersion();
+                        }
+                    }
+                }
+                return null;
             }
         };
     }
