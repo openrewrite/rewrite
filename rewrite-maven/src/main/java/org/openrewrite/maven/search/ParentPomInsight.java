@@ -20,12 +20,18 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.ParentPomsInUse;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @EqualsAndHashCode(callSuper = false)
@@ -51,6 +57,12 @@ public class ParentPomInsight extends Recipe {
             required = false)
     @Nullable
     String version;
+
+    @Option(displayName = "Recursive",
+            description = "Whether to search recursively through the parents. True by default.",
+            required = false)
+    @Nullable
+    Boolean recursive;
 
     @Override
     public String getDisplayName() {
@@ -79,26 +91,43 @@ public class ParentPomInsight extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
+            @Nullable
+            final VersionComparator versionComparator = version == null ? null : Semver.validate(version, null).getValue();
+
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if (isParentTag()) {
-                    ResolvedPom resolvedPom = getResolutionResult().getPom();
-                    String groupId = resolvedPom.getValue(tag.getChildValue("groupId").orElse(null));
-                    String artifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null));
+                if (!isParentTag()) {
+                    return t;
+                }
+
+                MavenResolutionResult mrr = getResolutionResult();
+                MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+
+                Parent ancestor = mrr.getPom().getRequested().getParent();
+                String relativePath = tag.getChildValue("relativePath").orElse(null);
+                while (ancestor != null) {
+                    String groupId = ancestor.getGroupId();
+                    String artifactId = ancestor.getArtifactId();
                     if (matchesGlob(groupId, groupIdPattern) && matchesGlob(artifactId, artifactIdPattern)) {
-                        String parentVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
-                        if (version != null) {
-                            if (!Semver.validate(version, null).getValue()
-                                    .isValid(null, parentVersion)) {
-                                return t;
-                            }
+                        String parentVersion = ancestor.getVersion();
+                        if (versionComparator == null || versionComparator.isValid(null, parentVersion)) {
+                            // Found a parent pom that matches the criteria
+                            inUse.insertRow(ctx, new ParentPomsInUse.Row(
+                                    mrr.getPom().getArtifactId(), groupId, artifactId, parentVersion, relativePath));
+                            return SearchResult.found(t);
                         }
-                        // Found a parent pom that matches the criteria
-                        String relativePath = tag.getChildValue("relativePath").orElse(null);
-                        inUse.insertRow(ctx, new ParentPomsInUse.Row(
-                                resolvedPom.getArtifactId(), groupId, artifactId, parentVersion, relativePath));
-                        return SearchResult.found(t);
+                    }
+                    if (Boolean.FALSE.equals(recursive)) {
+                        return t;
+                    }
+                    try {
+                        ResolvedPom ancestorPom = mpd.download(ancestor.getGav(), null, null, mrr.getPom().getRepositories())
+                                .resolve(emptyList(), mpd, ctx);
+                        ancestor = ancestorPom.getRequested().getParent();
+                        relativePath = null;
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(t);
                     }
                 }
                 return t;
