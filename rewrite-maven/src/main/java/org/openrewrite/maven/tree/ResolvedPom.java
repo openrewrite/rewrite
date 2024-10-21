@@ -73,7 +73,7 @@ public class ResolvedPom {
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> modules) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
@@ -83,7 +83,7 @@ public class ResolvedPom {
         this.requestedDependencies = requestedDependencies;
         this.plugins = plugins;
         this.pluginManagement = pluginManagement;
-        this.modules = modules;
+        this.subprojects = subprojects;
     }
 
     @NonFinal
@@ -116,7 +116,7 @@ public class ResolvedPom {
 
     @NonFinal
     @Builder.Default
-    List<String> modules = emptyList();
+    List<String> subprojects = emptyList();
 
 
     /**

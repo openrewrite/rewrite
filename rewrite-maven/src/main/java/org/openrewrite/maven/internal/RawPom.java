@@ -25,6 +25,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.tree.*;
 
@@ -120,6 +121,9 @@ public class RawPom {
 
     @Nullable
     Modules modules;
+
+    @Nullable
+    SubProjects subprojects;
 
     public static RawPom parse(InputStream inputStream, @Nullable String snapshotVersion) {
         try {
@@ -230,6 +234,19 @@ public class RawPom {
 
         public Modules(@JacksonXmlProperty(localName = "module") List<String> modules) {
             this.modules = modules;
+        }
+    }
+
+    @Getter
+    public static class SubProjects {
+        private final List<String> subprojects;
+
+        public SubProjects() {
+            this.subprojects = emptyList();
+        }
+
+        public SubProjects(@JacksonXmlProperty(localName = "subProjects") List<String> subprojects) {
+            this.subprojects = subprojects;
         }
     }
 
@@ -399,7 +416,7 @@ public class RawPom {
                 .properties(getProperties() == null ? emptyMap() : getProperties())
                 .licenses(mapLicenses(getLicenses()))
                 .profiles(mapProfiles(getProfiles()))
-                .modules(getModules() == null ? emptyList() : getModules().getModules());
+                .subprojects(mapSubProjects(getModules(), getSubprojects()));
         if (StringUtils.isBlank(pomVersion)) {
             builder.dependencies(mapRequestedDependencies(getDependencies()))
                     .dependencyManagement(mapDependencyManagement(getDependencyManagement()))
@@ -562,6 +579,19 @@ public class RawPom {
             }
         }
         return executions;
+    }
+
+    private List<String> mapSubProjects(@Nullable Modules modules, @Nullable SubProjects subprojects) {
+        if (modules == null && subprojects != null) {
+            return subprojects.getSubprojects();
+        }
+        if (subprojects == null && modules != null) {
+            return modules.getModules();
+        }
+        if (modules != null && subprojects != null) {
+            return ListUtils.concatAll(modules.getModules(), subprojects.getSubprojects());
+        }
+        return emptyList();
     }
 
 }

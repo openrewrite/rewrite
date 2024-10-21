@@ -116,7 +116,7 @@ public class Pom {
     List<Plugin> pluginManagement = emptyList();
 
     @Builder.Default
-    List<String> modules = emptyList();
+    List<String> subprojects = emptyList();
 
     public String getGroupId() {
         return gav.getGroupId();
@@ -188,7 +188,7 @@ public class Pom {
                 dependencies,
                 plugins,
                 pluginManagement,
-                modules)
+                subprojects)
                 .resolve(ctx, downloader);
     }
 

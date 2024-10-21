@@ -242,9 +242,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return maven;
                 }
 
-                if (!getResolutionResult().getPom().getModules().isEmpty()
+                if (!getResolutionResult().getPom().getSubprojects().isEmpty()
                     && (getResolutionResult().getModules().isEmpty()
-                        || getResolutionResult().getModules().stream().map(MavenResolutionResult::getPom).map(ResolvedPom::getGav).map(ResolvedGroupArtifactVersion::getArtifactId).noneMatch(art -> getResolutionResult().getPom().getModules().contains(art))
+                        || getResolutionResult().getModules().stream().map(MavenResolutionResult::getPom).map(ResolvedPom::getGav).map(ResolvedGroupArtifactVersion::getArtifactId).noneMatch(art -> getResolutionResult().getPom().getSubprojects().contains(art))
                     )) {
                     return maven;
                 }
