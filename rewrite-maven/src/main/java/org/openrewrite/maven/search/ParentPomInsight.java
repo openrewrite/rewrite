@@ -97,36 +97,37 @@ public class ParentPomInsight extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if (isParentTag()) {
-                    MavenResolutionResult mrr = getResolutionResult();
-                    ResolvedPom resolvedPom = mrr.getPom();
-                    MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                if (!isParentTag()) {
+                    return t;
+                }
 
-                    Parent ancestor = mrr.getPom().getRequested().getParent();
-                    String relativePath = tag.getChildValue("relativePath").orElse(null);
-                    while (ancestor != null) {
-                        String groupId = ancestor.getGroupId();
-                        String artifactId = ancestor.getArtifactId();
-                        if (matchesGlob(groupId, groupIdPattern) && matchesGlob(artifactId, artifactIdPattern)) {
-                            String parentVersion = ancestor.getVersion();
-                            if (versionComparator == null || versionComparator.isValid(null, parentVersion)) {
-                                // Found a parent pom that matches the criteria
-                                inUse.insertRow(ctx, new ParentPomsInUse.Row(
-                                        resolvedPom.getArtifactId(), groupId, artifactId, parentVersion, relativePath));
-                                return SearchResult.found(t);
-                            }
+                MavenResolutionResult mrr = getResolutionResult();
+                MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+
+                Parent ancestor = mrr.getPom().getRequested().getParent();
+                String relativePath = tag.getChildValue("relativePath").orElse(null);
+                while (ancestor != null) {
+                    String groupId = ancestor.getGroupId();
+                    String artifactId = ancestor.getArtifactId();
+                    if (matchesGlob(groupId, groupIdPattern) && matchesGlob(artifactId, artifactIdPattern)) {
+                        String parentVersion = ancestor.getVersion();
+                        if (versionComparator == null || versionComparator.isValid(null, parentVersion)) {
+                            // Found a parent pom that matches the criteria
+                            inUse.insertRow(ctx, new ParentPomsInUse.Row(
+                                    mrr.getPom().getArtifactId(), groupId, artifactId, parentVersion, relativePath));
+                            return SearchResult.found(t);
                         }
-                        if (Boolean.FALSE.equals(recursive)) {
-                            return t;
-                        }
-                        try {
-                            ResolvedPom ancestorPom = mpd.download(ancestor.getGav(), null, null, mrr.getPom().getRepositories())
-                                    .resolve(emptyList(), mpd, ctx);
-                            ancestor = ancestorPom.getRequested().getParent();
-                            relativePath = null;
-                        } catch (MavenDownloadingException e) {
-                            return e.warn(t);
-                        }
+                    }
+                    if (Boolean.FALSE.equals(recursive)) {
+                        return t;
+                    }
+                    try {
+                        ResolvedPom ancestorPom = mpd.download(ancestor.getGav(), null, null, mrr.getPom().getRepositories())
+                                .resolve(emptyList(), mpd, ctx);
+                        ancestor = ancestorPom.getRequested().getParent();
+                        relativePath = null;
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(t);
                     }
                 }
                 return t;
