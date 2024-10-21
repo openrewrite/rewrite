@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -232,6 +233,70 @@ class ExcludeDependencyTest implements RewriteTest {
             </dependencies>
           </project>
           """)
+        );
+    }
+
+    @Test
+    void excludeAlsoWhereConflictOmitted() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()).afterTypeValidationOptions(TypeValidation.none())
+            .recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter</artifactId>
+                    <version>2.7.18</version>
+                  </dependency>
+                  <dependency>
+                    <!-- (org.apache.logging.log4j:log4j-api:jar:2.20.0:compile - omitted for conflict with 2.17.2) -->
+                    <groupId>org.opensearch.client</groupId>
+                    <artifactId>spring-data-opensearch-starter</artifactId>
+                    <version>1.3.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter</artifactId>
+                    <version>2.7.18</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-api</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                  <dependency>
+                    <!-- (org.apache.logging.log4j:log4j-api:jar:2.20.0:compile - omitted for conflict with 2.17.2) -->
+                    <groupId>org.opensearch.client</groupId>
+                    <artifactId>spring-data-opensearch-starter</artifactId>
+                    <version>1.3.0</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-api</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
         );
     }
 }
