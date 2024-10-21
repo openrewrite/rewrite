@@ -15,14 +15,11 @@
  */
 package org.openrewrite.groovy;
 
-import groovy.lang.GString;
 import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Markers;
 
 public class ChangeStringValueOfNamedParameterInMethodInvocation extends Recipe {
 
@@ -62,7 +59,7 @@ public class ChangeStringValueOfNamedParameterInMethodInvocation extends Recipe 
                     return mapEntry;
                 }
 
-                if (!((J.Literal) mapEntry.getValue()).getType().equals(JavaType.Primitive.String)) {
+                if (!hasStringValue(mapEntry)) {
                     return mapEntry;
                 }
 
@@ -82,17 +79,26 @@ public class ChangeStringValueOfNamedParameterInMethodInvocation extends Recipe 
             }
 
             private G. MapEntry replaceValue(final G.MapEntry mapEntry) {
-                J.Literal mapValue = (J.Literal) mapEntry.getValue();
-                String oldValue = (String) mapValue.getValue();
+                J.Literal entryValue = (J.Literal) mapEntry.getValue();
 
-                mapValue = mapValue.withValue(value);
+                J.Literal newEntryValue = entryValue
+                        .withValue(value)
+                        .withValueSource(buildNewValueSource(entryValue));
 
-                String newValueSource = mapValue.getValueSource().replace(oldValue, value);
-                mapValue = mapValue.withValueSource(newValueSource);
+                return mapEntry.withValue(newEntryValue);
+            }
 
-                return mapEntry.withValue(mapValue);
+            private String buildNewValueSource(J.Literal entryValue) {
+                String oldValue = entryValue.getValue() == null ? "" : entryValue.getValue().toString();
+                return entryValue.getValueSource().replace(oldValue, value);
             }
 
         };
     }
+
+    private static boolean hasStringValue(G.MapEntry mapEntry) {
+        return ((J.Literal) mapEntry.getValue()).getType().equals(JavaType.Primitive.String);
+    }
+
+
 }
