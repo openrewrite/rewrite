@@ -21,6 +21,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -933,8 +934,27 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym :
                 ((JCIdent) jcSelect).sym;
 
+        Type jcSelectType = jcSelect.type;
+        if (jcSelectType == null && jcSelect instanceof JCFieldAccess &&
+                hasOneMatchingMethod(((JCFieldAccess) jcSelect).selected.type, name.getSimpleName(), node.getArguments().size())) {
+            jcSelectType = methodSymbol.type;
+        }
+
         return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                typeMapping.methodInvocationType(jcSelect.type, methodSymbol));
+                typeMapping.methodInvocationType(jcSelectType, methodSymbol));
+    }
+
+    private boolean hasOneMatchingMethod(Type methodSelectType, String name, int argCount) {
+        Symbol methodSymbol = null;
+        Type classType = methodSelectType;
+        while (!classType.equals(Type.noType)) {
+            for (var sym : classType.tsym.members().getSymbols(sym -> sym.name.toString().equals(name) && ((Symbol.MethodSymbol) sym).params().size() == argCount)) {
+                if (methodSymbol != null) return false;
+                methodSymbol = sym;
+            }
+            classType = ((Type.ClassType) classType).supertype_field;
+        }
+        return methodSymbol != null;
     }
 
     @Override
