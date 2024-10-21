@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.tree.Yaml;
@@ -26,6 +27,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -97,7 +99,7 @@ public class ChangePropertyValue extends Recipe {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
                 if (matchesPropertyKey(prop) && matchesOldValue(e.getValue())) {
-                    Yaml.Scalar updatedValue = updateValue(e.getValue());
+                    Yaml.Block updatedValue = updateValue(e.getValue());
                     if (updatedValue != null) {
                         e = e.withValue(updatedValue);
                     }
@@ -108,15 +110,26 @@ public class ChangePropertyValue extends Recipe {
     }
 
     // returns null if value should not change
-    private Yaml.@Nullable Scalar updateValue(Yaml.Block value) {
-        if (!(value instanceof Yaml.Scalar)) {
-            return null;
+    private Yaml.@Nullable Block updateValue(Yaml.Block value) {
+        if (value instanceof Yaml.Scalar) {
+            Yaml.Scalar scalar = (Yaml.Scalar) value;
+            Yaml.Scalar newScalar = scalar.withValue(Boolean.TRUE.equals(regex) ?
+                    scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue) :
+                    newValue);
+            return scalar.getValue().equals(newScalar.getValue()) ? null : newScalar;
+        } else if (value instanceof Yaml.Sequence) {
+            Yaml.Sequence sequence = (Yaml.Sequence) value;
+            Yaml.Sequence newSequence = sequence.withEntries(ListUtils.map(sequence.getEntries(), entry -> {
+                if (matchesOldValue(entry.getBlock())) {
+                    Yaml.Block updatedValue = updateValue(entry.getBlock());
+                    return updatedValue != null ? entry.withBlock(updatedValue) : entry;
+                } else {
+                    return entry;
+                }
+            }));
+            return sequence == newSequence ? null : newSequence;
         }
-        Yaml.Scalar scalar = (Yaml.Scalar) value;
-        Yaml.Scalar newScalar = scalar.withValue(Boolean.TRUE.equals(regex) ?
-                scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue) :
-                newValue);
-        return scalar.getValue().equals(newScalar.getValue()) ? null : newScalar;
+        return null;
     }
 
     private boolean matchesPropertyKey(String prop) {
@@ -126,14 +139,17 @@ public class ChangePropertyValue extends Recipe {
     }
 
     private boolean matchesOldValue(Yaml.Block value) {
-        if (!(value instanceof Yaml.Scalar)) {
-            return false;
+        if (value instanceof Yaml.Scalar) {
+            Yaml.Scalar scalar = (Yaml.Scalar) value;
+            return StringUtils.isNullOrEmpty(oldValue) ||
+                   (Boolean.TRUE.equals(regex) ?
+                           Pattern.compile(oldValue).matcher(scalar.getValue()).find() :
+                           scalar.getValue().equals(oldValue));
+        } else if (value instanceof Yaml.Sequence) {
+            Yaml.Sequence sequence = (Yaml.Sequence) value;
+            return sequence.getEntries().stream().anyMatch(entry -> matchesOldValue(entry.getBlock()));
         }
-        Yaml.Scalar scalar = (Yaml.Scalar) value;
-        return StringUtils.isNullOrEmpty(oldValue) ||
-               (Boolean.TRUE.equals(regex) ?
-                       Pattern.compile(oldValue).matcher(scalar.getValue()).find() :
-                       scalar.getValue().equals(oldValue));
+        return false;
     }
 
     private static String getProperty(Cursor cursor) {
