@@ -61,7 +61,7 @@ class UpgradeParentVersionTest implements RewriteTest {
     void nonMavenCentralRepository() {
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeParentVersion("org.codehaus.mojo", "mojo-parent", "86", null))
+            .recipe(new UpgradeParentVersion("org.jenkins-ci", "jenkins", "1.125", null))
             .executionContext(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
@@ -73,9 +73,9 @@ class UpgradeParentVersionTest implements RewriteTest {
             """
               <project>
                   <parent>
-                      <groupId>org.codehaus.mojo</groupId>
-                      <artifactId>mojo-parent</artifactId>
-                      <version>85s</version>
+                      <groupId>org.jenkins-ci</groupId>
+                      <artifactId>jenkins</artifactId>
+                      <version>1.124</version>
                   </parent>
                   <artifactId>example</artifactId>
                   <version>1.0.0</version>
@@ -84,9 +84,9 @@ class UpgradeParentVersionTest implements RewriteTest {
             """
               <project>
                   <parent>
-                      <groupId>org.codehaus.mojo</groupId>
-                      <artifactId>mojo-parent</artifactId>
-                      <version>86</version>
+                      <groupId>org.jenkins-ci</groupId>
+                      <artifactId>jenkins</artifactId>
+                      <version>1.125</version>
                   </parent>
                   <artifactId>example</artifactId>
                   <version>1.0.0</version>
