@@ -421,13 +421,13 @@ class XmlParserTest implements RewriteTest {
               </beans>
               """,
             spec -> spec.afterRecipe(after -> {
-                Xml.Tag testBean = ((Xml.Tag)after.getRoot().getContent().get(0));
+                Xml.Tag testBean = ((Xml.Tag) after.getRoot().getContent().get(0));
                 assertTrue(testBean.getAttributes().get(1).getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
-                Xml.Tag unnamedBeanInSiblingProperty = ((Xml.Tag)((Xml.Tag)testBean.getContent().get(1)).getContent().get(0));
+                Xml.Tag unnamedBeanInSiblingProperty = ((Xml.Tag) ((Xml.Tag) testBean.getContent().get(1)).getContent().get(0));
                 assertTrue(unnamedBeanInSiblingProperty.getAttributes().get(0).getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
-                Xml.Tag ageProperty = ((Xml.Tag)unnamedBeanInSiblingProperty.getContent().get(0));
+                Xml.Tag ageProperty = ((Xml.Tag) unnamedBeanInSiblingProperty.getContent().get(0));
                 assertTrue(ageProperty.getAttributes().get(2).getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
-                Xml.Tag someNameValue = (Xml.Tag) ((Xml.Tag)unnamedBeanInSiblingProperty.getContent().get(1)).getContent().get(0);
+                Xml.Tag someNameValue = (Xml.Tag) ((Xml.Tag) unnamedBeanInSiblingProperty.getContent().get(1)).getContent().get(0);
                 assertTrue(someNameValue.getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
             })
           )

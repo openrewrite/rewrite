@@ -163,7 +163,7 @@ public class XmlParser implements Parser {
         }
     }
 
-    private XmlVisitor<ExecutionContext> addJavaTypeOrPackageMarkers(){
+    private XmlVisitor<ExecutionContext> addJavaTypeOrPackageMarkers() {
         final Pattern PACKAGE_OR_TYPE_REFERENCE = Pattern.compile("^([a-zA-Z_][a-zA-Z0-9_]*)(\\.[a-zA-Z_][a-zA-Z0-9_]*)*(\\.[A-Z][a-zA-Z0-9_]*|\\$[A-Z][a-zA-Z0-9_]*)*(\\.\\*)?$");
         final List<String> ATTRIBUTES_THAT_REFERENCE_PACKAGE_OR_TYPE = Arrays.asList("class", "type");
         final List<String> TAGS_THAT_REFERENCE_PACKAGE_OR_TYPE = Arrays.asList("value");
