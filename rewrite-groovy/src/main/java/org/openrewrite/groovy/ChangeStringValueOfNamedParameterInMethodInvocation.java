@@ -15,9 +15,9 @@
  */
 package org.openrewrite.groovy;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
@@ -88,11 +88,15 @@ public class ChangeStringValueOfNamedParameterInMethodInvocation extends Recipe 
                 return mapEntry.withValue(newEntryValue);
             }
 
-            private String buildNewValueSource(J.Literal entryValue) {
+            private @Nullable String buildNewValueSource(J.Literal entryValue) {
                 String oldValue = entryValue.getValue() == null ? "" : entryValue.getValue().toString();
+
+                if (entryValue.getValueSource() == null) {
+                    return null;
+                }
+
                 return entryValue.getValueSource().replace(oldValue, value);
             }
-
         };
     }
 
