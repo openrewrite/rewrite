@@ -27,7 +27,6 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
