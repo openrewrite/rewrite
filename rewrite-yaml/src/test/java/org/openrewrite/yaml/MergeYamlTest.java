@@ -1180,6 +1180,9 @@ class MergeYamlTest implements RewriteTest {
                 
                 # comment
                 - id: 3
+                
+                  # foo bar
+                  foo: bar
                 """,
               false,
               "id",
@@ -1197,6 +1200,9 @@ class MergeYamlTest implements RewriteTest {
                 - id: 2
                 # comment
                 - id: 3
+              
+                  # foo bar
+                  foo: bar
               """
           )
         );

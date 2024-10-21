@@ -95,6 +95,23 @@ class RewriteTestTest implements RewriteTest {
           text("")
         );
     }
+
+
+    @Test
+    void rejectRecipeValidationFailure() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipeFromYaml("""
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.RefersToNonExistentRecipe
+              displayName: Refers to non-existent recipe
+              description: Deliberately has a non-existent recipe in its recipe list to trigger a validation failure.
+              recipeList:
+                - org.openrewrite.DoesNotExist
+              
+              """, "org.openrewrite.RefersToNonExistentRecipe")
+          ));
+    }
 }
 
 @Value

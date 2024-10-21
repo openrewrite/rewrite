@@ -122,15 +122,21 @@ class IndentsTest implements RewriteTest {
         rewriteRun(
           yaml("""
               key:
-              # under-indented
-                  # over-indented
-                - a
+              # a under-indented
+                  # a over-indented
+                - a :
+                # b under-indented
+                      # b over-indented
+                     - b
               """,
             """
               key:
-                # under-indented
-                # over-indented
-                - a
+                # a under-indented
+                # a over-indented
+                - a :
+                    # b under-indented
+                    # b over-indented
+                    - b
               """
           )
         );
@@ -144,6 +150,8 @@ class IndentsTest implements RewriteTest {
               # under-indented
                   # over-indented
                 a : # no change
+              
+              
                 # under-indented
                     # over-indented
                   b : c
@@ -153,6 +161,8 @@ class IndentsTest implements RewriteTest {
                 # under-indented
                 # over-indented
                 a : # no change
+              
+              
                   # under-indented
                   # over-indented
                   b : c
@@ -166,12 +176,16 @@ class IndentsTest implements RewriteTest {
         rewriteRun(
           yaml("""
                 # over-indented 1
+              ---
+                # over-indented 2
               key: value # no change
                 # over-indented 2
               key2: value2
               """,
             """
               # over-indented 1
+              ---
+              # over-indented 2
               key: value # no change
               # over-indented 2
               key2: value2
