@@ -1543,7 +1543,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void addDependencyToAggregatingPomWhenAggregatingPomIsParent() {
+    void addDependencyToAggregatingPomAndParentPomWhenAggregatingPomIsParent() {
         rewriteRun(
           spec -> spec.recipe(new AddDependency(
             "org.hamcrest",
@@ -1566,8 +1566,8 @@ class AddDependencyTest implements RewriteTest {
                   <artifactId>my-app-aggregate</artifactId>
                   <version>1</version>
                   <modules>
-                    <module>project-parent</module>
-                    <module>project-child</module>
+                    <module>my-app-parent</module>
+                    <module>my-app-child</module>
                   </modules>
                 </project>
                 """,
@@ -1577,8 +1577,8 @@ class AddDependencyTest implements RewriteTest {
                   <artifactId>my-app-aggregate</artifactId>
                   <version>1</version>
                   <modules>
-                    <module>project-parent</module>
-                    <module>project-child</module>
+                    <module>my-app-parent</module>
+                    <module>my-app-child</module>
                   </modules>
                   <dependencies>
                     <dependency>
@@ -1602,6 +1602,27 @@ class AddDependencyTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>3.1.5</version>
                 </parent>
+              </project>
+              """,
+
+              """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app-parent</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.1.5</version>
+                </parent>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.hamcrest</groupId>
+                    <artifactId>hamcrest-junit</artifactId>
+                    <version>2.0.0.0</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
               </project>
               """)
           ),
