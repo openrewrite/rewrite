@@ -15,8 +15,10 @@
  */
 package org.openrewrite.groovy;
 
+import groovy.lang.GString;
 import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
@@ -60,8 +62,7 @@ public class ChangeStringValueOfNamedParameterInMethodInvocation extends Recipe 
                     return mapEntry;
                 }
 
-                char quote = extractQuoting(mapEntry);
-                if (quote != '\'' && extractQuoting(mapEntry) != '"') {
+                if (!((J.Literal) mapEntry.getValue()).getType().equals(JavaType.Primitive.String)) {
                     return mapEntry;
                 }
 
@@ -73,20 +74,25 @@ public class ChangeStringValueOfNamedParameterInMethodInvocation extends Recipe 
                     return mapEntry;
                 }
 
-                return replaceValue(mapEntry, quote);
+                return replaceValue(mapEntry);
             }
 
             private boolean isInTargetMethod() {
                 return getCursor().firstEnclosingOrThrow(J.MethodInvocation.class).getSimpleName().equals(methodName);
             }
 
-            private G. MapEntry replaceValue(final G.MapEntry mapEntry, char quote) {
-                return mapEntry.withValue(new J.Literal(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, value, String.format("%c%s%c", quote, value, quote), null, JavaType.Primitive.String));
+            private G. MapEntry replaceValue(final G.MapEntry mapEntry) {
+                J.Literal mapValue = (J.Literal) mapEntry.getValue();
+                String oldValue = (String) mapValue.getValue();
+
+                mapValue = mapValue.withValue(value);
+
+                String newValueSource = mapValue.getValueSource().replace(oldValue, value);
+                mapValue = mapValue.withValueSource(newValueSource);
+
+                return mapEntry.withValue(mapValue);
             }
 
-            private char extractQuoting(final G.MapEntry mapEntry) {
-                return mapEntry.getValue().printTrimmed(getCursor()).charAt(0);
-            }
         };
     }
 }
