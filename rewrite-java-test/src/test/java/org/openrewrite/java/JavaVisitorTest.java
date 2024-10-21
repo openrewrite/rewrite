@@ -132,4 +132,40 @@ class JavaVisitorTest implements RewriteTest {
            """)
         );
     }
+
+    @Test
+    void javaVisitorHandlesErroneousNodes() {
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(2)
+            .recipes(
+              toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                      if (method.getSimpleName().equals("test")) {
+                          return JavaTemplate.builder("Exception").contextSensitive().build()
+                            .apply(getCursor(), method.getCoordinates().replaceThrows());
+                      }
+                      return method;
+                  }
+              })
+            ),
+          java(
+            """
+              class A {
+                  void test() {
+                      owner
+                  }
+              }
+              """,
+            """
+              class A {
+                  void test() throws Exception {
+                      owner
+                  }
+              }
+              """
+          )
+        );
+    }
 }
