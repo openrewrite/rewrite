@@ -209,20 +209,8 @@ public class MavenResolutionResult implements Marker {
                 .anyMatch(gav -> gav.equals(parentGav));
     }
 
-    /**
-     * Often recipes operating on multi-module projects will prefer to make changes to the parent pom rather than in multiple child poms.
-     * But if the parent isn't in the same repository as the child, the recipe would need to be applied to the child poms.
-     *
-     * @return true when the parent pom of the current pom is present in the same repository as the current pom
-     */
     public boolean isAggregatingPom() {
-        if (getParent() == null) {
-            return false;
-        }
-        ResolvedGroupArtifactVersion parentGav = getParent().getPom().getGav();
-        return getProjectPoms().values().stream()
-                .map(Pom::getGav)
-                .anyMatch(gav -> gav.equals(parentGav));
+        return !getPom().getSubprojects().isEmpty();
     }
 
     private Map<Path, Pom> getProjectPomsRecursive(Map<Path, Pom> projectPoms) {
