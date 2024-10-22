@@ -245,7 +245,7 @@ public class RawPom {
             this.subprojects = emptyList();
         }
 
-        public SubProjects(@JacksonXmlProperty(localName = "subProjects") List<String> subprojects) {
+        public SubProjects(@JacksonXmlProperty(localName = "subproject") List<String> subprojects) {
             this.subprojects = subprojects;
         }
     }
