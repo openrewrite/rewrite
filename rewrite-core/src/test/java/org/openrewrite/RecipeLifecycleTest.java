@@ -139,7 +139,7 @@ class RecipeLifecycleTest implements RewriteTest {
             //noinspection NullableProblems
             return new TreeVisitor<>() {
                 @Override
-                public Tree visit(Tree tree, ExecutionContext executionContext) {
+                public Tree visit(Tree tree, ExecutionContext ctx) {
                     if (tree.getMarkers().findFirst(RecipesThatMadeChanges.class).isPresent()) {
                         return tree;
                     }
