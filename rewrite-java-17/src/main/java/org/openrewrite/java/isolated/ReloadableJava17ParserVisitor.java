@@ -1552,8 +1552,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 // this is a lambda parameter with an inferred type expression
                 typeExpr = null;
             } else {
-                typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.EMPTY, emptyList(), "var", typeMapping.type(vartype), null);
-                typeExpr = typeExpr.withMarkers(typeExpr.getMarkers().add(JavaVarKeyword.build()));
+                typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.EMPTY.add(JavaVarKeyword.build()), emptyList(), "var", typeMapping.type(vartype), null);
             }
         } else if (vartype instanceof JCArrayTypeTree) {
             JCExpression elementType = vartype;
@@ -1571,6 +1570,11 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     convert(elementType);
         } else {
             typeExpr = convert(vartype);
+        }
+
+        // Should only hit this when there are missing types
+        if (typeExpr == null && node.declaredUsingVar()) {
+            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.EMPTY.add(JavaVarKeyword.build()), emptyList(), "var", typeMapping.type(vartype), null);
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
@@ -1671,8 +1675,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
      * Conversion utilities
      * --------------
      */
-    @SuppressWarnings("DataFlowIssue")
-    private <J2 extends J> @Nullable J2 convert(Tree t) {
+    private <J2 extends J> @Nullable J2 convert(@Nullable Tree t) {
+        if (t == null) {
+            return null;
+        }
         try {
             int saveCursor = cursor;
             String prefix = source.substring(cursor, max(((JCTree) t).getStartPosition(), cursor));
@@ -1712,7 +1718,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
     }
 
-    private <J2 extends J> @Nullable JRightPadded<J2> convert(Tree t, Function<Tree, Space> suffix) {
+    private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(Tree t, Function<Tree, Space> suffix) {
         J2 j = convert(t);
         if (j == null) {
             return null;
