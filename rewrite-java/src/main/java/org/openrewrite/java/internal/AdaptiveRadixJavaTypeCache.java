@@ -26,6 +26,7 @@ public class AdaptiveRadixJavaTypeCache extends JavaTypeCache {
 
     @Override
     public <T> @Nullable T get(String signature) {
+        //noinspection unchecked
         return (T) typeCache.search(signature);
     }
 
