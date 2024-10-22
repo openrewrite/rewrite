@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.marker;
+package org.openrewrite.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 @Value
 @With
-public class JavaType implements Marker {
+public class TypeReference implements Marker {
     UUID id;
+    String language;
 }

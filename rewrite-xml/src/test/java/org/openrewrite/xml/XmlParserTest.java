@@ -22,9 +22,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.marker.TypeReference;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.xml.marker.JavaType;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
@@ -422,13 +422,13 @@ class XmlParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(after -> {
                 Xml.Tag testBean = ((Xml.Tag) after.getRoot().getContent().get(0));
-                assertTrue(testBean.getAttributes().get(1).getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
+                assertTrue(testBean.getAttributes().get(1).getMarkers().getMarkers().stream().anyMatch(TypeReference.class::isInstance));
                 Xml.Tag unnamedBeanInSiblingProperty = ((Xml.Tag) ((Xml.Tag) testBean.getContent().get(1)).getContent().get(0));
-                assertTrue(unnamedBeanInSiblingProperty.getAttributes().get(0).getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
+                assertTrue(unnamedBeanInSiblingProperty.getAttributes().get(0).getMarkers().getMarkers().stream().anyMatch(TypeReference.class::isInstance));
                 Xml.Tag ageProperty = ((Xml.Tag) unnamedBeanInSiblingProperty.getContent().get(0));
-                assertTrue(ageProperty.getAttributes().get(2).getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
+                assertTrue(ageProperty.getAttributes().get(2).getMarkers().getMarkers().stream().anyMatch(TypeReference.class::isInstance));
                 Xml.Tag someNameValue = (Xml.Tag) ((Xml.Tag) unnamedBeanInSiblingProperty.getContent().get(1)).getContent().get(0);
-                assertTrue(someNameValue.getMarkers().getMarkers().stream().anyMatch(JavaType.class::isInstance));
+                assertTrue(someNameValue.getMarkers().getMarkers().stream().anyMatch(TypeReference.class::isInstance));
             })
           )
         );

@@ -23,18 +23,20 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.marker.TypeReference;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.xml.internal.XmlParserVisitor;
 import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
-import org.openrewrite.xml.marker.JavaType;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
-import java.util.*;
-import java.util.regex.Pattern;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public class XmlParser implements Parser {
@@ -164,18 +166,18 @@ public class XmlParser implements Parser {
     }
 
     private XmlVisitor<ExecutionContext> addJavaTypeOrPackageMarkers() {
-        final Pattern PACKAGE_OR_TYPE_REFERENCE = Pattern.compile("^([a-zA-Z_][a-zA-Z0-9_]*)(\\.[a-zA-Z_][a-zA-Z0-9_]*)*(\\.[A-Z][a-zA-Z0-9_]*|\\$[A-Z][a-zA-Z0-9_]*)*(\\.\\*)?$");
-        final List<String> ATTRIBUTES_THAT_REFERENCE_PACKAGE_OR_TYPE = Arrays.asList("class", "type");
-        final List<String> TAGS_THAT_REFERENCE_PACKAGE_OR_TYPE = Arrays.asList("value");
+        XPathMatcher classXPath = new XPathMatcher("//@class[contains(., '.')]");
+        XPathMatcher typeXPath = new XPathMatcher("//@type[contains(., '.')]");
+        XPathMatcher tags = new XPathMatcher("//value[contains(text(), '.')]");
 
         return new XmlVisitor<ExecutionContext>() {
+
             @Override
             public Xml visitAttribute(Xml.Attribute attribute, ExecutionContext ctx) {
                 Xml.Attribute attrib = (Xml.Attribute) super.visitAttribute(attribute, ctx);
-                if (ATTRIBUTES_THAT_REFERENCE_PACKAGE_OR_TYPE.contains(attrib.getKey().getName())) {
-                    if (PACKAGE_OR_TYPE_REFERENCE.matcher(attrib.getValueAsString()).matches()) {
-                        return attrib.withMarkers(attrib.getMarkers().withMarkers(Collections.singletonList(new JavaType(attrib.getId()))));
-                    }
+                if (classXPath.matches(getCursor()) || typeXPath.matches(getCursor())) {
+                    return attrib.withMarkers(attrib.getMarkers().withMarkers(Collections.singletonList(new TypeReference(attrib.getId(), "Java"))));
+
                 }
                 return attrib;
             }
@@ -183,11 +185,9 @@ public class XmlParser implements Parser {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag tg = (Xml.Tag) super.visitTag(tag, ctx);
-                if (TAGS_THAT_REFERENCE_PACKAGE_OR_TYPE.contains(tg.getName())) {
+                if (tags.matches(getCursor())) {
                     if (tg.getValue().isPresent()) {
-                        if (PACKAGE_OR_TYPE_REFERENCE.matcher(tg.getValue().get()).matches()) {
-                            return tg.withMarkers(tg.getMarkers().withMarkers(Collections.singletonList(new JavaType(tg.getId()))));
-                        }
+                        return tg.withMarkers(tg.getMarkers().withMarkers(Collections.singletonList(new TypeReference(tg.getId(), "Java"))));
                     }
                 }
                 return tg;
