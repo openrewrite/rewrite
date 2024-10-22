@@ -1667,7 +1667,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
      * --------------
      */
 
-    private @Nullable <J2 extends J>  J2 convert(Tree t) {
+    private @Nullable <J2 extends J> J2 convert(Tree t) {
         try {
             int saveCursor = cursor;
             String prefix = source.substring(cursor, max(((JCTree) t).getStartPosition(), cursor));
