@@ -357,14 +357,19 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
         } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
-        } else if (tree instanceof JCTree.JCClassDecl && ((JCTree.JCClassDecl) tree).type == null) {
-            return type(((JCTree.JCClassDecl) tree).sym.type);
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            symbol = ((JCTree.JCClassDecl) tree).sym;
+        } else if(tree instanceof JCTree.JCFieldAccess) {
+            symbol = ((JCTree.JCFieldAccess) tree).sym;
         }
 
         return type(((JCTree) tree).type, symbol);
     }
 
-    private @Nullable JavaType type(Type type, Symbol symbol) {
+    private @Nullable JavaType type(@Nullable Type type, @Nullable Symbol symbol) {
+        if(type == null && symbol != null) {
+            type = symbol.type;
+        }
         if (type instanceof Type.MethodType) {
             return methodInvocationType(type, symbol);
         }

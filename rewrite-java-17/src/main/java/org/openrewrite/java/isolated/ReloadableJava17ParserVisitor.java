@@ -424,7 +424,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         JLeftPadded<TypeTree> extendings = node.getExtendsClause() == null ? null :
-                padLeft(sourceBefore("extends"), convertOrNull(node.getExtendsClause()));
+                padLeft(sourceBefore("extends"), convert(node.getExtendsClause()));
 
         JContainer<TypeTree> implementings = null;
         if (node.getImplementsClause() != null && !node.getImplementsClause().isEmpty()) {
@@ -688,7 +688,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                                 commaDelim.apply(t)
                 );
 
-        JRightPadded<Expression> condition = convertOrNull(node.getCondition(), semiDelim);
+        JRightPadded<Expression> condition = convert(node.getCondition(), semiDelim);
         if (condition == null) {
             condition = padRight(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), EMPTY);
         }
@@ -964,7 +964,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         List<J.Annotation> returnTypeAnnotations = collectAnnotations(annotationPosTable);
-        TypeTree returnType = convertOrNull(node.getReturnType());
+        TypeTree returnType = convert(node.getReturnType());
         if (returnType != null && !returnTypeAnnotations.isEmpty()) {
             returnType = new J.AnnotatedType(randomId(), Space.EMPTY, Markers.EMPTY,
                     returnTypeAnnotations, returnType);
@@ -1011,7 +1011,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim),
                         Markers.EMPTY);
 
-        J.Block body = convertOrNull(node.getBody());
+        J.Block body = convert(node.getBody());
 
         JLeftPadded<Expression> defaultValue = node.getDefaultValue() == null ? null :
                 padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
@@ -1037,9 +1037,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             while (elementType instanceof JCArrayTypeTree) {
                 elementType = ((JCArrayTypeTree) elementType).elemtype;
             }
-            typeExpr = convertOrNull(elementType);
+            typeExpr = convert(elementType);
         } else {
-            typeExpr = convertOrNull(jcVarType);
+            typeExpr = convert(jcVarType);
         }
 
         List<? extends ExpressionTree> nodeDimensions = node.getDimensions();
@@ -1089,7 +1089,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         // for enum definitions with anonymous class initializers, endPos of node identifier will be -1
-        TypeTree clazz = endPos(node.getIdentifier()) >= 0 ? convertOrNull(node.getIdentifier()) : null;
+        TypeTree clazz = endPos(node.getIdentifier()) >= 0 ? convert(node.getIdentifier()) : null;
 
         JContainer<Expression> args;
         if (positionOfNext("(", '{') > -1) {
@@ -1198,7 +1198,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitReturn(ReturnTree node, Space fmt) {
         skip("return");
-        Expression expression = convertOrNull(node.getExpression());
+        Expression expression = convert(node.getExpression());
         return new J.Return(randomId(), fmt, Markers.EMPTY, expression);
     }
 
@@ -1606,7 +1606,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                             new J.VariableDeclarations.NamedVariable(randomId(), namedVarPrefix, Markers.EMPTY,
                                     name,
                                     dimensionsAfterName,
-                                    n.init != null ? padLeft(sourceBefore("="), convertOrNull(n.init)) : null,
+                                    n.init != null ? padLeft(sourceBefore("="), convert(n.init)) : null,
                                     (JavaType.Variable) typeMapping.type(n)
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
@@ -1663,7 +1663,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 bound = null;
         }
 
-        return new J.Wildcard(randomId(), fmt, Markers.EMPTY, bound, convertOrNull(wildcard.inner));
+        return new J.Wildcard(randomId(), fmt, Markers.EMPTY, bound, convert(wildcard.inner));
     }
 
     /**
@@ -1671,8 +1671,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
      * Conversion utilities
      * --------------
      */
-
-    private @Nullable <J2 extends J> J2 convert(Tree t) {
+    @SuppressWarnings("DataFlowIssue")
+    private <J2 extends J> @Nullable J2 convert(Tree t) {
         try {
             int saveCursor = cursor;
             String prefix = source.substring(cursor, max(((JCTree) t).getStartPosition(), cursor));
@@ -1726,18 +1726,13 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return source.substring(0, ((JCTree) tree).getStartPosition()).chars().filter(c -> c == '\n').count() + 1;
     }
 
-    private <T extends J> @Nullable T convertOrNull(@Nullable Tree t) {
-        return t == null ? null : convert(t);
-    }
-
-    private <J2 extends J> @Nullable JRightPadded<J2> convertOrNull(@Nullable Tree t, Function<Tree, Space> suffix) {
-        return t == null ? null : convert(t, suffix);
-    }
-
     private <J2 extends J> List<J2> convertAll(List<? extends Tree> trees) {
         List<J2> converted = new ArrayList<>(trees.size());
         for (Tree tree : trees) {
-            converted.add(convert(tree));
+            J2 j = convert(tree);
+            if(j != null) {
+                converted.add(j);
+            }
         }
         return converted;
     }
@@ -1827,6 +1822,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 JRightPadded<Statement> padded = convert(treeGroup.get(0), suffix);
                 if (padded != null) {
                     converted.add(padded);
+                } else {
+                    System.out.println("");
                 }
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
