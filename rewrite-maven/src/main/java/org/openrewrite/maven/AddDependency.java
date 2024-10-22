@@ -25,7 +25,10 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
@@ -242,16 +245,24 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return maven;
                 }
 
-                if (!getResolutionResult().getPom().getSubprojects().isEmpty()
-                    && (getResolutionResult().getModules().isEmpty()
-                        || getResolutionResult().getModules().stream().map(MavenResolutionResult::getPom).map(ResolvedPom::getGav).map(ResolvedGroupArtifactVersion::getArtifactId).noneMatch(art -> getResolutionResult().getPom().getSubprojects().contains(art))
-                    )) {
+                if (!getResolutionResult().getPom().getSubprojects().isEmpty() &&
+                    (getResolutionResult().getModules().isEmpty() ||
+                     anyChildIsSubProject())) {
                     return maven;
                 }
 
                 return new AddDependencyVisitor(
                         groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
                         type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(document, ctx);
+            }
+
+            private boolean anyChildIsSubProject() {
+                for (MavenResolutionResult child : getResolutionResult().getModules()) {
+                    if (getResolutionResult().getPom().getSubprojects().contains(child.getPom().getGav().getArtifactId())) {
+                        return true;
+                    }
+                }
+                return false;
             }
         });
     }
