@@ -101,7 +101,7 @@ public class AddProfile extends Recipe {
                 if (maybeProfile.isPresent()) {
                     Xml.Tag profile = maybeProfile.get();
 
-                    t = (Xml.Tag) new RemoveContentVisitor(profile, false).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                    t = (Xml.Tag) new RemoveContentVisitor(profile, false, false).visitNonNull(t, ctx, getCursor().getParentOrThrow());
 
                 }
                 Xml.Tag profileTag = Xml.Tag.build("<profile>\n" +

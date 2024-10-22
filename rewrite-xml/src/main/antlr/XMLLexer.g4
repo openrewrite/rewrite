@@ -65,7 +65,7 @@ DTD_CLOSE        :  '>'    -> popMode ;
 DTD_SUBSET_OPEN  :  '['    -> pushMode(INSIDE_DTD_SUBSET) ;
 DTD_S            :   S     -> skip ;
 
-DOCTYPE          :  'DOCTYPE' ;
+DOCTYPE options { caseInsensitive = true; }         :  'DOCTYPE' ;
 
 DTD_NAME         :  Name   -> type(Name) ;
 DTD_STRING       :  STRING -> type(STRING) ;

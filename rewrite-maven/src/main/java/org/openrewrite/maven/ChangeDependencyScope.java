@@ -81,7 +81,7 @@ public class ChangeDependencyScope extends Recipe {
                         Optional<Xml.Tag> scope = tag.getChild("scope");
                         if (scope.isPresent()) {
                             if (newScope == null) {
-                                doAfterVisit(new RemoveContentVisitor<>(scope.get(), false));
+                                doAfterVisit(new RemoveContentVisitor<>(scope.get(), false, true));
                             } else if (!newScope.equals(scope.get().getValue().orElse(null))) {
                                 doAfterVisit(new ChangeTagValueVisitor<>(scope.get(), newScope));
                             }

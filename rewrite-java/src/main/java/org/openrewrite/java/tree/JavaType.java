@@ -37,8 +37,7 @@ import static org.openrewrite.java.tree.TypeUtils.unknownIfNull;
 
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
-@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c", include = JsonTypeInfo.As.PROPERTY)
 public interface JavaType {
 
     FullyQualified[] EMPTY_FULLY_QUALIFIED_ARRAY = new FullyQualified[0];
@@ -46,11 +45,6 @@ public interface JavaType {
     Method[] EMPTY_METHOD_ARRAY = new Method[0];
     String[] EMPTY_STRING_ARRAY = new String[0];
     JavaType[] EMPTY_JAVA_TYPE_ARRAY = new JavaType[0];
-
-    @JsonProperty("@c")
-    default String getJacksonPolymorphicTypeTag() {
-        return getClass().getName();
-    }
 
     // TODO: To be removed with OpenRewrite 9
     default @Nullable Integer getManagedReference() {

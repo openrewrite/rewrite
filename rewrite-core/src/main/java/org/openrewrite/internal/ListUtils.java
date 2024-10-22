@@ -96,7 +96,7 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> mapLast(@Nullable List<T> ls, UnaryOperator<T> mapLast) {
+    public static <T> List<T> mapLast(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapLast) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
@@ -115,7 +115,7 @@ public final class ListUtils {
         return ls;
     }
 
-    public static <T> List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<T> mapFirst) {
+    public static <T> List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapFirst) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
@@ -134,13 +134,13 @@ public final class ListUtils {
         return ls;
     }
 
-    public static <T> List<T> map(@Nullable List<T> ls, BiFunction<Integer, T, T> map) {
+    public static <T> List<T> map(@Nullable List<T> ls, BiFunction<Integer, T, @Nullable T> map) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
         }
 
-        List<T> newLs = ls;
+        List<@Nullable T> newLs = ls;
         boolean nullEncountered = false;
         for (int i = 0; i < ls.size(); i++) {
             T tree = ls.get(i);
@@ -159,17 +159,18 @@ public final class ListUtils {
             while (newLs.remove(null)) ;
         }
 
+        //noinspection NullableProblems
         return newLs;
     }
 
     // inlined version of `map(List, BiFunction)` for memory efficiency (no overhead for lambda)
-    public static <T> List<T> map(@Nullable List<T> ls, UnaryOperator<T> map) {
+    public static <T> List<T> map(@Nullable List<T> ls, UnaryOperator<@Nullable T> map) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
         }
 
-        List<T> newLs = ls;
+        List<@Nullable T> newLs = ls;
         boolean nullEncountered = false;
         for (int i = 0; i < ls.size(); i++) {
             T tree = ls.get(i);
@@ -188,15 +189,16 @@ public final class ListUtils {
             while (newLs.remove(null)) ;
         }
 
+        //noinspection NullableProblems
         return newLs;
     }
 
-    public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, Object> flatMap) {
+    public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, @Nullable Object> flatMap) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
         }
-        List<T> newLs = ls;
+        List<@Nullable T> newLs = ls;
         int j = 0;
         for (int i = 0; i < ls.size(); i++, j++) {
             T tree = ls.get(i);
@@ -251,6 +253,7 @@ public final class ListUtils {
             }
         }
 
+        //noinspection NullableProblems
         return newLs;
     }
 

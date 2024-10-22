@@ -359,6 +359,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     prefix,
                     Markers.EMPTY,
                     name,
+                    ctx.DOCTYPE().getText(),
                     externalId,
                     internalSubset == null ? emptyList() : internalSubset,
                     externalSubsets,

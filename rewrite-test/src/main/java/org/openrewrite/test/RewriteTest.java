@@ -218,9 +218,9 @@ public interface RewriteTest extends SourceSpecs {
         }
         List<Validated<Object>> validations = new ArrayList<>();
         recipe.validateAll(ctx, validations);
-        assertThat(validations)
+        assertThat(validations.stream().filter(Validated::isInvalid))
                 .as("Recipe validation must have no failures")
-                .noneMatch(Validated::isInvalid);
+                .isEmpty();
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
@@ -370,6 +370,9 @@ public interface RewriteTest extends SourceSpecs {
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
         }
 
+        CursorValidatingExecutionContextView.view(recipeCtx)
+                .setValidateCursorAcyclic(TypeValidation.before(testMethodSpec, testClassSpec)
+                .cursorAcyclic());
         RecipeRun recipeRun = recipe.run(
                 lss,
                 recipeCtx,

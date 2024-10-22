@@ -259,9 +259,9 @@ public class MavenPomDownloader {
                 try {
                     String scheme = URI.create(repo.getUri()).getScheme();
                     String baseUri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                                 requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
-                                 gav.getArtifactId() + '/' +
-                                 (gav.getVersion() == null ? "" : gav.getVersion() + '/');
+                                     requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
+                                     gav.getArtifactId() + '/' +
+                                     (gav.getVersion() == null ? "" : gav.getVersion() + '/');
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
@@ -496,9 +496,24 @@ public class MavenPomDownloader {
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                gav.getArtifactId().equals(projectPom.getArtifactId()) &&
-                (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion())))) {
-                return projectPom;
+                gav.getArtifactId().equals(projectPom.getArtifactId())){
+                if (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion()))) {
+                    return projectPom;
+                }
+                Parent parent = projectPom.getParent();
+                while (parent != null){
+                    for (Pom project : projectPoms.values()) {
+                        if (parent.getGroupId().equals(project.getGroupId()) && parent.getArtifactId().equals(project.getArtifactId())){
+                            if (projectPom.getVersion().equals(project.getValue(gav.getVersion()))){
+                                return projectPom;
+                            }
+                            parent = project.getParent();
+                            if (parent == null){
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -777,25 +792,21 @@ public class MavenPomDownloader {
         }
 
         HttpSender.Request.Builder request = httpSender.options(httpsUri);
-        if (repository.getTimeout() != null) {
-            request = request.withConnectTimeout(repository.getTimeout())
-                    .withReadTimeout(repository.getTimeout());
-        }
 
-        ReachabilityResult reachability = reachable(applyAuthenticationToRequest(repository, request));
+        ReachabilityResult reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request));
         if (reachability.isSuccess()) {
             return repository.withUri(httpsUri);
         }
-        reachability = reachable(applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(httpsUri)));
+        reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(httpsUri)));
         if (reachability.isReachable()) {
             return repository.withUri(httpsUri);
         }
         if (!originalUrl.equals(httpsUri)) {
-            reachability = reachable(applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
+            reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
             if (reachability.isSuccess()) {
                 return repository.withUri(originalUrl);
             }
-            reachability = reachable(applyAuthenticationToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
+            reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
             if (reachability.isReachable()) {
                 return repository.withUri(originalUrl);
             }
@@ -851,10 +862,8 @@ public class MavenPomDownloader {
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         try {
-            HttpSender.Request.Builder request = httpSender.get(uriString)
-                    .withConnectTimeout(repo.getTimeout())
-                    .withReadTimeout(repo.getTimeout());
-            return sendRequest(applyAuthenticationToRequest(repo, request).build());
+            HttpSender.Request.Builder request = httpSender.get(uriString);
+            return sendRequest(applyAuthenticationAndTimeoutToRequest(repo, request).build());
         } catch (HttpSenderResponseException e) {
             if (hasCredentials(repo) && e.isClientSideException()) {
                 return retryRequestAnonymously(uriString, e);
@@ -886,8 +895,10 @@ public class MavenPomDownloader {
     /**
      * Returns a request builder with Authorization header set if the provided repository specifies credentials
      */
-    private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
+    private HttpSender.Request.Builder applyAuthenticationAndTimeoutToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
         if (mavenSettings != null && mavenSettings.getServers() != null) {
+            request.withConnectTimeout(repository.getTimeout() == null ? Duration.ofSeconds(10) : repository.getTimeout());
+            request.withReadTimeout(repository.getTimeout() == null ? Duration.ofSeconds(30) : repository.getTimeout());
             for (MavenSettings.Server server : mavenSettings.getServers().getServers()) {
                 if (server.getId().equals(repository.getId()) && server.getConfiguration() != null) {
                     MavenSettings.ServerConfiguration configuration = server.getConfiguration();
