@@ -96,13 +96,24 @@ public class XmlParser implements Parser {
                         is.isCharsetBomMarked()
                 ).visitDocument(parser.document());
                 parsingListener.parsed(input, document);
-                document = (Xml.Document) addJavaTypeOrPackageMarkers().visitDocument(document, ctx);
+                if (isSpringXmlDocument(document)) {
+                    document = (Xml.Document) addJavaTypeOrPackageMarkers().visitDocument(document, ctx);
+                }
                 return requirePrintEqualsInput(document, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
                 return ParseError.build(this, input, relativeTo, ctx, t);
             }
         });
+    }
+
+    private boolean isSpringXmlDocument(Xml.Document document) {
+        for (Xml.Attribute attrib : document.getRoot().getAttributes()) {
+            if (attrib.getKeyAsString().equals("xsi:schemaLocation") && attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
