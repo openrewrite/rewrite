@@ -1521,6 +1521,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, typeMapping.type(node));
     }
 
+    @Nullable
     @Override
     public J visitVariable(VariableTree node, Space fmt) {
         return hasFlag(node.getModifiers(), Flags.ENUM) ?
@@ -1528,8 +1529,12 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 visitVariables(singletonList(node), fmt); // method arguments cannot be multi-declarations
     }
 
-    private J.VariableDeclarations visitVariables(List<VariableTree> nodes, Space fmt) {
+    private J.@Nullable VariableDeclarations visitVariables(List<VariableTree> nodes, Space fmt) {
         JCTree.JCVariableDecl node = (JCVariableDecl) nodes.get(0);
+
+        if (isLombokGenerated(node.sym)) {
+            return null;
+        }
 
         JCExpression vartype = node.vartype;
 

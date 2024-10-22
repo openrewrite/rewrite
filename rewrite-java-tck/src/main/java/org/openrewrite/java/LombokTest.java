@@ -69,4 +69,24 @@ public class LombokTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void slf4j() {
+        rewriteRun(
+          java(
+            """
+            import lombok.extern.slf4j.Slf4j;
+            
+            import java.util.Map;
+            
+            @Slf4j
+            class A {
+                int n;
+                String string;
+                Map<String, String> map;
+            }
+            """
+          )
+        );
+    }
 }
