@@ -218,7 +218,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return annotationType.getType();
         }
 
@@ -4014,6 +4014,11 @@ public interface J extends Tree {
         @With
         @Getter
         List<Annotation> annotations;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitModifier(this, p);
+        }
 
         /**
          * @deprecated Use {@link #Modifier(UUID, Space, Markers, String, Type, List)} instead.

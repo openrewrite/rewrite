@@ -21,7 +21,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AccessLevel;
 import lombok.Value;
 import lombok.experimental.FieldDefaults;
-
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;

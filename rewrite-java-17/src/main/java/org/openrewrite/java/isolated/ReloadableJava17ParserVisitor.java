@@ -1818,6 +1818,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             case ASSERT:
             case ASSIGNMENT:
             case DO_WHILE_LOOP:
+            case IMPORT:
             case METHOD_INVOCATION:
             case NEW_CLASS:
             case THROW:

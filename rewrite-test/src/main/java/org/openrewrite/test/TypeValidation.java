@@ -80,6 +80,15 @@ public class TypeValidation {
     private boolean dependencyModel = true;
 
     /**
+     * Controls whether the recipe's usage of cursoring is validated to be acyclic.
+     * The cursor indicates a position within a tree which has no cycles. So if a cursor ever shows that an element is
+     * its own parent the recipe author has made a mistake. In some circumstances this mistake causes problems, in others
+     * it is benign.
+     */
+    @Builder.Default
+    private boolean cursorAcyclic = true;
+
+    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -90,7 +99,7 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false);
+        return new TypeValidation(false, false, false, false, false, false, false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {

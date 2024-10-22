@@ -94,7 +94,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         }
     }
 
-    protected void visitModifier(Modifier mod, PrintOutputCapture<P> p) {
+    @Override
+    public J visitModifier(Modifier mod, PrintOutputCapture<P> p) {
         visit(mod.getAnnotations(), p);
         String keyword = "";
         switch (mod.getType()) {
@@ -156,6 +157,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         beforeSyntax(mod, Space.Location.MODIFIER_PREFIX, p);
         p.append(keyword);
         afterSyntax(mod, p);
+        return mod;
     }
 
     @Override
