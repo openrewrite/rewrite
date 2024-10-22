@@ -263,6 +263,7 @@ public class VariableNameUtils {
             return super.visitVariable(variable, strings);
         }
 
+        @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> namesInScope) {
             J.Identifier v = super.visitIdentifier(identifier, namesInScope);
             if (v.getType() instanceof JavaType.Class &&
