@@ -1849,8 +1849,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    private static boolean isLombokGenerated(Symbol sym) {
-        return sym.getMetadata() != null && sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.Generated".equals(a.type.toString()));
+    private static boolean isLombokGenerated(@Nullable Symbol sym) {
+        return sym != null && sym.getMetadata() != null && sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.Generated".equals(a.type.toString()));
     }
 
     /**
