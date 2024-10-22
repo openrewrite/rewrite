@@ -247,7 +247,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                 if (!getResolutionResult().getPom().getSubprojects().isEmpty() &&
                     (getResolutionResult().getModules().isEmpty() ||
-                     anyChildIsSubProject())) {
+                     !anyChildIsSubProject())) {
                     return maven;
                 }
 
