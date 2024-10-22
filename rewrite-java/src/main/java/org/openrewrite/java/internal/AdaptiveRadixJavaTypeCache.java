@@ -16,15 +16,16 @@
 package org.openrewrite.java.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.AdaptiveRadixTree;
 
+@Incubating(since = "8.38.0")
 public class AdaptiveRadixJavaTypeCache extends JavaTypeCache {
 
     AdaptiveRadixTree<Object> typeCache = new AdaptiveRadixTree<>();
 
     @Override
     public <T> @Nullable T get(String signature) {
-        //noinspection unchecked
         return (T) typeCache.search(signature);
     }
 
