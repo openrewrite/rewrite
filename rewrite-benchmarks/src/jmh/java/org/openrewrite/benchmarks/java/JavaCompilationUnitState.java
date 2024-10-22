@@ -134,11 +134,13 @@ public class JavaCompilationUnitState {
 
         Map<String, Object> typeCache = new HashMap<>();
 
+        @Override
         public <T> @Nullable T get(String signature) {
             //noinspection unchecked
             return (T) typeCache.get(signature);
         }
 
+        @Override
         public void put(String signature, Object o) {
             typeCache.put(signature, o);
         }
@@ -147,10 +149,12 @@ public class JavaCompilationUnitState {
             return typeCache;
         }
 
+        @Override
         public void clear() {
             typeCache.clear();
         }
 
+        @Override
         public int size() {
             return typeCache.size();
         }
