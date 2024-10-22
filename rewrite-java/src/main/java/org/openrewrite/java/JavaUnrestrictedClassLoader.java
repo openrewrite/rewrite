@@ -20,14 +20,19 @@ import org.jspecify.annotations.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Rewrite's JavaParser is reliant on java's compiler internal classes that are now encapsulated within Java's
@@ -38,7 +43,7 @@ import java.util.List;
  * <p>
  * NOTE: Any classes in the package "org.openrewrite.java.isolated" will be loaded into this isolated classloader.
  */
-public class JavaUnrestrictedClassLoader extends ClassLoader {
+public class JavaUnrestrictedClassLoader extends URLClassLoader {
 
     static {
         ClassLoader.registerAsParallelCapable();
@@ -47,7 +52,19 @@ public class JavaUnrestrictedClassLoader extends ClassLoader {
     final List<Path> modules;
 
     public JavaUnrestrictedClassLoader(ClassLoader parentClassloader) {
-        super(parentClassloader);
+
+
+        this(parentClassloader, JavaParser.dependenciesFromClasspath("lombok").stream().map(it -> {
+            try {
+                return it.toUri().toURL();
+            } catch (MalformedURLException e) {
+                throw new RuntimeException(e);
+            }
+        }).collect(Collectors.toList()));
+    }
+
+    public JavaUnrestrictedClassLoader(ClassLoader parentClassloader, List<URL> jars) {
+        super(jars.toArray(new URL[0]), parentClassloader);
 
         //A list of modules to load internal classes from
         final FileSystem fs = FileSystems.getFileSystem(URI.create("jrt:/"));
@@ -89,6 +106,9 @@ public class JavaUnrestrictedClassLoader extends ClassLoader {
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
+            }
+            if(name.contains("lombok")) {
+                return findClass(name);
             }
             return super.loadClass(name);
         }
