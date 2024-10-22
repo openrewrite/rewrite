@@ -26,6 +26,7 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
+import lombok.Getter;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.ClassReader;
@@ -34,7 +35,6 @@ import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -113,8 +113,6 @@ public class ReloadableJava17Parser implements JavaParser {
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
 
-        // If lombok is on the classpath, enable it for annotation processing
-
         if(classpath!= null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
@@ -189,6 +187,7 @@ public class ReloadableJava17Parser implements JavaParser {
                 );
 
                 J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
+                //noinspection DataFlowIssue
                 cuByPath.setValue(null); // allow memory used by this JCCompilationUnit to be released
                 parsingListener.parsed(input, cu);
                 return requirePrintEqualsInput(cu, input, relativeTo, ctx);
@@ -213,22 +212,18 @@ public class ReloadableJava17Parser implements JavaParser {
         }
 
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
-
-        if (annotationProcessors.isEmpty()) {
-            acceptedInputs(sourceFiles).forEach(input1 -> {
-                try {
-                    JCTree.JCCompilationUnit jcCompilationUnit = compiler.parse(new ReloadableJava17ParserInputFileObject(input1, ctx));
-                    cus.put(input1, jcCompilationUnit);
-                } catch (IllegalStateException e) {
-                    if ("endPosTable already set".equals(e.getMessage())) {
-                        throw new IllegalStateException(
-                                "Call reset() on JavaParser before parsing another set of source files that " +
-                                "have some of the same fully qualified names. Source file [" +
-                                input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource(ctx), getCharset(ctx)) + "\n]", e);
-                    }
-                    throw e;
-                }
-            });
+        List<ReloadableJava17ParserInputFileObject> inputFileObjects = acceptedInputs(sourceFiles)
+                .map(input -> new ReloadableJava17ParserInputFileObject(input, ctx))
+                .toList();
+        if (!annotationProcessors.isEmpty()) {
+            compiler.initProcessAnnotations(annotationProcessors, inputFileObjects, emptyList());
+        }
+        try {
+            //noinspection unchecked
+            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = compiler.parseFiles(((List<JavaFileObject>) (List<?>) inputFileObjects));
+            for (int i = 0; i < inputFileObjects.size(); i++) {
+                cus.put(inputFileObjects.get(i).getInput(), jcCompilationUnits.get(i));
+            }
             try {
                 initModules(cus.values());
                 enterAll(cus.values());
@@ -239,38 +234,22 @@ public class ReloadableJava17Parser implements JavaParser {
                 while (annotate.annotationsBlocked()) {
                     annotate.unblockAnnotations(); // also flushes once unblocked
                 }
-
+                if (!annotationProcessors.isEmpty()) {
+                    compiler.processAnnotations(jcCompilationUnits, emptyList());
+                }
                 compiler.attribute(compiler.todo);
-            } catch (
-                    Throwable t) {
+            } catch (Throwable t) {
                 // when symbol entering fails on problems like missing types, attribution can often times proceed
                 // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
                 ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
             }
-        } else {
-            List<ReloadableJava17ParserInputFileObject> inputFileObjects = acceptedInputs(sourceFiles)
-                    .map(input -> new ReloadableJava17ParserInputFileObject(input, ctx))
-                    .toList();
-            compiler.initProcessAnnotations(annotationProcessors, inputFileObjects, emptyList());
-            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = compiler.parseFiles(((List<JavaFileObject>) (List<?>) inputFileObjects));
-
-            for (int i = 0; i < inputFileObjects.size(); i++) {
-                cus.put(inputFileObjects.get(i).getInput(), jcCompilationUnits.get(i));
+        } catch (IllegalStateException e) {
+            if ("endPosTable already set".equals(e.getMessage())) {
+                throw new IllegalStateException(
+                        "Call reset() on JavaParser before parsing another set of source files that " +
+                        "have some of the same fully qualified names.", e);
             }
-
-            initModules(cus.values());
-            enterAll(cus.values());
-
-            // For some reason this is necessary in JDK 9+, where the internal block counter that
-            // annotationsBlocked() tests against remains >0 after attribution.
-            Annotate annotate = Annotate.instance(context);
-            while (annotate.annotationsBlocked()) {
-                annotate.unblockAnnotations(); // also flushes once unblocked
-            }
-            // Currently this does nothing because LombokProcessor.getJavacProcessingEnvironment has an instanceof check which fails because the classloader is different
-            //
-            compiler.processAnnotations(jcCompilationUnits, emptyList());
-            compiler.attribute(compiler.todo);
+            throw e;
         }
 
         return cus;
@@ -395,6 +374,7 @@ public class ReloadableJava17Parser implements JavaParser {
 
     private static class PackageAwareJavaFileObject extends SimpleJavaFileObject {
         private final String pkg;
+        @Getter
         private final String className;
         private final byte[] classBytes;
 
@@ -426,10 +406,6 @@ public class ReloadableJava17Parser implements JavaParser {
 
         public String getPackage() {
             return pkg;
-        }
-
-        public String getClassName() {
-            return className;
         }
 
         @Override
