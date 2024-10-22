@@ -68,7 +68,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             description = "Only remove the explicit version if the managed version has the specified comparative relationship to the explicit version. " +
                           "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
                           "Default `eq`.",
-            valid = {"any", "eq", "lt", "lte", "gt", "gte"},
+            valid = {"ANY", "EQ", "LT", "LTE", "GT", "GTE"},
             required = false)
     @Nullable
     Comparator onlyIfManagedVersionIs;
