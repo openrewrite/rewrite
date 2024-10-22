@@ -263,6 +263,15 @@ public class VariableNameUtils {
             return super.visitVariable(variable, strings);
         }
 
+        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> namesInScope) {
+            J.Identifier v = super.visitIdentifier(identifier, namesInScope);
+            if (v.getType() instanceof JavaType.Class &&
+                    ((JavaType.Class) v.getType()).getKind() == JavaType.FullyQualified.Kind.Enum) {
+                namesInScope.add(v.getSimpleName());
+            }
+            return v;
+        }
+
         private void addImportedStaticFieldNames(@Nullable JavaSourceFile cu, Cursor classCursor) {
             if (cu != null) {
                 List<J.Import> imports = cu.getImports();
