@@ -44,6 +44,7 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.processing.Processor;
 import javax.tools.JavaFileManager;
@@ -61,6 +62,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -126,7 +128,7 @@ public class ReloadableJava17Parser implements JavaParser {
                 throw new RuntimeException(e);
             }
         } else {
-            annotationProcessors = Collections.emptyList();
+            annotationProcessors = emptyList();
         }
 
         // MUST be created (registered with the context) after pfm and compilerLog
@@ -147,7 +149,7 @@ public class ReloadableJava17Parser implements JavaParser {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
                     if (!log.isBlank()) {
-                        org.slf4j.LoggerFactory.getLogger(ReloadableJava17Parser.class).warn(log);
+                        LoggerFactory.getLogger(ReloadableJava17Parser.class).warn(log);
                     }
                 }
             }
@@ -246,15 +248,16 @@ public class ReloadableJava17Parser implements JavaParser {
                 ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
             }
         } else {
-            //TODO: Generalize beyond a test case where there is a single source file named "A"
-            List<JavaFileObject> inputFileObjects = acceptedInputs(sourceFiles)
-                    .map(input -> (JavaFileObject) new ReloadableJava17ParserInputFileObject(input, ctx))
+            List<ReloadableJava17ParserInputFileObject> inputFileObjects = acceptedInputs(sourceFiles)
+                    .map(input -> new ReloadableJava17ParserInputFileObject(input, ctx))
                     .toList();
-            List<String> initialClassNames = Collections.singletonList("A");
-            compiler.initProcessAnnotations(annotationProcessors, inputFileObjects, initialClassNames);
-            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = compiler.parseFiles(inputFileObjects);
+            compiler.initProcessAnnotations(annotationProcessors, inputFileObjects, emptyList());
+            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = compiler.parseFiles(((List<JavaFileObject>) (List<?>) inputFileObjects));
 
-            cus.put(sourceFiles.iterator().next(), jcCompilationUnits.get(0));
+            for (int i = 0; i < inputFileObjects.size(); i++) {
+                cus.put(inputFileObjects.get(i).getInput(), jcCompilationUnits.get(i));
+            }
+
             initModules(cus.values());
             enterAll(cus.values());
 
@@ -266,7 +269,7 @@ public class ReloadableJava17Parser implements JavaParser {
             }
             // Currently this does nothing because LombokProcessor.getJavacProcessingEnvironment has an instanceof check which fails because the classloader is different
             //
-            compiler.processAnnotations(jcCompilationUnits, initialClassNames);
+            compiler.processAnnotations(jcCompilationUnits, emptyList());
             compiler.attribute(compiler.todo);
         }
 
