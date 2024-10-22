@@ -47,4 +47,26 @@ public class LombokTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void builder() {
+        rewriteRun(
+            java(
+                """
+                import lombok.Builder;
+                
+                @Builder
+                class A {
+                    boolean b;
+                    int n;
+                    String s;
+                
+                    void test() {
+                        A a = A.builder().n(1).b(true).s("foo").build();
+                    }
+                }
+                """
+            )
+        );
+    }
 }
