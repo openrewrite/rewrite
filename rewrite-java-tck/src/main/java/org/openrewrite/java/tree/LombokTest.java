@@ -105,9 +105,12 @@ class LombokTest implements RewriteTest {
             
             @Slf4j
             class A {
-                int n;
                 String string;
                 Map<String, String> map;
+                void m() {
+                    log.info("string = " + string);
+                    log.info("map = {}", map);
+                }
             }
             """
           )
