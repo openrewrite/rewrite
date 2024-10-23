@@ -61,7 +61,7 @@ class UpgradeParentVersionTest implements RewriteTest {
     void nonMavenCentralRepository() {
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeParentVersion("org.jenkins-ci.plugins", "plugin", "4.40", null))
+            .recipe(new UpgradeParentVersion("org.jenkins-ci", "jenkins", "1.125", null))
             .executionContext(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
@@ -73,22 +73,22 @@ class UpgradeParentVersionTest implements RewriteTest {
             """
               <project>
                   <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>4.33</version>
+                      <groupId>org.jenkins-ci</groupId>
+                      <artifactId>jenkins</artifactId>
+                      <version>1.124</version>
                   </parent>
-                  <artifactId>antisamy-markup-formatter</artifactId>
+                  <artifactId>example</artifactId>
                   <version>1.0.0</version>
               </project>
               """,
             """
               <project>
                   <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>4.40</version>
+                      <groupId>org.jenkins-ci</groupId>
+                      <artifactId>jenkins</artifactId>
+                      <version>1.125</version>
                   </parent>
-                  <artifactId>antisamy-markup-formatter</artifactId>
+                  <artifactId>example</artifactId>
                   <version>1.0.0</version>
               </project>
               """
