@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("CaughtExceptionImmediatelyRethrown")
-public class LombokTest implements RewriteTest {
+class LombokTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

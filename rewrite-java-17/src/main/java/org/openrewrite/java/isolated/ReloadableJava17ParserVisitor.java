@@ -1522,8 +1522,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, typeMapping.type(node));
     }
 
-    @Nullable
-    @Override
+    public @Nullable J visitVariable(VariableTree node, Space fmt) {
     public J visitVariable(VariableTree node, Space fmt) {
         return hasFlag(node.getModifiers(), Flags.ENUM) ?
                 visitEnumVariable(node, fmt) :
