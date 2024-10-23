@@ -22,6 +22,7 @@ import java.lang.Object
 
 const val field = 10
 fun function(arg: C) {
+    val inFun = 10
 }
 
 @AnnotationWithRuntimeRetention
