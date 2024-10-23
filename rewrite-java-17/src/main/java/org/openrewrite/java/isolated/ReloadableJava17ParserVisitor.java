@@ -1235,6 +1235,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitTry(TryTree node, Space fmt) {
+        // If Lombok's @SneakyThrows is in use the whole try-catch block might not exist in source
         skip("try");
         JContainer<J.Try.Resource> resources;
         if (node.getResources().isEmpty()) {

@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
+@SuppressWarnings("CaughtExceptionImmediatelyRethrown")
 public class LombokTest implements RewriteTest {
 
     @Override
@@ -71,6 +73,28 @@ public class LombokTest implements RewriteTest {
     }
 
     @Test
+    void singular() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Builder;
+              import lombok.Singular;
+              import java.util.Collection;
+              import java.util.Set;
+              import java.util.SortedMap;
+              
+              @Builder
+              public class SingularExample<T extends Number> {
+                  private @Singular Set<String> occupations;
+                  private @Singular SortedMap<Integer, T> elves;
+                  private @Singular Collection<?> minutiae;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void slf4j() {
         rewriteRun(
           java(
@@ -86,6 +110,35 @@ public class LombokTest implements RewriteTest {
                 Map<String, String> map;
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void sneakyThrows() {
+        rewriteRun(
+          java(
+            """
+              import lombok.SneakyThrows;
+              
+              import java.nio.charset.StandardCharsets;
+              
+              public class SneakyThrowsExample implements Runnable {
+                  @SneakyThrows(UnsupportedEncodingException.class)
+                  public String utf8ToString(byte[] bytes) {
+                      return new String(bytes, StandardCharsets.UTF_8);
+                  }
+              
+                  @SneakyThrows
+                  public void run() {
+                      try {
+                          throw new Throwable();
+                      } catch (RuntimeException e) {
+                          throw e;
+                      }
+                  }
+              }
+              """
           )
         );
     }
