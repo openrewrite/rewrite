@@ -501,7 +501,7 @@ public class MavenPomDownloader {
                     return projectPom;
                 }
                 Parent parent = projectPom.getParent();
-                while (parent != null){
+                if (parent != null){
                     for (Pom project : projectPoms.values()) {
                         if (parent.getGroupId().equals(project.getGroupId()) && parent.getArtifactId().equals(project.getArtifactId())){
                             if (projectPom.getVersion().equals(project.getValue(gav.getVersion()))){
