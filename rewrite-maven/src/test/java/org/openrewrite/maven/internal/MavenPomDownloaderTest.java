@@ -727,6 +727,37 @@ class MavenPomDownloaderTest {
 
             assertThrows(IllegalArgumentException.class, () -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
         }
+
+        @Test
+        void canResolveDifferentVersionOfProjectPom() {
+            var gav = new GroupArtifactVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0");
+
+            Path pomPath = Paths.get("pom.xml");
+            Pom pom = Pom.builder()
+              .sourcePath(pomPath)
+              .repository(MAVEN_CENTRAL)
+              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+              .parent(new Parent(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", "2.7.0"), null))
+              .gav(new ResolvedGroupArtifactVersion(
+                "${REPO_URL}", "org.springframework.boot", "spring-boot-starter-parent", "2.7.0", null))
+              .build();
+
+            ResolvedPom resolvedPom = ResolvedPom.builder()
+              .requested(pom)
+              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+              .repositories(singletonList(MAVEN_CENTRAL))
+              .build();
+
+            Map<Path, Pom> pomsByPath = new HashMap<>();
+            pomsByPath.put(pomPath, pom);
+
+            String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
+            MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
+
+            MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+
+            assertDoesNotThrow(() -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
+        }
     }
 
     @Nested
