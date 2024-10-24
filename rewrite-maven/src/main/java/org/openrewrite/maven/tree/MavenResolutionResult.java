@@ -209,7 +209,7 @@ public class MavenResolutionResult implements Marker {
                 .anyMatch(gav -> gav.equals(parentGav));
     }
 
-    public boolean isAggregatingPom() {
+    public boolean isMultiModulePom() {
         return !getPom().getSubprojects().isEmpty();
     }
 
