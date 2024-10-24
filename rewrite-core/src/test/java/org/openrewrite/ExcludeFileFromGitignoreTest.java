@@ -203,7 +203,7 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
     }
 
     @Test
-    void ignoredDirectories() {
+    void ignoredExactDirectories() {
         rewriteRun(
           spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/"))),
           text(
@@ -211,6 +211,23 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               /directory/
               """,
             """
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void ignoredDirectories() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/"))),
+          text(
+            """
+              directory/
+              """,
+            """
+              directory/
+              !/directory/
               """,
             spec -> spec.path(".gitignore")
           )
