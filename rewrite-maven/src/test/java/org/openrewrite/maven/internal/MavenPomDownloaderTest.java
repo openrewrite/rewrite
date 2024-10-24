@@ -642,7 +642,7 @@ class MavenPomDownloaderTest {
 
             Path pomPath2 = Paths.get("test/pom.xml");
             Pom pom2 = Pom.builder()
-              .sourcePath(pomPath)
+              .sourcePath(pomPath2)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
               .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
@@ -696,7 +696,7 @@ class MavenPomDownloaderTest {
 
             Path pomPath2 = Paths.get("test/pom.xml");
             Pom pom2 = Pom.builder()
-              .sourcePath(pomPath)
+              .sourcePath(pomPath2)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
               .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))

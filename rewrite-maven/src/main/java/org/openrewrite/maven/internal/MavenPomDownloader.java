@@ -185,6 +185,14 @@ public class MavenPomDownloader {
         return result;
     }
 
+    private GroupArtifactVersion resolveGav(GroupArtifactVersion gav, Map<String, String> mergedProperties) {
+        return new GroupArtifactVersion(
+                    gav.getGroupId(),
+                    gav.getArtifactId(),
+                    ResolvedPom.placeholderHelper.replacePlaceholders(gav.getVersion(), mergedProperties::get)
+        );
+    }
+
     private Map<String, String> mergeProperties(final List<Pom> pomAncestry) {
         Map<String, String> mergedProperties = new HashMap<>();
         for (final Pom pom : pomAncestry) {
@@ -495,25 +503,11 @@ public class MavenPomDownloader {
 
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
-            if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                gav.getArtifactId().equals(projectPom.getArtifactId())){
-                if (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion()))) {
-                    return projectPom;
-                }
-                Parent parent = projectPom.getParent();
-                if (parent != null){
-                    for (Pom project : projectPoms.values()) {
-                        if (parent.getGroupId().equals(project.getGroupId()) && parent.getArtifactId().equals(project.getArtifactId())){
-                            if (projectPom.getVersion().equals(project.getValue(gav.getVersion()))){
-                                return projectPom;
-                            }
-                            parent = project.getParent();
-                            if (parent == null){
-                                break;
-                            }
-                        }
-                    }
-                }
+            GroupArtifactVersion resolvedGav = resolveGav(gav, mergeProperties(getAncestryWithinProject(projectPom, projectPoms)));
+            if (projectPom.getGroupId().equals(resolvedGav.getGroupId()) &&
+                projectPom.getArtifactId().equals(resolvedGav.getArtifactId()) &&
+                projectPom.getVersion().equals(resolvedGav.getVersion())) {
+                return projectPom;
             }
         }
 
