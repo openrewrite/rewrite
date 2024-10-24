@@ -21,6 +21,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Arrays;
@@ -46,27 +47,26 @@ public class ContainsPackageReference implements Trait<Tree> {
 
 
     public static class Matcher extends SimpleTraitMatcher<ContainsPackageReference> {
-        private final Pattern PACKAGE_OR_TYPE_REFERENCE = Pattern.compile("^([a-zA-Z_][a-zA-Z0-9_]*)(\\.[a-zA-Z_][a-zA-Z0-9_]*)*(\\.[A-Z][a-zA-Z0-9_]*|\\$[A-Z][a-zA-Z0-9_]*)*(\\.\\*)?$");
-        private final List<String> ATTRIBUTES_THAT_REFERENCE_PACKAGE_OR_TYPE = Arrays.asList("class", "type");
-        private final List<String> ELEMENTS_THAT_REFERENCE_PACKAGE_OR_TYPE = Arrays.asList("value");
+        private final Pattern typeReference = Pattern.compile("(?:[a-zA-Z_][a-zA-Z0-9_]*\\.)+[A-Z*][a-zA-Z0-9_]*(?:<[a-zA-Z0-9_,?<> ]*>)?");
+        XPathMatcher classXPath = new XPathMatcher("//@class");
+        XPathMatcher typeXPath = new XPathMatcher("//@type");
+        private final XPathMatcher tags = new XPathMatcher("//value");
 
         @Override
         protected @Nullable ContainsPackageReference test(Cursor cursor) {
             Object value = cursor.getValue();
             if (value instanceof Xml.Attribute) {
                 Xml.Attribute attrib = (Xml.Attribute) value;
-                if (ATTRIBUTES_THAT_REFERENCE_PACKAGE_OR_TYPE.contains(attrib.getKeyAsString())) {
-                    if (PACKAGE_OR_TYPE_REFERENCE.matcher(attrib.getValueAsString()).matches()) {
+                if (classXPath.matches(cursor) || typeXPath.matches(cursor)) {
+                    if (typeReference.matcher(attrib.getValueAsString()).matches()) {
                         return new ContainsPackageReference(cursor);
                     }
                 }
             } else if (value instanceof Xml.Tag) {
                 Xml.Tag tag = (Xml.Tag) value;
-                if (ELEMENTS_THAT_REFERENCE_PACKAGE_OR_TYPE.contains(tag.getName())) {
-                    if (tag.getValue().isPresent()) {
-                        if (PACKAGE_OR_TYPE_REFERENCE.matcher(tag.getValue().get()).matches()) {
-                            return new ContainsPackageReference(cursor);
-                        }
+                if (tags.matches(cursor)) {
+                    if (tag.getValue().isPresent() && typeReference.matcher(tag.getValue().get()).matches()) {
+                        return new ContainsPackageReference(cursor);
                     }
                 }
             }
