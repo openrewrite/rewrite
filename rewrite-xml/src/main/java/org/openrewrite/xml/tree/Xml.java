@@ -18,6 +18,7 @@ package org.openrewrite.xml.tree;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -26,10 +27,13 @@ import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.internal.JavaTypeReferences;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
 import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 
+import java.beans.Transient;
+import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -79,6 +83,7 @@ public interface Xml extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Document implements Xml, SourceFile {
         @With
         @EqualsAndHashCode.Include
@@ -141,7 +146,7 @@ public interface Xml extends Tree {
             if (this.eof.equals(eof)) {
                 return this;
             }
-            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
+            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof, javaTypeReferences);
         }
 
         @Override
@@ -162,6 +167,27 @@ public interface Xml extends Tree {
             }
             return SourceFile.super.service(service);
         }
+
+        @Nullable
+        @NonFinal
+        SoftReference<JavaTypeReferences> javaTypeReferences;
+
+        @Transient
+        public JavaTypeReferences getJavaTypeReferences() {
+            JavaTypeReferences cache;
+            if (this.javaTypeReferences == null) {
+                cache = JavaTypeReferences.build(this);
+                this.javaTypeReferences = new SoftReference<>(cache);
+            } else {
+                cache = this.javaTypeReferences.get();
+                if (cache == null || cache.getCu() != this) {
+                    cache = JavaTypeReferences.build(this);
+                    this.javaTypeReferences = new SoftReference<>(cache);
+                }
+            }
+            return cache;
+        }
+
     }
 
     @Value
@@ -304,10 +330,10 @@ public interface Xml extends Tree {
         }
 
         public Tag withName(String name) {
-            if(!name.equals(name.trim())) {
+            if (!name.equals(name.trim())) {
                 throw new IllegalArgumentException("Tag name must not contain leading or trailing whitespace");
             }
-            if(this.name.equals(name)) {
+            if (this.name.equals(name)) {
                 return this;
             }
             return new Tag(id, prefixUnsafe, markers, name, attributes, content,
@@ -654,7 +680,7 @@ public interface Xml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(onConstructor_ = { @JsonCreator })
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator})
     @With
     class DocTypeDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
@@ -675,10 +701,11 @@ public interface Xml extends Tree {
         Markers markers;
         Ident name;
         String documentDeclaration;
+
         // Override lombok default getter to avoid backwards compatibility problems with old LSTs
         public String getDocumentDeclaration() {
             //noinspection ConstantValue
-            if ( documentDeclaration == null) {
+            if (documentDeclaration == null) {
                 return "DOCTYPE";
             }
             return documentDeclaration;

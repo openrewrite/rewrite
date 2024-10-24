@@ -24,12 +24,10 @@ import org.openrewrite.trait.Trait;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.regex.Pattern;
 
 @Value
-public class ContainsPackageReference implements Trait<Tree> {
+public class JavaTypeReference implements Trait<Tree> {
     Cursor cursor;
 
     public @Nullable String getValue() {
@@ -46,27 +44,27 @@ public class ContainsPackageReference implements Trait<Tree> {
     }
 
 
-    public static class Matcher extends SimpleTraitMatcher<ContainsPackageReference> {
+    public static class Matcher extends SimpleTraitMatcher<JavaTypeReference> {
         private final Pattern typeReference = Pattern.compile("(?:[a-zA-Z_][a-zA-Z0-9_]*\\.)+[A-Z*][a-zA-Z0-9_]*(?:<[a-zA-Z0-9_,?<> ]*>)?");
         XPathMatcher classXPath = new XPathMatcher("//@class");
         XPathMatcher typeXPath = new XPathMatcher("//@type");
         private final XPathMatcher tags = new XPathMatcher("//value");
 
         @Override
-        protected @Nullable ContainsPackageReference test(Cursor cursor) {
+        protected @Nullable JavaTypeReference test(Cursor cursor) {
             Object value = cursor.getValue();
             if (value instanceof Xml.Attribute) {
                 Xml.Attribute attrib = (Xml.Attribute) value;
                 if (classXPath.matches(cursor) || typeXPath.matches(cursor)) {
                     if (typeReference.matcher(attrib.getValueAsString()).matches()) {
-                        return new ContainsPackageReference(cursor);
+                        return new JavaTypeReference(cursor);
                     }
                 }
             } else if (value instanceof Xml.Tag) {
                 Xml.Tag tag = (Xml.Tag) value;
                 if (tags.matches(cursor)) {
                     if (tag.getValue().isPresent() && typeReference.matcher(tag.getValue().get()).matches()) {
-                        return new ContainsPackageReference(cursor);
+                        return new JavaTypeReference(cursor);
                     }
                 }
             }
