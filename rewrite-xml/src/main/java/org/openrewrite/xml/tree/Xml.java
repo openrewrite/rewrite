@@ -180,7 +180,7 @@ public interface Xml extends Tree {
                 this.javaTypeReferences = new SoftReference<>(cache);
             } else {
                 cache = this.javaTypeReferences.get();
-                if (cache == null || cache.getCu() != this) {
+                if (cache == null || cache.getDocument() != this) {
                     cache = JavaTypeReferences.build(this);
                     this.javaTypeReferences = new SoftReference<>(cache);
                 }

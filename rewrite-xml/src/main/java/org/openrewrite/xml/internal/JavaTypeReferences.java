@@ -27,7 +27,7 @@ import java.util.Set;
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Getter
 public class JavaTypeReferences {
-    private final Xml.Document cu;
+    private final Xml.Document document;
     private final Set<JavaTypeReference> typeReferences;
 
     public static JavaTypeReferences build(Xml.Document doc) {
