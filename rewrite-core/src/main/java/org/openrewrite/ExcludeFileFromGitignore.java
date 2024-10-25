@@ -71,7 +71,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             }
 
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 try {
                     String gitignoreFileName = text.getSourcePath().toString();
                     gitignoreFileName = gitignoreFileName.startsWith("/") ? gitignoreFileName : "/" + gitignoreFileName;
@@ -223,7 +223,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             }
 
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 String gitignoreFileName = text.getSourcePath().toString();
                 gitignoreFileName = gitignoreFileName.startsWith("/") ? gitignoreFileName : "/" + gitignoreFileName;
                 IgnoreNode ignoreNode = acc.getRules().get(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1));
