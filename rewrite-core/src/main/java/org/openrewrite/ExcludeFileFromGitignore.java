@@ -228,7 +228,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                     for (int i = 0; i < rules.size(); i++) {
                         FastIgnoreRule ignoreRule = rules.get(i);
                         if (newRules.stream().noneMatch(rule -> rule.equalsIgnoreCase(ignoreRule.toString()))) {
-                            //TODO find the position to insert the rule using surrounding rules as best as possible
+                            //Can we not find the position to insert the rule using surrounding rules as best as possible?
                             newRules.add(ignoreRule.toString());
                         }
                     }
