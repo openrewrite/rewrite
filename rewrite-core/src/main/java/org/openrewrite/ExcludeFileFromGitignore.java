@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite;
 
 import lombok.Data;
@@ -51,8 +66,8 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
     public TreeVisitor<?, ExecutionContext> getScanner(Repository acc) {
         return new PlainTextVisitor<ExecutionContext>() {
             @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-                return super.isAcceptable(sourceFile, executionContext) && sourceFile.getSourcePath().endsWith(".gitignore");
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return super.isAcceptable(sourceFile, ctx) && sourceFile.getSourcePath().endsWith(".gitignore");
             }
 
             @Override
@@ -67,7 +82,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 } catch (IOException e) {
                     throw new RuntimeException("Unknown error udring recipe run", e);
                 }
-                return super.visitText(text, executionContext);
+                return super.visitText(text, ctx);
             }
         };
     }
@@ -173,8 +188,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             });
         }
 
-        @Nullable
-        private Boolean isIgnoredByDirectoryIssue3Bypass(String gitignoreFileName, String path) {
+        private @Nullable Boolean isIgnoredByDirectoryIssue3Bypass(String gitignoreFileName, String path) {
             List<String> ignoredDirectories = issue3IgnoredDirectories.get(gitignoreFileName);
             List<String> negatedDirectories = issue3NegatedDirectories.get(gitignoreFileName);
             if (negatedDirectories != null) {
@@ -204,8 +218,8 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
 
         return new PlainTextVisitor<ExecutionContext>() {
             @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-                return super.isAcceptable(sourceFile, executionContext) && sourceFile.getSourcePath().endsWith(".gitignore");
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return super.isAcceptable(sourceFile, ctx) && sourceFile.getSourcePath().endsWith(".gitignore");
             }
 
             @Override
@@ -241,7 +255,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                     }
                     return text.withText(sb.toString());
                 }
-                return super.visitText(text, executionContext);
+                return super.visitText(text, ctx);
             }
         };
     }
