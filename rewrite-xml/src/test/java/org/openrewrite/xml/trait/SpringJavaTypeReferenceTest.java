@@ -23,12 +23,12 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
-class JavaTypeReferenceTest implements RewriteTest {
+class SpringJavaTypeReferenceTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(RewriteTest.toRecipe(() -> new JavaTypeReference.Matcher()
-          .asVisitor(javaTypeReference -> SearchResult.found(javaTypeReference.getTree(), javaTypeReference.getValue()))));
+        spec.recipe(RewriteTest.toRecipe(() -> new SpringJavaTypeReference.Matcher()
+          .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getValue()))));
     }
 
     @SuppressWarnings("SpringXmlModelInspection")

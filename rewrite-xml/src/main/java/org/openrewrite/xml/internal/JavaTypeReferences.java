@@ -19,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.xml.trait.JavaTypeReference;
+import org.openrewrite.xml.trait.SpringJavaTypeReference;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
@@ -32,7 +33,7 @@ public class JavaTypeReferences {
 
     public static JavaTypeReferences build(Xml.Document doc) {
         Set<JavaTypeReference> typeReferences = new HashSet<>();
-        new JavaTypeReference.Matcher().asVisitor(reference -> {
+        new SpringJavaTypeReference.Matcher().asVisitor(reference -> {
             typeReferences.add(reference);
             return reference.getTree();
         }).visit(doc, null);
