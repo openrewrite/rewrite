@@ -273,4 +273,41 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void ignoreWildcardedDirectory() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/nested/"))),
+          text(
+            """
+              /**/nested/
+              """,
+            """
+              /**/nested/
+              !/directory/nested/
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void ignoreWildcardedFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/test.yml", "directory/other.txt"))),
+          text(
+            """
+              /test.*
+              /*.txt
+              """,
+            """
+              /test.*
+              /*.txt
+              !/test.yml
+              !/other.txt
+              """,
+            spec -> spec.path("directory/.gitignore")
+          )
+        );
+    }
 }
