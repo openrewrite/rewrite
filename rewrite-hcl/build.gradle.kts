@@ -26,4 +26,5 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.9.+")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
 }
