@@ -32,10 +32,7 @@ import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -241,13 +238,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
                 }
 
-                if (onlyIfUsing == null && getResolutionResult().getParent() != null && acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav())) {
+                if (onlyIfUsing == null && isSubprojectOfParentInRepository(acc)) {
                     return maven;
                 }
-
-                if (!getResolutionResult().getPom().getSubprojects().isEmpty() &&
-                    (getResolutionResult().getModules().isEmpty() ||
-                     !anyChildIsSubProject())) {
+                if (isAggregatorNotUsedAsParent()) {
                     return maven;
                 }
 
@@ -256,14 +250,28 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(document, ctx);
             }
 
-            private boolean anyChildIsSubProject() {
-                for (MavenResolutionResult child : getResolutionResult().getModules()) {
-                    if (getResolutionResult().getPom().getSubprojects().contains(child.getPom().getGav().getArtifactId())) {
-                        return true;
+            private boolean isSubprojectOfParentInRepository(Scanned acc) {
+                return getResolutionResult().getParent() != null &&
+                       acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav());
+            }
+
+            private boolean isAggregatorNotUsedAsParent() {
+                List<String> subprojects = getResolutionResult().getPom().getSubprojects();
+                if (subprojects.isEmpty()) {
+                    return false;
+                }
+                List<MavenResolutionResult> modules = getResolutionResult().getModules();
+                if (modules.isEmpty()) {
+                    return true;
+                }
+                for (MavenResolutionResult child : modules) {
+                    if (subprojects.contains(child.getPom().getGav().getArtifactId())) {
+                        return false;
                     }
                 }
-                return false;
+                return true;
             }
+
         });
     }
 
