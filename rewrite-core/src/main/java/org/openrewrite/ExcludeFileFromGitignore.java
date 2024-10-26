@@ -39,12 +39,14 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
 
     @Override
     public String getDisplayName() {
-        return "Remove ignoral of files or directories in .gitignore";
+        return "Remove ignoral of files or directories from .gitignore";
     }
 
     @Override
     public String getDescription() {
-        return "This recipe will remove a file or directory to the .gitignore file. " + "If the file or directory is already in the .gitignore file, it will be removed." + "If the file or directory is not in the .gitignore file, no action will be taken.";
+        return "This recipe will remove a file or directory from the .gitignore file. " +
+               "If the file or directory is already in the .gitignore file, it will be removed or negated." +
+               "If the file or directory is not in the .gitignore file, no action will be taken.";
     }
 
     @Option(displayName = "Paths", description = "The paths to find and remove from the gitignore files.", example = "blacklist")
@@ -57,15 +59,11 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Repository acc) {
-        return new PlainTextVisitor<ExecutionContext>() {
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return super.isAcceptable(sourceFile, ctx) && sourceFile.getSourcePath().endsWith(".gitignore");
-            }
-
+        return Preconditions.check(new FindSourceFiles("**/.gitignore"), new PlainTextVisitor<ExecutionContext>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 try {
+                    text.getSourcePath().getParent()
                     String gitignoreFileName = text.getSourcePath().toString();
                     gitignoreFileName = gitignoreFileName.startsWith("/") ? gitignoreFileName : "/" + gitignoreFileName;
                     IgnoreNode ignoreNode = new IgnoreNode();
@@ -73,11 +71,11 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                     acc.getRules().put(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1), ignoreNode);
                     acc.issue3Directories(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1), text.getText());
                 } catch (IOException e) {
-                    throw new RuntimeException("Unknown error udring recipe run", e);
+                    throw new RecipeException("Failed to parse the .gitignore file", e);
                 }
                 return super.visitText(text, ctx);
             }
-        };
+        });
     }
 
     @Data
@@ -209,12 +207,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             acc.exclude(path);
         }
 
-        return new PlainTextVisitor<ExecutionContext>() {
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return super.isAcceptable(sourceFile, ctx) && sourceFile.getSourcePath().endsWith(".gitignore");
-            }
-
+        return Preconditions.check(new FindSourceFiles("**/.gitignore"), new PlainTextVisitor<ExecutionContext>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 String gitignoreFileName = text.getSourcePath().toString();
@@ -227,13 +220,9 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                         if (line.startsWith("#") || StringUtils.isBlank(line)) {
                             return true;
                         }
-                        if (rules.stream().anyMatch(rule -> line.equalsIgnoreCase(rule.toString()))) {
-                            return true;
-                        }
-                        return false;
+                        return rules.stream().anyMatch(rule -> line.equalsIgnoreCase(rule.toString()));
                     }).collect(Collectors.toList());
-                    for (int i = 0; i < rules.size(); i++) {
-                        FastIgnoreRule ignoreRule = rules.get(i);
+                    for (FastIgnoreRule ignoreRule : rules) {
                         if (newRules.stream().noneMatch(rule -> rule.equalsIgnoreCase(ignoreRule.toString()))) {
                             //Can we not find the position to insert the rule using surrounding rules as best as possible?
                             newRules.add(ignoreRule.toString());
@@ -250,6 +239,6 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 }
                 return super.visitText(text, ctx);
             }
-        };
+        });
     }
 }
