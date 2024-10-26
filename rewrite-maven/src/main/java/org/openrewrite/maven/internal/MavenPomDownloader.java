@@ -185,14 +185,6 @@ public class MavenPomDownloader {
         return result;
     }
 
-    private GroupArtifactVersion resolveGav(GroupArtifactVersion gav, Map<String, String> mergedProperties) {
-        return new GroupArtifactVersion(
-                gav.getGroupId(),
-                gav.getArtifactId(),
-                ResolvedPom.placeholderHelper.replacePlaceholders(gav.getVersion(), mergedProperties::get)
-        );
-    }
-
     private Map<String, String> mergeProperties(final List<Pom> pomAncestry) {
         Map<String, String> mergedProperties = new HashMap<>();
         for (Pom pom : pomAncestry) {
@@ -503,10 +495,18 @@ public class MavenPomDownloader {
 
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
-            GroupArtifactVersion resolvedGav = resolveGav(gav, mergeProperties(getAncestryWithinProject(projectPom, projectPoms)));
-            if (projectPom.getGroupId().equals(resolvedGav.getGroupId()) &&
-                    projectPom.getArtifactId().equals(resolvedGav.getArtifactId()) &&
-                    projectPom.getVersion().equals(resolvedGav.getVersion())) {
+            if (!projectPom.getGroupId().equals(gav.getGroupId()) ||
+                !projectPom.getArtifactId().equals(gav.getArtifactId())) {
+                continue;
+            }
+
+            if (projectPom.getVersion().equals(gav.getVersion())) {
+                return projectPom;
+            }
+
+            Map<String, String> mergedProperties = mergeProperties(getAncestryWithinProject(projectPom, projectPoms));
+            String versionWithReplacements = ResolvedPom.placeholderHelper.replacePlaceholders(gav.getVersion(), mergedProperties::get);
+            if (projectPom.getVersion().equals(versionWithReplacements)) {
                 return projectPom;
             }
         }
