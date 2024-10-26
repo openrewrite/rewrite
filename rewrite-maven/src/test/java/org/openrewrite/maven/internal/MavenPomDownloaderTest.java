@@ -624,9 +624,9 @@ class MavenPomDownloaderTest {
         void shouldNotThrowExceptionForModulesInModulesWithRightProperty() {
             var gav = new GroupArtifactVersion("test", "test2", "${test}");
 
-            Path pomPath = Paths.get("test/test2/pom.xml");
+            Path testTest2PomXml = Paths.get("test/test2/pom.xml");
             Pom pom = Pom.builder()
-              .sourcePath(pomPath)
+              .sourcePath(testTest2PomXml)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
               .parent(new Parent(new GroupArtifactVersion("test", "test", "${test}"), "../pom.xml"))
@@ -640,9 +640,9 @@ class MavenPomDownloaderTest {
               .repositories(singletonList(MAVEN_CENTRAL))
               .build();
 
-            Path pomPath2 = Paths.get("test/pom.xml");
+            Path testPomXml = Paths.get("test/pom.xml");
             Pom pom2 = Pom.builder()
-              .sourcePath(pomPath2)
+              .sourcePath(testPomXml)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
               .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
@@ -651,9 +651,9 @@ class MavenPomDownloaderTest {
               .build();
 
 
-            Path parentPomPath = Paths.get("pom.xml");
+            Path rootPomXml = Paths.get("pom.xml");
             Pom parentPom = Pom.builder()
-              .sourcePath(parentPomPath)
+              .sourcePath(rootPomXml)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("test", "7.0.0"))
               .parent(null)
@@ -662,9 +662,9 @@ class MavenPomDownloaderTest {
               .build();
 
             Map<Path, Pom> pomsByPath = new HashMap<>();
-            pomsByPath.put(parentPomPath, parentPom);
-            pomsByPath.put(pomPath, pom);
-            pomsByPath.put(pomPath2, pom2);
+            pomsByPath.put(rootPomXml, parentPom);
+            pomsByPath.put(testTest2PomXml, pom);
+            pomsByPath.put(testPomXml, pom2);
 
             String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
             MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
@@ -678,9 +678,9 @@ class MavenPomDownloaderTest {
         void shouldThrowExceptionForModulesInModulesWithNoRightProperty() {
             var gav = new GroupArtifactVersion("test", "test2", "${test}");
 
-            Path pomPath = Paths.get("test/test2/pom.xml");
+            Path testTest2PomXml = Paths.get("test/test2/pom.xml");
             Pom pom = Pom.builder()
-              .sourcePath(pomPath)
+              .sourcePath(testTest2PomXml)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
               .parent(new Parent(new GroupArtifactVersion("test", "test", "${test}"), "../pom.xml"))
@@ -694,9 +694,9 @@ class MavenPomDownloaderTest {
               .repositories(singletonList(MAVEN_CENTRAL))
               .build();
 
-            Path pomPath2 = Paths.get("test/pom.xml");
+            Path testPomXml = Paths.get("test/pom.xml");
             Pom pom2 = Pom.builder()
-              .sourcePath(pomPath2)
+              .sourcePath(testPomXml)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
               .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
@@ -705,9 +705,9 @@ class MavenPomDownloaderTest {
               .build();
 
 
-            Path parentPomPath = Paths.get("pom.xml");
+            Path rootPomXml = Paths.get("pom.xml");
             Pom parentPom = Pom.builder()
-              .sourcePath(parentPomPath)
+              .sourcePath(rootPomXml)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("tt", "7.0.0"))
               .parent(null)
@@ -716,9 +716,9 @@ class MavenPomDownloaderTest {
               .build();
 
             Map<Path, Pom> pomsByPath = new HashMap<>();
-            pomsByPath.put(parentPomPath, parentPom);
-            pomsByPath.put(pomPath, pom);
-            pomsByPath.put(pomPath2, pom2);
+            pomsByPath.put(rootPomXml, parentPom);
+            pomsByPath.put(testTest2PomXml, pom);
+            pomsByPath.put(testPomXml, pom2);
 
             String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
             MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
