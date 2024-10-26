@@ -27,18 +27,11 @@ import org.openrewrite.text.PlainTextVisitor;
 import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.openrewrite.ExcludeFileFromGitignore.Repository;
-import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.CHECK_PARENT;
-import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.IGNORED;
-import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.NOT_IGNORED;
+import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -96,10 +89,10 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
         public void exclude(String path) {
             String normalizedPath = path.startsWith("/") ? path : "/" + path;
             List<String> impactingFiles = rules.keySet()
-                                               .stream()
-                                               .filter(k -> normalizedPath.toLowerCase().startsWith(k.toLowerCase()))
-                                               .sorted(Comparator.comparingInt(String::length).reversed())
-                                               .collect(Collectors.toList());
+                    .stream()
+                    .filter(k -> normalizedPath.toLowerCase().startsWith(k.toLowerCase()))
+                    .sorted(Comparator.comparingInt(String::length).reversed())
+                    .collect(Collectors.toList());
 
             IgnoreNode.MatchResult isIgnored;
             boolean isDirectory = path.endsWith("/");

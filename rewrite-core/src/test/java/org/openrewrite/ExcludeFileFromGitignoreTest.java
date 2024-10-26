@@ -24,6 +24,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class ExcludeFileFromGitignoreTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void removesEntryIfExactPathMatch() {
         rewriteRun(
@@ -173,19 +174,22 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               """,
             spec -> spec.path(".gitignore")
           ),
-            text(
-                """
-                otherfile.yml
-                """,
-                spec -> spec.path("directory/.gitignore")
-            )
+          text(
+            """
+              otherfile.yml
+              """,
+            spec -> spec.path("directory/.gitignore")
+          )
         );
     }
 
     @Test
     void multiplePaths() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/test.yml", "otherdirectory/otherfile.yml", "directory/nested/not-ignored.yml"))),
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of(
+            "directory/test.yml",
+            "otherdirectory/otherfile.yml",
+            "directory/nested/not-ignored.yml"))),
           text(
             """
               test.yml
