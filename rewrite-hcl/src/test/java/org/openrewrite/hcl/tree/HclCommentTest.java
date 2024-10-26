@@ -108,10 +108,10 @@ class HclCommentTest implements RewriteTest {
         rewriteRun(
           hcl(
             """
-                locals {
-                  a = 3
-                }
-                # Nice code, right?
+              locals {
+                a = 3
+              }
+              # Nice code, right?
               """
           )
         );
