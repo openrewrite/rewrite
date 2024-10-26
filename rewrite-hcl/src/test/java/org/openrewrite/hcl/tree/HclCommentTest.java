@@ -71,9 +71,29 @@ class HclCommentTest implements RewriteTest {
                   myvar = {
                     # below {attributes}
                     myattribute = "myvalue"
-
+              
                     # add more attributes {here}
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void inLineCommentsNextLineAttribute() {
+        rewriteRun(
+          hcl(
+            """
+              # test
+              /*
+               multiline
+              */
+              resource {
+                  # test
+                  // test
+                  a = 1
+                  // test 3
               }
               """
           )

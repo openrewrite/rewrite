@@ -740,6 +740,9 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                         delimIndex++;
                     } else switch (source.substring(delimIndex, delimIndex + 2)) {
                         case "//":
+                            inSingleLineComment = true;
+                            delimIndex++;
+                            break;
                         case "/*":
                             inMultiLineComment = true;
                             delimIndex++;
