@@ -172,10 +172,10 @@ public class MavenPomDownloader {
 
     private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
         Map<GroupArtifactVersion, Pom> result = new HashMap<>();
-        for (final Pom projectPom : projectPoms.values()) {
-            final List<Pom> ancestryWithinProject = getAncestryWithinProject(projectPom, projectPoms);
-            final Map<String, String> mergedProperties = mergeProperties(ancestryWithinProject);
-            final GroupArtifactVersion gav = new GroupArtifactVersion(
+        for (Pom projectPom : projectPoms.values()) {
+            List<Pom> ancestryWithinProject = getAncestryWithinProject(projectPom, projectPoms);
+            Map<String, String> mergedProperties = mergeProperties(ancestryWithinProject);
+            GroupArtifactVersion gav = new GroupArtifactVersion(
                     projectPom.getGroupId(),
                     projectPom.getArtifactId(),
                     ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getVersion(), mergedProperties::get)
@@ -187,8 +187,8 @@ public class MavenPomDownloader {
 
     private Map<String, String> mergeProperties(final List<Pom> pomAncestry) {
         Map<String, String> mergedProperties = new HashMap<>();
-        for (final Pom pom : pomAncestry) {
-            for (final Map.Entry<String, String> property : pom.getProperties().entrySet()) {
+        for (Pom pom : pomAncestry) {
+            for (Map.Entry<String, String> property : pom.getProperties().entrySet()) {
                 mergedProperties.putIfAbsent(property.getKey(), property.getValue());
             }
         }
@@ -205,7 +205,7 @@ public class MavenPomDownloader {
     }
 
     private @Nullable Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
-        final Parent parent = projectPom.getParent();
+        Parent parent = projectPom.getParent();
         if (parent == null || projectPom.getSourcePath() == null) {
             return null;
         }
@@ -488,32 +488,26 @@ public class MavenPomDownloader {
 
         // The pom being examined might be from a remote repository or a local filesystem.
         // First try to match the requested download with one of the project POMs.
-        final Pom projectPomWithResolvedVersion = projectPomsByGav.get(gav);
+        Pom projectPomWithResolvedVersion = projectPomsByGav.get(gav);
         if (projectPomWithResolvedVersion != null) {
             return projectPomWithResolvedVersion;
         }
 
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
-            if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                gav.getArtifactId().equals(projectPom.getArtifactId())){
-                if (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion()))) {
-                    return projectPom;
-                }
-                Parent parent = projectPom.getParent();
-                if (parent != null){
-                    for (Pom project : projectPoms.values()) {
-                        if (parent.getGroupId().equals(project.getGroupId()) && parent.getArtifactId().equals(project.getArtifactId())){
-                            if (projectPom.getVersion().equals(project.getValue(gav.getVersion()))){
-                                return projectPom;
-                            }
-                            parent = project.getParent();
-                            if (parent == null){
-                                break;
-                            }
-                        }
-                    }
-                }
+            if (!projectPom.getGroupId().equals(gav.getGroupId()) ||
+                !projectPom.getArtifactId().equals(gav.getArtifactId())) {
+                continue;
+            }
+
+            if (projectPom.getVersion().equals(gav.getVersion())) {
+                return projectPom;
+            }
+
+            Map<String, String> mergedProperties = mergeProperties(getAncestryWithinProject(projectPom, projectPoms));
+            String versionWithReplacements = ResolvedPom.placeholderHelper.replacePlaceholders(gav.getVersion(), mergedProperties::get);
+            if (projectPom.getVersion().equals(versionWithReplacements)) {
+                return projectPom;
             }
         }
 
@@ -649,7 +643,7 @@ public class MavenPomDownloader {
     private GroupArtifactVersion handleSnapshotTimestampVersion(GroupArtifactVersion gav) {
         Matcher m = SNAPSHOT_TIMESTAMP.matcher(requireNonNull(gav.getVersion()));
         if (m.matches()) {
-            final String baseVersion;
+            String baseVersion;
             if (m.group(1) != null) {
                 baseVersion = m.group(1) + SNAPSHOT;
             } else {
