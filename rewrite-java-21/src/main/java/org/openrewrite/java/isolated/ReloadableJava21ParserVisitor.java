@@ -21,7 +21,6 @@ import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -1668,7 +1667,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             cursor += prefix.length();
             // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
             Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
-            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, (JCTree) t);
+            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
             @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
             return j;
         } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
@@ -2009,7 +2008,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 } else {
                     leadingAnnotations.add(annotation);
                 }
-                i = cursor -1;
+                i = cursor - 1;
                 lastAnnotationPosition = cursor;
                 continue;
             }
