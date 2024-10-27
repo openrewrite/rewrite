@@ -475,6 +475,12 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   String alwaysA4() {
                       return !false ? "a" : "b";
                   }
+                  String alwaysA5() {
+                      return (!false) ? "a" : "b";
+                  }
+                  String alwaysA6() {
+                      return !(false) ? "a" : "b";
+                  }
                   String alwaysB() {
                       return false ? "a" : "b";
                   }
@@ -492,6 +498,12 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       return "a";
                   }
                   String alwaysA4() {
+                      return "a";
+                  }
+                  String alwaysA5() {
+                      return "a";
+                  }
+                  String alwaysA6() {
                       return "a";
                   }
                   String alwaysB() {
