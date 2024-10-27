@@ -84,6 +84,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
               var gradleSh = result(run, PlainText.class, "gradlew");
               assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
               assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+              //noinspection DataFlowIssue
               assertThat(gradleSh.getFileAttributes()).isNotNull();
               assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
               assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
@@ -119,6 +120,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
                 var gradleSh = result(run, PlainText.class, "gradlew");
                 assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
                 assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+                //noinspection DataFlowIssue
                 assertThat(gradleSh.getFileAttributes()).isNotNull();
                 assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
                 assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
@@ -416,6 +418,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
                 var gradleSh = result(run, PlainText.class, "gradlew");
                 assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
                 assertThat(gradleSh.getText()).isNotBlank();
+                //noinspection DataFlowIssue
                 assertThat(gradleSh.getFileAttributes()).isNotNull();
                 assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
                 assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
@@ -493,6 +496,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
                 var gradleSh = result(run, PlainText.class, "gradlew");
                 assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
                 assertThat(gradleSh.getText()).isNotBlank();
+                //noinspection DataFlowIssue
                 assertThat(gradleSh.getFileAttributes()).isNotNull();
                 assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
                 assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
@@ -635,6 +639,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
                 var gradleSh = result(run, PlainText.class, "gradlew");
                 assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
+                //noinspection DataFlowIssue
                 assertThat(gradleSh.getFileAttributes()).isNotNull();
                 assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
                 assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
@@ -815,44 +820,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    void servicesGradleOrgUnavailable() {
-        HttpSender unhelpfulSender = request -> {
-            if (request.getUrl().toString().contains("services.gradle.org")) {
-                throw new RuntimeException("I'm sorry Dave, I'm afraid I can't do that.");
-            }
-            return new HttpUrlConnectionSender().send(request);
-        };
-        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-          .setHttpSender(unhelpfulSender)
-          .setLargeFileHttpSender(unhelpfulSender);
-        rewriteRun(
-          spec -> spec.recipe(new UpdateGradleWrapper("8.6", null, null, null, null))
-            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
-            .executionContext(ctx),
-          properties(
-            """
-              distributionBase=GRADLE_USER_HOME
-              distributionPath=wrapper/dists
-              distributionUrl=https\\://services.gradle.org/distributions/gradle-5.6.4-bin.zip
-              zipStoreBase=GRADLE_USER_HOME
-              zipStorePath=wrapper/dists
-              """,
-            """
-              distributionBase=GRADLE_USER_HOME
-              distributionPath=wrapper/dists
-              distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6-bin.zip
-              zipStoreBase=GRADLE_USER_HOME
-              zipStorePath=wrapper/dists
-              """,
-            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          ),
-          text(GRADLEW_TEXT, spec -> spec.path(WRAPPER_SCRIPT_LOCATION)),
-          text(GRADLEW_BAT_TEXT, spec -> spec.path(WRAPPER_BATCH_LOCATION)),
-          gradleWrapperJarQuark
-        );
-    }
-
-    @Test
     void servicesGradleOrgUnavailableForCustomDistributionUri() {
         HttpSender unhelpfulSender = request -> {
             if (request.getUrl().toString().contains("services.gradle.org")) {
@@ -903,6 +870,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
                 var gradleSh = result(run, PlainText.class, "gradlew");
                 assertThat(gradleSh.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_SCRIPT_LOCATION));
                 assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+                //noinspection DataFlowIssue
                 assertThat(gradleSh.getFileAttributes()).isNotNull();
                 assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
                 assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();

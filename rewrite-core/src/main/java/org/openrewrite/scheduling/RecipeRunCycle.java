@@ -97,6 +97,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                             });
                         } catch (Throwable t) {
                             after = handleError(recipe, source, after, t);
+                            // We don't normally consider anything the scanning phase does to be a change
+                            // But this simplifies error reporting so that exceptions can all be handled the same
+                            assert after != null;
+                            after = addRecipesThatMadeChanges(recipeStack, after);
                         }
                     }
                     return after;

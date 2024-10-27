@@ -71,4 +71,21 @@ class NoMutableStaticFieldsInRecipesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void retainWhenWarningsSuppressed() {
+        rewriteRun(
+          java(
+            """
+              import org.openrewrite.Recipe;
+              
+              public class A extends Recipe {
+                  static final int immutable = 0;
+                  @SuppressWarnings("unused")
+                  static int mutable = 0;
+              }
+              """
+          )
+        );
+    }
 }

@@ -428,13 +428,12 @@ class FindTypesTest implements RewriteTest {
 
     @Test
     void javadocComment() {
-
         rewriteRun(
           spec -> spec.recipe(new FindTypes("java.lang.String", true)),
           java(
             """
-                    public class A {               
-                      /** 
+                    public class A {
+                      /**
                         * JavaDoc comment with {{@link String#trim()}}
                         * JavaDoc comment with String#trim()
                         */
@@ -444,7 +443,7 @@ class FindTypesTest implements RewriteTest {
                     }
                     """,
             """
-                    public class A {               
+                    public class A {
                       /**
                         * JavaDoc comment with {{@link ~~>String#trim()}}
                         * JavaDoc comment with String#trim()

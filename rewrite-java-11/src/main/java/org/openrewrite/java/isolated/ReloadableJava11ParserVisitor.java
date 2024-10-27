@@ -1476,8 +1476,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                     elementType = ((JCArrayTypeTree) elementType).elemtype;
                 }
             }
-            String check = source.substring(elementType.getEndPosition(endPosTable)).trim();
-            typeExpr = check.startsWith("@") || check.startsWith("[") ? convert(vartype) :
+            int idx = indexOfNextNonWhitespace(elementType.getEndPosition(endPosTable), source);
+            typeExpr = idx != -1 && (source.charAt(idx) == '[' || source.charAt(idx) == '@') ? convert(vartype) :
                     // we'll capture the array dimensions in a bit, just convert the element type
                     convert(elementType);
         } else {
@@ -1682,6 +1682,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 t instanceof JCBreak ||
                 t instanceof JCContinue ||
                 t instanceof JCDoWhileLoop ||
+                t instanceof JCImport ||
                 t instanceof JCMethodInvocation ||
                 t instanceof JCNewClass ||
                 t instanceof JCReturn ||

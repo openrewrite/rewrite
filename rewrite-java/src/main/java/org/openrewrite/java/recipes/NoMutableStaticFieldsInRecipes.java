@@ -21,6 +21,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
@@ -48,7 +49,9 @@ public class NoMutableStaticFieldsInRecipes extends Recipe {
                             return cd.withBody(cd.getBody().withStatements(ListUtils.map(cd.getBody().getStatements(), stmt -> {
                                         if (stmt instanceof J.VariableDeclarations) {
                                             J.VariableDeclarations field = (J.VariableDeclarations) stmt;
-                                            if (field.hasModifier(J.Modifier.Type.Static) && !field.hasModifier(J.Modifier.Type.Final)) {
+                                            if (field.hasModifier(J.Modifier.Type.Static) &&
+                                                !field.hasModifier(J.Modifier.Type.Final) &&
+                                                FindAnnotations.find(field, "@java.lang.SuppressWarnings").isEmpty()) {
                                                 // We want to discourage the use of mutable static fields in recipes,
                                                 // so rather than make them immutable, we'll just remove the field.
                                                 // Any fields that were intended as constants should be made final.

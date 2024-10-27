@@ -104,7 +104,7 @@ public class FindTypes extends Recipe {
                 JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(j.getType());
                 typeUses.insertRow(ctx, new TypeUses.Row(
                         getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
-                        j.printTrimmed(getCursor()),
+                        j.printTrimmed(getCursor().getParentTreeCursor()),
                         fqn == null ? j.getType().toString() : fqn.getFullyQualifiedName()
                 ));
                 return SearchResult.found(j);
@@ -112,6 +112,7 @@ public class FindTypes extends Recipe {
         });
     }
 
+    @SuppressWarnings("unused")
     public static Set<NameTree> findAssignable(J j, String fullyQualifiedClassName) {
         return find(true, j, fullyQualifiedClassName);
     }
