@@ -24,7 +24,6 @@ import org.openrewrite.jgit.ignore.IgnoreNode;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
-import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.*;
@@ -36,6 +35,11 @@ import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.*;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
+
+    @Option(displayName = "Paths", description = "The paths to find and remove from the gitignore files. \n" +
+            "Paths must start at root of the project (with a slash at the beginning) OR " +
+            "they can be file names which match all files in an optionally given folder (no slash at the beginning).", example = "/folder/file.txt")
+    List<String> paths;
 
     @Override
     public String getDisplayName() {
@@ -49,9 +53,6 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                "If the file or directory is not in the .gitignore file, no action will be taken.";
     }
 
-    @Option(displayName = "Paths", description = "The paths to find and remove from the gitignore files.", example = "blacklist")
-    List<String> paths;
-
     @Override
     public Repository getInitialValue(ExecutionContext ctx) {
         return new Repository();
@@ -63,140 +64,13 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 try {
-                    String gitignoreFileName = text.getSourcePath().toString();
-                    gitignoreFileName = gitignoreFileName.startsWith("/") ? gitignoreFileName : "/" + gitignoreFileName;
-                    IgnoreNode ignoreNode = new IgnoreNode();
-                    ignoreNode.parse(gitignoreFileName, new ByteArrayInputStream(text.getText().getBytes()));
-                    acc.getRules().put(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1), ignoreNode);
-                    acc.issue3Directories(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1), text.getText());
+                    acc.addGitignoreFile(text);
                 } catch (IOException e) {
                     throw new RecipeException("Failed to parse the .gitignore file", e);
                 }
                 return super.visitText(text, ctx);
             }
         });
-    }
-
-    @Data
-    public static class Repository {
-        private final Map<String, IgnoreNode> rules = new HashMap<>();
-        private final Map<String, List<String>> issue3IgnoredDirectories = new HashMap<>();
-        private final Map<String, List<String>> issue3NegatedDirectories = new HashMap<>();
-
-        public void exclude(String path) {
-            String normalizedPath = path.startsWith("/") ? path : "/" + path;
-            List<String> impactingFiles = rules.keySet()
-                    .stream()
-                    .filter(k -> normalizedPath.toLowerCase().startsWith(k.toLowerCase()))
-                    .sorted(Comparator.comparingInt(String::length).reversed())
-                    .collect(Collectors.toList());
-
-            IgnoreNode.MatchResult isIgnored;
-            boolean isDirectory = path.endsWith("/");
-            for (String impactingFile : impactingFiles) {
-                IgnoreNode ignoreNode = rules.get(impactingFile);
-                String nestedPath = normalizedPath.substring(impactingFile.length() - 1);
-                isIgnored = ignoreNode.isIgnored(nestedPath, isDirectory);
-                // Overcoming issue3 in jgit repo for the pathMatch being false
-                if (CHECK_PARENT.equals(isIgnored) && isDirectory) {
-                    List<FastIgnoreRule> rules = ignoreNode.getRules();
-                    for (int i = rules.size() - 1; i > -1; i--) {
-                        FastIgnoreRule rule = rules.get(i);
-                        if (rule.isMatch(nestedPath, true, false)) {
-                            if (rule.getResult()) {
-                                isIgnored = IGNORED;
-                            } else {
-                                isIgnored = NOT_IGNORED;
-                            }
-                            break;
-                        }
-                    }
-                }
-                // Overcoming issue3 in jgit repo for the single directory rules
-                if (CHECK_PARENT.equals(isIgnored)) {
-                    Boolean ignored = isIgnoredByDirectoryIssue3Bypass(impactingFile, nestedPath);
-                    if (ignored != null) {
-                        if (ignored) {
-                            isIgnored = IGNORED;
-                        } else {
-                            isIgnored = NOT_IGNORED;
-                        }
-                    }
-                }
-                if (CHECK_PARENT.equals(isIgnored)) {
-                    continue;
-                }
-                if (IGNORED.equals(isIgnored)) {
-                    List<FastIgnoreRule> remainingRules = new ArrayList<>();
-                    for (FastIgnoreRule rule : ignoreNode.getRules()) {
-                        // First 2 if clauses are for the jgit issue (#3) opened at openrewrite/jgit
-                        if (issue3IgnoredDirectories.getOrDefault(impactingFile, new ArrayList<>()).stream().anyMatch(nestedPath::equalsIgnoreCase)) {
-                            continue;
-                        } else if (issue3IgnoredDirectories.getOrDefault(impactingFile, new ArrayList<>()).stream().anyMatch(nestedPath::startsWith)) {
-                            remainingRules.add(rule);
-                            remainingRules.add(new FastIgnoreRule("!" + nestedPath));
-                            continue;
-                        } else if (!rule.isMatch(nestedPath, isDirectory, true) || !rule.getResult()) {
-                            remainingRules.add(rule);
-                            continue;
-                        } else if (rule.toString().equals(nestedPath)) {
-                            continue;
-                        } else if (rule.getNameOnly() || rule.dirOnly()) {
-                            remainingRules.add(rule);
-                            remainingRules.add(new FastIgnoreRule("!" + nestedPath));
-                            continue;
-                        }
-                        remainingRules.add(rule);
-                    }
-                    IgnoreNode replacedNode = new IgnoreNode(remainingRules);
-                    rules.put(impactingFile, replacedNode);
-                    if (CHECK_PARENT.equals(replacedNode.isIgnored(nestedPath, isDirectory))) {
-                        continue;
-                    }
-                }
-                break;
-            }
-        }
-
-        public void issue3Directories(final String gitignoreFileName, final String ignoreFile) {
-            Arrays.stream(ignoreFile.split("\\r?\\n")).forEach(line -> {
-                if (line.startsWith("#") || StringUtils.isBlank(line)) {
-                    return;
-                }
-                Map<String, List<String>> directories = issue3IgnoredDirectories;
-                if (line.startsWith("!")) {
-                    line = line.substring(1);
-                    directories = issue3NegatedDirectories;
-                }
-                if (!line.startsWith("/")) {
-                    // lines not starting with / are not exact directory matches but equivalent to **/line/
-                    return;
-                }
-                if (line.endsWith("/")) {
-                    directories.computeIfAbsent(gitignoreFileName, k -> new ArrayList<>()).add(line);
-                }
-            });
-        }
-
-        private @Nullable Boolean isIgnoredByDirectoryIssue3Bypass(String gitignoreFileName, String path) {
-            List<String> ignoredDirectories = issue3IgnoredDirectories.get(gitignoreFileName);
-            List<String> negatedDirectories = issue3NegatedDirectories.get(gitignoreFileName);
-            if (negatedDirectories != null) {
-                for (String negatedDirectory : negatedDirectories) {
-                    if (path.startsWith(negatedDirectory)) {
-                        return false;
-                    }
-                }
-            }
-            if (ignoredDirectories != null) {
-                for (String ignoredDirectory : ignoredDirectories) {
-                    if (path.startsWith(ignoredDirectory)) {
-                        return true;
-                    }
-                }
-            }
-            return null;
-        }
     }
 
     @Override
@@ -239,5 +113,91 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 return super.visitText(text, ctx);
             }
         });
+    }
+
+    @Data
+    public static class Repository {
+        private final Map<String, IgnoreNode> rules = new HashMap<>();
+
+        public void exclude(String path) {
+            String normalizedPath = path.startsWith("/") ? path : "/" + path;
+            List<String> impactingFiles = rules.keySet()
+                    .stream()
+                    .filter(k -> normalizedPath.toLowerCase().startsWith(k.toLowerCase()))
+                    .sorted(Comparator.comparingInt(String::length).reversed())
+                    .collect(Collectors.toList());
+
+            IgnoreNode.MatchResult isIgnored;
+            for (String impactingFile : impactingFiles) {
+                IgnoreNode ignoreNode = rules.get(impactingFile);
+                String nestedPath = normalizedPath.substring(impactingFile.length() - 1);
+                isIgnored = isIgnored(ignoreNode, nestedPath);
+                if (CHECK_PARENT.equals(isIgnored)) {
+                    continue;
+                }
+                if (IGNORED.equals(isIgnored)) {
+                    List<FastIgnoreRule> remainingRules = new ArrayList<>();
+                    for (FastIgnoreRule rule : ignoreNode.getRules()) {
+                        if (!rule.getResult() || !isMatch(rule, nestedPath)) {
+                            // If this rule has nothing to do with the path to remove / it is a negated rule, we keep it.
+                            remainingRules.add(rule);
+                            continue;
+                        } else if (rule.toString().equals(nestedPath)) {
+                            // If this rule is an exact match to the path to remove, we remove it.
+                            continue;
+                        } else if (isMatch(rule, nestedPath)) {
+                            // If this rule is a directory match, we need to negate the rule for the given path.
+                            remainingRules.add(rule);
+                            remainingRules.add(new FastIgnoreRule("!" + nestedPath));
+                            continue;
+                        }
+                        // If we still have the rule, we keep it. --> not making changes to an unknown flow.
+                        remainingRules.add(rule);
+                    }
+                    IgnoreNode replacedNode = new IgnoreNode(remainingRules);
+                    rules.put(impactingFile, replacedNode);
+                    if (CHECK_PARENT.equals(isIgnored(replacedNode, nestedPath))) {
+                        continue;
+                    }
+                }
+                // There is already an ignore rule for the path, so not needed to check parent rules.
+                break;
+            }
+        }
+
+        public void addGitignoreFile(PlainText text) throws IOException {
+            String gitignoreFileName = text.getSourcePath().toString();
+            gitignoreFileName = gitignoreFileName.startsWith("/") ? gitignoreFileName : "/" + gitignoreFileName;
+            IgnoreNode ignoreNode = new IgnoreNode();
+            ignoreNode.parse(gitignoreFileName, new ByteArrayInputStream(text.getText().getBytes()));
+            getRules().put(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1), ignoreNode);
+        }
+
+        // We do not use jgit's IgnoreNode#isIgnored method because it does not handle the directory correct always.
+        // See the difference between rule.isMatch in the pathMatch parameter.
+        private boolean isMatch(FastIgnoreRule rule, String path) {
+            String rulePath = rule.toString();
+            if (rulePath.startsWith("!")) {
+                rulePath = rulePath.substring(1);
+            }
+            if (rule.dirOnly() && path.contains(rulePath)) {
+                return rule.isMatch(path, true, false);
+            }
+            return rule.isMatch(path, true, true);
+        }
+
+        private IgnoreNode.MatchResult isIgnored(IgnoreNode ignoreNode, String path) {
+            for (int i = ignoreNode.getRules().size() - 1; i > -1; i--) {
+                FastIgnoreRule rule = ignoreNode.getRules().get(i);
+                if (isMatch(rule, path)) {
+                    if (rule.getResult()) {
+                        return IGNORED;
+                    } else {
+                        return NOT_IGNORED;
+                    }
+                }
+            }
+            return CHECK_PARENT;
+        }
     }
 }
