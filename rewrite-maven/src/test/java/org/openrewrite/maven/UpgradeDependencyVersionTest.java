@@ -39,82 +39,6 @@ import static org.openrewrite.maven.Assertions.pomXml;
 class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
-    @Issue("https://github.com/openrewrite/rewrite-spring/issues/474")
-    void upgradePropertyAdditionalCheck() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework", "*", "5.2.x", "",
-            false, null)).expectedCyclesThatMakeChanges(2),
-          mavenProject("project",
-            //language=xml
-            pomXml(
-              """
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                	<modelVersion>4.0.0</modelVersion>
-                	<groupId>com.openrewrite.example</groupId>
-                	<artifactId>example</artifactId>
-                	<version>0.0.1-SNAPSHOT</version>
-                	<name>example</name>
-                	<description>Demo project for Spring Boot</description>
-                	<properties>
-                		<spring.boot.version>2.2.13.RELEASE</spring.boot.version>
-                		<spring.jms.version>5.2.22.RELEASE</spring.jms.version>
-                	</properties>
-                	<dependencyManagement>
-                		<dependencies>
-                			<dependency>
-                				<groupId>org.springframework.boot</groupId>
-                				<artifactId>spring-boot-dependencies</artifactId>
-                				<version>${spring.boot.version}</version>
-                				<type>pom</type>
-                				<scope>import</scope>
-                			</dependency>
-                			<dependency>
-                				<groupId>org.springframework</groupId>
-                				<artifactId>spring-jms</artifactId>
-                				<version>${spring.jms.version}</version>
-                			</dependency>
-                		</dependencies>
-                	</dependencyManagement>
-                </project>
-                """,
-              """
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                	<modelVersion>4.0.0</modelVersion>
-                	<groupId>com.openrewrite.example</groupId>
-                	<artifactId>example</artifactId>
-                	<version>0.0.1-SNAPSHOT</version>
-                	<name>example</name>
-                	<description>Demo project for Spring Boot</description>
-                	<properties>
-                		<spring.boot.version>2.2.13.RELEASE</spring.boot.version>
-                		<spring.jms.version>5.2.25.RELEASE</spring.jms.version>
-                	</properties>
-                	<dependencyManagement>
-                		<dependencies>
-                			<dependency>
-                				<groupId>org.springframework.boot</groupId>
-                				<artifactId>spring-boot-dependencies</artifactId>
-                				<version>${spring.boot.version}</version>
-                				<type>pom</type>
-                				<scope>import</scope>
-                			</dependency>
-                			<dependency>
-                				<groupId>org.springframework</groupId>
-                				<artifactId>spring-jms</artifactId>
-                				<version>${spring.jms.version}</version>
-                			</dependency>
-                		</dependencies>
-                	</dependencyManagement>
-                </project>
-                """
-            )
-          )
-        );
-    }
-
-    @Test
     void doNotOverrideImplicitProperty() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("io.dropwizard.metrics", "metrics-annotation", "4.2.9", null,
@@ -1965,4 +1889,81 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/474")
+    void upgradePropertyAdditionalCheck() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework", "*", "5.2.x", "",
+            false, null)),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.openrewrite.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <name>example</name>
+                  <description>Demo project for Spring Boot</description>
+                  <properties>
+                    <spring.boot.version>2.2.13.RELEASE</spring.boot.version>
+                    <spring.jms.version>5.2.22.RELEASE</spring.jms.version>
+                  </properties>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-dependencies</artifactId>
+                        <version>${spring.boot.version}</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                      <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-jms</artifactId>
+                        <version>${spring.jms.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """,
+              """
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.openrewrite.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <name>example</name>
+                  <description>Demo project for Spring Boot</description>
+                  <properties>
+                    <spring.boot.version>2.2.13.RELEASE</spring.boot.version>
+                    <spring.jms.version>5.2.25.RELEASE</spring.jms.version>
+                  </properties>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-dependencies</artifactId>
+                        <version>${spring.boot.version}</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                      <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-jms</artifactId>
+                        <version>${spring.jms.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
 }
