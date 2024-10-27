@@ -218,7 +218,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return annotationType.getType();
         }
 
