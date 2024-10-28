@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.apache.commons.lang3.StringUtils.join;
 import static org.openrewrite.ExcludeFileFromGitignore.Repository;
 import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.*;
 
@@ -36,9 +37,7 @@ import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.*;
 @EqualsAndHashCode(callSuper = false)
 public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
 
-    @Option(displayName = "Paths", description = "The paths to find and remove from the gitignore files. \n" +
-            "Paths must start at root of the project (with a slash at the beginning) OR " +
-            "they can be file names which match all files in an optionally given folder (no slash at the beginning).", example = "/folder/file.txt")
+    @Option(displayName = "Paths", description = "The paths to find and remove from the gitignore files.", example = "/folder/file.txt")
     List<String> paths;
 
     @Override
@@ -88,29 +87,37 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 IgnoreNode ignoreNode = acc.getRules().get(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1));
                 if (ignoreNode != null) {
                     String separator = text.getText().contains("\r\n") ? "\r\n" : "\n";
-                    List<FastIgnoreRule> rules = ignoreNode.getRules();
-                    List<String> newRules = Arrays.stream(text.getText().split(separator)).filter(line -> {
-                        if (line.startsWith("#") || StringUtils.isBlank(line)) {
-                            return true;
-                        }
-                        return rules.stream().anyMatch(rule -> line.equalsIgnoreCase(rule.toString()));
-                    }).collect(Collectors.toList());
-                    for (FastIgnoreRule ignoreRule : rules) {
-                        if (newRules.stream().noneMatch(rule -> rule.equalsIgnoreCase(ignoreRule.toString()))) {
-                            //Can we not find the position to insert the rule using surrounding rules as best as possible?
-                            newRules.add(ignoreRule.toString());
-                        }
-                    }
-                    StringBuilder sb = new StringBuilder();
-                    for (int i = 0; i < newRules.size(); i++) {
-                        if (i > 0) {
-                            sb.append(separator);
-                        }
-                        sb.append(newRules.get(i));
-                    }
-                    return text.withText(sb.toString());
+                    List<String> newRules = ignoreNode.getRules().stream().map(FastIgnoreRule::toString).collect(Collectors.toList());
+                    String[] currentContent = text.getText().split(separator);
+                    return text.withText(join(sortRules(newRules, currentContent), separator));
                 }
                 return super.visitText(text, ctx);
+            }
+
+            private List<String> sortRules(List<String> newRules, String[] originalRules) {
+                LinkedList<String> results = new LinkedList<>();
+                Arrays.stream(originalRules).filter(line -> {
+                    if (line.startsWith("#") || StringUtils.isBlank(line)) {
+                        return true;
+                    }
+                    return newRules.stream().anyMatch(line::equalsIgnoreCase);
+                }).forEach(results::add);
+
+                int resultsIndexCurrentlyAt = 0;
+                for (String newRule : newRules) {
+                    List<String> resultsSubList = results.subList(resultsIndexCurrentlyAt, results.size());
+                    if (resultsSubList.stream().noneMatch(rule -> rule.equalsIgnoreCase(newRule))) {
+                        if (resultsIndexCurrentlyAt >= results.size()) {
+                            results.add(newRule);
+                        } else {
+                            results.add(resultsIndexCurrentlyAt, newRule);
+                        }
+                    } else {
+                        resultsIndexCurrentlyAt += resultsSubList.indexOf(newRule);
+                    }
+                    resultsIndexCurrentlyAt++;
+                }
+                return results;
             }
         });
     }
@@ -137,6 +144,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 }
                 if (IGNORED.equals(isIgnored)) {
                     List<FastIgnoreRule> remainingRules = new ArrayList<>();
+                    boolean done = false;
                     for (FastIgnoreRule rule : ignoreNode.getRules()) {
                         if (!rule.getResult() || !isMatch(rule, nestedPath)) {
                             // If this rule has nothing to do with the path to remove / it is a negated rule, we keep it.
@@ -148,7 +156,11 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                         } else if (isMatch(rule, nestedPath)) {
                             // If this rule is a directory match, we need to negate the rule for the given path.
                             remainingRules.add(rule);
-                            remainingRules.add(new FastIgnoreRule("!" + nestedPath));
+                            // If it's already negated by another rule encountered before, we do not need to add another negation.
+                            if (!done) {
+                                remainingRules.add(new FastIgnoreRule("!" + nestedPath));
+                                done = true;
+                            }
                             continue;
                         }
                         // If we still have the rule, we keep it. --> not making changes to an unknown flow.
@@ -187,17 +199,18 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
         }
 
         private IgnoreNode.MatchResult isIgnored(IgnoreNode ignoreNode, String path) {
+            IgnoreNode.MatchResult isIgnored = CHECK_PARENT;
             for (int i = ignoreNode.getRules().size() - 1; i > -1; i--) {
                 FastIgnoreRule rule = ignoreNode.getRules().get(i);
                 if (isMatch(rule, path)) {
                     if (rule.getResult()) {
-                        return IGNORED;
+                        isIgnored = IGNORED;
                     } else {
                         return NOT_IGNORED;
                     }
                 }
             }
-            return CHECK_PARENT;
+            return isIgnored;
         }
     }
 }

@@ -321,11 +321,61 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               """,
             """
               /test.*
-              /*.txt
               !/test.yml
+              /*.txt
               !/other.txt
               """,
             spec -> spec.path("directory/.gitignore")
+          )
+        );
+    }
+
+    @Test
+    void excludedPathsOnlyGetAddedOnce() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("nested/test.yml"))),
+          text(
+            """
+              test.yml
+              otherfile.yml
+              nested/test.yml
+              """,
+            """
+              test.yml
+              !/nested/test.yml
+              otherfile.yml
+              nested/test.yml
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void newRulesGetAddedBesidesExistingRules() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("/test.yml", "/otherfile.yml", "end-of-file/file.yml"))),
+          text(
+            """
+              # comment
+              test.yml
+              /yet-another-file.yml
+              # comment
+              /otherfile.yml
+              # comment
+              end-of-file/file.yml
+              """,
+            """
+              # comment
+              test.yml
+              !/test.yml
+              /yet-another-file.yml
+              # comment
+              # comment
+              end-of-file/file.yml
+              !/end-of-file/file.yml
+              """,
+            spec -> spec.path(".gitignore")
           )
         );
     }
