@@ -20,12 +20,33 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import static org.openrewrite.java.Assertions.java;
 
 class Java21ParserTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
+        String filename = File.separator + ".rewrite" + File.separator + "classpath" + File.separator + "jackson-annotations-2.17.1.jar";
+        String userHome = System.getProperty("user.home");
+        Path filePath = Paths.get(userHome, filename);
+
+        try {
+            if (Files.exists(filePath)) {
+                Files.delete(filePath);
+                System.out.println("File deleted successfully.");
+            } else {
+                System.out.println("File does not exist.");
+            }
+        } catch (IOException e) {
+            System.err.println("Error deleting file: " + e.getMessage());
+        }
+
         spec.parser(JavaParser.fromJavaVersion().classpathFromResources(new InMemoryExecutionContext(), "jackson-annotations"));
     }
 
