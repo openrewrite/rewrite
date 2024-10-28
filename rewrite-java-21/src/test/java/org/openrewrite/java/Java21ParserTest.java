@@ -17,16 +17,17 @@ class Java21ParserTest implements RewriteTest {
     @Test
     void shouldCompile() {
         rewriteRun(
-                //language=java
-                java(
-                        """
-                                import com.fasterxml.jackson.annotation.JsonInclude;
-                                class Test {
-                                    @JsonInclude(value = JsonInclude.Include.NON_NULL)
-                                    String text;
-                                }
-                                """
-                )
+          //language=java
+          java(
+            """
+              import com.fasterxml.jackson.annotation.JsonInclude;
+              
+              class Test {
+                  @JsonInclude(value = JsonInclude.Include.NON_NULL)
+                  String text;
+              }
+              """
+          )
         );
     }
 }
