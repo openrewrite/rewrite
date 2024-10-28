@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlIsoVisitor;
@@ -46,9 +47,10 @@ public class ModernizeObsoletePoms extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
         return Preconditions.check(new FindSourceFiles("**/pom.xml"), new XmlIsoVisitor<ExecutionContext>() {
+
             @SuppressWarnings({"DataFlowIssue", "ConcatenationWithEmptyString"})
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public  Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 Cursor c = getCursor();
                 if (POM_VERSION.matches(c)) {

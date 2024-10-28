@@ -17,6 +17,7 @@ package org.openrewrite.hcl;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -47,8 +48,9 @@ public class DeleteContent extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher pathMatcher = new JsonPathMatcher(contentPath);
         return new HclIsoVisitor<ExecutionContext>() {
+
             @Override
-            public BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
+            public @Nullable BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
                 BodyContent b = super.visitBodyContent(bodyContent, ctx);
                 if (pathMatcher.matches(getCursor())) {
                     //noinspection ConstantConditions
