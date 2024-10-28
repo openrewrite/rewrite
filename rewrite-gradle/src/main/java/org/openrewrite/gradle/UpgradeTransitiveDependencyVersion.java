@@ -517,7 +517,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     private static class RemoveVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
         @Override
-        public J.Return visitReturn(J.Return _return, ExecutionContext ctx) {
+        public @Nullable J.Return visitReturn(J.Return _return, ExecutionContext ctx) {
             J.Return r = super.visitReturn(_return, ctx);
             if(r.getExpression() == null) {
                 //noinspection DataFlowIssue
@@ -527,7 +527,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         }
 
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+        public @Nullable J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
                 //noinspection DataFlowIssue

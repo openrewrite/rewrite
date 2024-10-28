@@ -91,9 +91,10 @@ public class DependencyConstraintToRule extends Recipe {
     }
 
     static class RemoveConstraints extends GroovyIsoVisitor<List<GroupArtifactVersionBecause>> {
+
         @SuppressWarnings("DataFlowIssue")
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<GroupArtifactVersionBecause> groupArtifactVersions) {
+        public @Nullable J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<GroupArtifactVersionBecause> groupArtifactVersions) {
             J.MethodInvocation m = super.visitMethodInvocation(method, groupArtifactVersions);
             if ("constraints".equals(m.getSimpleName()) && isInDependenciesBlock(getCursor())) {
                 if (!(m.getArguments().get(0) instanceof J.Lambda)) {

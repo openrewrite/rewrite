@@ -356,8 +356,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         }
 
         return new TreeVisitor<Tree, ExecutionContext>() {
+
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
@@ -471,7 +472,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         }
 
         @Override
-        public Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+        public @Nullable Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if (DISTRIBUTION_URL_KEY.equals(entry.getKey())) {
                 Properties.Value value = entry.getValue();
                 if (!mavenWrapper.getDistributionUrl().equals(value.getText())) {

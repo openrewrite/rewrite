@@ -82,7 +82,7 @@ public class ChangeTagAttribute extends Recipe {
                 return t;
             }
 
-            public Xml.Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
+            public @Nullable Xml.Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
                 if (!attribute.getKeyAsString().equals(attributeName)) {
                     return attribute;
                 }

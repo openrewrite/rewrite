@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
@@ -86,7 +87,7 @@ public class ExtractInterface {
         }
 
         @Override
-        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+        public @Nullable J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             if (method.hasModifier(J.Modifier.Type.Static) || !method.hasModifier(J.Modifier.Type.Public) ||
                 method.isConstructor()) {
                 //noinspection ConstantConditions

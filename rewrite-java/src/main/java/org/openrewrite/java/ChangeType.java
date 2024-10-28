@@ -579,7 +579,7 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+        public @Nullable J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
             Boolean updatePackage = getCursor().pollNearestMessage("UPDATE_PACKAGE");
             if (updatePackage != null && updatePackage) {
                 String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
@@ -29,8 +30,9 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 class NormalizeFormatTest implements RewriteTest {
 
     Recipe removeAnnotation = toRecipe(() -> new JavaIsoVisitor<>() {
+
         @Override
-        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+        public @Nullable J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
             //noinspection ConstantConditions
             return null;
         }

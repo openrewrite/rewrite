@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
@@ -34,7 +35,7 @@ public class DeimplementInterface<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
+    public @Nullable J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         if (method.getMethodType() != null && method.getMethodType().isInheritedFrom(fullyQualifiedInterfaceName)) {
             //noinspection ConstantConditions
             return null;

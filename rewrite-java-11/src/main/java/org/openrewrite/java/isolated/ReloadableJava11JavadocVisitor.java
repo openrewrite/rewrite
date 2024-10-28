@@ -568,7 +568,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     @Override
-    public J visitReference(@Nullable ReferenceTree node, List<Javadoc> body) {
+    public @Nullable J visitReference(@Nullable ReferenceTree node, List<Javadoc> body) {
         DCTree.DCReference ref = (DCTree.DCReference) node;
         if (node == null) {
             //noinspection ConstantConditions

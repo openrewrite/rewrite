@@ -235,7 +235,7 @@ public class Substitutions {
     }
 
     @SuppressWarnings("SpellCheckingInspection")
-    public <J2 extends J> J2 unsubstitute(J2 j) {
+    public <J2 extends J> @Nullable J2 unsubstitute(J2 j) {
         if (parameters.length == 0) {
             return j;
         }
