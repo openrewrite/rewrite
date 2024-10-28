@@ -123,7 +123,7 @@ public class PsiTreePrinter {
         int depth;
     }
 
-    public static String printFirFile(FirFile file) {
+    public static @Nullable String printFirFile(FirFile file) {
         StringBuilder sb = new StringBuilder();
         List<StringBuilder> lines = new ArrayList<>();
         sb.append("------------").append("\n");
@@ -131,8 +131,9 @@ public class PsiTreePrinter {
 
         TreePrinterContext context = new TreePrinterContext(lines, 1);
         new FirDefaultVisitor<Void, TreePrinterContext>() {
+
             @Override
-            public Void visitElement(FirElement firElement, TreePrinterContext ctx) {
+            public @Nullable Void visitElement(FirElement firElement, TreePrinterContext ctx) {
                 StringBuilder line = new StringBuilder();
                 line.append(leftPadding(ctx.getDepth()))
                         .append(printFirElement(firElement));
@@ -153,17 +154,18 @@ public class PsiTreePrinter {
                 return null;
             }
         }.visitFile(file, context);
-        sb.append(java.lang.String.join("\n", lines));
+        sb.append(String.join("\n", lines));
         return sb.toString();
     }
 
-    public static String printFirTree(FirElement firElement) {
+    public static @Nullable String printFirTree(FirElement firElement) {
         StringBuilder sb = new StringBuilder();
         List<StringBuilder> lines = new ArrayList<>();
         TreePrinterContext context = new TreePrinterContext(lines, 1);
         new FirDefaultVisitor<Void, TreePrinterContext>() {
+
             @Override
-            public Void visitElement(FirElement fir, TreePrinterContext ctx) {
+            public @Nullable Void visitElement(FirElement fir, TreePrinterContext ctx) {
                 StringBuilder line = new StringBuilder();
                 line.append(leftPadding(ctx.getDepth()))
                         .append(printFirElement(fir));
@@ -184,7 +186,7 @@ public class PsiTreePrinter {
                 return null;
             }
         }.visitElement(firElement, context);
-        sb.append(java.lang.String.join("\n", lines));
+        sb.append(String.join("\n", lines));
         return sb.toString();
     }
 

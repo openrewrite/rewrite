@@ -248,7 +248,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
     @Override
-    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
+    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;
