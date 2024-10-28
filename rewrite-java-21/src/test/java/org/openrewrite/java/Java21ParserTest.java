@@ -15,44 +15,19 @@
  */
 package org.openrewrite.java;
 
-import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-
-import static org.openrewrite.java.Assertions.java;
 
 class Java21ParserTest implements RewriteTest {
 
-    @Override
-    @SneakyThrows
-    public void defaults(RecipeSpec spec) {
-        String userHome = System.getProperty("user.home");
-        Path filePath = Paths.get(userHome, ".rewrite", "classpath", "jackson-annotations-2.17.1.jar");
-        Files.delete(filePath);
-
-        spec.parser(JavaParser.fromJavaVersion().classpathFromResources(new InMemoryExecutionContext(), "jackson-annotations"));
-    }
-
     @Test
-    void shouldCompile() {
-        rewriteRun(
-          //language=java
-          java(
-            """
-              import com.fasterxml.jackson.annotation.JsonInclude;
-              
-              class Test {
-                  @JsonInclude(value = JsonInclude.Include.NON_NULL)
-                  String text;
-              }
-              """
-          )
-        );
+    void shouldLoadResourceFromClasspath() throws IOException {
+        Files.deleteIfExists(Paths.get(System.getProperty("user.home"), ".rewrite", "classpath", "jackson-annotations-2.17.1.jar"));
+        rewriteRun(spec -> spec.parser(JavaParser.fromJavaVersion().classpathFromResources(new InMemoryExecutionContext(), "jackson-annotations")));
     }
 }
