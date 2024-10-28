@@ -357,21 +357,21 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
           spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("/test.yml", "/otherfile.yml", "end-of-file/file.yml"))),
           text(
             """
-              # comment
+              # comment 1
               test.yml
               /yet-another-file.yml
-              # comment
+              # comment 2
               /otherfile.yml
-              # comment
+              # comment 3
               end-of-file/file.yml
               """,
             """
-              # comment
+              # comment 1
               test.yml
               !/test.yml
               /yet-another-file.yml
-              # comment
-              # comment
+              # comment 2
+              # comment 3
               end-of-file/file.yml
               !/end-of-file/file.yml
               """,

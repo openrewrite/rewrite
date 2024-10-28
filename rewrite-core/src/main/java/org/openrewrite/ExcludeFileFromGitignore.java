@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.internal.StringUtils;
@@ -27,8 +26,9 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collectors;
 
+import static java.util.Comparator.comparingInt;
+import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.join;
 import static org.openrewrite.ExcludeFileFromGitignore.Repository;
 import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.*;
@@ -48,7 +48,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
     @Override
     public String getDescription() {
         return "This recipe will remove a file or directory from the .gitignore file. " +
-               "If the file or directory is already in the .gitignore file, it will be removed or negated." +
+               "If the file or directory is already in the .gitignore file, it will be removed or negated. " +
                "If the file or directory is not in the .gitignore file, no action will be taken.";
     }
 
@@ -84,17 +84,17 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 String gitignoreFileName = text.getSourcePath().toString();
                 gitignoreFileName = gitignoreFileName.startsWith("/") ? gitignoreFileName : "/" + gitignoreFileName;
-                IgnoreNode ignoreNode = acc.getRules().get(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1));
+                IgnoreNode ignoreNode = acc.rules.get(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1));
                 if (ignoreNode != null) {
                     String separator = text.getText().contains("\r\n") ? "\r\n" : "\n";
-                    List<String> newRules = ignoreNode.getRules().stream().map(FastIgnoreRule::toString).collect(Collectors.toList());
+                    List<String> newRules = ignoreNode.getRules().stream().map(FastIgnoreRule::toString).collect(toList());
                     String[] currentContent = text.getText().split(separator);
-                    return text.withText(join(sortRules(newRules, currentContent), separator));
+                    return text.withText(join(sortRules(currentContent, newRules), separator));
                 }
                 return super.visitText(text, ctx);
             }
 
-            private List<String> sortRules(List<String> newRules, String[] originalRules) {
+            private List<String> sortRules(String[] originalRules, List<String> newRules) {
                 LinkedList<String> results = new LinkedList<>();
                 Arrays.stream(originalRules).filter(line -> {
                     if (line.startsWith("#") || StringUtils.isBlank(line)) {
@@ -122,7 +122,6 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
         });
     }
 
-    @Data
     public static class Repository {
         private final Map<String, IgnoreNode> rules = new HashMap<>();
 
@@ -131,18 +130,18 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             List<String> impactingFiles = rules.keySet()
                     .stream()
                     .filter(k -> normalizedPath.toLowerCase().startsWith(k.toLowerCase()))
-                    .sorted(Comparator.comparingInt(String::length).reversed())
-                    .collect(Collectors.toList());
+                    .sorted(comparingInt(String::length).reversed())
+                    .collect(toList());
 
             IgnoreNode.MatchResult isIgnored;
             for (String impactingFile : impactingFiles) {
                 IgnoreNode ignoreNode = rules.get(impactingFile);
                 String nestedPath = normalizedPath.substring(impactingFile.length() - 1);
                 isIgnored = isIgnored(ignoreNode, nestedPath);
-                if (CHECK_PARENT.equals(isIgnored)) {
+                if (CHECK_PARENT == isIgnored) {
                     continue;
                 }
-                if (IGNORED.equals(isIgnored)) {
+                if (IGNORED == isIgnored) {
                     List<FastIgnoreRule> remainingRules = new ArrayList<>();
                     boolean done = false;
                     for (FastIgnoreRule rule : ignoreNode.getRules()) {
@@ -168,7 +167,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                     }
                     IgnoreNode replacedNode = new IgnoreNode(remainingRules);
                     rules.put(impactingFile, replacedNode);
-                    if (CHECK_PARENT.equals(isIgnored(replacedNode, nestedPath))) {
+                    if (CHECK_PARENT == isIgnored(replacedNode, nestedPath)) {
                         continue;
                     }
                 }
@@ -182,7 +181,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             gitignoreFileName = gitignoreFileName.startsWith("/") ? gitignoreFileName : "/" + gitignoreFileName;
             IgnoreNode ignoreNode = new IgnoreNode();
             ignoreNode.parse(gitignoreFileName, new ByteArrayInputStream(text.getText().getBytes()));
-            getRules().put(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1), ignoreNode);
+            rules.put(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1), ignoreNode);
         }
 
         // We do not use jgit's IgnoreNode#isIgnored method because it does not handle the directory correct always.
