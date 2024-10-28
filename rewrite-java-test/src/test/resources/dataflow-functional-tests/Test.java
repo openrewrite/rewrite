@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.function.Supplier;
@@ -42,7 +44,7 @@ abstract class Test<P extends Collection> implements Supplier<P> {
     }
 
     @Override
-    public P get() {
+    public @Nullable P get() {
         return null;
     }
 
