@@ -183,12 +183,12 @@ class JavaParserTest implements RewriteTest {
                    *//*
                    * public void setOther(Some value) { this.other =
                    * value; }
-              
-                  *//*
+
+                   *//*
                    public Some createSome() {
                        return new Some();
                    }
-              
+
                   *//**
                    * Create an instance of {@link Some }
                    *
