@@ -167,6 +167,7 @@ class JavaParserTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4624")
     void shouldParseComments() {
         rewriteRun(
           java(
@@ -185,7 +186,31 @@ class JavaParserTest implements RewriteTest {
                    * value; }
                    */
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getBody().getEnd().getComments())
+              .extracting("text")
+              .containsExactly(
+                """
+                  
+                       * public Some getOther() { return other; }
+                       *
+                       \
+                  """,
+                """
+                  *
+                       * Sets the value of the other property.
+                       *
+                       * @param value allowed object is {@link Some }
+                       *
+                       \
+                  """,
+                """
+                  
+                       * public void setOther(Some value) { this.other =
+                       * value; }
+                       \
+                  """
+              ))
           )
         );
     }
