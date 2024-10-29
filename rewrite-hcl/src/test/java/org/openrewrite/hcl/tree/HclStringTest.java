@@ -39,7 +39,22 @@ class HclStringTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
+    @Test
+    void escapingTheDollarSign() {
+        // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#template-literals
+        // The interpolation and directive introductions are escaped by doubling their leading characters. The ${
+        // sequence is escaped as $${ and the %{ sequence is escaped as %%{.
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                something = "Not a template/expression, just escaping $${somethingElse}."
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4613")
     @Test
     void trailingDollarSign() {
