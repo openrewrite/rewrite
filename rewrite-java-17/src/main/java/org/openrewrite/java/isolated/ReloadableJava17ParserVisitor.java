@@ -1904,6 +1904,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                             if (c2 == '/') {
                                 inMultiLineComment = false;
                                 delimIndex++;
+                                continue;
                             }
                             break;
                     }

@@ -1894,13 +1894,13 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                                 case '*':
                                     inMultiLineComment = true;
                                     delimIndex++;
-                                    break;
                             }
                             break;
                         case '*':
                             if (c2 == '/') {
                                 inMultiLineComment = false;
                                 delimIndex++;
+                                continue;
                             }
                             break;
                     }

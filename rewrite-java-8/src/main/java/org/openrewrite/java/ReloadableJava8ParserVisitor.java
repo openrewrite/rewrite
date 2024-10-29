@@ -1809,6 +1809,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                             if(c2 == '/') {
                                 inMultiLineComment = false;
                                 delimIndex++;
+                                continue;
                             }
                             break;
                     }
