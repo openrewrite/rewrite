@@ -31,7 +31,7 @@ import java.util.concurrent.*;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RemoteArchiveTest {
 
@@ -40,6 +40,8 @@ class RemoteArchiveTest {
     void gradleWrapper(String version) throws Exception {
         URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-" + version + "-bin.zip"));
         ExecutionContext ctx = new InMemoryExecutionContext();
+        RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(
+          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapper")));
         HttpSenderExecutionContextView.view(ctx)
           .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
@@ -58,6 +60,8 @@ class RemoteArchiveTest {
     void gradleWrapperDownloadFails() throws Exception {
         URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-7.4.2-bin.zip"));
         ExecutionContext ctx = new InMemoryExecutionContext();
+        RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(
+          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperDownloadFails")));
         HttpSenderExecutionContextView.view(ctx)
           .setLargeFileHttpSender(new MockHttpSender(408));
 
@@ -68,11 +72,9 @@ class RemoteArchiveTest {
           )
           .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
-
-        assertThat(
-          assertThrows(IllegalStateException.class, () -> getInputStreamSize(remoteArchive.getInputStream(ctx)))
-            .getMessage()
-        ).contains("Failed to download");
+        assertThatThrownBy(() -> getInputStreamSize(remoteArchive.getInputStream(ctx)))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("Failed to download " + distributionUrl.toURI() + " to artifact cache");
     }
 
     @ParameterizedTest
@@ -81,6 +83,8 @@ class RemoteArchiveTest {
         int executionCount = 5;
         ExecutorService executorService = Executors.newFixedThreadPool(executionCount);
         CompletionService<Long> completionService = new ExecutorCompletionService<>(executorService);
+        LocalRemoteArtifactCache localRemoteArtifactCache = new LocalRemoteArtifactCache(
+          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperConcurrent"));
 
         for (int i = 0; i < executionCount; i++) {
             completionService.submit(() -> {
@@ -88,6 +92,7 @@ class RemoteArchiveTest {
                   .getResource("gradle-" + version + "-bin.zip"));
 
                 ExecutionContext ctx = new InMemoryExecutionContext();
+                RemoteExecutionContextView.view(ctx).setArtifactCache(localRemoteArtifactCache);
                 HttpSenderExecutionContextView.view(ctx)
                   .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
