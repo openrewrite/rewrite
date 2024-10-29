@@ -154,15 +154,39 @@ class JavaParserTest implements RewriteTest {
         rewriteRun(
           java(
             source,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my","example","PublicClass.java")))
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my", "example", "PublicClass.java")))
           )
         );
     }
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1895")
-    void moduleInfo(){
+    void moduleInfo() {
         // Ignored until properly handled: https://github.com/openrewrite/rewrite/issues/4054#issuecomment-2267605739
         assertFalse(JavaParser.fromJavaVersion().build().accept(Path.of("src/main/java/foo/module-info.java")));
+    }
+
+    @Test
+    void invalidComment() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  /*
+                   * public Some getOther() { return other; }
+                   *
+                   *//**
+                   * Sets the value of the other property.
+                   *
+                   * @param value allowed object is {@link Some }
+                   *
+                   *//*
+                   * public void setOther(Some value) { this.other =
+                   * value; }
+                   */
+              }
+              """
+          )
+        );
     }
 }
