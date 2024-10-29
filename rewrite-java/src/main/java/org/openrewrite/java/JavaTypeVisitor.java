@@ -62,7 +62,7 @@ public class JavaTypeVisitor<P> {
         return t;
     }
 
-    public JavaType visit(@Nullable JavaType javaType, P p) {
+    public @Nullable JavaType visit(@Nullable JavaType javaType, P p) {
         if (javaType != null) {
             cursor = new Cursor(cursor, javaType);
             javaType = preVisit(javaType, p);

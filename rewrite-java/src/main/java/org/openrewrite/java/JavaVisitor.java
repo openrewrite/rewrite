@@ -1353,7 +1353,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return y;
     }
 
-    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
+    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;
@@ -1379,7 +1379,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 right : new JRightPadded<>(t, after, markers);
     }
 
-    public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
+    public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
         if (left == null) {
             //noinspection ConstantConditions
             return null;
@@ -1405,7 +1405,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return t == null ? null : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
-    public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
+    public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
                                                         JContainer.Location loc, P p) {
         if (container == null) {
             //noinspection ConstantConditions

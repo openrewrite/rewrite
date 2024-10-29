@@ -50,6 +50,12 @@ public class UpgradeParentVersion extends Recipe {
     @Nullable
     String versionPattern;
 
+    @Option(displayName = "Only external",
+            description = "Only upgrade `<parent>` if external to the project, i.e. it has an empty `<relativePath>`. Defaults to `false`.",
+            required = false)
+    @Nullable
+    Boolean onlyExternal;
+
     @Override
     public String getDisplayName() {
         return "Upgrade Maven parent project version";
@@ -82,7 +88,7 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     private ChangeParentPom changeParentPom() {
-        return new ChangeParentPom(groupId, null, artifactId, null, newVersion, null, null,
+        return new ChangeParentPom(groupId, null, artifactId, null, newVersion, Boolean.TRUE.equals(onlyExternal) ? "" : null, null,
                 versionPattern, false);
     }
 }
