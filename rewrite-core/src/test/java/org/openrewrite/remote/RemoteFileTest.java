@@ -72,7 +72,7 @@ class RemoteFileTest {
 
         assertThatThrownBy(() -> getInputStreamSize(remoteFile.getInputStream(ctx)))
           .isInstanceOf(IllegalStateException.class)
-          .hasMessage("Failed to download");
+          .hasMessage("Failed to download " + distributionUrl.toURI() + " to artifact cache");
     }
 
     @Test
