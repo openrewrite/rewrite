@@ -29,6 +29,7 @@ import java.util.concurrent.*;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RemoteFileTest {
 
@@ -48,6 +49,27 @@ class RemoteFileTest {
 
         long actual = getInputStreamSize(remoteFile.getInputStream(ctx));
         assertThat(actual).isGreaterThan(800);
+    }
+
+    @Test
+    void gradleWrapperDownloadFails() throws Exception {
+        URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        HttpSenderExecutionContextView.view(ctx)
+          .setLargeFileHttpSender(new MockHttpSender(408));
+
+        RemoteArchive remoteFile = Remote
+          .builder(
+            Paths.get("gradle/wrapper/gradle-wrapper.properties"),
+            distributionUrl.toURI()
+          )
+          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+
+
+        assertThat(
+          assertThrows(IllegalStateException.class, () -> getInputStreamSize(remoteFile.getInputStream(ctx)))
+            .getMessage()
+        ).contains("Failed to download");
     }
 
     @Test

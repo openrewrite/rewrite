@@ -15,6 +15,7 @@
  */
 package org.openrewrite.remote;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
@@ -30,6 +31,7 @@ import java.util.concurrent.*;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RemoteArchiveTest {
 
@@ -50,6 +52,27 @@ class RemoteArchiveTest {
 
         long actual = getInputStreamSize(remoteArchive.getInputStream(ctx));
         assertThat(actual).isGreaterThan(50_000);
+    }
+
+    @Test
+    void gradleWrapperDownloadFails() throws Exception {
+        URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-7.4.2-bin.zip"));
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        HttpSenderExecutionContextView.view(ctx)
+          .setLargeFileHttpSender(new MockHttpSender(408));
+
+        RemoteArchive remoteArchive = Remote
+          .builder(
+            Paths.get("gradle/wrapper/gradle-wrapper.jar"),
+            distributionUrl.toURI()
+          )
+          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+
+
+        assertThat(
+          assertThrows(IllegalStateException.class, () -> getInputStreamSize(remoteArchive.getInputStream(ctx)))
+            .getMessage()
+        ).contains("Failed to download");
     }
 
     @ParameterizedTest
