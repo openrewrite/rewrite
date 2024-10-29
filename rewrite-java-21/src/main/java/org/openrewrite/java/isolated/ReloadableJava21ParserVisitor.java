@@ -1900,7 +1900,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                         case '*':
                             if (c2 == '/') {
                                 inMultiLineComment = false;
-                                delimIndex += 2;
+                                delimIndex++;
                             }
                             break;
                     }
