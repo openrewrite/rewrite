@@ -117,6 +117,29 @@ class RawPomTest {
     }
 
     @Test
+    void modulesAndSubProjectsEmpty() {
+        RawPom pom = RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+            
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        assertThat(pom).isNotNull();
+        //noinspection DataFlowIssue
+        assertThat(pom.getSubprojects()).isNull();
+        assertThat(pom.getModules()).isNull();
+        assertThat(pom.toPom(null, null).getSubprojects()).isNotNull();
+    }
+
+    @Test
     void serializePluginFlags() {
         RawPom pom = RawPom.parse(
           //language=xml
