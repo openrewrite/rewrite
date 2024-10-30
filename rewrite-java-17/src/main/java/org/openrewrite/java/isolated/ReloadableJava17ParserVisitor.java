@@ -1565,6 +1565,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = convert(vartype);
         }
 
+        if (typeExpr == null && node.declaredUsingVar()) {
+            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", typeMapping.type(vartype), null);
+        }
+
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
             Space prefix = typeExprAnnotations.get(0).getPrefix();
             typeExpr = new J.AnnotatedType(randomId(), prefix, Markers.EMPTY, ListUtils.mapFirst(typeExprAnnotations, a -> a.withPrefix(EMPTY)), typeExpr);
@@ -1708,7 +1712,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
     }
 
-    private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(Tree t, Function<Tree, Space> suffix) {
+    private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
+        if (t == null) {
+            return null;
+        }
         J2 j = convert(t);
         JRightPadded<J2> rightPadded = new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
         cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
@@ -2021,7 +2028,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 } else {
                     leadingAnnotations.add(annotation);
                 }
-                i = cursor -1;
+                i = cursor - 1;
                 lastAnnotationPosition = cursor;
                 continue;
             }
