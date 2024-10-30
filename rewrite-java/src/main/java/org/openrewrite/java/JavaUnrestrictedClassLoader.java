@@ -112,7 +112,7 @@ public class JavaUnrestrictedClassLoader extends URLClassLoader {
                     throw new RuntimeException(e);
                 }
             }
-            if(name.contains("lombok")) {
+            if (name.startsWith("lombok")) {
                 return findClass(name);
             }
             return super.loadClass(name);
