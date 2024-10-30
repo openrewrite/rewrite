@@ -24,10 +24,6 @@ import lombok.javac.JavacNode;
 
 @HandlerPriority(512)
 public class NonNullNoOpHandler extends JavacAnnotationHandler<NonNull> {
-    public NonNullNoOpHandler() {
-        super();
-    }
-
     @Override
     public void handle(AnnotationValues<NonNull> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
     }

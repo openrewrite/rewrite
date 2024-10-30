@@ -16,15 +16,13 @@
 package org.openrewrite.java.lombok;
 
 import com.sun.tools.javac.tree.JCTree;
-import lombok.SneakyThrows;
+import lombok.Synchronized;
 import lombok.core.AnnotationValues;
-import lombok.core.HandlerPriority;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
 
-@HandlerPriority(1024)
-public class SneakyThrowsNoOpHandler extends JavacAnnotationHandler<SneakyThrows> {
+public class SynchronizedNoOpHandler extends JavacAnnotationHandler<Synchronized> {
     @Override
-    public void handle(AnnotationValues<SneakyThrows> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
+    public void handle(AnnotationValues<Synchronized> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
     }
 }
