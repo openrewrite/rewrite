@@ -91,15 +91,16 @@ public class MethodMatcher {
         this(signature, Boolean.TRUE.equals(matchOverrides));
     }
 
-    public MethodMatcher(String signature, boolean matchOverrides) {
+    public @Nullable MethodMatcher(String signature, boolean matchOverrides) {
         this.matchOverrides = matchOverrides;
 
         MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
                 CharStreams.fromString(signature))));
 
         new MethodSignatureParserBaseVisitor<Void>() {
+
             @Override
-            public Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
+            public @Nullable Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
                 MethodSignatureParser.TargetTypePatternContext targetTypePatternContext = ctx.targetTypePattern();
                 String pattern = new TypeVisitor().visitTargetTypePattern(targetTypePatternContext);
                 targetTypeAspectJ = pattern;

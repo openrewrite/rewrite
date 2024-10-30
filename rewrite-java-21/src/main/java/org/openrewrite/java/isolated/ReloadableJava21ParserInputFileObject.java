@@ -51,7 +51,7 @@ public class ReloadableJava21ParserInputFileObject implements JavaFileObject {
     }
 
     @Override
-    public URI toUri() {
+    public @Nullable URI toUri() {
         if (path == null) {
             //noinspection ConstantConditions
             return null;
@@ -60,7 +60,7 @@ public class ReloadableJava21ParserInputFileObject implements JavaFileObject {
     }
 
     @Override
-    public String getName() {
+    public @Nullable String getName() {
         if (path == null) {
             //noinspection ConstantConditions
             return null;
