@@ -84,6 +84,7 @@ public class ReloadableJava17Parser implements JavaParser {
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
     private final List<Processor> annotationProcessors;
+
     private ReloadableJava17Parser(
             boolean logCompilationWarningsAndErrors,
             @Nullable Collection<Path> classpath,
@@ -113,11 +114,23 @@ public class ReloadableJava17Parser implements JavaParser {
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
 
-        if(classpath!= null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+        if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
                 Class<?> lombokProcessorClass = Class.forName("lombok.launch.AnnotationProcessorHider$AnnotationProcessor", true, getClass().getClassLoader());
                 Constructor<?> lombokProcessorConstructor = lombokProcessorClass.getConstructor();
+
+                String systemClasspath = System.getProperty("java.class.path");
+                if (systemClasspath != null && !systemClasspath.isEmpty()) {
+                    List<String> overrideClasspath = new ArrayList<>();
+                    for (String part : systemClasspath.split("\\s*" + (File.pathSeparatorChar == ';' ? ";" : ":") + "\\s*")) {
+                        if (part.contains("lombok")) {
+                            overrideClasspath.add(part);
+                        }
+                    }
+                    System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
+                }
+
                 Processor lombokProcessor = (Processor) lombokProcessorConstructor.newInstance();
                 annotationProcessors = Collections.singletonList(lombokProcessor);
                 Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
@@ -364,9 +377,9 @@ public class ReloadableJava17Parser implements JavaParser {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
                 return classByteClasspath.isEmpty() ? listed :
                         Stream.concat(classByteClasspath.stream()
-                                .filter(jfo -> jfo.getPackage().equals(packageName)),
-                        StreamSupport.stream(listed.spliterator(), false)
-                ).collect(toList());
+                                        .filter(jfo -> jfo.getPackage().equals(packageName)),
+                                StreamSupport.stream(listed.spliterator(), false)
+                        ).collect(toList());
             }
             return super.list(location, packageName, kinds, recurse);
         }

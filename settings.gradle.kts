@@ -19,6 +19,7 @@ val allProjects = listOf(
         "rewrite-java",
         "rewrite-java-tck",
         "rewrite-java-test",
+        "rewrite-java-lombok",
         "rewrite-java-17", // remove this when rewrite recipe gradle plugin moves to 21
         "rewrite-java-21",
         "rewrite-json",
@@ -42,9 +43,9 @@ val includedProjects = file("IDE.properties").let {
     }
 }.toSet()
 
-if(!file("IDE.properties").exists() || includedProjects.contains("tools")) {
+//if(!file("IDE.properties").exists() || includedProjects.contains("tools")) {
     includeBuild("tools")
-}
+//}
 
 include(*allProjects.toTypedArray())
 

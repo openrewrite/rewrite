@@ -1818,6 +1818,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             } else if (t instanceof JCTree.JCClassDecl && isLombokGenerated(((JCClassDecl) t).sym)) {
                 continue;
+            } else if (t instanceof JCTree.JCVariableDecl && isLombokGenerated(((JCVariableDecl) t).sym)) {
+                continue;
             }
             treesGroupedByStartPosition.computeIfAbsent(((JCTree) t).getStartPosition(), k -> new ArrayList<>(1)).add(t);
         }

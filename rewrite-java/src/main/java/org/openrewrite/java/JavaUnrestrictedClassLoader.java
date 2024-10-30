@@ -28,11 +28,8 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
-
-import static java.util.Collections.emptyList;
 
 /**
  * Rewrite's JavaParser is reliant on java's compiler internal classes that are now encapsulated within Java's
@@ -111,6 +108,51 @@ public class JavaUnrestrictedClassLoader extends URLClassLoader {
                 return findClass(name);
             }
             return super.loadClass(name);
+        }
+    }
+
+    @Override
+    public Enumeration<URL> getResources(String name) throws IOException {
+        // Give precedence to our own Lombok handlers
+        if (name.startsWith("META-INF/services/lombok.")) {
+            Objects.requireNonNull(name);
+            @SuppressWarnings("unchecked")
+            Enumeration<URL>[] tmp = (Enumeration<URL>[]) new Enumeration<?>[2];
+            tmp[0] = findResources(name);
+            tmp[1] = getParent().getResources(name);
+
+            return new CompoundEnumeration<>(tmp);
+        }
+        return super.getResources(name);
+    }
+
+    private static final class CompoundEnumeration<E> implements Enumeration<E> {
+        private final Enumeration<E>[] enums;
+        private int index;
+
+        public CompoundEnumeration(Enumeration<E>[] enums) {
+            this.enums = enums;
+        }
+
+        private boolean next() {
+            while (index < enums.length) {
+                if (enums[index].hasMoreElements()) {
+                    return true;
+                }
+                index++;
+            }
+            return false;
+        }
+
+        public boolean hasMoreElements() {
+            return next();
+        }
+
+        public E nextElement() {
+            if (!next()) {
+                throw new NoSuchElementException();
+            }
+            return enums[index].nextElement();
         }
     }
 

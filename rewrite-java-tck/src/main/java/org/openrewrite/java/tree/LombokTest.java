@@ -95,21 +95,21 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
-    void slf4j() {
+    void jul() {
         rewriteRun(
           java(
             """
-            import lombok.extern.slf4j.Slf4j;
+            import lombok.extern.java.Log;
             
             import java.util.Map;
             
-            @Slf4j
+            @Log
             class A {
                 String string;
                 Map<String, String> map;
                 void m() {
                     log.info("string = " + string);
-                    log.info("map = {}", map);
+                    log.info(() -> "map = %s".formatted(map));
                 }
             }
             """
@@ -124,6 +124,7 @@ class LombokTest implements RewriteTest {
             """
               import lombok.SneakyThrows;
               
+              import java.io.UnsupportedEncodingException;
               import java.nio.charset.StandardCharsets;
               
               public class SneakyThrowsExample implements Runnable {
