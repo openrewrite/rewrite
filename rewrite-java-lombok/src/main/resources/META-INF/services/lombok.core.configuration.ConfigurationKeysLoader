@@ -13,5 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-# This might be required to allow overriding some Lombok config, like delete Lombok annotations or add `@Generated`
+org.openrewrite.java.lombok.OpenRewriteConfigurationKeysLoader
