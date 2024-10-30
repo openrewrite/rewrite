@@ -93,7 +93,11 @@ public class RemoteArchive implements Remote {
             Path localArchive = cache.compute(uri, () -> {
                 //noinspection resource
                 HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
-                return response.getBody();
+                if (response.isSuccessful()) {
+                    return response.getBody();
+                } else {
+                    throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
+                }
             }, ctx.getOnError());
 
             if (localArchive == null) {
