@@ -117,7 +117,7 @@ class RawPomTest {
     }
 
     @Test
-    void modulesAndSubProjectsEmpty() {
+    void modulesAndSubProjectsNull() {
         RawPom pom = RawPom.parse(
           //language=xml
           new ByteArrayInputStream("""
@@ -137,6 +137,37 @@ class RawPomTest {
         assertThat(pom.getSubprojects()).isNull();
         assertThat(pom.getModules()).isNull();
         assertThat(pom.toPom(null, null).getSubprojects()).isNotNull();
+    }
+
+    @Test
+    void modulesAndSubProjectsEmpty() {
+        RawPom pom = RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+            
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+      
+                  <modules>
+                  </modules>
+            
+                  <subprojects>
+                  </subprojects>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        assertThat(pom).isNotNull();
+        //noinspection DataFlowIssue
+        assertThat(pom.getSubprojects()).isNotNull();
+        //noinspection DataFlowIssue
+        assertThat(pom.getModules()).isNotNull();
+        assertThat(pom.getSubprojects().getSubprojects()).isEmpty();
+        assertThat(pom.getModules().getModules()).isEmpty();
     }
 
     @Test
