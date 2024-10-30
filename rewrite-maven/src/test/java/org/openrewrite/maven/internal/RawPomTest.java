@@ -114,6 +114,7 @@ class RawPomTest {
         assertThat(pom.getModules()).isNotNull();
         assertThat(pom.getSubprojects().getSubprojects()).hasSize(2);
         assertThat(pom.getModules().getModules()).hasSize(2);
+        assertThat(pom.toPom(null, null).getSubprojects()).hasSize(4);
     }
 
     @Test
@@ -137,6 +138,66 @@ class RawPomTest {
         assertThat(pom.getSubprojects()).isNull();
         assertThat(pom.getModules()).isNull();
         assertThat(pom.toPom(null, null).getSubprojects()).isNotNull();
+    }
+
+    @Test
+    void modulesNullAndSubProjects() {
+        RawPom pom = RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+            
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+            
+                  <subprojects>
+                    <subproject>my-subproject</subproject>
+                    <subproject>my-other-subproject</subproject>
+                  </subprojects>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        assertThat(pom).isNotNull();
+        //noinspection DataFlowIssue
+        assertThat(pom.getSubprojects()).isNotNull();
+        //noinspection DataFlowIssue
+        assertThat(pom.getModules()).isNull();
+        assertThat(pom.getSubprojects().getSubprojects()).hasSize(2);
+        assertThat(pom.toPom(null, null).getSubprojects()).hasSize(2);
+    }
+
+    @Test
+    void subProjectsNullAndModules() {
+        RawPom pom = RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+            
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+            
+                  <modules>
+                    <module>my-module</module>
+                    <module>my-other-module</module>
+                  </modules>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        assertThat(pom).isNotNull();
+        //noinspection DataFlowIssue
+        assertThat(pom.getSubprojects()).isNull();
+        //noinspection DataFlowIssue
+        assertThat(pom.getModules()).isNotNull();
+        assertThat(pom.getModules().getModules()).hasSize(2);
+        assertThat(pom.toPom(null, null).getSubprojects()).hasSize(2);
     }
 
     @Test
@@ -168,6 +229,7 @@ class RawPomTest {
         assertThat(pom.getModules()).isNotNull();
         assertThat(pom.getSubprojects().getSubprojects()).isEmpty();
         assertThat(pom.getModules().getModules()).isEmpty();
+        assertThat(pom.toPom(null, null).getSubprojects()).isEmpty();
     }
 
     @Test
