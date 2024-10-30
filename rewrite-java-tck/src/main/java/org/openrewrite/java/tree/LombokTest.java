@@ -121,6 +121,23 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    void val() {
+        rewriteRun(
+          java(
+            """
+            import lombok.val;
+            
+            class A {
+                void m() {
+                    val foo = "foo";
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void sneakyThrows() {
         rewriteRun(
           java(
