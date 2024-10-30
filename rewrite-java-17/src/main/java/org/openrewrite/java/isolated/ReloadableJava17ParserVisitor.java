@@ -1830,8 +1830,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 JRightPadded<Statement> padded = convert(treeGroup.get(0), suffix);
                 if (padded != null) {
                     converted.add(padded);
-                } else {
-                    System.out.println("");
                 }
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
