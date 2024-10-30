@@ -16,6 +16,8 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnJre;
+import org.junit.jupiter.api.condition.JRE;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -23,6 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("CaughtExceptionImmediatelyRethrown")
+@EnabledOnJre(JRE.JAVA_17)
 class LombokTest implements RewriteTest {
 
     @Override

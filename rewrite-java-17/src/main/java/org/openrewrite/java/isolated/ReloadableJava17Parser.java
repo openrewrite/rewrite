@@ -128,6 +128,12 @@ public class ReloadableJava17Parser implements JavaParser {
                             overrideClasspath.add(part);
                         }
                     }
+                    // make sure the rewrite-java-lombok dependency comes first
+                    for (int i = 0; i < overrideClasspath.size(); i++) {
+                        if (overrideClasspath.get(i).contains("rewrite-java-lombok")) {
+                            overrideClasspath.add(0, overrideClasspath.remove(i));
+                        }
+                    }
                     System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
                 }
 

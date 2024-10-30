@@ -31,6 +31,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+
 /**
  * Rewrite's JavaParser is reliant on java's compiler internal classes that are now encapsulated within Java's
  * module system. Starting in Java 17, the JVM now enforces strong encapsulation of these internal classes and
@@ -49,15 +51,21 @@ public class JavaUnrestrictedClassLoader extends URLClassLoader {
     final List<Path> modules;
 
     public JavaUnrestrictedClassLoader(ClassLoader parentClassloader) {
+        this(parentClassloader, getLombok());
+    }
 
-
-        this(parentClassloader, JavaParser.dependenciesFromClasspath("lombok").stream().map(it -> {
-            try {
-                return it.toUri().toURL();
-            } catch (MalformedURLException e) {
-                throw new RuntimeException(e);
-            }
-        }).collect(Collectors.toList()));
+    private static List<URL> getLombok() {
+        try {
+            return JavaParser.dependenciesFromClasspath("lombok").stream().map(it -> {
+                try {
+                    return it.toUri().toURL();
+                } catch (MalformedURLException e) {
+                    throw new RuntimeException(e);
+                }
+            }).collect(Collectors.toList());
+        } catch (Exception e) {
+            return emptyList();
+        }
     }
 
     public JavaUnrestrictedClassLoader(ClassLoader parentClassloader, List<URL> jars) {
