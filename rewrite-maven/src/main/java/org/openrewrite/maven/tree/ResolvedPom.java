@@ -116,8 +116,8 @@ public class ResolvedPom {
 
     @NonFinal
     @Builder.Default
+    @Nullable // on older LSTs, this field is not yet present
     List<String> subprojects = emptyList();
-
 
     /**
      * Deduplicate dependencies and dependency management dependencies
