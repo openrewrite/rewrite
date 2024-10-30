@@ -16,9 +16,8 @@
 package org.openrewrite.trait;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Tree;
 
-public interface JavaTypeReference extends Trait<Tree> {
+public interface JavaTypeReference {
 
     @Nullable
     String getValue();

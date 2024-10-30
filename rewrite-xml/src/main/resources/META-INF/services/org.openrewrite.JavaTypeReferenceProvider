@@ -1,1 +1,1 @@
-org.openrewrite.xml.SpringJavaTypeReferenceService
+org.openrewrite.xml.SpringJavaTypeReferenceProvider

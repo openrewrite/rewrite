@@ -173,6 +173,7 @@ public interface Xml extends Tree {
         SoftReference<JavaTypeReferences> javaTypeReferences;
 
         @Transient
+        @Override
         public JavaTypeReferences getJavaTypeReferences() {
             JavaTypeReferences cache;
             if (this.javaTypeReferences == null) {

@@ -24,7 +24,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.HashSet;
 import java.util.Set;
 
-public class SpringJavaTypeReferenceService implements JavaTypeReferenceProvider {
+public class SpringJavaTypeReferenceProvider implements JavaTypeReferenceProvider {
 
     @Override
     public Set<JavaTypeReference> getTypeReferences(SourceFile sourceFile) {
