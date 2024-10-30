@@ -18,9 +18,8 @@ package org.openrewrite.xml.trait;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
+import org.openrewrite.trait.JavaTypeReference;
 import org.openrewrite.trait.SimpleTraitMatcher;
-import org.openrewrite.trait.Trait;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 

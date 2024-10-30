@@ -23,11 +23,11 @@ import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.JavaTypeReferences;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
-import org.openrewrite.xml.internal.JavaTypeReferences;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
 import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
@@ -84,7 +84,7 @@ public interface Xml extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class Document implements Xml, SourceFile {
+    class Document implements Xml, SourceFile, SourceFileWithTypeReferences {
         @With
         @EqualsAndHashCode.Include
         UUID id;

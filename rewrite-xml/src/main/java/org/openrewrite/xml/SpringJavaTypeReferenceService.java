@@ -13,30 +13,39 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.internal;
+package org.openrewrite.xml;
 
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import org.openrewrite.xml.trait.JavaTypeReference;
+import org.openrewrite.JavaTypeReferenceProvider;
+import org.openrewrite.SourceFile;
+import org.openrewrite.trait.JavaTypeReference;
 import org.openrewrite.xml.trait.SpringJavaTypeReference;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
 
-@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-@Getter
-public class JavaTypeReferences {
-    private final Xml.Document document;
-    private final Set<JavaTypeReference> typeReferences;
+public class SpringJavaTypeReferenceService implements JavaTypeReferenceProvider {
 
-    public static JavaTypeReferences build(Xml.Document doc) {
+    @Override
+    public Set<JavaTypeReference> getTypeReferences(SourceFile sourceFile) {
         Set<JavaTypeReference> typeReferences = new HashSet<>();
         new SpringJavaTypeReference.Matcher().asVisitor(reference -> {
             typeReferences.add(reference);
             return reference.getTree();
-        }).visit(doc, null);
-        return new JavaTypeReferences(doc, typeReferences);
+        }).visit(sourceFile, null);
+        return typeReferences;
+    }
+
+    @Override
+    public boolean isAcceptable(SourceFile sourceFile) {
+        if (sourceFile instanceof Xml.Document) {
+            Xml.Document doc = (Xml.Document) sourceFile;
+            for (Xml.Attribute attrib : doc.getRoot().getAttributes()) {
+                if (attrib.getKeyAsString().equals("xsi:schemaLocation") && attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

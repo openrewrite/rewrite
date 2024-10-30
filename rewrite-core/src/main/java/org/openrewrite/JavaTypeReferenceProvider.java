@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.trait;
+package org.openrewrite;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.Tree;
-import org.openrewrite.trait.Trait;
+import org.openrewrite.trait.JavaTypeReference;
 
-public interface JavaTypeReference extends Trait<Tree> {
+import java.util.Set;
 
-    @Nullable String getValue();
+public interface JavaTypeReferenceProvider {
 
+    Set<JavaTypeReference> getTypeReferences(SourceFile sourceFile);
+
+    boolean isAcceptable(SourceFile sourceFile);
 }
