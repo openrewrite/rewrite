@@ -359,7 +359,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
         } else if (tree instanceof JCTree.JCClassDecl) {
             symbol = ((JCTree.JCClassDecl) tree).sym;
-        } else if(tree instanceof JCTree.JCFieldAccess) {
+        } else if (tree instanceof JCTree.JCFieldAccess) {
             symbol = ((JCTree.JCFieldAccess) tree).sym;
         }
 
@@ -367,7 +367,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private @Nullable JavaType type(@Nullable Type type, @Nullable Symbol symbol) {
-        if(type == null && symbol != null) {
+        if (type == null && symbol != null) {
             type = symbol.type;
         }
         if (type instanceof Type.MethodType) {
@@ -412,7 +412,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType.@Nullable Variable variableType(@Nullable Symbol symbol,
-            JavaType.@Nullable FullyQualified owner) {
+                                                     JavaType.@Nullable FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
         }

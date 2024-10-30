@@ -1520,7 +1520,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Override
-    public @Nullable J visitVariable(VariableTree node, Space fmt) {
+    public J visitVariable(VariableTree node, Space fmt) {
         return hasFlag(node.getModifiers(), Flags.ENUM) ?
                 visitEnumVariable(node, fmt) :
                 visitVariables(singletonList(node), fmt); // method arguments cannot be multi-declarations
@@ -1668,7 +1668,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            int saveCursor = cursor;
             String prefix = source.substring(cursor, max(((JCTree) t).getStartPosition(), cursor));
             cursor += prefix.length();
             // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
