@@ -239,7 +239,7 @@ public class ReloadableJava17Parser implements JavaParser {
         }
         try {
             //noinspection unchecked
-            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = compiler.parseFiles(((List<JavaFileObject>) (List<?>) inputFileObjects));
+            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = compiler.parseFiles((List<JavaFileObject>) (List<?>) inputFileObjects, true);
             for (int i = 0; i < inputFileObjects.size(); i++) {
                 cus.put(inputFileObjects.get(i).getInput(), jcCompilationUnits.get(i));
             }

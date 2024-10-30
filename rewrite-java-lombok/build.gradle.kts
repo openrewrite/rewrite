@@ -52,6 +52,7 @@ val compiler = javaToolchains.compilerFor {
 val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 
 dependencies {
+    implementation("org.jspecify:jspecify:latest.release")
     runtimeOnly("org.projectlombok:lombok:latest.release")
 
     // Add lombok dependency to the newly created lombok configuration

@@ -14,3 +14,4 @@
 # limitations under the License.
 #
 org.openrewrite.java.lombok.SneakyThrowsNoOpHandler
+org.openrewrite.java.lombok.NonNullNoOpHandler
