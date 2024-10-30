@@ -45,7 +45,7 @@ public class SemanticallyEqual {
         boolean areEqual = true;
 
         @Override
-        public Xml visitDocument(Xml.Document document, Xml other) {
+        public @Nullable Xml visitDocument(Xml.Document document, Xml other) {
             if(document == other) {
                 return null;
             }
@@ -59,7 +59,7 @@ public class SemanticallyEqual {
         }
 
         @Override
-        public Xml visitTag(Xml.Tag tag, Xml other) {
+        public @Nullable Xml visitTag(Xml.Tag tag, Xml other) {
             if(tag == other) {
                 return null;
             }
@@ -114,7 +114,7 @@ public class SemanticallyEqual {
         }
 
         @Override
-        public Xml visitAttribute(Xml.Attribute attribute, Xml other) {
+        public @Nullable Xml visitAttribute(Xml.Attribute attribute, Xml other) {
             if(attribute == other) {
                 return null;
             }
@@ -135,7 +135,7 @@ public class SemanticallyEqual {
         }
 
         @Override
-        public Xml visitCharData(Xml.CharData charData, Xml other) {
+        public @Nullable Xml visitCharData(Xml.CharData charData, Xml other) {
             if(charData == other) {
                 return null;
             }

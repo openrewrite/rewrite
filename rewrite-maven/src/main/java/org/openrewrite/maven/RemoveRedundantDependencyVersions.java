@@ -175,7 +175,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public  Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag()) {
                     ResolvedDependency d = findDependency(tag);
                     if (d != null && matchesGroup(d) && matchesArtifact(d) && matchesVersion(d) && isNotExcepted(d)) {
@@ -374,8 +374,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     private static class RemoveEmptyDependenciesTags extends MavenIsoVisitor<ExecutionContext> {
+
         @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+        public  Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
             if (("dependencyManagement".equals(t.getName()) || "dependencies".equals(t.getName())) && (t.getContent() == null || t.getContent().isEmpty())) {
                 //noinspection DataFlowIssue
@@ -386,8 +387,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     private static class RemoveEmptyPluginsTags extends MavenIsoVisitor<ExecutionContext> {
+
         @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+        public  Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
             if (("pluginManagement".equals(t.getName()) || "plugins".equals(t.getName())) && (t.getContent() == null || t.getContent().isEmpty())) {
                 //noinspection DataFlowIssue

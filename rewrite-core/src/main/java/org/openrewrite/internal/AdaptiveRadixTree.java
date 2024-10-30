@@ -409,7 +409,7 @@ public class AdaptiveRadixTree<V> {
             final byte[] prefixKeys = new byte[PESSIMISTIC_PATH_COMPRESSION_LIMIT];
             int prefixLen;
             short noOfChildren;
-            final @Nullable Node[] child;
+            final Node @Nullable[] child;
 
             InnerNode(int size) {
                 child = new Node[size + 1];

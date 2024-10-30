@@ -34,7 +34,7 @@ public class StringUtils {
     private StringUtils() {
     }
 
-    public static String trimIndentPreserveCRLF(@Nullable String text) {
+    public static @Nullable String trimIndentPreserveCRLF(@Nullable String text) {
         if (text == null) {
             //noinspection DataFlowIssue
             return null;
