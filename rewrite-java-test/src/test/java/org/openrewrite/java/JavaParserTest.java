@@ -214,4 +214,21 @@ class JavaParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotatedVargArgs() {
+        rewriteRun(
+          java(
+            """
+              import org.jspecify.annotations.NonNull;
+              
+              class ParserError {
+                  private String method(@NonNull final String @NonNull ... args) {
+                      return "";
+                  }
+              }
+              """
+          )
+        );
+    }
 }
