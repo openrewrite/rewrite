@@ -223,7 +223,7 @@ class JavaParserTest implements RewriteTest {
               import org.jspecify.annotations.NonNull;
               
               class ParserError {
-                  private String method(@NonNull final String @NonNull ... args) {
+                  private String method(@NonNull final String @NonNull[] arrayArgs, @NonNull final String @NonNull ... varArgs) {
                       return "";
                   }
               }
