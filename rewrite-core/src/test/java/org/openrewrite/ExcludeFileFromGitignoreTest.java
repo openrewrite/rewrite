@@ -213,7 +213,7 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               /directory/
               """,
             """
-              /directory/
+              /directory/*
               !/directory/test.yml
               """,
             spec -> spec.path(".gitignore")
@@ -262,7 +262,7 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               /directory/
               """,
             """
-              /directory/
+              /directory/*
               !/directory/nested/
               """,
             spec -> spec.path(".gitignore")
@@ -285,7 +285,7 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               /yet-another-nested/
               """,
             """
-              /yet-another-nested/
+              /yet-another-nested/*
               !/yet-another-nested/test.yml
               """,
             spec -> spec.path("directory/nested/.gitignore")
