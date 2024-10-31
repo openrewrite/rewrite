@@ -38,6 +38,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -135,8 +136,20 @@ public interface JavaParser extends Parser {
                             throw new RuntimeException(e);
                         }
                     })
-                    .filter(c -> !c.getName().equals(JavaParser.class.getName()) &&
-                                 !c.getName().equals(JavaParser.Builder.class.getName()))
+                    // Drop anything before the parser or builder class, as well as those classes themselves
+                    .filter(new Predicate<Class<?>>() {
+                        boolean parserOrBuilderFound = false;
+
+                        @Override
+                        public boolean test(Class<?> c1) {
+                            if (c1.getName().equals(JavaParser.class.getName()) ||
+                                c1.getName().equals(Builder.class.getName())) {
+                                parserOrBuilderFound = true;
+                                return false;
+                            }
+                            return parserOrBuilderFound;
+                        }
+                    })
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Unable to find caller of JavaParser.dependenciesFromResources(..)")));
         } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException |
