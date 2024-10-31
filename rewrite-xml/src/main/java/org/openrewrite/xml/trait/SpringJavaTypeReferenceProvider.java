@@ -13,23 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml;
+package org.openrewrite.xml.trait;
 
 import org.openrewrite.JavaTypeReferenceProvider;
 import org.openrewrite.SourceFile;
-import org.openrewrite.trait.JavaTypeReference;
-import org.openrewrite.xml.trait.SpringJavaTypeReference;
+import org.openrewrite.trait.TypeReference;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
 
-public class SpringJavaTypeReferenceProvider implements JavaTypeReferenceProvider {
+class SpringJavaTypeReferenceProvider implements JavaTypeReferenceProvider {
 
     @Override
-    public Set<JavaTypeReference> getTypeReferences(SourceFile sourceFile) {
-        Set<JavaTypeReference> typeReferences = new HashSet<>();
-        new SpringJavaTypeReference.Matcher().asVisitor(reference -> {
+    public Set<TypeReference> getTypeReferences(SourceFile sourceFile) {
+        Set<TypeReference> typeReferences = new HashSet<>();
+        new SpringTypeReference.Matcher().asVisitor(reference -> {
             typeReferences.add(reference);
             return reference.getTree();
         }).visit(sourceFile, null);

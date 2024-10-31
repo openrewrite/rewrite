@@ -19,20 +19,20 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.trait.JavaTypeReference;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
+import org.openrewrite.trait.TypeReference;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.regex.Pattern;
 
 @Value
-public class SpringJavaTypeReference implements JavaTypeReference, Trait<Tree> {
+class SpringTypeReference implements TypeReference, Trait<Tree> {
     Cursor cursor;
 
     @Override
-    public @Nullable String getValue() {
+    public @Nullable String getName() {
         if (getTree() instanceof Xml.Attribute) {
             Xml.Attribute attribute = (Xml.Attribute) getTree();
             return attribute.getValueAsString();
@@ -45,27 +45,27 @@ public class SpringJavaTypeReference implements JavaTypeReference, Trait<Tree> {
         return null;
     }
 
-    public static class Matcher extends SimpleTraitMatcher<SpringJavaTypeReference> {
+    public static class Matcher extends SimpleTraitMatcher<SpringTypeReference> {
         private final Pattern typeReference = Pattern.compile("(?:[a-zA-Z_][a-zA-Z0-9_]*\\.)+[A-Z*][a-zA-Z0-9_]*(?:<[a-zA-Z0-9_,?<> ]*>)?");
         private final XPathMatcher classXPath = new XPathMatcher("//@class");
         private final XPathMatcher typeXPath = new XPathMatcher("//@type");
         private final XPathMatcher tags = new XPathMatcher("//value");
 
         @Override
-        protected @Nullable SpringJavaTypeReference test(Cursor cursor) {
+        protected @Nullable SpringTypeReference test(Cursor cursor) {
             Object value = cursor.getValue();
             if (value instanceof Xml.Attribute) {
                 Xml.Attribute attrib = (Xml.Attribute) value;
                 if (classXPath.matches(cursor) || typeXPath.matches(cursor)) {
                     if (typeReference.matcher(attrib.getValueAsString()).matches()) {
-                        return new SpringJavaTypeReference(cursor);
+                        return new SpringTypeReference(cursor);
                     }
                 }
             } else if (value instanceof Xml.Tag) {
                 Xml.Tag tag = (Xml.Tag) value;
                 if (tags.matches(cursor)) {
                     if (tag.getValue().isPresent() && typeReference.matcher(tag.getValue().get()).matches()) {
-                        return new SpringJavaTypeReference(cursor);
+                        return new SpringTypeReference(cursor);
                     }
                 }
             }

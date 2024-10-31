@@ -15,11 +15,8 @@
  */
 package org.openrewrite.trait;
 
-import org.jspecify.annotations.Nullable;
+public interface TypeReference {
 
-public interface JavaTypeReference {
-
-    @Nullable
-    String getValue();
+    String getName();
 
 }

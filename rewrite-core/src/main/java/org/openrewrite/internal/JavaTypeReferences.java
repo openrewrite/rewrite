@@ -20,7 +20,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.JavaTypeReferenceProvider;
 import org.openrewrite.SourceFile;
-import org.openrewrite.trait.JavaTypeReference;
+import org.openrewrite.trait.TypeReference;
 
 import java.util.HashSet;
 import java.util.ServiceLoader;
@@ -29,17 +29,17 @@ import java.util.Set;
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Getter
 public class JavaTypeReferences {
-    private final SourceFile document;
-    private final Set<JavaTypeReference> typeReferences;
+    private final SourceFile sourceFile;
+    private final Set<TypeReference> typeReferences;
 
-    public static JavaTypeReferences build(SourceFile doc) {
-        Set<JavaTypeReference> typeReferences = new HashSet<>();
+    public static JavaTypeReferences build(SourceFile sourceFile) {
+        Set<TypeReference> typeReferences = new HashSet<>();
         ServiceLoader<JavaTypeReferenceProvider> loader = ServiceLoader.load(JavaTypeReferenceProvider.class);
         loader.forEach(provider -> {
-            if (provider.isAcceptable(doc)) {
-                typeReferences.addAll(provider.getTypeReferences(doc));
+            if (provider.isAcceptable(sourceFile)) {
+                typeReferences.addAll(provider.getTypeReferences(sourceFile));
             }
         });
-        return new JavaTypeReferences(doc, typeReferences);
+        return new JavaTypeReferences(sourceFile, typeReferences);
     }
 }

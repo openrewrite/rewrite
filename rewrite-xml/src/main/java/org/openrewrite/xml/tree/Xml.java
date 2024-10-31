@@ -84,7 +84,7 @@ public interface Xml extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class Document implements Xml, SourceFile, SourceFileWithTypeReferences {
+    class Document implements Xml, SourceFileWithTypeReferences {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -165,12 +165,12 @@ public interface Xml extends Tree {
             if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 return (T) new XmlWhitespaceValidationService();
             }
-            return SourceFile.super.service(service);
+            return SourceFileWithTypeReferences.super.service(service);
         }
 
         @Nullable
         @NonFinal
-        SoftReference<JavaTypeReferences> javaTypeReferences;
+        transient SoftReference<JavaTypeReferences> javaTypeReferences;
 
         @Transient
         @Override
@@ -181,7 +181,7 @@ public interface Xml extends Tree {
                 this.javaTypeReferences = new SoftReference<>(cache);
             } else {
                 cache = this.javaTypeReferences.get();
-                if (cache == null || cache.getDocument() != this) {
+                if (cache == null || cache.getSourceFile() != this) {
                     cache = JavaTypeReferences.build(this);
                     this.javaTypeReferences = new SoftReference<>(cache);
                 }
