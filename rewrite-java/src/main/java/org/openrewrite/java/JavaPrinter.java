@@ -850,8 +850,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         if (multiVariable.getVarargs() != null) {
             // The `visit(multiVariable.getTypeExpression(), p);` statement above does not know the
             // enclosing VariableDeclarations is a vararg therefore we have to remove unnecessary dimensions here
-            if (p.out.charAt(p.out.length()) == ']') {
-                if (p.out.charAt(p.out.length() - 1) == '[') {
+            if (p.out.charAt(p.out.length() - 1) == ']') {
+                if (p.out.charAt(p.out.length() - 2) == '[') {
                     p.out.delete(p.out.length() - 2, p.out.length());
                 } else {
                     throw new IllegalStateException("Vararg was interpreted with non empty dimensions");
