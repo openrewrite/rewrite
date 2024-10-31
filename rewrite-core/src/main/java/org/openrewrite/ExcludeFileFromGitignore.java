@@ -153,15 +153,15 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                             continue;
                         } else if (isMatch(rule, nestedPath)) {
                             String rulePath = rule.toString();
-                            if (rulePath.contains("*")) {
+                            if (rulePath.contains("*") || ("/" + rule).equals(nestedPath)) {
                                 remainingRules.add(rule);
                                 remainingRules.add(new FastIgnoreRule("!" + nestedPath));
                                 continue;
                             }
                             if (!rule.dirOnly()) {
                                 remainingRules.add(rule);
-                                remainingRules.add(new FastIgnoreRule("!/" + rule + "/"));
-                                rulePath = rule + "/";
+                                remainingRules.add(new FastIgnoreRule("!" + normalizedPath));
+                                continue;
                             }
                             String pathToTraverse = nestedPath.substring(rule.toString().length());
                             if (pathToTraverse.replace("/", "").isEmpty()) {
@@ -174,7 +174,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                                 String s = splitPath[i];
                                 remainingRules.add(new FastIgnoreRule(rulePath + "*"));
                                 rulePath += s;
-                                remainingRules.add(new FastIgnoreRule("!" + rulePath + (i < splitPath.length - 1 ? "/" : "")));
+                                remainingRules.add(new FastIgnoreRule("!" + rulePath + (i < splitPath.length - 1 || nestedPath.endsWith("/") ? "/" : "")));
                                 rulePath += "/";
                             }
                             continue;
