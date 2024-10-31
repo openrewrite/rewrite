@@ -1545,7 +1545,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 // this is a lambda parameter with an inferred type expression
                 typeExpr = null;
             } else {
-                typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", typeMapping.type(vartype), null);
+                typeExpr = new J.Identifier(randomId(),
+                        whitespace(),
+                        Markers.build(singletonList(JavaVarKeyword.build())),
+                        emptyList(),
+                        // Might be looking at Java's "var" or lombok's "val", both of which are conveniently three characters long.
+                        source.substring(cursor, cursor += 3),
+                        typeMapping.type(vartype),
+                        null);
             }
         } else if (vartype instanceof JCArrayTypeTree) {
             JCExpression elementType = vartype;
@@ -1672,7 +1679,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix = source.substring(cursor, max(((JCTree) t).getStartPosition(), cursor));
+            String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
             // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
             Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
@@ -1805,11 +1812,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
         for (Tree t : trees) {
-            if (t instanceof JCTree.JCMethodDecl && isLombokGenerated(((JCMethodDecl) t).sym)) {
-                continue;
-            } else if (t instanceof JCTree.JCClassDecl && isLombokGenerated(((JCClassDecl) t).sym)) {
-                continue;
-            } else if (t instanceof JCTree.JCVariableDecl && isLombokGenerated(((JCVariableDecl) t).sym)) {
+            if (isLombokGenerated(t)) {
                 continue;
             }
             treesGroupedByStartPosition.computeIfAbsent(((JCTree) t).getStartPosition(), k -> new ArrayList<>(1)).add(t);
@@ -1837,8 +1840,34 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
+    private static boolean isLombokGenerated(Tree t) {
+        Symbol sym = null;
+        if (t instanceof JCAnnotation) {
+            t = ((JCAnnotation) t).getAnnotationType();
+        }
+        if (t instanceof JCIdent) {
+            sym = ((JCIdent) t).sym;
+        } else if (t instanceof JCTree.JCMethodDecl) {
+            sym = ((JCMethodDecl) t).sym;
+        } else if (t instanceof JCTree.JCClassDecl) {
+            sym = ((JCClassDecl) t).sym;
+        } else if (t instanceof JCTree.JCVariableDecl) {
+            sym = ((JCVariableDecl) t).sym;
+        }
+        return isLombokGenerated(sym);
+    }
+
     private static boolean isLombokGenerated(@Nullable Symbol sym) {
-        if (sym == null || sym.getMetadata() == null) return false;
+        if (sym == null) {
+            return false;
+        }
+        // Lombok val is represented as a @lombok.val on a "final" modifier, neither which appear in source
+        if ("lombok.val".equals(sym.getQualifiedName().toString())) {
+            return true;
+        }
+        if ( sym.getMetadata() == null) {
+            return false;
+        }
         for (Attribute.Compound a : sym.getDeclarationAttributes()) {
             if ("lombok.Generated".equals(a.type.toString())) {
                 return true;
@@ -2023,7 +2052,12 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         int keywordStartIdx = -1;
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
-                J.Annotation annotation = convert(annotationPosTable.get(i));
+                JCAnnotation jcAnnotation = annotationPosTable.get(i);
+                // Skip over lombok's "@val" annotation which does not actually appear in source
+                if (isLombokGenerated(jcAnnotation.getAnnotationType())) {
+                    continue;
+                }
+                J.Annotation annotation = convert(jcAnnotation);
                 if (afterFirstModifier) {
                     currentAnnotations.add(annotation);
                 } else {
@@ -2143,7 +2177,11 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         boolean inMultilineComment = false;
         for (int i = cursor; i <= maxAnnotationPosition && i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
-                annotations.add(convert(annotationPosTable.get(i)));
+                JCAnnotation jcAnnotation = annotationPosTable.get(i);
+                if(isLombokGenerated(jcAnnotation)) {
+                    continue;
+                }
+                annotations.add(convert(jcAnnotation));
                 i = cursor;
                 continue;
             }

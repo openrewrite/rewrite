@@ -10,8 +10,9 @@ configurations.named("compileOnly").configure {
     extendsFrom(lombok)
 }
 
-val unpackedAndRenamedLombokDir = file("$buildDir/lombok")
+val unpackedAndRenamedLombokDir = layout.buildDirectory.dir("lombok").get().asFile
 
+// Lombok hides its internal classes with a ".SCL.lombok" extension, so we have to undo that to compile with them
 tasks.register("unpackAndRenameLombok") {
     inputs.files(configurations.getByName("lombok"))
     outputs.dir(unpackedAndRenamedLombokDir)
