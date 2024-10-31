@@ -54,7 +54,7 @@ public class TypeMatcher {
         this(fieldType, false);
     }
 
-    public TypeMatcher(@Nullable String fieldType, boolean matchInherited) {
+    public @Nullable TypeMatcher(@Nullable String fieldType, boolean matchInherited) {
         this.signature = fieldType == null ? ".*" : fieldType;
         this.matchInherited = matchInherited;
 
@@ -65,8 +65,9 @@ public class TypeMatcher {
                     CharStreams.fromString(fieldType))));
 
             new MethodSignatureParserBaseVisitor<Void>() {
+
                 @Override
-                public Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
+                public @Nullable Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
                     String pattern = new TypeVisitor().visitTargetTypePattern(ctx);
                     if (isPlainIdentifier(ctx)) {
                         targetType = pattern;

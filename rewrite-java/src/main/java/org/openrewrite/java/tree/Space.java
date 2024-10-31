@@ -55,7 +55,7 @@ public class Space {
     }
 
     @JsonCreator
-    public static Space build(@Nullable String whitespace, List<Comment> comments) {
+    public static @Nullable Space build(@Nullable String whitespace, List<Comment> comments) {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
@@ -233,7 +233,7 @@ public class Space {
     }
 
     @SuppressWarnings("ConstantConditions")
-    public static <J2 extends J> List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,
+    public static <J2 extends J> @Nullable List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,
                                                                          Space suffix) {
         if (trees == null) {
             return null;

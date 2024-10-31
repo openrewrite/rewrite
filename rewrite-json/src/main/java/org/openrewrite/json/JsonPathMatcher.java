@@ -144,7 +144,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitRecursiveDecent(JsonPathParser.RecursiveDecentContext ctx) {
+        public @Nullable Object visitRecursiveDecent(JsonPathParser.RecursiveDecentContext ctx) {
             if (scope == null) {
                 return null;
             }
@@ -180,7 +180,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitBracketOperator(JsonPathParser.BracketOperatorContext ctx) {
+        public @Nullable Object visitBracketOperator(JsonPathParser.BracketOperatorContext ctx) {
             if (!ctx.property().isEmpty()) {
                 if (ctx.property().size() == 1) {
                     return visitProperty(ctx.property(0));
@@ -270,7 +270,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitProperty(JsonPathParser.PropertyContext ctx) {
+        public @Nullable Object visitProperty(JsonPathParser.PropertyContext ctx) {
             if (scope instanceof Json.Member) {
                 Json.Member member = (Json.Member) scope;
 
@@ -347,7 +347,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitWildcard(JsonPathParser.WildcardContext ctx) {
+        public @Nullable Object visitWildcard(JsonPathParser.WildcardContext ctx) {
             if (scope instanceof Json.Member) {
                 Json.Member member = (Json.Member) scope;
                 return member.getValue();
@@ -407,7 +407,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) {
+        public @Nullable Object visitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) {
             if (ctx.AT() != null) {
                 if (scope instanceof Json.Literal) {
                     if (ctx.Identifier() == null && ctx.StringLiteral() == null) {
@@ -475,7 +475,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitRegexExpression(JsonPathParser.RegexExpressionContext ctx) {
+        public @Nullable Object visitRegexExpression(JsonPathParser.RegexExpressionContext ctx) {
             if (scope == null || scope instanceof List && ((List<Object>) scope).isEmpty()) {
                 return null;
             }
@@ -500,7 +500,7 @@ public class JsonPathMatcher {
 
         // Checks if a string contains the specified substring (case-sensitive), or an array contains the specified element.
         @Override
-        public Object visitContainsExpression(JsonPathParser.ContainsExpressionContext ctx) {
+        public @Nullable Object visitContainsExpression(JsonPathParser.ContainsExpressionContext ctx) {
             Object originalScope = scope;
             if (ctx.children.get(0) instanceof JsonPathParser.UnaryExpressionContext) {
                 Object lhs = visitUnaryExpression(ctx.unaryExpression());
@@ -550,7 +550,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) {
+        public @Nullable Object visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) {
             Object lhs = ctx.children.get(0);
             Object rhs = ctx.children.get(2);
 

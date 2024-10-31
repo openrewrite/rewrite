@@ -44,7 +44,7 @@ public final class SearchResult implements Marker {
         return found(t, null);
     }
 
-    public static <T extends Tree> T found(@Nullable T t, @Nullable String description) {
+    public static <T extends Tree> @Nullable T found(@Nullable T t, @Nullable String description) {
         if (t == null) {
             //noinspection ConstantConditions
             return null;
@@ -71,7 +71,7 @@ public final class SearchResult implements Marker {
      * @param delimiter The delimiter to use when merging descriptions.
      */
     @Incubating(since = "8.0.0")
-    public static <T extends Tree> T mergingFound(@Nullable T t, String description, String delimiter) {
+    public static <T extends Tree> @Nullable T mergingFound(@Nullable T t, String description, String delimiter) {
         Objects.requireNonNull(delimiter, "delimiter must not be null");
         if (t == null) {
             //noinspection ConstantConditions

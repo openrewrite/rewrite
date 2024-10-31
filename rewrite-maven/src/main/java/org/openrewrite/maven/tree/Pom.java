@@ -116,6 +116,7 @@ public class Pom {
     List<Plugin> pluginManagement = emptyList();
 
     @Builder.Default
+    @Nullable
     List<String> subprojects = emptyList();
 
     public String getGroupId() {
