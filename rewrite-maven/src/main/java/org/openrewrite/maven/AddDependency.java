@@ -257,7 +257,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             private boolean isAggregatorNotUsedAsParent() {
                 List<String> subprojects = getResolutionResult().getPom().getSubprojects();
-                if (subprojects.isEmpty()) {
+                if (subprojects == null || subprojects.isEmpty()) {
                     return false;
                 }
                 List<MavenResolutionResult> modules = getResolutionResult().getModules();

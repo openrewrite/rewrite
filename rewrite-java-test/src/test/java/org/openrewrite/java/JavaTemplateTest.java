@@ -71,6 +71,47 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/550")
+    @Test
+    void genericTypeVariable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getTypeExpression() instanceof J.Identifier && "var".equals(((J.Identifier) multiVariable.getTypeExpression()).getSimpleName())) {
+                      return multiVariable;
+                  }
+                  J.VariableDeclarations.NamedVariable var0 = multiVariable.getVariables().get(0);
+                  return JavaTemplate.builder("var #{} = #{any()}")
+                    .contextSensitive()
+                    .build()
+                    .apply(getCursor(), multiVariable.getCoordinates().replace(), var0.getSimpleName(), var0.getInitializer());
+              }
+          })),
+          java(
+            """
+              import java.io.Serializable;
+              
+              abstract class Outer<T extends Serializable> {
+                  abstract T doIt();
+                  void trigger() {
+                      T x = doIt();
+                  }
+              }
+              """, """
+              import java.io.Serializable;
+              
+              abstract class Outer<T extends Serializable> {
+                  abstract T doIt();
+                  void trigger() {
+                      var x = doIt();
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("InstantiationOfUtilityClass")
     @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/66")
     @Test
