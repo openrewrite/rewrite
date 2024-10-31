@@ -271,6 +271,46 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
     }
 
     @Test
+    void ignoreDeeplyNestedDirectory() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/deeply/nested/"))),
+          text(
+            """
+              /directory/
+              """,
+            """
+              /directory/*
+              !/directory/deeply/
+              /directory/deeply/*
+              !/directory/deeply/nested/
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void ignoreDeeplyNestedFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/deeply/nested/file.txt"))),
+          text(
+            """
+              /directory/
+              """,
+            """
+              /directory/*
+              !/directory/deeply/
+              /directory/deeply/*
+              !/directory/deeply/nested/
+              /directory/deeply/nested/*
+              !/directory/deeply/nested/file.txt
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
     void ignoreNestedDirectoryWithMultipleGitignoreFiles() {
         rewriteRun(
           spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/nested/yet-another-nested/test.yml"))),
