@@ -28,7 +28,7 @@ class SpringTypeReferenceTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(RewriteTest.toRecipe(() -> new SpringTypeReference.Matcher()
-          .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getValue()))));
+          .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getName()))));
     }
 
     @SuppressWarnings("SpringXmlModelInspection")
