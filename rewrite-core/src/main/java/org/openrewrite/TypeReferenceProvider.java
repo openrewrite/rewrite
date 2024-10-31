@@ -19,7 +19,7 @@ import org.openrewrite.trait.TypeReference;
 
 import java.util.Set;
 
-public interface JavaTypeReferenceProvider {
+public interface TypeReferenceProvider {
 
     Set<TypeReference> getTypeReferences(SourceFile sourceFile);
 

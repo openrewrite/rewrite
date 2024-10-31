@@ -18,7 +18,7 @@ package org.openrewrite.internal;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.JavaTypeReferenceProvider;
+import org.openrewrite.TypeReferenceProvider;
 import org.openrewrite.SourceFile;
 import org.openrewrite.trait.TypeReference;
 
@@ -34,7 +34,7 @@ public class JavaTypeReferences {
 
     public static JavaTypeReferences build(SourceFile sourceFile) {
         Set<TypeReference> typeReferences = new HashSet<>();
-        ServiceLoader<JavaTypeReferenceProvider> loader = ServiceLoader.load(JavaTypeReferenceProvider.class);
+        ServiceLoader<TypeReferenceProvider> loader = ServiceLoader.load(TypeReferenceProvider.class);
         loader.forEach(provider -> {
             if (provider.isAcceptable(sourceFile)) {
                 typeReferences.addAll(provider.getTypeReferences(sourceFile));
