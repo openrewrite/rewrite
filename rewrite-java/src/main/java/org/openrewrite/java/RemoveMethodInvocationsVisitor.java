@@ -59,12 +59,13 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         J j = removeMethods(m, 0, isLambdaBody(), new Stack<>());
         if (j != null) {
             j = j.withPrefix(m.getPrefix());
+            // There should always be
+            if (!m.getArguments().isEmpty() && m.getArguments().stream().allMatch(ToBeRemoved::hasMarker)) {
+                return ToBeRemoved.withMarker(j);
+            }
         }
 
-        // There should always be
-        if (!m.getArguments().isEmpty() && m.getArguments().stream().allMatch(ToBeRemoved::hasMarker)) {
-            return ToBeRemoved.withMarker(j);
-        }
+        //noinspection DataFlowIssue allow returning null to remove the element
         return j;
     }
 
@@ -75,6 +76,10 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
         boolean isStatement = isStatement();
         J.MethodInvocation m = (J.MethodInvocation) expression;
+
+        if (m.getMethodType() == null || m.getSelect() == null) {
+            return expression;
+        }
 
         if (matchers.entrySet().stream().anyMatch(entry -> matches(m, entry.getKey(), entry.getValue()))) {
             boolean hasSameReturnType = TypeUtils.isAssignableTo(m.getMethodType().getReturnType(), m.getSelect().getType());
@@ -127,6 +132,9 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
     }
 
     private boolean isLambdaBody() {
+        if (getCursor().getParent() == null) {
+            return false;
+        }
         Object parent = getCursor().getParent().getValue();
         return parent instanceof J.Lambda && ((J.Lambda) parent).getBody() == getCursor().getValue();
     }
@@ -137,23 +145,26 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
     private J.MethodInvocation inheritSelectAfter(J.MethodInvocation method, Stack<Space> prefix) {
         return (J.MethodInvocation) new JavaIsoVisitor<ExecutionContext>() {
+            @Nullable
             @Override
             public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
                                                         JRightPadded.Location loc,
                                                         ExecutionContext executionContext) {
+                if (right == null) return null;
                 return prefix.isEmpty() ? right : right.withAfter(prefix.pop());
             }
-        }.visit(method, new InMemoryExecutionContext());
+        }.visitNonNull(method, new InMemoryExecutionContext());
     }
 
     private Space getSelectAfter(J.MethodInvocation method) {
         return new JavaIsoVisitor<List<Space>>() {
+            @Nullable
             @Override
             public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
                                                         JRightPadded.Location loc,
                                                         List<Space> selectAfter) {
                 if (selectAfter.isEmpty()) {
-                    selectAfter.add(right.getAfter());
+                    selectAfter.add(right == null ? Space.EMPTY : right.getAfter());
                 }
                 return right;
             }
@@ -161,17 +172,11 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
     }
 
     public static Predicate<List<Expression>> isTrueArgument() {
-        return args -> (args != null &&
-                        args.size() == 1 &&
-                        isTrue(args.get(0))
-        );
+        return args -> args.size() == 1 && isTrue(args.get(0));
     }
 
     public static Predicate<List<Expression>> isFalseArgument() {
-        return args -> (args != null &&
-                        args.size() == 1 &&
-                        isFalse(args.get(0))
-        );
+        return args -> args.size() == 1 && isFalse(args.get(0));
     }
 
     public static boolean isTrue(Expression expression) {

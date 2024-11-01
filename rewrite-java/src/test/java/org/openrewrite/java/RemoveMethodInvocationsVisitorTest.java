@@ -172,6 +172,34 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
+    @ExpectedToFail
+    void removeWithoutSelect() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("Test foo()")),
+          //language=java
+          java(
+            """
+              public class Test {
+                  void foo() {}
+                  void method() {
+                      StringBuilder sb = new StringBuilder();
+                      foo();
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void foo() {}
+                  void method() {
+                      StringBuilder sb = new StringBuilder();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeFromWithinArguments() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
