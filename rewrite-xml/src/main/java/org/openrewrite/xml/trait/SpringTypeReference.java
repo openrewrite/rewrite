@@ -20,7 +20,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.trait.SimpleTraitMatcher;
-import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.TypeReference;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -28,8 +27,13 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.regex.Pattern;
 
 @Value
-class SpringTypeReference implements TypeReference, Trait<Tree> {
+class SpringTypeReference implements TypeReference {
     Cursor cursor;
+
+    @Override
+    public Tree getTree() {
+        return TypeReference.super.getTree();
+    }
 
     @Override
     public @Nullable String getName() {

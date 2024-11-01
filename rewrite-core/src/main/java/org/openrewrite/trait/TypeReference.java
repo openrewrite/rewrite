@@ -15,8 +15,20 @@
  */
 package org.openrewrite.trait;
 
-public interface TypeReference {
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+
+import java.util.Set;
+
+public interface TypeReference extends Trait<Tree> {
 
     String getName();
+
+    interface TypeReferenceProvider {
+
+        Set<TypeReference> getTypeReferences(SourceFile sourceFile);
+
+        boolean isAcceptable(SourceFile sourceFile);
+    }
 
 }
