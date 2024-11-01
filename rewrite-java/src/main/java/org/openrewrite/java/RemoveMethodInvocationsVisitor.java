@@ -99,7 +99,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
                     } else if (isLambdaBody) {
                         return ToBeRemoved.withMarker(J.Block.createEmptyBlock());
                     } else {
-                        return hasSameReturnType ? m.getSelect() : expression;
+                        return m.getSelect();
                     }
                 }
             } else if (m.getSelect() instanceof J.MethodInvocation) {
