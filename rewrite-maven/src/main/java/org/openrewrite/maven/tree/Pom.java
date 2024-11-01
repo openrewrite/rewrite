@@ -26,10 +26,7 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -160,6 +157,22 @@ public class Pom {
                     return r;
                 })
                 .distinct()
+                .collect(Collectors.toList());
+    }
+
+    public List<Profile> activeProfiles(final Iterable<String> explicitActiveProfiles) {
+        final List<Profile> pomActivatedProfiles =
+                profiles.stream()
+                        .filter(p -> p.isActive(explicitActiveProfiles))
+                        .collect(Collectors.toList());
+
+        if (!pomActivatedProfiles.isEmpty()) {
+            return pomActivatedProfiles;
+        }
+
+        return profiles
+                .stream()
+                .filter(p -> p.getActivation() != null && Boolean.TRUE.equals(p.getActivation().getActiveByDefault()))
                 .collect(Collectors.toList());
     }
 
