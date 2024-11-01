@@ -145,8 +145,8 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
     private J.MethodInvocation inheritSelectAfter(J.MethodInvocation method, Stack<Space> prefix) {
         return (J.MethodInvocation) new JavaIsoVisitor<ExecutionContext>() {
-            @Nullable
-            @Override
+
+            public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
             public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
                                                         JRightPadded.Location loc,
                                                         ExecutionContext executionContext) {
@@ -158,8 +158,8 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
     private Space getSelectAfter(J.MethodInvocation method) {
         return new JavaIsoVisitor<List<Space>>() {
-            @Nullable
-            @Override
+
+            public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
             public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
                                                         JRightPadded.Location loc,
                                                         List<Space> selectAfter) {
