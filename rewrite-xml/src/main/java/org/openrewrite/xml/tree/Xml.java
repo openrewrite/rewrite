@@ -23,7 +23,7 @@ import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.JavaTypeReferences;
+import org.openrewrite.internal.TypeReferences;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
@@ -170,19 +170,19 @@ public interface Xml extends Tree {
 
         @Nullable
         @NonFinal
-        transient SoftReference<JavaTypeReferences> javaTypeReferences;
+        transient SoftReference<TypeReferences> javaTypeReferences;
 
         @Transient
         @Override
-        public JavaTypeReferences getJavaTypeReferences() {
-            JavaTypeReferences cache;
+        public TypeReferences getJavaTypeReferences() {
+            TypeReferences cache;
             if (this.javaTypeReferences == null) {
-                cache = JavaTypeReferences.build(this);
+                cache = TypeReferences.build(this);
                 this.javaTypeReferences = new SoftReference<>(cache);
             } else {
                 cache = this.javaTypeReferences.get();
                 if (cache == null || cache.getSourceFile() != this) {
-                    cache = JavaTypeReferences.build(this);
+                    cache = TypeReferences.build(this);
                     this.javaTypeReferences = new SoftReference<>(cache);
                 }
             }

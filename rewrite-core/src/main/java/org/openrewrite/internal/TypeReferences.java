@@ -28,11 +28,11 @@ import java.util.Set;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Getter
-public class JavaTypeReferences {
+public class TypeReferences {
     private final SourceFile sourceFile;
     private final Set<TypeReference> typeReferences;
 
-    public static JavaTypeReferences build(SourceFile sourceFile) {
+    public static TypeReferences build(SourceFile sourceFile) {
         Set<TypeReference> typeReferences = new HashSet<>();
         ServiceLoader<TypeReferenceProvider> loader = ServiceLoader.load(TypeReferenceProvider.class);
         loader.forEach(provider -> {
@@ -40,6 +40,6 @@ public class JavaTypeReferences {
                 typeReferences.addAll(provider.getTypeReferences(sourceFile));
             }
         });
-        return new JavaTypeReferences(sourceFile, typeReferences);
+        return new TypeReferences(sourceFile, typeReferences);
     }
 }
