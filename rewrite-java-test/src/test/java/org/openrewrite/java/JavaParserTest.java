@@ -224,7 +224,7 @@ class JavaParserTest implements RewriteTest {
               import org.jspecify.annotations.NonNull;
               
               class C1 {
-                  void m(@NonNull final String @NonNull[] arrayArgs) {
+                  void m(@NonNull String @NonNull[] arrayArgs) {
                   }
               }
               """
@@ -234,7 +234,7 @@ class JavaParserTest implements RewriteTest {
               import org.jspecify.annotations.NonNull;
               
               class C2 {
-                  void m(@NonNull final String @NonNull ... varArgs) {
+                  void m(@NonNull String @NonNull ... varArgs) {
                   }
               }
               """
