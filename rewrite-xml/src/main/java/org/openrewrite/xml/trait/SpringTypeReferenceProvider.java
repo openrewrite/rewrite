@@ -15,15 +15,15 @@
  */
 package org.openrewrite.xml.trait;
 
-import org.openrewrite.TypeReferenceProvider;
 import org.openrewrite.SourceFile;
+import org.openrewrite.TypeReferenceProvider;
 import org.openrewrite.trait.TypeReference;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
 
-class SpringTypeReferenceProvider implements TypeReferenceProvider {
+public class SpringTypeReferenceProvider implements TypeReferenceProvider {
 
     @Override
     public Set<TypeReference> getTypeReferences(SourceFile sourceFile) {
