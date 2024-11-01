@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
@@ -163,6 +164,47 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeFromWithinArguments() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          //language=java
+          java(
+            """
+              public class Test {
+                  void method() {
+                      StringBuilder sb = new StringBuilder();
+                      StringBuilder sb2 = new StringBuilder();
+                      sb.append(1)
+                          .append(((java.util.function.Supplier<Character>) () -> sb2
+                              .append("foo")
+                              .append('b')
+                              .toString()
+                              .charAt(0)))
+                          .append(2)
+                          .toString();
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void method() {
+                      StringBuilder sb = new StringBuilder();
+                      StringBuilder sb2 = new StringBuilder();
+                      sb.append(1)
+                          .append(((java.util.function.Supplier<Character>) () -> sb2
+                              .append('b')
+                              .toString()
+                              .charAt(0)))
+                          .append(2)
+                          .toString();
                   }
               }
               """
@@ -361,7 +403,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
           java(
             """
               import java.util.function.Consumer;
-                          
+
               public class Test {
                   public void method() {
                       StringBuilder sb = new StringBuilder();
