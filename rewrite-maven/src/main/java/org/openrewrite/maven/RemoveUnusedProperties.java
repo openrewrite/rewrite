@@ -24,6 +24,7 @@ import org.openrewrite.ScanningRecipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -106,7 +107,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, List<Mave
 
                     if (acc.containsKey(propertyName)) {
                         for (MavenResolutionResult pomWhereUsed : acc.get(propertyName)) {
-                            if (isAncestorOf(getResolutionResult(), pomWhereUsed)) {
+                            if (isAncestor(pomWhereUsed, getResolutionResult().getPom().getGav())) {
                                 return t;
                             }
                         }
@@ -122,13 +123,13 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, List<Mave
                 return propertyName.startsWith("project.") || propertyName.startsWith("maven.");
             }
 
-            private boolean isAncestorOf(MavenResolutionResult ancestor, MavenResolutionResult descendant) {
-                MavenResolutionResult parent = descendant;
-                while (parent != null) {
-                    if (parent.getPom().getGav().equals(ancestor.getPom().getGav())) {
+            private boolean isAncestor(MavenResolutionResult project, ResolvedGroupArtifactVersion possibleAncestorGav) {
+                MavenResolutionResult projectAncestor = project;
+                while (projectAncestor != null) {
+                    if (projectAncestor.getPom().getGav().equals(possibleAncestorGav)) {
                         return true;
                     }
-                    parent = parent.getParent();
+                    projectAncestor = projectAncestor.getParent();
                 }
                 return false;
             }
