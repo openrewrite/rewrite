@@ -26,8 +26,9 @@ import java.util.function.Consumer;
 
 public interface MavenArtifactCache {
     MavenArtifactCache NOOP = new MavenArtifactCache() {
+
         @Override
-        public Path getArtifact(ResolvedDependency dependency) {
+        public @Nullable Path getArtifact(ResolvedDependency dependency) {
             return null;
         }
 

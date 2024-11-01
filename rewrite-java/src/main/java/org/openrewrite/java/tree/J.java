@@ -218,7 +218,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return annotationType.getType();
         }
 
@@ -1760,7 +1760,7 @@ public interface J extends Tree {
         Markers markers;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 
@@ -4835,7 +4835,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             J2 element = tree.getElement();
             if (element instanceof Expression) {
                 return ((Expression) element).getType();
@@ -6101,7 +6101,7 @@ public interface J extends Tree {
         NameTree boundedType;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 
