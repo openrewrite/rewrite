@@ -49,19 +49,20 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+        J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+
         if (inMethodCallChain()) {
-            List<Expression> newArgs = ListUtils.map(method.getArguments(), arg -> (Expression) this.visit(arg, ctx));
-            return method.withArguments(newArgs);
+            List<Expression> newArgs = ListUtils.map(m.getArguments(), arg -> (Expression) this.visit(arg, ctx));
+            return m.withArguments(newArgs);
         }
 
-        method = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-        J j = removeMethods(method, 0, isLambdaBody(), new Stack<>());
+        J j = removeMethods(m, 0, isLambdaBody(), new Stack<>());
         if (j != null) {
-            j = j.withPrefix(method.getPrefix());
+            j = j.withPrefix(m.getPrefix());
         }
 
         // There should always be
-        if (!method.getArguments().isEmpty() && method.getArguments().stream().allMatch(ToBeRemoved::hasMarker)) {
+        if (!m.getArguments().isEmpty() && m.getArguments().stream().allMatch(ToBeRemoved::hasMarker)) {
             return ToBeRemoved.withMarker(j);
         }
         return j;
