@@ -41,10 +41,10 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
     }
 
     public RemoveMethodInvocationsVisitor(List<String> methodSignatures) {
-        matchers = methodSignatures.stream().collect(Collectors.toMap(
+        this(methodSignatures.stream().collect(Collectors.toMap(
             MethodMatcher::new,
             signature -> args -> true
-        ));
+        )));
     }
 
     @Override
@@ -171,10 +171,12 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         }.reduce(method, new ArrayList<>()).get(0);
     }
 
+    @SuppressWarnings("unused") // used in rewrite-spring / convenient for consumers
     public static Predicate<List<Expression>> isTrueArgument() {
         return args -> args.size() == 1 && isTrue(args.get(0));
     }
 
+    @SuppressWarnings("unused") // used in rewrite-spring / convenient for consumers
     public static Predicate<List<Expression>> isFalseArgument() {
         return args -> args.size() == 1 && isFalse(args.get(0));
     }
