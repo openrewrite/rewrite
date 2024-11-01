@@ -18,6 +18,7 @@ package org.openrewrite.internal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 @Incubating(since = "8.38.0")
@@ -40,7 +41,7 @@ public class AdaptiveRadixTree<V> {
     }
 
     public void insert(String key, V value) {
-        byte[] bytes = key.getBytes();
+        byte[] bytes = key.getBytes(StandardCharsets.UTF_8);
         if (root == null) {
             // create leaf node and set root to that
             root = new Node.LeafNode<>(bytes, value);
@@ -64,7 +65,7 @@ public class AdaptiveRadixTree<V> {
         if (root == null) { // empty tree
             return null;
         }
-        byte[] bytes = key.getBytes();
+        byte[] bytes = key.getBytes(StandardCharsets.UTF_8);
         return getEntry(root, bytes);
     }
 
