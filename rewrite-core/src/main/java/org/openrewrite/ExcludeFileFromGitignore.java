@@ -31,6 +31,7 @@ import static java.util.Comparator.comparingInt;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.join;
 import static org.openrewrite.ExcludeFileFromGitignore.Repository;
+import static org.openrewrite.PathUtils.separatorsToUnix;
 import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.*;
 
 @Value
@@ -73,25 +74,28 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Repository acc) {
-
+    public Collection<? extends SourceFile> generate(Repository acc, ExecutionContext ctx) {
         for (String path : paths) {
             acc.exclude(path);
         }
+        return Collections.emptyList();
+    }
 
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Repository acc) {
         return Preconditions.check(new FindSourceFiles("**/.gitignore"), new PlainTextVisitor<ExecutionContext>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                String gitignoreFileName = text.getSourcePath().toString();
+                String gitignoreFileName = separatorsToUnix(text.getSourcePath().toString());
                 gitignoreFileName = gitignoreFileName.startsWith("/") ? gitignoreFileName : "/" + gitignoreFileName;
                 IgnoreNode ignoreNode = acc.rules.get(gitignoreFileName.substring(0, gitignoreFileName.lastIndexOf("/") + 1));
                 if (ignoreNode != null) {
                     String separator = text.getText().contains("\r\n") ? "\r\n" : "\n";
                     List<String> newRules = ignoreNode.getRules().stream().map(FastIgnoreRule::toString).collect(toList());
                     String[] currentContent = text.getText().split(separator);
-                    return text.withText(join(sortRules(currentContent, newRules), separator));
+                    text = text.withText(join(sortRules(currentContent, newRules), separator));
                 }
-                return super.visitText(text, ctx);
+                return text;
             }
 
             private List<String> sortRules(String[] originalRules, List<String> newRules) {
@@ -126,6 +130,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
         private final Map<String, IgnoreNode> rules = new HashMap<>();
 
         public void exclude(String path) {
+            path = separatorsToUnix(path);
             String normalizedPath = path.startsWith("/") ? path : "/" + path;
             List<String> impactingFiles = rules.keySet()
                     .stream()
@@ -152,8 +157,8 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                             // If this rule is an exact match to the path to remove, we remove it.
                             continue;
                         } else if (isMatch(rule, nestedPath)) {
-                            String rulePath = rule.toString();
-                            if (rulePath.contains("*") || ("/" + rule).equals(nestedPath)) {
+                            StringBuilder rulePath = new StringBuilder(rule.toString());
+                            if (rulePath.toString().contains("*") || ("/" + rule).equals(nestedPath)) {
                                 remainingRules.add(rule);
                                 remainingRules.add(new FastIgnoreRule("!" + nestedPath));
                                 continue;
@@ -173,9 +178,9 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                             for (int i = 0; i < splitPath.length; i++) {
                                 String s = splitPath[i];
                                 remainingRules.add(new FastIgnoreRule(rulePath + "*"));
-                                rulePath += s;
+                                rulePath.append(s);
                                 remainingRules.add(new FastIgnoreRule("!" + rulePath + (i < splitPath.length - 1 || nestedPath.endsWith("/") ? "/" : "")));
-                                rulePath += "/";
+                                rulePath.append("/");
                             }
                             continue;
                         }
@@ -194,7 +199,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
         }
 
         public void addGitignoreFile(PlainText text) throws IOException {
-            String gitignoreFileName = text.getSourcePath().toString();
+            String gitignoreFileName = separatorsToUnix(text.getSourcePath().toString());
             gitignoreFileName = gitignoreFileName.startsWith("/") ? gitignoreFileName : "/" + gitignoreFileName;
             IgnoreNode ignoreNode = new IgnoreNode();
             ignoreNode.parse(gitignoreFileName, new ByteArrayInputStream(text.getText().getBytes()));
