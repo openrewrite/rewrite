@@ -357,15 +357,6 @@ public class AdaptiveRadixTree<V> {
             return null;
         }
 
-        private InternalNode<V> grow() {
-            Node16<V> node = new Node16<>(partialKey);
-            node.value = this.value;
-            for (int i = 0; i < size; i++) {
-                node.addChild(keys[i], children[i]);
-            }
-            return node;
-        }
-
         @Override
         Node<V> insert(byte[] key, int depth, V value) {
             if (!matchesPartialKey(key, depth)) {
@@ -384,12 +375,6 @@ public class AdaptiveRadixTree<V> {
 
             if (child == null) {
                 // Need to add a new child
-                if (size >= 4) {
-                    // If we're full, grow first
-                    InternalNode<V> larger = grow();
-                    return larger.insert(key, depth - partialKey.length, value);
-                }
-
                 byte[] remainingKey = Arrays.copyOfRange(key, depth + 1, key.length);
                 Node<V> newChild = new LeafNode<>(remainingKey, value);
                 InternalNode<V> grown = addChild(nextByte, newChild);
@@ -454,22 +439,8 @@ public class AdaptiveRadixTree<V> {
                 return null;
             }
 
-            // Use binary search for larger sizes
-            int low = 0;
-            int high = size - 1;
-            while (low <= high) {
-                int mid = (low + high) >>> 1;
-                int midVal = keys[mid] & 0xFF;
-                int keyVal = key & 0xFF;
-
-                if (midVal < keyVal)
-                    low = mid + 1;
-                else if (midVal > keyVal)
-                    high = mid - 1;
-                else
-                    return children[mid];
-            }
-            return null;
+            int idx = Arrays.binarySearch(keys, 0, size, key);
+            return idx >= 0 ? children[idx] : null;
         }
 
         @Override
@@ -507,15 +478,6 @@ public class AdaptiveRadixTree<V> {
             children[pos] = child;
             size++;
             return null;
-        }
-
-        private InternalNode<V> grow() {
-            Node48<V> node = new Node48<>(partialKey);
-            node.value = this.value;
-            for (int i = 0; i < size; i++) {
-                node.addChild(keys[i], children[i]);
-            }
-            return node;
         }
 
         @Override
@@ -560,15 +522,16 @@ public class AdaptiveRadixTree<V> {
         @Override
         @Nullable
         Node<V> getChild(byte key) {
-            int idx = index[key];
-            return idx >= 0 ? children[idx] : null;
+            int idx = index[key & 0xFF] & 0xFF;
+            return idx < size ? children[idx] : null;
         }
 
         @Override
         @Nullable
         InternalNode<V> addChild(byte key, Node<V> child) {
-            if (index[key] >= 0) {
-                children[index[key]] = child;
+            int idx = key & 0xFF;
+            if (index[idx] >= 0) {
+                children[index[idx]] = child;
                 return null;
             }
 
@@ -584,21 +547,10 @@ public class AdaptiveRadixTree<V> {
                 return node;
             }
 
-            index[key] = (byte) size;
+            index[idx] = (byte) size;
             children[size] = child;
             size++;
             return null;
-        }
-
-        private InternalNode<V> grow() {
-            Node256<V> node = new Node256<>(partialKey);
-            node.value = this.value;
-            for (int i = 0; i < 256; i++) {
-                if (index[i] >= 0) {
-                    node.addChild((byte) i, children[index[i]]);
-                }
-            }
-            return node;
         }
 
         @Override
@@ -646,10 +598,11 @@ public class AdaptiveRadixTree<V> {
         @Override
         @Nullable
         InternalNode<V> addChild(byte key, Node<V> child) {
-            if (children[key] == null) {
+            int idx = key & 0xFF;
+            if (children[idx] == null) {
                 size++;
             }
-            children[key] = child;
+            children[idx] = child;
             return null;
         }
 
