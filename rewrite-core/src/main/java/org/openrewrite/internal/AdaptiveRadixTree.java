@@ -270,129 +270,123 @@ public class AdaptiveRadixTree<V> {
     }
 
     private static class Node4<V> extends InternalNode<V> {
-        private byte[] keys;
-        private Node<V>[] children;
-        private int size;
+        // Keys and children inline to avoid array overhead
+        private byte k0, k1, k2, k3;
+        private Node<V> c0, c1, c2, c3;
+        private byte size;
 
-        @SuppressWarnings("unchecked")
         Node4(byte[] partialKey) {
             super(partialKey);
-            this.keys = new byte[4];
-            this.children = (Node<V>[]) new Node[4];
             this.size = 0;
         }
 
         @Override
-        @Nullable
-        Node<V> getChild(byte key) {
-            // Unrolled loop for Node4 since it's the most common case
-            switch (size) {
-                case 4:
-                    if (keys[3] == key) return children[3];
-                case 3:
-                    if (keys[2] == key) return children[2];
-                case 2:
-                    if (keys[1] == key) return children[1];
-                case 1:
-                    if (keys[0] == key) return children[0];
-                default:
-                    return null;
-            }
+        @Nullable Node<V> getChild(byte key) {
+            // Unrolled loop, testing one at a time for best branch prediction
+            if (size > 0 && k0 == key) return c0;
+            if (size > 1 && k1 == key) return c1;
+            if (size > 2 && k2 == key) return c2;
+            if (size > 3 && k3 == key) return c3;
+            return null;
         }
 
         @Override
-        @Nullable
-        InternalNode<V> addChild(byte key, Node<V> child) {
+        @Nullable InternalNode<V> addChild(byte key, Node<V> child) {
             // Check if we're replacing an existing child
-            switch (size) {
-                case 4:
-                    if (keys[3] == key) {
-                        children[3] = child;
-                        return null;
-                    }
-                case 3:
-                    if (keys[2] == key) {
-                        children[2] = child;
-                        return null;
-                    }
-                case 2:
-                    if (keys[1] == key) {
-                        children[1] = child;
-                        return null;
-                    }
-                case 1:
-                    if (keys[0] == key) {
-                        children[0] = child;
-                        return null;
-                    }
-            }
+            if (size > 0 && k0 == key) { c0 = child; return null; }
+            if (size > 1 && k1 == key) { c1 = child; return null; }
+            if (size > 2 && k2 == key) { c2 = child; return null; }
+            if (size > 3 && k3 == key) { c3 = child; return null; }
 
-            // If we're at capacity, grow
+            // If we're at capacity, grow to Node16
             if (size == 4) {
                 Node16<V> node = new Node16<>(partialKey);
                 node.value = this.value;
-                for (int i = 0; i < size; i++) {
-                    node.addChild(keys[i], children[i]);
-                }
+                // Add existing children in sorted order
+                node.addChild(k0, c0);
+                node.addChild(k1, c1);
+                node.addChild(k2, c2);
+                node.addChild(k3, c3);
                 node.addChild(key, child);
                 return node;
             }
 
             // Find insertion point while maintaining sorted order
-            int pos = 0;
-            while (pos < size && (keys[pos] & 0xFF) < (key & 0xFF)) pos++;
-
-            // Shift elements to make room for new entry
-            if (pos < size) {
-                System.arraycopy(keys, pos, keys, pos + 1, size - pos);
-                System.arraycopy(children, pos, children, pos + 1, size - pos);
+            byte keyByte = (byte)(key & 0xFF);
+            if (size == 0) {
+                k0 = keyByte;
+                c0 = child;
+            } else if (size == 1) {
+                if (keyByte < (k0 & 0xFF)) {
+                    k1 = k0;
+                    c1 = c0;
+                    k0 = keyByte;
+                    c0 = child;
+                } else {
+                    k1 = keyByte;
+                    c1 = child;
+                }
+            } else if (size == 2) {
+                if (keyByte < (k0 & 0xFF)) {
+                    k2 = k1;
+                    c2 = c1;
+                    k1 = k0;
+                    c1 = c0;
+                    k0 = keyByte;
+                    c0 = child;
+                } else if (keyByte < (k1 & 0xFF)) {
+                    k2 = k1;
+                    c2 = c1;
+                    k1 = keyByte;
+                    c1 = child;
+                } else {
+                    k2 = keyByte;
+                    c2 = child;
+                }
+            } else { // size == 3
+                if (keyByte < (k0 & 0xFF)) {
+                    k3 = k2;
+                    c3 = c2;
+                    k2 = k1;
+                    c2 = c1;
+                    k1 = k0;
+                    c1 = c0;
+                    k0 = keyByte;
+                    c0 = child;
+                } else if (keyByte < (k1 & 0xFF)) {
+                    k3 = k2;
+                    c3 = c2;
+                    k2 = k1;
+                    c2 = c1;
+                    k1 = keyByte;
+                    c1 = child;
+                } else if (keyByte < (k2 & 0xFF)) {
+                    k3 = k2;
+                    c3 = c2;
+                    k2 = keyByte;
+                    c2 = child;
+                } else {
+                    k3 = keyByte;
+                    c3 = child;
+                }
             }
-
-            keys[pos] = key;
-            children[pos] = child;
             size++;
             return null;
-        }
-
-        @Override
-        Node<V> insert(byte[] key, int depth, V value) {
-            if (!matchesPartialKey(key, depth)) {
-                return super.insert(key, depth, value);
-            }
-
-            depth += partialKey.length;
-
-            if (depth == key.length) {
-                this.value = value;
-                return this;
-            }
-
-            byte nextByte = key[depth];
-            Node<V> child = getChild(nextByte);
-
-            if (child == null) {
-                // Need to add a new child
-                byte[] remainingKey = Arrays.copyOfRange(key, depth + 1, key.length);
-                Node<V> newChild = new LeafNode<>(remainingKey, value);
-                InternalNode<V> grown = addChild(nextByte, newChild);
-                return grown != null ? grown : this;
-            }
-
-            Node<V> newChild = child.insert(key, depth + 1, value);
-            if (newChild != child) {
-                InternalNode<V> grown = addChild(nextByte, newChild);
-                return grown != null ? grown : this;
-            }
-            return this;
         }
 
         @Override
         InternalNode<V> cloneWithNewKey(byte[] newKey) {
             Node4<V> clone = new Node4<>(newKey);
             clone.value = this.value;
-            System.arraycopy(this.keys, 0, clone.keys, 0, this.size);
-            System.arraycopy(this.children, 0, clone.children, 0, this.size);
             clone.size = this.size;
+            clone.k0 = this.k0;
+            clone.k1 = this.k1;
+            clone.k2 = this.k2;
+            clone.k3 = this.k3;
+            clone.c0 = this.c0;
+            clone.c1 = this.c1;
+            clone.c2 = this.c2;
+            clone.c3 = this.c3;
             return clone;
         }
 
@@ -401,12 +395,14 @@ public class AdaptiveRadixTree<V> {
             Node4<V> clone = new Node4<>(Arrays.copyOf(partialKey, partialKey.length));
             clone.value = this.value;
             clone.size = this.size;
-            clone.keys = Arrays.copyOf(this.keys, this.keys.length);
-            clone.children = Arrays.copyOf(this.children, this.children.length);
-            // Deep copy children
-            for (int i = 0; i < size; i++) {
-                clone.children[i] = children[i].copy();
-            }
+            clone.k0 = this.k0;
+            clone.k1 = this.k1;
+            clone.k2 = this.k2;
+            clone.k3 = this.k3;
+            if (size > 0) clone.c0 = c0.copy();
+            if (size > 1) clone.c1 = c1.copy();
+            if (size > 2) clone.c2 = c2.copy();
+            if (size > 3) clone.c3 = c3.copy();
             return clone;
         }
     }
