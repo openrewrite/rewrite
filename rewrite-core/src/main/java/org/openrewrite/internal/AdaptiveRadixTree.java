@@ -42,11 +42,21 @@ public class AdaptiveRadixTree<V> {
         abstract Node<V> copy(); // New abstract method
 
         protected boolean matchesPartialKey(byte[] key, int depth) {
-            if (depth + partialKey.length > key.length) return false;
-            for (int i = 0; i < partialKey.length; i++) {
-                if (key[depth + i] != partialKey[i]) return false;
+            int len = partialKey.length;
+            if (depth + len > key.length) return false;
+            switch (len) {
+                case 0:
+                    return true;
+                case 1:
+                    return key[depth] == partialKey[0];
+                case 2:
+                    return key[depth] == partialKey[0] && key[depth + 1] == partialKey[1];
+                default:
+                    for (int i = 0; i < len; i++) {
+                        if (key[depth + i] != partialKey[i]) return false;
+                    }
+                    return true;
             }
-            return true;
         }
 
         // Helper method to find common prefix length
