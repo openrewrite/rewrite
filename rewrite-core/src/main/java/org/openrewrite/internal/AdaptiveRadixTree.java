@@ -675,7 +675,10 @@ public class AdaptiveRadixTree<V> {
     }
 
     public void insert(String key, V value) {
-        byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+        insert(key.getBytes(StandardCharsets.UTF_8), value);
+    }
+
+    public void insert(byte[] keyBytes, V value) {
         if (root == null) {
             root = new LeafNode<>(keyBytes, value);
         } else {
@@ -683,10 +686,14 @@ public class AdaptiveRadixTree<V> {
         }
     }
 
-    @Nullable
-    public V search(String key) {
+    public @Nullable V search(String key) {
         if (root == null) return null;
-        return root.search(key.getBytes(StandardCharsets.UTF_8), 0);
+        return search(key.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public @Nullable V search(byte[] bytes) {
+        if (root == null) return null;
+        return root.search(bytes, 0);
     }
 
     public AdaptiveRadixTree<V> copy() {
