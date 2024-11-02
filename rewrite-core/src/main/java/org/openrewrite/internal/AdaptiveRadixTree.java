@@ -104,10 +104,16 @@ public class AdaptiveRadixTree<V> {
                 }
                 Node4<V> newNode = new Node4<>(partialKey);
                 newNode.value = this.value;
-                newNode.addChild(key[depth], new LeafNode<>(
-                        Arrays.copyOfRange(key, depth + 1, key.length),
-                        value
-                ));
+
+                // Optimize this common case - we know the exact length needed
+                byte[] remainingKey;
+                int remainingLength = key.length - (depth + 1);
+                if (remainingLength == 0) {
+                    remainingKey = new byte[0];
+                } else {
+                    remainingKey = Arrays.copyOfRange(key, depth + 1, key.length);
+                }
+                newNode.addChild(key[depth], new LeafNode<>(remainingKey, value));
                 return newNode;
             }
 
@@ -119,20 +125,22 @@ public class AdaptiveRadixTree<V> {
             byte[] commonKey = Arrays.copyOfRange(key, depth, depth + commonPrefix);
             Node4<V> newNode = new Node4<>(commonKey);
 
-            byte[] remainingOldKey = Arrays.copyOfRange(partialKey, commonPrefix, partialKey.length);
-            if (remainingOldKey.length > 0) {
-                newNode.addChild(remainingOldKey[0], new LeafNode<>(
-                        Arrays.copyOfRange(remainingOldKey, 1, remainingOldKey.length),
+            int remainingOldLength = partialKey.length - commonPrefix;
+            if (remainingOldLength > 0) {
+                byte firstByte = partialKey[commonPrefix];
+                newNode.addChild(firstByte, new LeafNode<>(
+                        Arrays.copyOfRange(partialKey, commonPrefix + 1, partialKey.length),
                         this.value
                 ));
             } else {
                 newNode.value = this.value;
             }
 
-            byte[] remainingNewKey = Arrays.copyOfRange(key, depth + commonPrefix, key.length);
-            if (remainingNewKey.length > 0) {
-                newNode.addChild(remainingNewKey[0], new LeafNode<>(
-                        Arrays.copyOfRange(remainingNewKey, 1, remainingNewKey.length),
+            int remainingNewLength = key.length - (depth + commonPrefix);
+            if (remainingNewLength > 0) {
+                byte firstByte = key[depth + commonPrefix];
+                newNode.addChild(firstByte, new LeafNode<>(
+                        Arrays.copyOfRange(key, depth + commonPrefix + 1, key.length),
                         value
                 ));
             } else {
@@ -195,14 +203,15 @@ public class AdaptiveRadixTree<V> {
                 Node4<V> newNode = new Node4<>(commonKey);
 
                 // Add current node with remaining key
-                byte[] remainingCurrentKey = Arrays.copyOfRange(partialKey, commonPrefix, partialKey.length);
-                if (remainingCurrentKey.length > 0) {
+                int remainingCurrentLength = partialKey.length - commonPrefix;
+                if (remainingCurrentLength > 0) {
                     // Current node becomes child of new node
+                    byte firstByte = partialKey[commonPrefix];
                     InternalNode<V> currentNodeCopy = this.cloneWithNewKey(
-                            Arrays.copyOfRange(remainingCurrentKey, 1, remainingCurrentKey.length)
+                            Arrays.copyOfRange(partialKey, commonPrefix + 1, partialKey.length)
                     );
                     try {
-                        newNode.addChild(remainingCurrentKey[0], currentNodeCopy);
+                        newNode.addChild(firstByte, currentNodeCopy);
                     } catch (NodeGrowthException e) {
                         newNode = (Node4<V>) e.getNewNode();
                     }
@@ -222,11 +231,12 @@ public class AdaptiveRadixTree<V> {
                 }
 
                 // Add new value
-                byte[] remainingNewKey = Arrays.copyOfRange(key, depth + commonPrefix, key.length);
-                if (remainingNewKey.length > 0) {
+                int remainingNewLength = key.length - (depth + commonPrefix);
+                if (remainingNewLength > 0) {
                     try {
-                        newNode.addChild(remainingNewKey[0], new LeafNode<>(
-                                Arrays.copyOfRange(remainingNewKey, 1, remainingNewKey.length),
+                        byte firstByte = key[depth + commonPrefix];
+                        newNode.addChild(firstByte, new LeafNode<>(
+                                Arrays.copyOfRange(key, depth + commonPrefix + 1, key.length),
                                 value
                         ));
                     } catch (NodeGrowthException e) {
@@ -639,10 +649,10 @@ public class AdaptiveRadixTree<V> {
 
         @Override
         void addChild(byte key, Node<V> child) {
-            if (children[key & 0xFF] == null) {
+            if (children[key] == null) {
                 size++;
             }
-            children[key & 0xFF] = child;
+            children[key] = child;
         }
 
         @Override
