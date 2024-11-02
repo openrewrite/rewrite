@@ -160,7 +160,7 @@ public class Pom {
                 .collect(Collectors.toList());
     }
 
-    public List<Profile> activeProfiles(final Iterable<String> explicitActiveProfiles) {
+    List<Profile> activeProfiles(final Iterable<String> explicitActiveProfiles) {
         final List<Profile> pomActivatedProfiles =
                 profiles.stream()
                         .filter(p -> p.isActive(explicitActiveProfiles))
