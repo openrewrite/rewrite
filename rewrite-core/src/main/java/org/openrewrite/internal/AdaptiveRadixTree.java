@@ -166,7 +166,12 @@ public class AdaptiveRadixTree<V> {
 
         abstract @Nullable Node<V> getChild(byte key);
 
-        abstract void addChild(byte key, Node<V> child);
+        // Return the new node if growth occurred, otherwise null
+        abstract @Nullable InternalNode<V> addChildWithGrowth(byte key, Node<V> child);
+
+        void addChild(byte key, Node<V> child) {
+            addChildWithGrowth(key, child);
+        }
 
         @Override
         @Nullable
@@ -198,55 +203,45 @@ public class AdaptiveRadixTree<V> {
             if (!matchesPartialKey(key, depth)) {
                 int commonPrefix = findCommonPrefixLength(key, depth, partialKey, 0);
 
-                // Create new node with common prefix
                 byte[] commonKey = Arrays.copyOfRange(key, depth, depth + commonPrefix);
                 Node4<V> newNode = new Node4<>(commonKey);
 
-                // Add current node with remaining key
                 int remainingCurrentLength = partialKey.length - commonPrefix;
                 if (remainingCurrentLength > 0) {
-                    // Current node becomes child of new node
                     byte firstByte = partialKey[commonPrefix];
                     InternalNode<V> currentNodeCopy = this.cloneWithNewKey(
                             Arrays.copyOfRange(partialKey, commonPrefix + 1, partialKey.length)
                     );
-                    try {
-                        newNode.addChild(firstByte, currentNodeCopy);
-                    } catch (NodeGrowthException e) {
-                        newNode = (Node4<V>) e.getNewNode();
+                    InternalNode<V> grown = newNode.addChildWithGrowth(firstByte, currentNodeCopy);
+                    if (grown != null) {
+                        newNode = (Node4<V>)grown;
                     }
                 } else {
-                    // Current node's value and children become new node's
                     newNode.value = this.value;
                     for (int i = 0; i < 256; i++) {
                         Node<V> child = getChild((byte) i);
                         if (child != null) {
-                            try {
-                                newNode.addChild((byte) i, child);
-                            } catch (NodeGrowthException e) {
-                                newNode = (Node4<V>) e.getNewNode();
+                            InternalNode<V> grown = newNode.addChildWithGrowth((byte)i, child);
+                            if (grown != null) {
+                                newNode = (Node4<V>)grown;
                             }
                         }
                     }
                 }
 
-                // Add new value
                 int remainingNewLength = key.length - (depth + commonPrefix);
                 if (remainingNewLength > 0) {
-                    try {
-                        byte firstByte = key[depth + commonPrefix];
-                        newNode.addChild(firstByte, new LeafNode<>(
-                                Arrays.copyOfRange(key, depth + commonPrefix + 1, key.length),
-                                value
-                        ));
-                    } catch (NodeGrowthException e) {
-                        return e.getNewNode();
-                    }
+                    byte firstByte = key[depth + commonPrefix];
+                    Node<V> leafNode = new LeafNode<>(
+                            Arrays.copyOfRange(key, depth + commonPrefix + 1, key.length),
+                            value
+                    );
+                    InternalNode<V> grown = newNode.addChildWithGrowth(firstByte, leafNode);
+                    return grown != null ? grown : newNode;
                 } else {
                     newNode.value = value;
+                    return newNode;
                 }
-
-                return newNode;
             }
 
             depth += partialKey.length;
@@ -262,24 +257,17 @@ public class AdaptiveRadixTree<V> {
             if (child == null) {
                 byte[] remainingKey = Arrays.copyOfRange(key, depth + 1, key.length);
                 Node<V> newChild = new LeafNode<>(remainingKey, value);
-
-                try {
-                    addChild(nextByte, newChild);
-                    return this;
-                } catch (NodeGrowthException e) {
-                    return e.getNewNode();
-                }
+                InternalNode<V> grown = addChildWithGrowth(nextByte, newChild);
+                return grown != null ? grown : this;
             }
 
             Node<V> newChild = child.insert(key, depth + 1, value);
             if (newChild != child) {
-                try {
-                    addChild(nextByte, newChild);
-                } catch (NodeGrowthException e) {
-                    InternalNode<V> larger = e.getNewNode();
-                    larger.partialKey = this.partialKey;
-                    larger.value = this.value;
-                    return larger;
+                InternalNode<V> grown = addChildWithGrowth(nextByte, newChild);
+                if (grown != null) {
+                    grown.partialKey = this.partialKey;
+                    grown.value = this.value;
+                    return grown;
                 }
             }
             return this;
@@ -320,37 +308,41 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        void addChild(byte key, Node<V> child) {
+        @Nullable
+        InternalNode<V> addChildWithGrowth(byte key, Node<V> child) {
             // Check if we're replacing an existing child
-            // Unrolled loop for Node4 since it's the most common case
             switch (size) {
                 case 4:
                     if (keys[3] == key) {
                         children[3] = child;
-                        return;
+                        return null;
                     }
                 case 3:
                     if (keys[2] == key) {
                         children[2] = child;
-                        return;
+                        return null;
                     }
                 case 2:
                     if (keys[1] == key) {
                         children[1] = child;
-                        return;
+                        return null;
                     }
                 case 1:
                     if (keys[0] == key) {
                         children[0] = child;
-                        return;
+                        return null;
                     }
             }
 
             // If we're at capacity, grow
             if (size == 4) {
-                InternalNode<V> larger = grow();
-                larger.addChild(key, child);
-                throw new NodeGrowthException(larger);
+                Node16<V> node = new Node16<>(partialKey);
+                node.value = this.value;
+                for (int i = 0; i < size; i++) {
+                    node.addChildWithGrowth(keys[i], children[i]);
+                }
+                node.addChildWithGrowth(key, child);
+                return node;
             }
 
             // Find insertion point while maintaining sorted order
@@ -366,6 +358,7 @@ public class AdaptiveRadixTree<V> {
             keys[pos] = key;
             children[pos] = child;
             size++;
+            return null;
         }
 
         private InternalNode<V> grow() {
@@ -487,27 +480,31 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        void addChild(byte key, Node<V> child) {
+        @Nullable
+        InternalNode<V> addChildWithGrowth(byte key, Node<V> child) {
             // Check if we're replacing an existing child
             for (int i = 0; i < size; i++) {
                 if (keys[i] == key) {
                     children[i] = child;
-                    return;
+                    return null;
                 }
             }
 
             // If we're at capacity, grow
             if (size >= 16) {
-                InternalNode<V> larger = grow();
-                larger.addChild(key, child);
-                throw new NodeGrowthException(larger);
+                Node48<V> node = new Node48<>(partialKey);
+                node.value = this.value;
+                for (int i = 0; i < size; i++) {
+                    node.addChildWithGrowth(keys[i], children[i]);
+                }
+                node.addChildWithGrowth(key, child);
+                return node;
             }
 
             // Find insertion point while maintaining sorted order
             int pos = 0;
             while (pos < size && (keys[pos] & 0xFF) < (key & 0xFF)) pos++;
 
-            // Shift elements to make room for new entry
             if (pos < size) {
                 System.arraycopy(keys, pos, keys, pos + 1, size - pos);
                 System.arraycopy(children, pos, children, pos + 1, size - pos);
@@ -516,6 +513,7 @@ public class AdaptiveRadixTree<V> {
             keys[pos] = key;
             children[pos] = child;
             size++;
+            return null;
         }
 
         private InternalNode<V> grow() {
@@ -574,24 +572,29 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        void addChild(byte key, Node<V> child) {
-            // Check if we're replacing an existing child
+        @Nullable
+        InternalNode<V> addChildWithGrowth(byte key, Node<V> child) {
             if (index[key] >= 0) {
                 children[index[key]] = child;
-                return;
+                return null;
             }
 
-            // If we're at capacity, grow
             if (size >= 48) {
-                InternalNode<V> larger = grow();
-                larger.addChild(key, child);
-                throw new NodeGrowthException(larger);
+                Node256<V> node = new Node256<>(partialKey);
+                node.value = this.value;
+                for (int i = 0; i < 256; i++) {
+                    if (index[i] >= 0) {
+                        node.addChildWithGrowth((byte) i, children[index[i]]);
+                    }
+                }
+                node.addChildWithGrowth(key, child);
+                return node;
             }
 
-            // Add new child
             index[key] = (byte) size;
             children[size] = child;
             size++;
+            return null;
         }
 
         private InternalNode<V> grow() {
@@ -648,11 +651,13 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        void addChild(byte key, Node<V> child) {
+        @Nullable
+        InternalNode<V> addChildWithGrowth(byte key, Node<V> child) {
             if (children[key] == null) {
                 size++;
             }
             children[key] = child;
+            return null;
         }
 
         @Override
