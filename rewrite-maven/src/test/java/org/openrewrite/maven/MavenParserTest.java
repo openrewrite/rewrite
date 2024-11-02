@@ -24,10 +24,12 @@ import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import okhttp3.tls.HandshakeCertificates;
 import okhttp3.tls.HeldCertificate;
+import org.junit.Assert;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
@@ -41,6 +43,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.tree.ParseError;
+import org.opentest4j.AssertionFailedError;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -53,8 +56,8 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -1271,11 +1274,8 @@ class MavenParserTest implements RewriteTest {
             final String activeProfile = "foobar";
             rewriteRun(recipeSpec -> {
                   final ExecutionContext context = new InMemoryExecutionContext();
-                  // I don't think this is having the effect I want:(
-                  recipeSpec.executionContext(
-                    MavenExecutionContextView.view(context)
-                      .setActiveProfiles(Collections.singletonList(activeProfile))
-                  );
+                  recipeSpec.executionContext(MavenExecutionContextView.view(context));
+                  recipeSpec.parser(MavenParser.builder().activeProfiles(activeProfile));
 
               }, mavenProject("c",
                 pomXml(
@@ -1325,9 +1325,7 @@ class MavenParserTest implements RewriteTest {
                             </profile>
                         </profiles>
                     </project>
-                    """, spec -> {
-                      ((MavenParser.Builder) spec.getParser()).activeProfiles(activeProfile);
-                  }
+                    """
                 )
               ),
               mavenProject("a",
@@ -1354,7 +1352,6 @@ class MavenParserTest implements RewriteTest {
                         </dependencies>
                     </project>
                     """, spec -> {
-                      ((MavenParser.Builder) spec.getParser()).activeProfiles(activeProfile);
                       spec.afterRecipe(pomXml -> {
                           final Map<String, List<ResolvedDependency>> deps =
                             pomXml.getMarkers()
@@ -1407,6 +1404,14 @@ class MavenParserTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should not be active" +
+          " if there is another active profile _from the same POM file_")
+        @Test
+        void activeByDefaultWithPomLocalActiveProfile() {
+            expectMavenDownloadingException("active-profile-1");
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
+        @DisplayName("activeByDefault=true profiles from a POM should not be active" +
           " if deactivated from the command-line")
         @Test
         @Disabled
@@ -1415,23 +1420,12 @@ class MavenParserTest implements RewriteTest {
             expectMavenDownloadingException("-active-profile-1");
         }
 
-
-        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
-        @DisplayName("activeByDefault=true profiles from a POM should not be active" +
-          " if there is another active profile _from the same POM file_")
-        @Test
-        void activeByDefaultWithPomLocalActiveProfile() {
-            expectMavenDownloadingException("active-profile-1");
-        }
-
         private void expectMavenDownloadingException(final String activeProfile) {
-            rewriteRun(recipeSpec -> {
+            Executable fn = () -> rewriteRun(recipeSpec -> {
                   final ExecutionContext context = new InMemoryExecutionContext();
                   // I don't think this is having the effect I want:(
-                  recipeSpec.executionContext(
-                    MavenExecutionContextView.view(context)
-                      .setActiveProfiles(Collections.singletonList(activeProfile))
-                  );
+                  recipeSpec.executionContext(MavenExecutionContextView.view(context));
+                  recipeSpec.parser(MavenParser.builder().activeProfiles(activeProfile));
 
               }, mavenProject("c",
                 pomXml(
@@ -1481,9 +1475,7 @@ class MavenParserTest implements RewriteTest {
                             </profile>
                         </profiles>
                     </project>
-                    """, spec -> {
-                      ((MavenParser.Builder) spec.getParser()).activeProfiles(activeProfile);
-                  }
+                    """
                 )
               ),
               mavenProject("a",
@@ -1509,42 +1501,7 @@ class MavenParserTest implements RewriteTest {
                             </dependency>
                         </dependencies>
                     </project>
-                    """,
-                  spec -> {
-                      ((MavenParser.Builder) spec.getParser()).activeProfiles(activeProfile);
-                      spec.afterRecipe(pomXml -> {
-                          final ParseExceptionResult parseExceptionResult =
-                            pomXml.getMarkers()
-                              .findFirst(ParseExceptionResult.class)
-                              .orElseThrow();
-
-                          assertThat(parseExceptionResult.getExceptionType())
-                            .isEqualTo("MavenDownloadingExceptions");
-
-                          assertThat(parseExceptionResult.getMessage().trim()).isEqualToIgnoringWhitespace("""
-                            <project>
-                                <parent>
-                                    <groupId>org.openrewrite.maven</groupId>
-                                    <artifactId>parent</artifactId>
-                                    <version>0.1.0-SNAPSHOT</version>
-                                    <relativePath />
-                                </parent>
-                                <groupId>org.openrewrite.maven</groupId>
-                                <artifactId>a</artifactId>
-                                <dependencies>
-                                    <dependency>
-                                        <groupId>org.openrewrite.maven</groupId>
-                                        <artifactId>d</artifactId>
-                                    </dependency>
-                                    <!--~~(No version provided)~~>--><dependency>
-                                        <groupId>org.openrewrite.maven</groupId>
-                                        <artifactId>e</artifactId>
-                                    </dependency>
-                                </dependencies>
-                            </project> 
-                            """);
-                      });
-                  }
+                    """
                 )
               ),
               mavenProject("d",
@@ -1570,6 +1527,63 @@ class MavenParserTest implements RewriteTest {
                     </project>
                     """
                 )
+              )
+            );
+
+            final AssertionFailedError err = assertThrows(AssertionFailedError.class, fn);
+            assertThat(err.getMessage()).contains("Problem parsing a/pom.xml");  // brittle:(, but class above is broad
+        }
+
+        @Issue("TODO: create issue")
+        @Test
+        @Disabled
+        void settingsActiveProfiles() throws IOException {
+            var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
+                throw new RuntimeException(t);
+            }));
+            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+              """
+                <settings>
+                  <activeProfiles>
+                      <activeProfile>foo</activeProfile>
+                  </activeProfiles>
+                </settings>
+                """
+            ), mavenCtx);
+
+            mavenCtx.setMavenSettings(settings);
+
+            rewriteRun(recipeSpec -> recipeSpec.executionContext(mavenCtx),
+              pomXml("""
+                <project>
+                    <groupId>some.group</groupId>
+                    <artifactId>some.artifact</artifactId>
+                    <version>1-SNAPSHOT</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>commons-io</groupId>
+                            <artifactId>commons-io</artifactId>
+                        </dependency>
+                    </dependencies>
+                    <profiles>
+                        <profile>
+                            <id>foo</id>
+                            <properties>
+                                <commons-io.version>2.11.0</commons-io.version>
+                            </properties>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>commons-io</groupId>
+                                        <artifactId>commons-io</artifactId>
+                                        <version>${commons-io.version}</version>
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                        </profile>
+                    </profiles>
+                </project>
+                """
               )
             );
         }
