@@ -71,6 +71,7 @@ public class AdaptiveRadixTree<V> {
     }
 
     private static class LeafNode<V> extends Node<V> {
+        private static final byte[] EMPTY_BYTES = new byte[0];
         private final V value;
 
         LeafNode(byte[] partialKey, V value) {
@@ -106,13 +107,9 @@ public class AdaptiveRadixTree<V> {
                 newNode.value = this.value;
 
                 // Optimize this common case - we know the exact length needed
-                byte[] remainingKey;
                 int remainingLength = key.length - (depth + 1);
-                if (remainingLength == 0) {
-                    remainingKey = new byte[0];
-                } else {
-                    remainingKey = Arrays.copyOfRange(key, depth + 1, key.length);
-                }
+                byte[] remainingKey = remainingLength == 0 ? EMPTY_BYTES :
+                        Arrays.copyOfRange(key, depth + 1, key.length);
                 newNode.addChild(key[depth], new LeafNode<>(remainingKey, value));
                 return newNode;
             }
@@ -439,8 +436,27 @@ public class AdaptiveRadixTree<V> {
                 return null;
             }
 
-            int idx = Arrays.binarySearch(keys, 0, size, key);
+            int idx = unsignedBinarySearch(keys, 0, size, key & 0xFF);
             return idx >= 0 ? children[idx] : null;
+        }
+
+        // Custom binary search for unsigned bytes
+        private int unsignedBinarySearch(byte[] array, int fromIndex, int toIndex, int key) {
+            int low = fromIndex;
+            int high = toIndex - 1;
+
+            while (low <= high) {
+                int mid = (low + high) >>> 1;
+                int midVal = array[mid] & 0xFF;
+
+                if (midVal < key)
+                    low = mid + 1;
+                else if (midVal > key)
+                    high = mid - 1;
+                else
+                    return mid; // key found
+            }
+            return -(low + 1);  // key not found
         }
 
         @Override
@@ -522,7 +538,7 @@ public class AdaptiveRadixTree<V> {
         @Override
         @Nullable
         Node<V> getChild(byte key) {
-            int idx = index[key & 0xFF] & 0xFF;
+            int idx = index[key] & 0xFF;
             return idx < size ? children[idx] : null;
         }
 
@@ -580,13 +596,11 @@ public class AdaptiveRadixTree<V> {
 
     private static class Node256<V> extends InternalNode<V> {
         private final @Nullable Node<V>[] children;
-        private int size;
 
         @SuppressWarnings("unchecked")
         Node256(byte[] partialKey) {
             super(partialKey);
             this.children = (Node<V>[]) new Node[256];
-            this.size = 0;
         }
 
         @Override
@@ -599,9 +613,6 @@ public class AdaptiveRadixTree<V> {
         @Nullable
         InternalNode<V> addChild(byte key, Node<V> child) {
             int idx = key & 0xFF;
-            if (children[idx] == null) {
-                size++;
-            }
             children[idx] = child;
             return null;
         }
@@ -611,7 +622,6 @@ public class AdaptiveRadixTree<V> {
             Node256<V> clone = new Node256<>(newKey);
             clone.value = this.value;
             System.arraycopy(this.children, 0, clone.children, 0, this.children.length);
-            clone.size = this.size;
             return clone;
         }
 
@@ -619,7 +629,6 @@ public class AdaptiveRadixTree<V> {
         Node<V> copy() {
             Node256<V> clone = new Node256<>(Arrays.copyOf(partialKey, partialKey.length));
             clone.value = this.value;
-            clone.size = this.size;
             System.arraycopy(this.children, 0, clone.children, 0, this.children.length);
             // Deep copy children
             for (int i = 0; i < 256; i++) {
