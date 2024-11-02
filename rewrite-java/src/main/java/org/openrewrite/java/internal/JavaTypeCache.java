@@ -15,69 +15,31 @@
  */
 package org.openrewrite.java.internal;
 
-import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.xerial.snappy.Snappy;
-
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
+import org.openrewrite.internal.AdaptiveRadixTree;
 
 public class JavaTypeCache implements Cloneable {
 
-    // empirical value: below this size, the compressed key is larger or only slightly smaller
-    // although also note that a String object has a 24 bytes overhead vs. the 16 bytes of a BytesKey object
-    public static final int COMPRESSION_THRESHOLD = 50;
-
-    @SuppressWarnings("ClassCanBeRecord")
-    @Value
-    private static class BytesKey {
-        byte[] data;
-    }
-
-    Map<Object, Object> typeCache = new HashMap<>();
+    AdaptiveRadixTree<Object> typeCache = new AdaptiveRadixTree<>();
 
     public <T> @Nullable T get(String signature) {
         //noinspection unchecked
-        return (T) typeCache.get(key(signature));
+        return (T) typeCache.search(signature);
     }
 
     public void put(String signature, Object o) {
-        typeCache.put(key(signature), o);
-    }
-
-    @Nullable
-    private static boolean snappyUsable = true;
-
-    private Object key(String signature) {
-        if (signature.length() > COMPRESSION_THRESHOLD && snappyUsable) {
-            try {
-                return new BytesKey(Snappy.compress(signature.getBytes(StandardCharsets.UTF_8)));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            } catch (NoClassDefFoundError e) {
-                // Some systems fail to load Snappy native components, so fall back to not compressing
-                snappyUsable = false;
-            }
-        }
-        return signature;
+        typeCache.insert(signature, o);
     }
 
     public void clear() {
         typeCache.clear();
     }
 
-    public int size() {
-        return typeCache.size();
-    }
-
     @Override
     public JavaTypeCache clone() {
         try {
             JavaTypeCache clone = (JavaTypeCache) super.clone();
-            clone.typeCache = new HashMap<>(this.typeCache);
+            clone.typeCache = this.typeCache.copy();
             return clone;
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
