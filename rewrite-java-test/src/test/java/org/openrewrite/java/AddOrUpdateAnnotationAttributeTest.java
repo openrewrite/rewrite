@@ -37,14 +37,14 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.example.Foo;
-
+              
               @Foo
               public class A {
               }
               """,
             """
               import org.example.Foo;
-
+              
               @Foo("hello")
               public class A {
               }
@@ -68,14 +68,14 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.example.Foo;
-
+              
               @Foo
               public class A {
               }
               """,
             """
               import org.example.Foo;
-
+              
               @Foo(Integer.class)
               public class A {
               }
@@ -99,14 +99,14 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.example.Foo;
-
+              
               @Foo
               public class A {
               }
               """,
             """
               import org.example.Foo;
-
+              
               @Foo(java.math.BigDecimal.class)
               public class A {
               }
@@ -131,14 +131,14 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.example.Foo;
-
+              
               @Foo("goodbye")
               public class A {
               }
               """,
             """
               import org.example.Foo;
-
+              
               @Foo("hello")
               public class A {
               }
@@ -163,14 +163,14 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.example.Foo;
-
+              
               @Foo(Long.class)
               public class A {
               }
               """,
             """
               import org.example.Foo;
-
+              
               @Foo(Integer.class)
               public class A {
               }
@@ -195,14 +195,14 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.example.Foo;
-
+              
               @Foo("goodbye")
               public class A {
               }
               """,
             """
               import org.example.Foo;
-
+              
               @Foo
               public class A {
               }
@@ -227,14 +227,14 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.example.Foo;
-
+              
               @Foo(Long.class)
               public class A {
               }
               """,
             """
               import org.example.Foo;
-
+              
               @Foo
               public class A {
               }
@@ -257,9 +257,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test
                   void foo() {
                   }
@@ -267,9 +267,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test(timeout = 500)
                   void foo() {
                   }
@@ -294,9 +294,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test(timeout = 1)
                   void foo() {
                   }
@@ -304,9 +304,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test(timeout = 500)
                   void foo() {
                   }
@@ -331,9 +331,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test(timeout = 1)
                   void foo() {
                   }
@@ -341,9 +341,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test
                   void foo() {
                   }
@@ -370,9 +370,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test(foo = "")
                   void foo() {
                   }
@@ -380,9 +380,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test(timeout = 500, foo = "")
                   void foo() {
                   }
@@ -407,9 +407,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test("foo")
                   void foo() {
                   }
@@ -417,9 +417,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test(other = 1, value = "foo")
                   void foo() {
                   }
@@ -444,9 +444,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test(Integer.class)
                   void foo() {
                   }
@@ -454,9 +454,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.junit.Test;
-
+              
               class SomeTest {
-
+              
                   @Test(other = 1, value = Integer.class)
                   void foo() {
                   }
@@ -482,11 +482,187 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-
+              
               class SomeTest {
                   @Test(other = 0)
                   void foo() {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInAnnotationAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "newTest",
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"oldTest"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"newTest"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInputMoreThanOneInAnnotationAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "newTest1,newTest2",
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"oldTest"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addArrayInputInAnnotationAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "newTest1,newTest2",
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeArrayInputInAnnotationAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            null,
+            null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addOtherAttributeInArrayAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "string",
+            "test",
+            null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+                  String string() default "";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(string = "test", array = {"newTest1", "newTest2"})
+              public class A {
               }
               """
           )

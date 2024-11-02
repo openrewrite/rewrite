@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
@@ -28,7 +29,7 @@ import java.util.*;
 import static java.util.Collections.emptyList;
 
 /**
- * Wherever whitespace can occur in HCL, so can comments (at least block and javadoc style comments).
+ * Comments can occur wherever whitespace can.
  * So whitespace and comments are like peanut butter and jelly.
  */
 @EqualsAndHashCode
@@ -36,6 +37,7 @@ import static java.util.Collections.emptyList;
 public class Space {
     public static final Space EMPTY = new Space("", emptyList());
 
+    @Getter
     private final List<Comment> comments;
 
     @Nullable
@@ -54,7 +56,7 @@ public class Space {
     }
 
     @JsonCreator
-    public static Space build(@Nullable String whitespace, List<Comment> comments) {
+    public static @Nullable Space build(@Nullable String whitespace, List<Comment> comments) {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
@@ -104,10 +106,6 @@ public class Space {
             return "";
         }
         return whitespace;
-    }
-
-    public List<Comment> getComments() {
-        return comments;
     }
 
     public String getWhitespace() {

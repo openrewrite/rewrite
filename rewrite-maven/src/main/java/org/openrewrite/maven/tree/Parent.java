@@ -22,6 +22,8 @@ import org.jspecify.annotations.Nullable;
 @Value
 @With
 public class Parent {
+    public static final String DEFAULT_RELATIVE_PATH = "../pom.xml";
+
     GroupArtifactVersion gav;
 
     @Nullable

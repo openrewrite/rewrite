@@ -458,6 +458,64 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void ternaryConstant() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  String alwaysA() {
+                      return true ? "a" : "b";
+                  }
+                  String alwaysA2() {
+                      return (true) ? "a" : "b";
+                  }
+                  String alwaysA3() {
+                      return (true ? "a" : "b");
+                  }
+                  String alwaysA4() {
+                      return !false ? "a" : "b";
+                  }
+                  String alwaysA5() {
+                      return (!false) ? "a" : "b";
+                  }
+                  String alwaysA6() {
+                      return !(false) ? "a" : "b";
+                  }
+                  String alwaysB() {
+                      return false ? "a" : "b";
+                  }
+              }
+              """,
+            """
+              class A {
+                  String alwaysA() {
+                      return "a";
+                  }
+                  String alwaysA2() {
+                      return "a";
+                  }
+                  String alwaysA3() {
+                      return "a";
+                  }
+                  String alwaysA4() {
+                      return "a";
+                  }
+                  String alwaysA5() {
+                      return "a";
+                  }
+                  String alwaysA6() {
+                      return "a";
+                  }
+                  String alwaysB() {
+                      return "b";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void ternaryDoubleNegation() {
         rewriteRun(
           java(

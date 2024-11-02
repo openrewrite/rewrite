@@ -98,7 +98,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             // left can be unaryOp or exprTerm, right can be another operation or exprTerm
             if (c.unaryOp() != null) {
                 left = (Expression) visit(c.unaryOp());
-            }else {
+            } else {
                 left = (Expression) visit(c.exprTerm(0));
             }
 
@@ -150,7 +150,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
 
             if (c.unaryOp() != null) {
                 right = (Expression) visit(c.operation() != null ? c.operation() : c.exprTerm(0));
-            }else {
+            } else {
                 right = (Expression) visit(c.operation() != null ? c.operation() : c.exprTerm(1));
             }
 
@@ -740,13 +740,16 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                         delimIndex++;
                     } else switch (source.substring(delimIndex, delimIndex + 2)) {
                         case "//":
+                            inSingleLineComment = true;
+                            delimIndex += 2;
+                            break;
                         case "/*":
                             inMultiLineComment = true;
-                            delimIndex++;
+                            delimIndex += 2;
                             break;
                         case "*/":
                             inMultiLineComment = false;
-                            delimIndex = delimIndex + 2;
+                            delimIndex += 2;
                             break;
                     }
                 }

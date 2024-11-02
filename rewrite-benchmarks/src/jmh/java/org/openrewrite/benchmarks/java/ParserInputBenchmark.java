@@ -16,6 +16,7 @@
 package org.openrewrite.benchmarks.java;
 
 import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
@@ -23,11 +24,9 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.stream.Collectors.toList;
@@ -35,45 +34,35 @@ import static java.util.stream.Collectors.toList;
 @Fork(1)
 @Measurement(iterations = 2)
 @Warmup(iterations = 2)
-@BenchmarkMode(Mode.SampleTime)
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@BenchmarkMode(Mode.Throughput)
+@OutputTimeUnit(TimeUnit.SECONDS)
 @Threads(4)
 public class ParserInputBenchmark {
 
     @Benchmark
-    public void readFromDisk(JavaFiles state) {
-        //language=java
+    public void detectCharset(JavaFiles state, Blackhole bh) {
         JavaParser.fromJavaVersion().build()
                 .parseInputs(state.getSourceFiles().stream()
-                                .map(sourceFile -> new Parser.Input(sourceFile, () -> {
-                                            try {
-                                                return Files.newInputStream(sourceFile);
-                                            } catch (IOException e) {
-                                                throw new UncheckedIOException(e);
-                                            }
-                                        })
-                                )
+                                .map(Parser.Input::fromFile)
                                 .collect(toList()),
                         null,
-                        new InMemoryExecutionContext());
+                        new InMemoryExecutionContext()
+                )
+                .forEach(bh::consume);
     }
 
     @Benchmark
-    public void readFromDiskWithBufferedInputStream(JavaFiles state) {
-        //language=java
+    public void knownCharset(JavaFiles state, Blackhole bh) {
+        ParsingExecutionContextView ctx = ParsingExecutionContextView.view(new InMemoryExecutionContext())
+                .setCharset(StandardCharsets.UTF_8);
         JavaParser.fromJavaVersion().build()
                 .parseInputs(state.getSourceFiles().stream()
-                                .map(sourceFile -> new Parser.Input(sourceFile, () -> {
-                                            try {
-                                                return new BufferedInputStream(Files.newInputStream(sourceFile));
-                                            } catch (IOException e) {
-                                                throw new UncheckedIOException(e);
-                                            }
-                                        })
-                                )
+                                .map(Parser.Input::fromFile)
                                 .collect(toList()),
                         null,
-                        new InMemoryExecutionContext());
+                        ctx
+                )
+                .forEach(bh::consume);
     }
 
     public static void main(String[] args) throws RunnerException {

@@ -36,6 +36,7 @@ public class JavaParserExecutionContextView extends DelegatingExecutionContext {
         return new JavaParserExecutionContextView(ctx);
     }
 
+    @SuppressWarnings("UnusedReturnValue")
     public JavaParserExecutionContextView setParserClasspathDownloadTarget(File folder) {
         putMessage(PARSER_CLASSPATH_DOWNLOAD_LOCATION, folder);
         return this;

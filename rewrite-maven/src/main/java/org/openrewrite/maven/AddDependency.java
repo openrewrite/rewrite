@@ -25,7 +25,10 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
@@ -180,17 +183,17 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         acc.usingType = true;
                         JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
                         JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
-                        if(javaProject != null && javaSourceSet != null) {
+                        if (javaProject != null && javaSourceSet != null) {
                             acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
                                     scope /* a `compile` scope dependency will also be available in test source set */ :
                                     "test".equals(javaSourceSet.getName()) ? "test" : "compile"
                             );
                         }
                     }
-                } else if(tree instanceof Xml.Document) {
+                } else if (tree instanceof Xml.Document) {
                     Xml.Document doc = (Xml.Document) tree;
                     MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
-                    if(mrr == null) {
+                    if (mrr == null) {
                         return sourceFile;
                     }
                     acc.pomsDefinedInCurrentRepository.add(mrr.getPom().getGav());
@@ -235,7 +238,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
                 }
 
-                if(onlyIfUsing == null && getResolutionResult().getParent() != null && acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav())) {
+                if (onlyIfUsing == null && isSubprojectOfParentInRepository(acc)) {
+                    return maven;
+                }
+                if (isAggregatorNotUsedAsParent()) {
                     return maven;
                 }
 
@@ -243,6 +249,29 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
                         type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(document, ctx);
             }
+
+            private boolean isSubprojectOfParentInRepository(Scanned acc) {
+                return getResolutionResult().getParent() != null &&
+                       acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav());
+            }
+
+            private boolean isAggregatorNotUsedAsParent() {
+                List<String> subprojects = getResolutionResult().getPom().getSubprojects();
+                if (subprojects == null || subprojects.isEmpty()) {
+                    return false;
+                }
+                List<MavenResolutionResult> modules = getResolutionResult().getModules();
+                if (modules.isEmpty()) {
+                    return true;
+                }
+                for (MavenResolutionResult child : modules) {
+                    if (subprojects.contains(child.getPom().getGav().getArtifactId())) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
         });
     }
 

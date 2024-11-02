@@ -51,6 +51,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                             if(doc.getBlock() instanceof Yaml.Mapping) {
                                 Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
                                 return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+                            } else if (doc.getBlock() instanceof Yaml.Sequence) {
+                                Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
+                                return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
                             }
                             return doc.getBlock().withPrefix(doc.getPrefix());
                         })
@@ -172,11 +175,20 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     for (Yaml.Sequence.Entry existingEntry : s1.getEntries()) {
                         Yaml.Mapping existingMapping = (Yaml.Mapping) existingEntry.getBlock();
                         if (keyMatches(existingMapping, incomingMapping)) {
-                            return existingEntry.withBlock(mergeMapping(existingMapping, incomingMapping, p, cursor));
+                            Yaml.Sequence.Entry e1 = existingEntry.withBlock(mergeMapping(existingMapping, incomingMapping, p, cursor));
+                            if(e1 == existingEntry) {
+                                // Made no change, no need to consider the entry "mutated"
+                                //noinspection DataFlowIssue
+                                return null;
+                            }
+                            return e1;
                         }
                     }
                     return entry;
                 });
+                if (mutatedEntries.isEmpty()) {
+                    return s1;
+                }
 
                 List<Yaml.Sequence.Entry> entries = ListUtils.concatAll(
                         s1.getEntries().stream().filter(entry -> !mutatedEntries.contains(entry))

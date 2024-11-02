@@ -122,10 +122,10 @@ public class CommentOutProperty extends Recipe {
                     String prefix = entry.getPrefix();
 
                     if (prefix.contains("\n")) {
-                        comment = entry.print(getCursor()).replace(prefix, prefix + "# ");
+                        comment = entry.print(getCursor().getParentTreeCursor()).replace(prefix, prefix + "# ");
                     } else {
                         // getCursor().getParent().getValue()
-                        comment = lastIndentation + "#" + entry.print(getCursor());
+                        comment = lastIndentation + "#" + entry.print(getCursor().getParentTreeCursor());
                     }
 
                     doAfterVisit(new DeleteProperty(propertyKey, null, null, null).getVisitor());

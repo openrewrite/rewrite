@@ -69,7 +69,7 @@ public class RemoveDuplicateDependencies extends Recipe {
 
             @SuppressWarnings("DataFlowIssue")
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public  Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependenciesTag()) {
                     getCursor().putMessage("dependencies", new HashMap<DependencyKey, Xml.Tag>());
                 } else if (isManagedDependenciesTag()) {

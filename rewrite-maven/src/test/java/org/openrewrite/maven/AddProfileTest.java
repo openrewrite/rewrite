@@ -131,6 +131,7 @@ class AddProfileTest implements RewriteTest {
                 <artifactId>artifact</artifactId>
                 <version>1</version>
                 <profiles>
+                  <!-- retained comment -->
                   <profile>
                     <id>myprofile</id>
                     <activation>
@@ -146,6 +147,7 @@ class AddProfileTest implements RewriteTest {
                 <artifactId>artifact</artifactId>
                 <version>1</version>
                 <profiles>
+                  <!-- retained comment -->
                   <profile>
                     <id>myprofile</id>
                     <activation>

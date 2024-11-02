@@ -1205,6 +1205,9 @@ public class GroovyParserVisitor {
                         text = "";
                     }
                     jType = JavaType.Primitive.Null;
+                } else if (expression instanceof AnnotationConstantExpression) {
+                    classVisitor.visitAnnotation((AnnotationNode) value);
+                    return ((Expression) classVisitor.pollQueue()).withPrefix(fmt);
                 } else {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
@@ -2501,7 +2504,7 @@ public class GroovyParserVisitor {
        Can contain a J.FieldAccess, as in a variable declaration with fully qualified type parameterization:
            List<java.lang.String>
      */
-    private JContainer<Expression> visitTypeParameterizations(@Nullable GenericsType[] genericsTypes) {
+    private JContainer<Expression> visitTypeParameterizations(GenericsType @Nullable[] genericsTypes) {
         Space prefix = sourceBefore("<");
         List<JRightPadded<Expression>> parameters;
 

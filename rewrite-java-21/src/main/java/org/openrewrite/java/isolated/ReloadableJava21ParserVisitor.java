@@ -21,7 +21,6 @@ import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -44,6 +43,8 @@ import org.openrewrite.style.NamedStyles;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
@@ -1553,8 +1554,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                     elementType = ((JCArrayTypeTree) elementType).elemtype;
                 }
             }
-            String check = source.substring(elementType.getEndPosition(endPosTable)).trim();
-            typeExpr = check.startsWith("@") || check.startsWith("[") ? convert(vartype) :
+            int idx = indexOfNextNonWhitespace(elementType.getEndPosition(endPosTable), source);
+            typeExpr = idx != -1 && (source.charAt(idx) == '[' || source.charAt(idx) == '@') ? convert(vartype) :
                     // we'll capture the array dimensions in a bit, just convert the element type
                     convert(elementType);
         } else {
@@ -1664,32 +1665,42 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         try {
             String prefix = source.substring(cursor, max(((JCTree) t).getStartPosition(), cursor));
             cursor += prefix.length();
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
+            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
+            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
+            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
             return j;
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+            reportJavaParsingException(ex);
+            throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         } catch (Throwable ex) {
-            // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
-            StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
-            message.append("--- BEGIN PATH ---\n");
-
-            List<Tree> paths = stream(getCurrentPath().spliterator(), false).toList();
-            for (int i = paths.size(); i-- > 0; ) {
-                JCTree tree = (JCTree) paths.get(i);
-                if (tree instanceof JCCompilationUnit) {
-                    message.append("JCCompilationUnit(sourceFile = ").append(((JCCompilationUnit) tree).sourcefile.getName()).append(")\n");
-                } else if (tree instanceof JCClassDecl) {
-                    message.append("JCClassDecl(name = ").append(((JCClassDecl) tree).name).append(", line = ").append(lineNumber(tree)).append(")\n");
-                } else if (tree instanceof JCVariableDecl) {
-                    message.append("JCVariableDecl(name = ").append(((JCVariableDecl) tree).name).append(", line = ").append(lineNumber(tree)).append(")\n");
-                } else {
-                    message.append(tree.getClass().getSimpleName()).append("(line = ").append(lineNumber(tree)).append(")\n");
-                }
-            }
-
-            message.append("--- END PATH ---\n");
-
-            ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
+            reportJavaParsingException(ex);
             throw ex;
         }
+    }
+
+    private void reportJavaParsingException(Throwable ex) {
+        // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
+        StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
+        message.append("--- BEGIN PATH ---\n");
+
+        List<Tree> paths = stream(getCurrentPath().spliterator(), false).toList();
+        for (int i = paths.size(); i-- > 0; ) {
+            JCTree tree = (JCTree) paths.get(i);
+            if (tree instanceof JCCompilationUnit) {
+                message.append("JCCompilationUnit(sourceFile = ").append(((JCCompilationUnit) tree).sourcefile.getName()).append(")\n");
+            } else if (tree instanceof JCClassDecl) {
+                message.append("JCClassDecl(name = ").append(((JCClassDecl) tree).name).append(", line = ").append(lineNumber(tree)).append(")\n");
+            } else if (tree instanceof JCVariableDecl) {
+                message.append("JCVariableDecl(name = ").append(((JCVariableDecl) tree).name).append(", line = ").append(lineNumber(tree)).append(")\n");
+            } else {
+                message.append(tree.getClass().getSimpleName()).append("(line = ").append(lineNumber(tree)).append(")\n");
+            }
+        }
+
+        message.append("--- END PATH ---\n");
+
+        ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
     }
 
     private <J2 extends J> JRightPadded<J2> convert(Tree t, Function<Tree, Space> suffix) {
@@ -1759,6 +1770,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             case BREAK:
             case CONTINUE:
             case DO_WHILE_LOOP:
+            case IMPORT:
             case METHOD_INVOCATION:
             case NEW_CLASS:
             case RETURN:
@@ -1888,7 +1900,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                         case '*':
                             if (c2 == '/') {
                                 inMultiLineComment = false;
-                                delimIndex += 2;
+                                delimIndex++;
+                                continue;
                             }
                             break;
                     }
@@ -1996,7 +2009,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 } else {
                     leadingAnnotations.add(annotation);
                 }
-                i = cursor -1;
+                i = cursor - 1;
                 lastAnnotationPosition = cursor;
                 continue;
             }

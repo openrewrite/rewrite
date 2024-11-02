@@ -31,7 +31,7 @@ public class RemoveUnusedVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     @Override
-    public Yaml.Sequence visitSequence(Yaml.Sequence sequence, P p) {
+    public  Yaml.@Nullable Sequence visitSequence(Yaml.Sequence sequence, P p) {
         Yaml.Sequence s = super.visitSequence(sequence, p);
         if (cursor == null || cursor.isScopeInPath(s)) {
             s = s.withEntries(ListUtils.map(s.getEntries(), e -> {
@@ -49,7 +49,7 @@ public class RemoveUnusedVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     @Override
-    public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
+    public  Yaml.@Nullable Mapping visitMapping(Yaml.Mapping mapping, P p) {
         Yaml.Mapping m = super.visitMapping(mapping, p);
         if (cursor == null || cursor.isScopeInPath(m)) {
             m = m.withEntries(ListUtils.map(m.getEntries(), e -> {

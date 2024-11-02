@@ -1,5 +1,8 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
     id("org.openrewrite.build.language-library")
+    id("org.openrewrite.build.shadow")
 }
 
 val antlrGeneration by configurations.creating {
@@ -18,6 +21,15 @@ tasks.register<JavaExec>("generateAntlrSources") {
     classpath = antlrGeneration
 }
 
+// Only need checkstyle for the classes that we use to load its configuration files
+val checkstyle = configurations.create("checkstyle")
+configurations.named("compileOnly").configure {
+    extendsFrom(checkstyle)
+}
+configurations.named("testImplementation").configure {
+    extendsFrom(checkstyle)
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-yaml"))
@@ -28,11 +40,12 @@ dependencies {
 
     antlrGeneration("org.antlr:antlr4:4.11.1")
     implementation("org.antlr:antlr4-runtime:4.11.1")
-    compileOnly("com.puppycrawl.tools:checkstyle:9.+") { // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
+    // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
+    checkstyle("com.puppycrawl.tools:checkstyle:9.+") {
         isTransitive = false
     }
     compileOnly(project(":rewrite-test"))
-    compileOnly("org.junit.jupiter:junit-jupiter-api:latest.release")
+    compileOnly("org.junit.jupiter:junit-jupiter-api")
     compileOnly("org.assertj:assertj-core:latest.release")
     implementation("org.apache.commons:commons-lang3:latest.release")
     implementation("org.apache.commons:commons-text:latest.release")
@@ -42,15 +55,10 @@ dependencies {
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 
-    implementation("io.github.fastfilter:fastfilter:latest.release")
-
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
 
     testImplementation("org.yaml:snakeyaml:latest.release")
-    testImplementation("com.puppycrawl.tools:checkstyle:9.+") { // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
-        isTransitive = false
-    }
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))
     testRuntimeOnly(project(":rewrite-java-17"))
@@ -77,4 +85,10 @@ tasks.withType<Javadoc> {
     //   location: @interface AllArgsConstructor
     // 1 error
     exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**", "**/J.java")
+}
+
+tasks.named<ShadowJar>("shadowJar").configure {
+    dependsOn(checkstyle)
+    configurations = listOf(checkstyle)
+    relocate("com.puppycrawl.tools.checkstyle", "org.openrewrite.tools.checkstyle")
 }
