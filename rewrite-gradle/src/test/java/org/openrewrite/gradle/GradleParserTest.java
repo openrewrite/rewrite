@@ -15,7 +15,9 @@
  */
 package org.openrewrite.gradle;
 
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -184,6 +186,19 @@ class GradleParserTest implements RewriteTest {
               dependencies {
                   testImplementation "junit:junit:4.13"
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4615")
+    @ExpectedToFail
+    @Test
+    void parensAroundAnExpression() {
+        rewriteRun(
+          buildGradle(
+            """
+              def version = (rootProject.jobName.startsWith('a')) ? "latest.release" : "3.0"
               """
           )
         );
