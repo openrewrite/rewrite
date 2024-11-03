@@ -227,7 +227,7 @@ public class Assertions {
         return addTypesToSourceSet(sourceSetName, Collections.emptyList(), Collections.emptyList());
     }
 
-    public static @Nullable JavaVersion javaVersion(int version) {
+    public static JavaVersion javaVersion(int version) {
         return javaVersions.computeIfAbsent(version, v ->
                 new JavaVersion(Tree.randomId(), "openjdk", "adoptopenjdk",
                         Integer.toString(v), Integer.toString(v)));
