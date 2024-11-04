@@ -1298,6 +1298,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             if (node.getUnderlyingType() instanceof JCFieldAccess) {
                 return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, annotatedTypeTree(node.getUnderlyingType(), annotationPosTable));
             } else if (node.getUnderlyingType() instanceof JCArrayTypeTree) {
+//                if (((JCArrayTypeTree) node.getUnderlyingType()).getType() instanceof JCAnnotatedType) {
+//                    return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, annotatedTypeTree(((JCArrayTypeTree) node.getUnderlyingType()).getType(), annotationPosTable));
+//                }
                 return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, arrayTypeTree(node, annotationPosTable));
             }
         }

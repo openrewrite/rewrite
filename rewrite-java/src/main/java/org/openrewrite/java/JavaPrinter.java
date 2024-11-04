@@ -860,6 +860,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                             throw new IllegalStateException("Vararg was interpreted with non empty dimensions");
                         }
                     }
+                    p.out.delete(posToCheck, p.out.length());
                 }
             }
             visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
