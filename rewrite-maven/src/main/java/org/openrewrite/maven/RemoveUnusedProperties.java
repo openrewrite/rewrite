@@ -29,18 +29,18 @@ import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class RemoveUnusedProperties extends ScanningRecipe<Map<String, List<MavenResolutionResult>>> {
+public class RemoveUnusedProperties extends ScanningRecipe<Map<String, Set<MavenResolutionResult>>> {
     @Option(displayName = "Property pattern",
             description = "A pattern to filter properties to remove. Defaults to `.+` to match anything",
             required = false,
@@ -59,7 +59,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, List<Mave
     }
 
     @Override
-    public Map<String, List<MavenResolutionResult>> getInitialValue(ExecutionContext ctx) {
+    public Map<String, Set<MavenResolutionResult>> getInitialValue(ExecutionContext ctx) {
         return new HashMap<>();
     }
 
@@ -68,7 +68,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, List<Mave
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Map<String, List<MavenResolutionResult>> acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<String, Set<MavenResolutionResult>> acc) {
         Pattern propertyMatcher = Pattern.compile(getPropertyPattern());
         Pattern propertyUsageMatcher = Pattern.compile(".*\\$\\{(" + propertyMatcher.pattern() + ")}.*");
         return new MavenIsoVisitor<ExecutionContext>() {
@@ -79,7 +79,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, List<Mave
                 if (value.isPresent()) {
                     Matcher matcher = propertyUsageMatcher.matcher(value.get());
                     if (matcher.matches()) {
-                        acc.putIfAbsent(matcher.group(1), new ArrayList<>());
+                        acc.putIfAbsent(matcher.group(1), new HashSet<>());
                         acc.get(matcher.group(1)).add(getResolutionResult());
                     }
                 }
@@ -89,7 +89,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, List<Mave
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Map<String, List<MavenResolutionResult>> acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(Map<String, Set<MavenResolutionResult>> acc) {
         Pattern propertyMatcher = Pattern.compile(getPropertyPattern());
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
