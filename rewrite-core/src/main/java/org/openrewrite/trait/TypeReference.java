@@ -15,8 +15,10 @@
  */
 package org.openrewrite.trait;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 
 import java.util.Set;
 
@@ -24,11 +26,26 @@ public interface TypeReference extends Trait<Tree> {
 
     String getName();
 
-    interface TypeReferenceProvider {
+    default boolean supportsRename() {
+        return false;
+    }
+
+    default TreeVisitor<Tree, ExecutionContext> renameTo(String name) {
+        throw new UnsupportedOperationException();
+    }
+
+    default boolean matches(Matcher matcher) {
+        return matcher.matchesName(getName());
+    }
+
+    interface Provider {
 
         Set<TypeReference> getTypeReferences(SourceFile sourceFile);
 
         boolean isAcceptable(SourceFile sourceFile);
     }
 
+    interface Matcher {
+        boolean matchesName(String name);
+    }
 }

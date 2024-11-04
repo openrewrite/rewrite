@@ -19,5 +19,5 @@ import org.openrewrite.internal.TypeReferences;
 
 public interface SourceFileWithTypeReferences extends SourceFile {
 
-    TypeReferences getJavaTypeReferences();
+    TypeReferences getTypeReferences();
 }

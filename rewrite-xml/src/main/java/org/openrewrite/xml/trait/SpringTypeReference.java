@@ -18,12 +18,15 @@ package org.openrewrite.xml.trait;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.TypeReference;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @Value
@@ -36,7 +39,7 @@ class SpringTypeReference implements TypeReference {
     }
 
     @Override
-    public @Nullable String getName() {
+    public String getName() {
         if (getTree() instanceof Xml.Attribute) {
             Xml.Attribute attribute = (Xml.Attribute) getTree();
             return attribute.getValueAsString();
@@ -46,10 +49,10 @@ class SpringTypeReference implements TypeReference {
                 return tag.getValue().get();
             }
         }
-        return null;
+        throw new IllegalArgumentException("getTree() must be an Xml.Attribute or Xml.Tag: " + getTree().getClass());
     }
 
-    public static class Matcher extends SimpleTraitMatcher<SpringTypeReference> {
+    static class Matcher extends SimpleTraitMatcher<SpringTypeReference> {
         private final Pattern typeReference = Pattern.compile("(?:[a-zA-Z_][a-zA-Z0-9_]*\\.)+[A-Z*][a-zA-Z0-9_]*(?:<[a-zA-Z0-9_,?<> ]*>)?");
         private final XPathMatcher classXPath = new XPathMatcher("//@class");
         private final XPathMatcher typeXPath = new XPathMatcher("//@type");
@@ -74,6 +77,33 @@ class SpringTypeReference implements TypeReference {
                 }
             }
             return null;
+        }
+    }
+
+    @SuppressWarnings("unused")
+    public static class Provider implements TypeReference.Provider {
+
+        @Override
+        public Set<TypeReference> getTypeReferences(SourceFile sourceFile) {
+            Set<TypeReference> typeReferences = new HashSet<>();
+            new Matcher().asVisitor(reference -> {
+                typeReferences.add(reference);
+                return reference.getTree();
+            }).visit(sourceFile, 0);
+            return typeReferences;
+        }
+
+        @Override
+        public boolean isAcceptable(SourceFile sourceFile) {
+            if (sourceFile instanceof Xml.Document) {
+                Xml.Document doc = (Xml.Document) sourceFile;
+                for (Xml.Attribute attrib : doc.getRoot().getAttributes()) {
+                    if (attrib.getKeyAsString().equals("xsi:schemaLocation") && attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
     }
 }
