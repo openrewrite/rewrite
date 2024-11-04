@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class RemoveUnusedProperties extends ScanningRecipe<Map<String, Set<MavenResolutionResult>>> {
+public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedProperties.Accumulator> {
     @Option(displayName = "Property pattern",
             description = "A pattern to filter properties to remove. Defaults to `.+` to match anything",
             required = false,
@@ -58,9 +58,13 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, Set<Maven
         return "Detect and remove Maven property declarations which do not have any usage within the project.";
     }
 
+    public static class Accumulator {
+        public Map<String, Set<MavenResolutionResult>> pomUsages = new HashMap<>();
+    }
+
     @Override
-    public Map<String, Set<MavenResolutionResult>> getInitialValue(ExecutionContext ctx) {
-        return new HashMap<>();
+    public RemoveUnusedProperties.Accumulator getInitialValue(ExecutionContext ctx) {
+        return new RemoveUnusedProperties.Accumulator();
     }
 
     private String getPropertyPattern() {
@@ -68,7 +72,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, Set<Maven
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Map<String, Set<MavenResolutionResult>> acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(RemoveUnusedProperties.Accumulator acc) {
         Pattern propertyMatcher = Pattern.compile(getPropertyPattern());
         Pattern propertyUsageMatcher = Pattern.compile(".*\\$\\{(" + propertyMatcher.pattern() + ")}.*");
         return new MavenIsoVisitor<ExecutionContext>() {
@@ -79,8 +83,8 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, Set<Maven
                 if (value.isPresent()) {
                     Matcher matcher = propertyUsageMatcher.matcher(value.get());
                     if (matcher.matches()) {
-                        acc.putIfAbsent(matcher.group(1), new HashSet<>());
-                        acc.get(matcher.group(1)).add(getResolutionResult());
+                        acc.pomUsages.putIfAbsent(matcher.group(1), new HashSet<>());
+                        acc.pomUsages.get(matcher.group(1)).add(getResolutionResult());
                     }
                 }
                 return t;
@@ -89,7 +93,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, Set<Maven
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Map<String, Set<MavenResolutionResult>> acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(RemoveUnusedProperties.Accumulator acc) {
         Pattern propertyMatcher = Pattern.compile(getPropertyPattern());
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
@@ -105,8 +109,8 @@ public class RemoveUnusedProperties extends ScanningRecipe<Map<String, Set<Maven
                         return t;
                     }
 
-                    if (acc.containsKey(propertyName)) {
-                        for (MavenResolutionResult pomWhereUsed : acc.get(propertyName)) {
+                    if (acc.pomUsages.containsKey(propertyName)) {
+                        for (MavenResolutionResult pomWhereUsed : acc.pomUsages.get(propertyName)) {
                             if (isAncestor(pomWhereUsed, getResolutionResult().getPom().getGav())) {
                                 return t;
                             }
