@@ -21,14 +21,23 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.ScanningRecipe;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextParser;
+import org.openrewrite.text.PlainTextVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -42,7 +51,7 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedProperties.Accumulator> {
     @Option(displayName = "Property pattern",
-            description = "A pattern to filter properties to remove. Defaults to `.+` to match anything",
+            description = "A pattern to filter properties to remove. Defaults to `.+?` to match anything",
             required = false,
             example = ".+\\.version")
     @Nullable
@@ -59,7 +68,24 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     }
 
     public static class Accumulator {
-        public Map<String, Set<MavenResolutionResult>> pomUsages = new HashMap<>();
+        public Map<String, Set<MavenResolutionResult>> propertiesToUsingPoms = new HashMap<>();
+        public Map<Path, MavenResolutionResult> filteredResourcePathsToDeclaringPoms = new HashMap<>();
+        public Map<Path, Set<String>> nonPomPathsToUsages = new HashMap<>();
+
+        public Map<String, Set<MavenResolutionResult>> getFilteredResourceUsages() {
+            Map<String, Set<MavenResolutionResult>> result = new HashMap<>();
+            filteredResourcePathsToDeclaringPoms.forEach((filteredResourcePath, mrr) ->
+                    nonPomPathsToUsages.forEach((usagePath, properties) -> {
+                        if (usagePath.startsWith(filteredResourcePath)) {
+                            properties.forEach(property -> {
+                                result.putIfAbsent(property, new HashSet<>());
+                                result.get(property).add(mrr);
+                            });
+                        }
+                    }
+            ));
+            return result;
+        }
     }
 
     @Override
@@ -68,26 +94,34 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     }
 
     private String getPropertyPattern() {
-        return propertyPattern != null ? propertyPattern : ".+";
+        return propertyPattern != null ? propertyPattern : ".+?";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(RemoveUnusedProperties.Accumulator acc) {
         Pattern propertyMatcher = Pattern.compile(getPropertyPattern());
-        Pattern propertyUsageMatcher = Pattern.compile(".*\\$\\{(" + propertyMatcher.pattern() + ")}.*");
-        return new MavenIsoVisitor<ExecutionContext>() {
+        Pattern propertyUsageMatcher = Pattern.compile("[^$]*\\$\\{(" + propertyMatcher.pattern() + ")}[^$]*");
+
+        MavenIsoVisitor<ExecutionContext> findPomUsagesVisitor =
+                new FindPomUsagesVisitor(propertyUsageMatcher, acc);
+        MavenIsoVisitor<ExecutionContext> findFilteredResourcePathsVisitor =
+                new FindFilteredResourcePathsVisitor(acc);
+        PlainTextVisitor<ExecutionContext> findResourceUsagesVisitor =
+                new FindResourceUsagesVisitor(propertyUsageMatcher, acc);
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = super.visitTag(tag, ctx);
-                Optional<String> value = t.getValue();
-                if (value.isPresent()) {
-                    Matcher matcher = propertyUsageMatcher.matcher(value.get());
-                    if (matcher.matches()) {
-                        acc.pomUsages.putIfAbsent(matcher.group(1), new HashSet<>());
-                        acc.pomUsages.get(matcher.group(1)).add(getResolutionResult());
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile) {
+                    SourceFile sf = (SourceFile) tree;
+                    if (findPomUsagesVisitor.isAcceptable(sf, ctx)) { // ie: is a pom
+                        findPomUsagesVisitor.visit(sf, ctx);
+                        findFilteredResourcePathsVisitor.visit(sf, ctx);
+                    } else if (!(tree instanceof JavaSourceFile)) { // optimization: avoid visiting code files which are almost always not filtered resources
+                        findResourceUsagesVisitor.visit(PlainTextParser.convert(sf), ctx);
                     }
                 }
-                return t;
+                return tree;
             }
         };
     }
@@ -95,6 +129,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(RemoveUnusedProperties.Accumulator acc) {
         Pattern propertyMatcher = Pattern.compile(getPropertyPattern());
+        Map<String, Set<MavenResolutionResult>> filteredResourceUsages = acc.getFilteredResourceUsages();
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -109,8 +144,16 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
                         return t;
                     }
 
-                    if (acc.pomUsages.containsKey(propertyName)) {
-                        for (MavenResolutionResult pomWhereUsed : acc.pomUsages.get(propertyName)) {
+                    if (acc.propertiesToUsingPoms.containsKey(propertyName)) {
+                        for (MavenResolutionResult pomWhereUsed : acc.propertiesToUsingPoms.get(propertyName)) {
+                            if (isAncestor(pomWhereUsed, getResolutionResult().getPom().getGav())) {
+                                return t;
+                            }
+                        }
+                    }
+
+                    if (filteredResourceUsages.containsKey(propertyName)) {
+                        for (MavenResolutionResult pomWhereUsed : filteredResourceUsages.get(propertyName)) {
                             if (isAncestor(pomWhereUsed, getResolutionResult().getPom().getGav())) {
                                 return t;
                             }
@@ -157,5 +200,75 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
                 }
             }
         };
+    }
+
+    private static class FindPomUsagesVisitor extends MavenIsoVisitor<ExecutionContext> {
+        private final Pattern propertyUsageMatcher;
+        private final Accumulator acc;
+
+        public FindPomUsagesVisitor(Pattern propertyUsageMatcher, Accumulator acc) {
+            this.propertyUsageMatcher = propertyUsageMatcher;
+            this.acc = acc;
+        }
+
+        @Override
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            Xml.Tag t = super.visitTag(tag, ctx);
+            Optional<String> value = t.getValue();
+            if (value.isPresent()) {
+                Matcher matcher = propertyUsageMatcher.matcher(value.get());
+                while (matcher.find()) {
+                    acc.propertiesToUsingPoms.putIfAbsent(matcher.group(1), new HashSet<>());
+                    acc.propertiesToUsingPoms.get(matcher.group(1)).add(getResolutionResult());
+                }
+            }
+            return t;
+        }
+    }
+
+    private static class FindFilteredResourcePathsVisitor extends MavenIsoVisitor<ExecutionContext> {
+        private final XPathMatcher resourceMatcher = new XPathMatcher("/project/build/resources/resource");
+        private final Accumulator acc;
+
+        public FindFilteredResourcePathsVisitor(Accumulator acc) {
+            this.acc = acc;
+        }
+
+        @Override
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (resourceMatcher.matches(getCursor())) {
+                String directory = tag.getChildValue("directory").orElse(null);
+                if (tag.getChildValue("filtering").map(Boolean::valueOf).orElse(false)
+                        && directory != null) {
+                    Path path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                    try {
+                        acc.filteredResourcePathsToDeclaringPoms.put(path.getParent().resolve(directory), getResolutionResult());
+                    } catch (InvalidPathException ignored) {} // fail quietly
+                }
+                return tag;
+            } else {
+                return super.visitTag(tag, ctx);
+            }
+        }
+    }
+
+    private static class FindResourceUsagesVisitor extends PlainTextVisitor<ExecutionContext> {
+        private final Pattern propertyUsageMatcher;
+        private final Accumulator acc;
+
+        public FindResourceUsagesVisitor(Pattern propertyUsageMatcher, Accumulator acc) {
+            this.propertyUsageMatcher = propertyUsageMatcher;
+            this.acc = acc;
+        }
+
+        @Override
+        public PlainText visitText(PlainText text, ExecutionContext ctx) {
+            Matcher matcher = propertyUsageMatcher.matcher(text.getText());
+            while (matcher.find()) {
+                acc.nonPomPathsToUsages.putIfAbsent(text.getSourcePath(), new HashSet<>());
+                acc.nonPomPathsToUsages.get(text.getSourcePath()).add(matcher.group(1));
+            }
+            return text;
+        }
     }
 }

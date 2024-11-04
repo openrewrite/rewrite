@@ -20,7 +20,10 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.java.Assertions.srcMainResources;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.xml.Assertions.xml;
 
 class RemoveUnusedPropertiesTest implements RewriteTest {
     @Override
@@ -251,6 +254,61 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void catchesMultiplePropertyUsagesInSameElement() {
+        rewriteRun(
+          pomXml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+              
+                <properties>
+                  <six>6</six>
+                  <zero>0</zero>
+                  <ten>10</ten>
+                </properties>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-beans</artifactId>
+                    <version>${six}.${zero}.${zero}</version>
+                  </dependency>
+                </dependencies>
+              
+              </project>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+              
+                <properties>
+                  <six>6</six>
+                  <zero>0</zero>
+                </properties>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-beans</artifactId>
+                    <version>${six}.${zero}.${zero}</version>
+                  </dependency>
+                </dependencies>
+              
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void keepsOverrideOfParentProperty() {
         rewriteRun(
           pomXml(
@@ -326,6 +384,314 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                   </project>
                   """
               ))
+          )
+        );
+    }
+
+    @Test
+    void keepsPropertyUsedByFilteredResource() {
+        rewriteRun(
+          mavenProject("my-project",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <properties>
+                    <a>a</a>
+                    <b>b</b>
+                  </properties>
+                
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                
+                </project>
+                """, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <properties>
+                    <a>a</a>
+                  </properties>
+                
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                
+                </project>
+                """
+            ),
+            srcMainResources(
+              text("Hello ${a}")
+            )
+          )
+        );
+    }
+
+    @Test
+    void removesPropertyUsedByNonFilteredResource_filteringFalse() {
+        rewriteRun(
+          mavenProject("my-project",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <properties>
+                    <a>a</a>
+                    <b>b</b>
+                  </properties>
+                
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>false</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                
+                </project>
+                """, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>false</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                
+                </project>
+                """
+            ),
+            srcMainResources(
+              text("Hello ${a}")
+            )
+          )
+        );
+    }
+
+    @Test
+    void removesPropertyUsedByNonFilteredResource_noFiltering() {
+        rewriteRun(
+          mavenProject("my-project",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <properties>
+                    <a>a</a>
+                    <b>b</b>
+                  </properties>
+                
+                </project>
+                """, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                </project>
+                """
+            ),
+            srcMainResources(
+              text("Hello ${a}")
+            )
+          )
+        );
+    }
+
+    @Test
+    void removesPropertyUsedByNonFilteredResource_wrongDir() {
+        rewriteRun(
+          mavenProject("my-project",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <properties>
+                    <a>a</a>
+                    <b>b</b>
+                  </properties>
+                
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources-filtered</directory>
+                        <filtering>false</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                
+                </project>
+                """, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources-filtered</directory>
+                        <filtering>false</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                
+                </project>
+                """
+            ),
+            srcMainResources(
+              text("Hello ${a}")
+            )
+          )
+        );
+    }
+
+    @Test
+    void keepsMultiplePropertiesUsedBySameFilteredResource() {
+        rewriteRun(
+          mavenProject("my-project",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <properties>
+                    <a>a</a>
+                    <b>b</b>
+                    <c>c</c>
+                  </properties>
+                
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                
+                </project>
+                """, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <properties>
+                    <a>a</a>
+                    <c>c</c>
+                  </properties>
+                
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                
+                </project>
+                """
+            ),
+            srcMainResources(
+              text("Hello ${a} ${c}")
+            )
+          )
+        );
+    }
+
+    @Test
+    void keepsPropertyUsedByResourceFilter_Xml() {
+        rewriteRun(
+          mavenProject("my-project",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <properties>
+                    <spring.version>6.0.0</spring.version>
+                  </properties>
+                
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                
+                </project>
+                """
+            ),
+            srcMainResources(
+              xml("""
+              <?xml version="1.0" encoding="UTF-8"?>
+              <elements>
+                <element>${spring.version}</element>
+              </elements>
+              """)
+            )
           )
         );
     }
@@ -413,4 +779,92 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void removesIrrelevantPropertyDeclarationForFilteredResourceUsage() {
+        rewriteRun(
+          mavenProject("parent",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                
+                  <modules>
+                    <module>module1</module>
+                    <module>module2</module>
+                  </modules>
+                
+                </project>
+                """
+            ),
+            mavenProject("module1",
+              pomXml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  
+                    <properties>
+                      <a>a</a>
+                    </properties>
+                  
+                    <build>
+                      <resources>
+                        <resource>
+                          <directory>src/main/resources</directory>
+                          <filtering>true</filtering>
+                        </resource>
+                      </resources>
+                    </build>
+                  
+                  </project>
+                  """
+              ),
+              srcMainResources(
+                text("Hello ${a}")
+              )
+            ),
+            mavenProject("module2",
+              pomXml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  
+                    <properties>
+                      <a>a</a>
+                    </properties>
+                  </project>
+                  """, """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
 }
