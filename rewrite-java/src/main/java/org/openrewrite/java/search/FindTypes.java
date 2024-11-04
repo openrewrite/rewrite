@@ -148,7 +148,7 @@ public class FindTypes extends Recipe {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     private static class TypeReferenceVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Set<Tree> matches;
 
