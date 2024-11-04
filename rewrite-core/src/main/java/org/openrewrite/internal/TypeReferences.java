@@ -21,15 +21,23 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.trait.TypeReference;
 
-import java.util.HashSet;
-import java.util.ServiceLoader;
-import java.util.Set;
+import java.util.*;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Getter
 public class TypeReferences {
     private final SourceFile sourceFile;
     private final Set<TypeReference> typeReferences;
+
+    public Collection<TypeReference> findMatches(TypeReference.Matcher matcher) {
+        List<TypeReference> list = new ArrayList<>();
+        for (TypeReference ref : typeReferences) {
+            if (ref.matches(matcher)) {
+                list.add(ref);
+            }
+        }
+        return list;
+    }
 
     public static TypeReferences build(SourceFile sourceFile) {
         Set<TypeReference> typeReferences = new HashSet<>();
