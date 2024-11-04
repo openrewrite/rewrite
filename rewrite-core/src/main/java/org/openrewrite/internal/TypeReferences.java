@@ -33,7 +33,7 @@ public class TypeReferences {
 
     public static TypeReferences build(SourceFile sourceFile) {
         Set<TypeReference> typeReferences = new HashSet<>();
-        ServiceLoader<TypeReference.TypeReferenceProvider> loader = ServiceLoader.load(TypeReference.TypeReferenceProvider.class);
+        ServiceLoader<TypeReference.Provider> loader = ServiceLoader.load(TypeReference.Provider.class);
         loader.forEach(provider -> {
             if (provider.isAcceptable(sourceFile)) {
                 typeReferences.addAll(provider.getTypeReferences(sourceFile));

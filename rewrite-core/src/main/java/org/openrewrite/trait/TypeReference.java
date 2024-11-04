@@ -24,7 +24,7 @@ public interface TypeReference extends Trait<Tree> {
 
     String getName();
 
-    interface TypeReferenceProvider {
+    interface Provider {
 
         Set<TypeReference> getTypeReferences(SourceFile sourceFile);
 
