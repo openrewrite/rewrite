@@ -244,7 +244,37 @@ class JavaParserTest implements RewriteTest {
               import org.jspecify.annotations.NonNull;
               
               class C3 {
+                  void m(String @NonNull[] @NonNull[] arrayArgs) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import org.jspecify.annotations.NonNull;
+              
+              class C4 {
                   void m(String @NonNull [ ] @NonNull ... s) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import org.jspecify.annotations.NonNull;
+              
+              class C5 {
+                  void m(@NonNull String @NonNull[] @NonNull[] arrayArgs) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import org.jspecify.annotations.NonNull;
+              
+              class C6 {
+                  void m(@NonNull String @NonNull [ ] @NonNull ... s) {
                   }
               }
               """
