@@ -36,34 +36,34 @@ public class HCLParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		FOR_BRACE=1, FOR_BRACK=2, IF=3, IN=4, LBRACE=5, RBRACE=6, ASSIGN=7, Identifier=8, 
-		WS=9, COMMENT=10, LINE_COMMENT=11, NEWLINE=12, NumericLiteral=13, BooleanLiteral=14, 
-		QUOTE=15, NULL=16, HEREDOC_START=17, PLUS=18, AND=19, EQ=20, LT=21, COLON=22, 
-		LBRACK=23, LPAREN=24, MINUS=25, OR=26, NEQ=27, GT=28, QUESTION=29, RBRACK=30, 
-		RPAREN=31, MUL=32, NOT=33, LEQ=34, DOT=35, DIV=36, GEQ=37, ARROW=38, COMMA=39, 
-		MOD=40, ELLIPSIS=41, TILDE=42, TEMPLATE_INTERPOLATION_START=43, TemplateStringLiteral=44, 
+		FOR_BRACE=1, FOR_BRACK=2, IF=3, IN=4, LBRACE=5, RBRACE=6, ASSIGN=7, Identifier=8,
+		WS=9, COMMENT=10, LINE_COMMENT=11, NEWLINE=12, NumericLiteral=13, BooleanLiteral=14,
+		QUOTE=15, NULL=16, HEREDOC_START=17, PLUS=18, AND=19, EQ=20, LT=21, COLON=22,
+		LBRACK=23, LPAREN=24, MINUS=25, OR=26, NEQ=27, GT=28, QUESTION=29, RBRACK=30,
+		RPAREN=31, MUL=32, NOT=33, LEQ=34, DOT=35, DIV=36, GEQ=37, ARROW=38, COMMA=39,
+		MOD=40, ELLIPSIS=41, TILDE=42, TEMPLATE_INTERPOLATION_START=43, TemplateStringLiteral=44,
 		TemplateStringLiteralChar=45, HTemplateLiteral=46, HTemplateLiteralChar=47;
 	public static final int
-		RULE_configFile = 0, RULE_body = 1, RULE_bodyContent = 2, RULE_attribute = 3, 
-		RULE_block = 4, RULE_blockLabel = 5, RULE_expression = 6, RULE_exprTerm = 7, 
-		RULE_blockExpr = 8, RULE_literalValue = 9, RULE_collectionValue = 10, 
-		RULE_tuple = 11, RULE_object = 12, RULE_objectelem = 13, RULE_forExpr = 14, 
-		RULE_forTupleExpr = 15, RULE_forObjectExpr = 16, RULE_forIntro = 17, RULE_forCond = 18, 
-		RULE_variableExpr = 19, RULE_functionCall = 20, RULE_arguments = 21, RULE_index = 22, 
-		RULE_getAttr = 23, RULE_splat = 24, RULE_attrSplat = 25, RULE_fullSplat = 26, 
-		RULE_operation = 27, RULE_unaryOp = 28, RULE_binaryOp = 29, RULE_binaryOperator = 30, 
-		RULE_compareOperator = 31, RULE_arithmeticOperator = 32, RULE_logicOperator = 33, 
-		RULE_templateExpr = 34, RULE_heredocTemplatePart = 35, RULE_heredocLiteral = 36, 
+		RULE_configFile = 0, RULE_body = 1, RULE_bodyContent = 2, RULE_attribute = 3,
+		RULE_block = 4, RULE_blockLabel = 5, RULE_expression = 6, RULE_exprTerm = 7,
+		RULE_blockExpr = 8, RULE_literalValue = 9, RULE_collectionValue = 10,
+		RULE_tuple = 11, RULE_object = 12, RULE_objectelem = 13, RULE_forExpr = 14,
+		RULE_forTupleExpr = 15, RULE_forObjectExpr = 16, RULE_forIntro = 17, RULE_forCond = 18,
+		RULE_variableExpr = 19, RULE_functionCall = 20, RULE_arguments = 21, RULE_index = 22,
+		RULE_getAttr = 23, RULE_splat = 24, RULE_attrSplat = 25, RULE_fullSplat = 26,
+		RULE_operation = 27, RULE_unaryOp = 28, RULE_binaryOp = 29, RULE_binaryOperator = 30,
+		RULE_compareOperator = 31, RULE_arithmeticOperator = 32, RULE_logicOperator = 33,
+		RULE_templateExpr = 34, RULE_heredocTemplatePart = 35, RULE_heredocLiteral = 36,
 		RULE_quotedTemplatePart = 37, RULE_stringLiteral = 38, RULE_templateInterpolation = 39;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"configFile", "body", "bodyContent", "attribute", "block", "blockLabel", 
-			"expression", "exprTerm", "blockExpr", "literalValue", "collectionValue", 
-			"tuple", "object", "objectelem", "forExpr", "forTupleExpr", "forObjectExpr", 
-			"forIntro", "forCond", "variableExpr", "functionCall", "arguments", "index", 
-			"getAttr", "splat", "attrSplat", "fullSplat", "operation", "unaryOp", 
-			"binaryOp", "binaryOperator", "compareOperator", "arithmeticOperator", 
-			"logicOperator", "templateExpr", "heredocTemplatePart", "heredocLiteral", 
+			"configFile", "body", "bodyContent", "attribute", "block", "blockLabel",
+			"expression", "exprTerm", "blockExpr", "literalValue", "collectionValue",
+			"tuple", "object", "objectelem", "forExpr", "forTupleExpr", "forObjectExpr",
+			"forIntro", "forCond", "variableExpr", "functionCall", "arguments", "index",
+			"getAttr", "splat", "attrSplat", "fullSplat", "operation", "unaryOp",
+			"binaryOp", "binaryOperator", "compareOperator", "arithmeticOperator",
+			"logicOperator", "templateExpr", "heredocTemplatePart", "heredocLiteral",
 			"quotedTemplatePart", "stringLiteral", "templateInterpolation"
 		};
 	}
@@ -71,23 +71,23 @@ public class HCLParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, "'if'", "'in'", "'{'", "'}'", "'='", null, null, null, 
-			null, null, null, null, null, "'null'", null, "'+'", "'&&'", "'=='", 
-			"'<'", "':'", "'['", "'('", "'-'", "'||'", "'!='", "'>'", "'?'", "']'", 
-			"')'", "'*'", "'!'", "'<='", "'.'", "'/'", "'>='", "'=>'", "','", "'%'", 
+			null, null, null, "'if'", "'in'", "'{'", "'}'", "'='", null, null, null,
+			null, null, null, null, null, "'null'", null, "'+'", "'&&'", "'=='",
+			"'<'", "':'", "'['", "'('", "'-'", "'||'", "'!='", "'>'", "'?'", "']'",
+			"')'", "'*'", "'!'", "'<='", "'.'", "'/'", "'>='", "'=>'", "','", "'%'",
 			"'...'", "'~'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "FOR_BRACE", "FOR_BRACK", "IF", "IN", "LBRACE", "RBRACE", "ASSIGN", 
-			"Identifier", "WS", "COMMENT", "LINE_COMMENT", "NEWLINE", "NumericLiteral", 
-			"BooleanLiteral", "QUOTE", "NULL", "HEREDOC_START", "PLUS", "AND", "EQ", 
-			"LT", "COLON", "LBRACK", "LPAREN", "MINUS", "OR", "NEQ", "GT", "QUESTION", 
-			"RBRACK", "RPAREN", "MUL", "NOT", "LEQ", "DOT", "DIV", "GEQ", "ARROW", 
-			"COMMA", "MOD", "ELLIPSIS", "TILDE", "TEMPLATE_INTERPOLATION_START", 
-			"TemplateStringLiteral", "TemplateStringLiteralChar", "HTemplateLiteral", 
+			null, "FOR_BRACE", "FOR_BRACK", "IF", "IN", "LBRACE", "RBRACE", "ASSIGN",
+			"Identifier", "WS", "COMMENT", "LINE_COMMENT", "NEWLINE", "NumericLiteral",
+			"BooleanLiteral", "QUOTE", "NULL", "HEREDOC_START", "PLUS", "AND", "EQ",
+			"LT", "COLON", "LBRACK", "LPAREN", "MINUS", "OR", "NEQ", "GT", "QUESTION",
+			"RBRACK", "RPAREN", "MUL", "NOT", "LEQ", "DOT", "DIV", "GEQ", "ARROW",
+			"COMMA", "MOD", "ELLIPSIS", "TILDE", "TEMPLATE_INTERPOLATION_START",
+			"TemplateStringLiteral", "TemplateStringLiteralChar", "HTemplateLiteral",
 			"HTemplateLiteralChar"
 		};
 	}
@@ -504,7 +504,7 @@ public class HCLParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_expression; }
-	 
+
 		public ExpressionContext() { }
 		public void copyFrom(ExpressionContext ctx) {
 			super.copyFrom(ctx);
@@ -637,7 +637,7 @@ public class HCLParser extends Parser {
 					setState(121);
 					expression(2);
 					}
-					} 
+					}
 				}
 				setState(127);
 				_errHandler.sync(this);
@@ -662,7 +662,7 @@ public class HCLParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_exprTerm; }
-	 
+
 		public ExprTermContext() { }
 		public void copyFrom(ExprTermContext ctx) {
 			super.copyFrom(ctx);
@@ -1010,7 +1010,7 @@ public class HCLParser extends Parser {
 						}
 						break;
 					}
-					} 
+					}
 				}
 				setState(151);
 				_errHandler.sync(this);
@@ -1259,7 +1259,7 @@ public class HCLParser extends Parser {
 						setState(165);
 						expression(0);
 						}
-						} 
+						}
 					}
 					setState(170);
 					_errHandler.sync(this);
@@ -1990,7 +1990,7 @@ public class HCLParser extends Parser {
 					setState(255);
 					expression(0);
 					}
-					} 
+					}
 				}
 				setState(260);
 				_errHandler.sync(this);
@@ -2237,7 +2237,7 @@ public class HCLParser extends Parser {
 					setState(277);
 					getAttr();
 					}
-					} 
+					}
 				}
 				setState(282);
 				_errHandler.sync(this);
@@ -2329,7 +2329,7 @@ public class HCLParser extends Parser {
 					default:
 						throw new NoViableAltException(this);
 					}
-					} 
+					}
 				}
 				setState(292);
 				_errHandler.sync(this);
@@ -2824,7 +2824,7 @@ public class HCLParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_templateExpr; }
-	 
+
 		public TemplateExprContext() { }
 		public void copyFrom(TemplateExprContext ctx) {
 			super.copyFrom(ctx);
@@ -2906,7 +2906,7 @@ public class HCLParser extends Parser {
 				match(HEREDOC_START);
 				setState(321);
 				match(Identifier);
-				setState(329); 
+				setState(329);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				do {
@@ -2930,7 +2930,7 @@ public class HCLParser extends Parser {
 					}
 					}
 					}
-					setState(331); 
+					setState(331);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				} while ( _la==NEWLINE );

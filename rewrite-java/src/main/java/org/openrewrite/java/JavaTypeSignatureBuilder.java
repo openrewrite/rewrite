@@ -32,7 +32,7 @@ public interface JavaTypeSignatureBuilder {
      * @return The type signature. If <code>t</code> is null, the signature is <code>{undefined}</code>.
      */
     String signature(@Nullable Object type);
-    
+
     /**
      * @param type An array type.
      * @return Formatted like <code>Integer[]</code>.

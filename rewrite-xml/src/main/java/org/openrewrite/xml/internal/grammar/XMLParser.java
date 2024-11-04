@@ -35,22 +35,22 @@ public class XMLParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		COMMENT=1, CDATA=2, ParamEntityRef=3, EntityRef=4, CharRef=5, SEA_WS=6, 
-		UTF_ENCODING_BOM=7, QUESTION_MARK=8, SPECIAL_OPEN_XML=9, OPEN=10, SPECIAL_OPEN=11, 
-		DTD_OPEN=12, TEXT=13, DTD_CLOSE=14, DTD_SUBSET_OPEN=15, DTD_S=16, DOCTYPE=17, 
-		DTD_SUBSET_CLOSE=18, MARKUP_OPEN=19, DTS_SUBSET_S=20, MARK_UP_CLOSE=21, 
-		MARKUP_S=22, MARKUP_TEXT=23, MARKUP_SUBSET=24, PI_S=25, PI_TEXT=26, CLOSE=27, 
-		SPECIAL_CLOSE=28, SLASH_CLOSE=29, S=30, DIRECTIVE_OPEN=31, DIRECTIVE_CLOSE=32, 
+		COMMENT=1, CDATA=2, ParamEntityRef=3, EntityRef=4, CharRef=5, SEA_WS=6,
+		UTF_ENCODING_BOM=7, QUESTION_MARK=8, SPECIAL_OPEN_XML=9, OPEN=10, SPECIAL_OPEN=11,
+		DTD_OPEN=12, TEXT=13, DTD_CLOSE=14, DTD_SUBSET_OPEN=15, DTD_S=16, DOCTYPE=17,
+		DTD_SUBSET_CLOSE=18, MARKUP_OPEN=19, DTS_SUBSET_S=20, MARK_UP_CLOSE=21,
+		MARKUP_S=22, MARKUP_TEXT=23, MARKUP_SUBSET=24, PI_S=25, PI_TEXT=26, CLOSE=27,
+		SPECIAL_CLOSE=28, SLASH_CLOSE=29, S=30, DIRECTIVE_OPEN=31, DIRECTIVE_CLOSE=32,
 		SLASH=33, EQUALS=34, STRING=35, Name=36;
 	public static final int
-		RULE_document = 0, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4, 
-		RULE_intsubset = 5, RULE_markupdecl = 6, RULE_declSep = 7, RULE_externalid = 8, 
-		RULE_processinginstruction = 9, RULE_content = 10, RULE_element = 11, 
+		RULE_document = 0, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4,
+		RULE_intsubset = 5, RULE_markupdecl = 6, RULE_declSep = 7, RULE_externalid = 8,
+		RULE_processinginstruction = 9, RULE_content = 10, RULE_element = 11,
 		RULE_jspdirective = 12, RULE_reference = 13, RULE_attribute = 14, RULE_chardata = 15;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"document", "prolog", "xmldecl", "misc", "doctypedecl", "intsubset", 
-			"markupdecl", "declSep", "externalid", "processinginstruction", "content", 
+			"document", "prolog", "xmldecl", "misc", "doctypedecl", "intsubset",
+			"markupdecl", "declSep", "externalid", "processinginstruction", "content",
 			"element", "jspdirective", "reference", "attribute", "chardata"
 		};
 	}
@@ -58,20 +58,20 @@ public class XMLParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, null, null, null, null, null, "'?'", null, "'<'", null, 
-			null, null, null, null, null, null, null, null, null, null, null, null, 
+			null, null, null, null, null, null, null, null, "'?'", null, "'<'", null,
+			null, null, null, null, null, null, null, null, null, null, null, null,
 			null, null, null, null, null, "'/>'", null, "'%@'", "'%'", "'/'", "'='"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef", "SEA_WS", 
-			"UTF_ENCODING_BOM", "QUESTION_MARK", "SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN", 
-			"DTD_OPEN", "TEXT", "DTD_CLOSE", "DTD_SUBSET_OPEN", "DTD_S", "DOCTYPE", 
-			"DTD_SUBSET_CLOSE", "MARKUP_OPEN", "DTS_SUBSET_S", "MARK_UP_CLOSE", "MARKUP_S", 
-			"MARKUP_TEXT", "MARKUP_SUBSET", "PI_S", "PI_TEXT", "CLOSE", "SPECIAL_CLOSE", 
-			"SLASH_CLOSE", "S", "DIRECTIVE_OPEN", "DIRECTIVE_CLOSE", "SLASH", "EQUALS", 
+			null, "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef", "SEA_WS",
+			"UTF_ENCODING_BOM", "QUESTION_MARK", "SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN",
+			"DTD_OPEN", "TEXT", "DTD_CLOSE", "DTD_SUBSET_OPEN", "DTD_S", "DOCTYPE",
+			"DTD_SUBSET_CLOSE", "MARKUP_OPEN", "DTS_SUBSET_S", "MARK_UP_CLOSE", "MARKUP_S",
+			"MARKUP_TEXT", "MARKUP_SUBSET", "PI_S", "PI_TEXT", "CLOSE", "SPECIAL_CLOSE",
+			"SLASH_CLOSE", "S", "DIRECTIVE_OPEN", "DIRECTIVE_CLOSE", "SLASH", "EQUALS",
 			"STRING", "Name"
 		};
 	}
@@ -266,7 +266,7 @@ public class XMLParser extends Parser {
 					setState(47);
 					jspdirective();
 					}
-					} 
+					}
 				}
 				setState(52);
 				_errHandler.sync(this);
@@ -849,7 +849,7 @@ public class XMLParser extends Parser {
 			{
 			setState(115);
 			match(SPECIAL_OPEN);
-			setState(117); 
+			setState(117);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -859,7 +859,7 @@ public class XMLParser extends Parser {
 				match(PI_TEXT);
 				}
 				}
-				setState(119); 
+				setState(119);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==PI_TEXT );
@@ -1066,7 +1066,7 @@ public class XMLParser extends Parser {
 						setState(140);
 						content();
 						}
-						} 
+						}
 					}
 					setState(145);
 					_errHandler.sync(this);

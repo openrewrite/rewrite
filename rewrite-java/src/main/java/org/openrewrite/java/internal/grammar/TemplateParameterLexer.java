@@ -30,7 +30,7 @@ public class TemplateParameterLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8, 
+		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8,
 		Variance=9, FullyQualifiedName=10, Number=11, Identifier=12, S=13;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
@@ -42,8 +42,8 @@ public class TemplateParameterLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", "WILDCARD", 
-			"Variance", "FullyQualifiedName", "Number", "Identifier", "JavaLetter", 
+			"LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", "WILDCARD",
+			"Variance", "FullyQualifiedName", "Number", "Identifier", "JavaLetter",
 			"JavaLetterOrDigit", "S"
 		};
 	}
@@ -57,8 +57,8 @@ public class TemplateParameterLexer extends Lexer {
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", 
-			"WILDCARD", "Variance", "FullyQualifiedName", "Number", "Identifier", 
+			null, "LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK",
+			"WILDCARD", "Variance", "FullyQualifiedName", "Number", "Identifier",
 			"S"
 		};
 	}
