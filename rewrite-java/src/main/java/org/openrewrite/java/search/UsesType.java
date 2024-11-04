@@ -22,7 +22,6 @@ import org.openrewrite.SourceFileWithTypeReferences;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.TypeReferences;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -122,7 +121,7 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
             }
         } else if (tree instanceof SourceFileWithTypeReferences) {
             SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
-            TypeReferences typeReferences = sourceFile.getTypeReferences();
+            SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
             TypeMatcher matcher = typeMatcher != null ? typeMatcher : new TypeMatcher(fullyQualifiedType);
             for (TypeReference ignored : typeReferences.findMatches(matcher)) {
                 return SearchResult.found(sourceFile);

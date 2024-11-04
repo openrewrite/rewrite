@@ -21,7 +21,6 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.TypeReferences;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.TypeMatcher;
@@ -78,7 +77,7 @@ public class FindTypes extends Recipe {
                     return new JavaSourceFileVisitor(fullyQualifiedType).visit(tree, ctx);
                 } else if (tree instanceof SourceFileWithTypeReferences) {
                     SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
-                    TypeReferences typeReferences = sourceFile.getTypeReferences();
+                    SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
                     TypeMatcher matcher = new TypeMatcher(fullyQualifiedTypeName);
                     Set<Tree> matches = typeReferences.findMatches(matcher).stream().map(Trait::getTree).collect(Collectors.toSet());
                     return new TypeReferenceVisitor(matches).visit(tree, ctx);
@@ -141,7 +140,7 @@ public class FindTypes extends Recipe {
     }
 
     private static boolean typeMatches(boolean checkAssignability, Pattern pattern,
-            JavaType.@Nullable FullyQualified test) {
+                                       JavaType.@Nullable FullyQualified test) {
         return test != null && (checkAssignability ?
                 test.isAssignableFrom(pattern) :
                 pattern.matcher(test.getFullyQualifiedName()).matches()
