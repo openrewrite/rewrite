@@ -174,7 +174,7 @@ public interface Xml extends Tree {
 
         @Transient
         @Override
-        public TypeReferences getJavaTypeReferences() {
+        public TypeReferences getTypeReferences() {
             TypeReferences cache;
             if (this.javaTypeReferences == null) {
                 cache = TypeReferences.build(this);
