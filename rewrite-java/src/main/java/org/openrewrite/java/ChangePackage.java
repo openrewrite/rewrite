@@ -134,6 +134,7 @@ public class ChangePackage extends Recipe {
                 return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithTypeReferences;
             }
 
+            @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     return new JavaChangePackageVisitor().visit(tree, ctx);

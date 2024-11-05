@@ -104,6 +104,7 @@ public class ChangeType extends Recipe {
                 return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithTypeReferences;
             }
 
+            @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx);
