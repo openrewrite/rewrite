@@ -53,7 +53,6 @@ import javax.tools.SimpleJavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.*;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
@@ -117,6 +116,7 @@ public class ReloadableJava17Parser implements JavaParser {
 
         LOMBOK:
         if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+            Processor lombokProcessor = null;
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
                 String systemClasspath = System.getProperty("java.class.path");
@@ -136,7 +136,6 @@ public class ReloadableJava17Parser implements JavaParser {
                         }
                     }
                     if (!found) {
-                        annotationProcessors = emptyList();
                         break LOMBOK;
                     }
                     System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
@@ -158,12 +157,12 @@ public class ReloadableJava17Parser implements JavaParser {
                         emptyList(),
                         singletonList("lombok.patcher.Symbols")
                 );
-                Processor lombokProcessor = (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
-                annotationProcessors = singletonList(lombokProcessor);
+                lombokProcessor = (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
                 Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
-            } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException |
-                     InvocationTargetException e) {
-                throw new RuntimeException(e);
+            } catch (ReflectiveOperationException ignore) {
+                // Lombok was not found or could not be initialized
+            } finally {
+                annotationProcessors = lombokProcessor != null ? singletonList(lombokProcessor) : emptyList();
             }
         } else {
             annotationProcessors = emptyList();
