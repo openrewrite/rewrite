@@ -145,7 +145,7 @@ public interface Xml extends Tree {
             if (this.eof.equals(eof)) {
                 return this;
             }
-            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof, javaTypeReferences);
+            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
         }
 
         @Override
@@ -169,20 +169,20 @@ public interface Xml extends Tree {
 
         @Nullable
         @NonFinal
-        transient SoftReference<TypeReferences> javaTypeReferences;
+        transient SoftReference<TypeReferences> typeReferences;
 
         @Transient
         @Override
         public TypeReferences getTypeReferences() {
             TypeReferences cache;
-            if (this.javaTypeReferences == null) {
+            if (this.typeReferences == null) {
                 cache = TypeReferences.build(this);
-                this.javaTypeReferences = new SoftReference<>(cache);
+                this.typeReferences = new SoftReference<>(cache);
             } else {
-                cache = this.javaTypeReferences.get();
+                cache = this.typeReferences.get();
                 if (cache == null || cache.getSourceFile() != this) {
                     cache = TypeReferences.build(this);
-                    this.javaTypeReferences = new SoftReference<>(cache);
+                    this.typeReferences = new SoftReference<>(cache);
                 }
             }
             return cache;
