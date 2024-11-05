@@ -22,6 +22,7 @@ import org.openrewrite.trait.TypeReference;
 
 import java.util.*;
 
+@Incubating(since = "8.39.0")
 public interface SourceFileWithTypeReferences extends SourceFile {
 
     TypeReferences getTypeReferences();

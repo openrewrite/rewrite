@@ -15,11 +15,13 @@
  */
 package org.openrewrite.trait;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 
 import java.util.Set;
 
+@Incubating(since = "8.39.0")
 public interface TypeReference extends Trait<Tree> {
 
     String getName();
