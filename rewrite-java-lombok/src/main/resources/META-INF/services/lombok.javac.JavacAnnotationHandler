@@ -13,11 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+org.openrewrite.java.lombok.AllArgsConstructorHandler
 org.openrewrite.java.lombok.CleanupNoOpHandler
+org.openrewrite.java.lombok.ExtensionMethodHandler
 org.openrewrite.java.lombok.GetterHandler
+org.openrewrite.java.lombok.HelperHandler
+org.openrewrite.java.lombok.JacksonizedHandler
 org.openrewrite.java.lombok.LockedNoOpHandler
 org.openrewrite.java.lombok.LockedReadNoOpHandler
 org.openrewrite.java.lombok.LockedWriteNoOpHandler
+org.openrewrite.java.lombok.NoArgsConstructorHandler
 org.openrewrite.java.lombok.NonNullNoOpHandler
+org.openrewrite.java.lombok.RequiredArgsConstructorHandler
+org.openrewrite.java.lombok.SetterHandler
 org.openrewrite.java.lombok.SneakyThrowsNoOpHandler
 org.openrewrite.java.lombok.SynchronizedNoOpHandler

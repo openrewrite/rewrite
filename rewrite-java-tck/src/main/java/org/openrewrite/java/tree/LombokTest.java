@@ -15,16 +15,22 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnJre;
 import org.junit.jupiter.api.condition.JRE;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
+import java.util.List;
+
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.CollectionAssert.assertThatCollection;
 import static org.openrewrite.java.Assertions.java;
 
-@SuppressWarnings("CaughtExceptionImmediatelyRethrown")
+@SuppressWarnings({"CaughtExceptionImmediatelyRethrown", "LombokGetterMayBeUsed", "LombokSetterMayBeUsed", "DefaultAnnotationParam", "NotNullFieldNotInitialized", "ProtectedMemberInFinalClass", "WriteOnlyObject", "ConcatenationWithEmptyString"})
 @EnabledOnJre(JRE.JAVA_17)
 class LombokTest implements RewriteTest {
 
@@ -437,5 +443,334 @@ class LombokTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void accessors() {
+        rewriteRun(
+          java(
+            """
+              import lombok.experimental.Accessors;
+              import lombok.Getter;
+              import lombok.Setter;
+              
+              @Accessors(fluent = true)
+              public class AccessorsExample {
+                  @Getter @Setter
+                  private int age = 10;
+                  public static void test() {
+                        new AccessorsExample().age(20);
+                  }
+              }
+              
+              class PrefixExample {
+                  @Accessors(prefix = "f") @Getter
+                  private String fName = "Hello, World!";
+                  public static String test() {
+                      return new PrefixExample().getName();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldDefaults() {
+        rewriteRun(
+            java(
+                """
+                import lombok.AccessLevel;
+                import lombok.experimental.FieldDefaults;
+                import lombok.experimental.NonFinal;
+                import lombok.experimental.PackagePrivate;
+                
+                @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
+                public class FieldDefaultsExample {
+                  public final int a;
+                  int b;
+                  @NonFinal int c;
+                  @PackagePrivate int d;
+                  FieldDefaultsExample() {
+                    a = 0;
+                    b = 0;
+                    d = 0;
+                  }
+                }
+                """,
+              spec -> spec.afterRecipe(cu -> {
+                  List<Statement> statements = cu.getClasses().get(0).getBody().getStatements();
+                  assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(0)).getVariables().get(0).getVariableType()).getFlags())
+                    .as("Field 'a' explicitly specifies its modifiers, overriding the lombok defaults")
+                    .containsExactlyInAnyOrder(Flag.Public, Flag.Final);
+                  assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(1)).getVariables().get(0).getVariableType()).getFlags())
+                    .as("Field 'b' does not specify its modifiers, so it should use the lombok defaults")
+                    .containsExactlyInAnyOrder(Flag.Private, Flag.Final);
+                  assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(2)).getVariables().get(0).getVariableType()).getFlags())
+                    .as("Field 'c' is annotated with @NonFinal, so it should not be final")
+                    .containsExactlyInAnyOrder(Flag.Private);
+                  assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(3)).getVariables().get(0).getVariableType()).getFlags())
+                    .as("Field 'd' is annotated with @PackagePrivate, so it should be package-private")
+                    .containsExactlyInAnyOrder(Flag.Final);
+              })
+            )
+        );
+    }
+
+    @Test
+    void delegate() {
+        rewriteRun(
+          java("""
+                import java.util.ArrayList;
+                import java.util.Collection;
+                
+                import lombok.experimental.Delegate;
+                
+                public class DelegationExample {
+                    private interface SimpleCollection {
+                        boolean add(String item);
+                        boolean remove(Object item);
+                    }
+                    @Delegate(types=SimpleCollection.class)
+                    private final Collection<String> collection = new ArrayList<>();
+                
+                    static void test() {
+                        DelegationExample example = new DelegationExample();
+                        example.add("s");
+                        example.remove("s");
+                    }
+                }
+                
+                class ExcludesDelegateExample {
+                    long counter = 0L;
+                    private interface Add {
+                        boolean add(String x);
+                        boolean addAll(Collection<? extends String> x);
+                    }
+                    @Delegate(excludes=Add.class)
+                    private final Collection<String> collection = new ArrayList<>();
+                    public boolean add(String item) {
+                        counter++;
+                        return collection.add(item);
+                    }
+                    public boolean addAll(Collection<? extends String> col) {
+                        counter += col.size();
+                        return collection.addAll(col);
+                    }
+                }
+                """
+          )
+        );
+    }
+
+    @Test
+    void utilityClass() {
+        rewriteRun(
+          java("""
+            import lombok.experimental.UtilityClass;
+            
+            @UtilityClass
+            public class UtilityClassExample {
+              private final int CONSTANT = 5;
+            
+              public int addSomething(int in) {
+                return in + CONSTANT;
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void fieldNameConstants() {
+        rewriteRun(
+          java("""
+            import lombok.experimental.FieldNameConstants;
+            
+            @FieldNameConstants
+            public class FieldNameConstantsExample {
+                private final String iAmAField;
+                private final int andSoAmI;
+                @FieldNameConstants.Exclude private final int asAmI;
+            
+                public void test() {
+                    System.out.println(FieldNameConstantsExample.Fields.iAmAField);
+                    System.out.println(FieldNameConstantsExample.Fields.andSoAmI);
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void tolerate() {
+        rewriteRun(
+          java("""
+            import lombok.experimental.Tolerate;
+            import lombok.Setter;
+            
+            public class TolerateExample {
+                @Setter
+                private String s;
+            
+                @Tolerate
+                public void setS(Object s) {
+                    this.s = s.toString();
+                }
+            
+                public void both(String s) {
+                    setS(s);
+                    setS((Object)s);
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void jacksonized() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("jackson-annotations", "lombok")),
+          java("""
+            import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+            import lombok.Builder;
+            import lombok.extern.jackson.Jacksonized;
+            
+            @Jacksonized
+            @Builder
+            @JsonIgnoreProperties(ignoreUnknown = true)
+            public class JacksonExample {
+                private List<String> strings;
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void standardException() {
+        rewriteRun(
+          java("""
+            import lombok.experimental.StandardException;
+            
+            @StandardException
+            public class ExampleException extends Exception {
+            }
+            """
+          )
+        );
+    }
+
+    /**
+     * These test lombok features that we do not fully support.
+     * Code should still parse and print back to its original source code but type information may be missing.
+     */
+    @SuppressWarnings("MismatchedReadAndWriteOfArray")
+    @Nested
+    class LessSupported {
+        @Test
+        void extensionMethod() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              java(
+                """
+                  import lombok.experimental.ExtensionMethod;
+                  
+                  @ExtensionMethod({java.util.Arrays.class, Extensions.class})
+                  public class ExtensionMethodExample {
+                      public String test() {
+                          int[] intArray = {5, 3, 8, 2};
+                          intArray.sort();
+                          String iAmNull = null;
+                          return iAmNull.or("hELlO, WORlD!".toTitleCase());
+                      }
+                  }
+                  
+                  class Extensions {
+                      public static <T> T or(T obj, T ifNull) {
+                          return obj != null ? obj : ifNull;
+                      }
+                      public static String toTitleCase(String in) {
+                          if (in.isEmpty()) return in;
+                          return "" + Character.toTitleCase(in.charAt(0)) + in.substring(1).toLowerCase();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void onConstructor() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              java("""
+                import lombok.AllArgsConstructor;
+                import lombok.Getter;
+                import lombok.Setter;
+                
+                import javax.inject.Inject;
+                import javax.persistence.Id;
+                import javax.persistence.Column;
+                import javax.validation.constraints.Max;
+                
+                // @__ missing attribution
+                @AllArgsConstructor(onConstructor=@__(@Inject))
+                public class OnXExample {
+                    @Getter(onMethod_={@Id, @Column(name="unique-id")}) //JDK8
+                    @Setter(onParam_=@Max(10000)) //JDK8
+                    private long unid;
+                }
+                """)
+            );
+        }
+
+        @Test
+        void onConstructorNoArgs() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              java("""
+                import lombok.NoArgsConstructor;
+                import lombok.Getter;
+                import lombok.RequiredArgsConstructor;import lombok.Setter;
+                
+                import javax.inject.Inject;
+                // @__ missing attribution
+                @NoArgsConstructor(onConstructor = @__(@Inject))
+                @RequiredArgsConstructor(onConstructor_ = @__(@Inject))
+                public class OnXExample {
+                    private long unid;
+                }
+                """)
+            );
+        }
+
+        @Test
+        void helper() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              java("""
+                import lombok.experimental.Helper;
+                
+                public class HelperExample {
+                    int someMethod(int arg1) {
+                        int localVar = 5;
+                
+                        @Helper
+                        class Helpers {
+                            int helperMethod(int arg) {
+                                return arg + localVar;
+                            }
+                        }
+                
+                        // helperMethod missing type attribution
+                        return helperMethod(10);
+                    }
+                }
+                """
+              )
+            );
+        }
     }
 }

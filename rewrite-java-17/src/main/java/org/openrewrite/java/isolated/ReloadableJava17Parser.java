@@ -117,9 +117,6 @@ public class ReloadableJava17Parser implements JavaParser {
         if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
-                Class<?> lombokProcessorClass = Class.forName("lombok.launch.AnnotationProcessorHider$AnnotationProcessor", true, getClass().getClassLoader());
-                Constructor<?> lombokProcessorConstructor = lombokProcessorClass.getConstructor();
-
                 String systemClasspath = System.getProperty("java.class.path");
                 if (systemClasspath != null && !systemClasspath.isEmpty()) {
                     List<String> overrideClasspath = new ArrayList<>();
@@ -129,15 +126,36 @@ public class ReloadableJava17Parser implements JavaParser {
                         }
                     }
                     // make sure the rewrite-java-lombok dependency comes first
+                    boolean found = false;
                     for (int i = 0; i < overrideClasspath.size(); i++) {
                         if (overrideClasspath.get(i).contains("rewrite-java-lombok")) {
                             overrideClasspath.add(0, overrideClasspath.remove(i));
+                            found = true;
                         }
+                    }
+                    if (!found) {
+                        throw new IllegalStateException("Unable to enable lombok annotation processing, rewrite-java-lombok not found in classpath");
                     }
                     System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
                 }
 
-                Processor lombokProcessor = (Processor) lombokProcessorConstructor.newInstance();
+                Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, getClass().getClassLoader());
+                Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
+                        Class.forName("java.lang.ClassLoader"),
+                        Class.forName("java.lang.String"),
+                        Class.forName("java.lang.String"),
+                        Class.forName("java.util.List"),
+                        Class.forName("java.util.List"));
+                shadowLoaderConstructor.setAccessible(true);
+
+                ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
+                        getClass().getClassLoader(),
+                        "lombok",
+                        null,
+                        emptyList(),
+                        Collections.singletonList("lombok.patcher.Symbols")
+                );
+                Processor lombokProcessor = (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
                 annotationProcessors = Collections.singletonList(lombokProcessor);
                 Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
             } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException |

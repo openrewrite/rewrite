@@ -17,25 +17,25 @@ package org.openrewrite.java.lombok;
 
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
-import lombok.Getter;
+import lombok.Setter;
 import lombok.core.AnnotationValues;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
-import lombok.javac.handlers.HandleGetter;
+import lombok.javac.handlers.HandleSetter;
 import lombok.javac.handlers.JavacHandlerUtil;
 
-public class GetterHandler extends JavacAnnotationHandler<Getter> {
+public class SetterHandler extends JavacAnnotationHandler<Setter> {
     @Override
-    public void handle(AnnotationValues<Getter> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
+    public void handle(AnnotationValues<Setter> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
         // "lazy" or "onMethod" can significantly complicate the resulting AST
         // Simplify the AST -> LST translation omitting these arguments from consideration
         if(jcAnnotation.getArguments().isEmpty()) {
-            new HandleGetter().handle(annotationValues, jcAnnotation, javacNode);
+            new HandleSetter().handle(annotationValues, jcAnnotation, javacNode);
         } else {
             List<JCTree.JCExpression> originalArgs = jcAnnotation.args;
             jcAnnotation.args = List.nil();
-            AnnotationValues<Getter> annotation = JavacHandlerUtil.createAnnotation(Getter.class, jcAnnotation, javacNode);
-            new HandleGetter().handle(annotation, jcAnnotation, javacNode);
+            AnnotationValues<Setter> annotation = JavacHandlerUtil.createAnnotation(Setter.class, jcAnnotation, javacNode);
+            new HandleSetter().handle(annotation, jcAnnotation, javacNode);
             jcAnnotation.args = originalArgs;
         }
     }
