@@ -152,48 +152,47 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                     .sorted(comparingInt(String::length).reversed())
                     .collect(toList());
 
-            IgnoreNode.MatchResult isIgnored;
             for (String impactingFile : impactingFiles) {
                 IgnoreNode ignoreNode = rules.get(impactingFile);
                 String nestedPath = normalizedPath.substring(impactingFile.length() - 1);
-                isIgnored = isIgnored(ignoreNode, nestedPath);
-                if (CHECK_PARENT == isIgnored) {
-                    continue;
-                }
-                if (IGNORED == isIgnored) {
+
+                boolean escapeLoop = false;
+                while (IGNORED == isIgnored(ignoreNode, nestedPath) && !escapeLoop) {
                     LinkedHashSet<FastIgnoreRule> remainingRules = new LinkedHashSet<>();
-                    boolean negated = false;
                     for (int i = ignoreNode.getRules().size() - 1; i > -1; i--) {
                         FastIgnoreRule rule = ignoreNode.getRules().get(i);
-                        if (!isMatch(rule, nestedPath)) {
+                        if (!isMatch(rule, nestedPath) || !rule.getResult()) {
                             // If this rule has nothing to do with the path to remove, we keep it.
+                            // OR if this rule is a negation, we keep it.
                             remainingRules.add(rule);
                             continue;
                         } else if (rule.toString().equals(nestedPath)) {
                             // If this rule is an exact match to the path to remove, we remove it.
                             continue;
-                        } else if (rule.toString().equals("!" + nestedPath)) {
-                            // If we've already negated the path, we remove this negated occurance. Probably the initial order was wrong.
-                            if (!negated) {
-                                remainingRules.add(rule);
-                                negated = true;
-                            }
-                            continue;
                         } else if (isMatch(rule, nestedPath)) {
                             StringBuilder rulePath = new StringBuilder(rule.toString());
-                            if (rulePath.toString().contains("*") || ("/" + rule).equals(nestedPath)) {
-                                if (!negated) {
-                                    remainingRules.add(new FastIgnoreRule("!" + nestedPath));
-                                    negated = true;
-                                }
+                            if (rulePath.toString().contains("*")) {
+                                remainingRules.addAll(getWildcardRules(rule, rulePath, nestedPath));
+                            }
+                            if (rulePath.toString().indexOf("*") != -1 && rulePath.toString().indexOf("*") != rulePath.length() - 1) {
+                                //Only a single wildcard at the end is supported for now.
+                                remainingRules.add(rule);
+                                escapeLoop = true;
+                                continue;
+                            }
+                            // Double wildcard best effort
+                            if (rulePath.toString().replaceAll("[^*]", "").length() == 2 &&) {
+                                remainingRules.add(new FastIgnoreRule("!" + nestedPath));
+                                remainingRules.add(rule);
+                                continue;
+                            }
+                            if (("/" + rule).equals(nestedPath)) {
+                                remainingRules.add(new FastIgnoreRule("!" + nestedPath));
                                 remainingRules.add(rule);
                                 continue;
                             }
                             if (!rule.dirOnly()) {
-                                if (!negated) {
-                                    remainingRules.add(new FastIgnoreRule("!" + normalizedPath));
-                                    negated = true;
-                                }
+                                remainingRules.add(new FastIgnoreRule("!" + normalizedPath));
                                 remainingRules.add(rule);
                                 continue;
                             }
@@ -214,7 +213,6 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                             }
                             Collections.reverse(traversedRemainingRules);
                             remainingRules.addAll(traversedRemainingRules);
-                            negated = true;
                             continue;
                         }
                         // If we still have the rule, we keep it. --> not making changes to an unknown flow.
@@ -222,11 +220,12 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                     }
                     ArrayList<FastIgnoreRule> ignoreRules = new ArrayList<>(remainingRules);
                     Collections.reverse(ignoreRules);
-                    IgnoreNode replacedNode = new IgnoreNode(ignoreRules);
-                    rules.put(impactingFile, replacedNode);
-                    if (CHECK_PARENT == isIgnored(replacedNode, nestedPath)) {
-                        continue;
-                    }
+                    ignoreNode = new IgnoreNode(ignoreRules);
+                }
+                rules.put(impactingFile, ignoreNode);
+
+                if (CHECK_PARENT == isIgnored(ignoreNode, nestedPath)) {
+                    continue;
                 }
                 // There is already an ignore rule for the path, so not needed to check parent rules.
                 break;
