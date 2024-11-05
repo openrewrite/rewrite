@@ -146,7 +146,7 @@ public class ChangePackage extends Recipe {
                             matches.add(ref);
                         }
                     }
-                    return new TypeReferenceVisitor(matches, oldPackageName, newPackageName).visit(tree, ctx);
+                    return new TypeReferenceChangePackageVisitor(matches, oldPackageName, newPackageName).visit(tree, ctx);
                 }
                 return tree;
             }
@@ -385,7 +385,7 @@ public class ChangePackage extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class TypeReferenceVisitor extends TreeVisitor<Tree, ExecutionContext> {
+    private static class TypeReferenceChangePackageVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Set<TypeReference> matches;
         String oldPackageName;
         String newPackageName;
@@ -394,7 +394,7 @@ public class ChangePackage extends Recipe {
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
             Tree tree1 = super.visit(tree, ctx);
             for (TypeReference ref : matches) {
-                if (ref.getTree().equals(tree)) {
+                if (ref.getTree().equals(tree) && ref.supportsRename()) {
                     return ref.renameTo(ref.getName().replace(oldPackageName, newPackageName)).visit(tree, ctx);
                 }
             }
