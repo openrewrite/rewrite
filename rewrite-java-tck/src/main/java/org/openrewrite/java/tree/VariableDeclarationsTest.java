@@ -26,6 +26,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
+@SuppressWarnings("UnnecessaryLocalVariable")
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
@@ -35,7 +36,7 @@ class VariableDeclarationsTest implements RewriteTest {
             """
               import java.util.Collections;
               import java.util.ArrayList;
-                            
+              
               class Test {
                   void test() {
                       ArrayList<String> categories = new ArrayList<>();
@@ -114,7 +115,7 @@ class VariableDeclarationsTest implements RewriteTest {
                   int [ ] n2;
                   String [ ] [ ] s2;
               }
-               """
+              """
           )
         );
     }

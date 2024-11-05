@@ -18,6 +18,7 @@ rewrite-test
 # language parser.
 
 rewrite-java
+rewrite-java-lombok
 rewrite-java-test
 rewrite-java-tck
 rewrite-java-17
