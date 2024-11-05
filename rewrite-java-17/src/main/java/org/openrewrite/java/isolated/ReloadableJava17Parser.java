@@ -63,6 +63,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -114,6 +115,7 @@ public class ReloadableJava17Parser implements JavaParser {
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
 
+        LOMBOK:
         if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
@@ -134,7 +136,8 @@ public class ReloadableJava17Parser implements JavaParser {
                         }
                     }
                     if (!found) {
-                        throw new IllegalStateException("Unable to enable lombok annotation processing, rewrite-java-lombok not found in classpath");
+                        annotationProcessors = emptyList();
+                        break LOMBOK;
                     }
                     System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
                 }
@@ -153,10 +156,10 @@ public class ReloadableJava17Parser implements JavaParser {
                         "lombok",
                         null,
                         emptyList(),
-                        Collections.singletonList("lombok.patcher.Symbols")
+                        singletonList("lombok.patcher.Symbols")
                 );
                 Processor lombokProcessor = (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
-                annotationProcessors = Collections.singletonList(lombokProcessor);
+                annotationProcessors = singletonList(lombokProcessor);
                 Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
             } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException |
                      InvocationTargetException e) {
