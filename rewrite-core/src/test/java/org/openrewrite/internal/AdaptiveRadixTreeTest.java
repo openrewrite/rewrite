@@ -34,6 +34,16 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
+    public void fullInternaNode() {
+        AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
+        tree.insert("cat", 1);
+        tree.insert("child", 1);
+        tree.insert("circle", 1);
+        tree.insert("cod", 1);
+        tree.insert("cute", 1);
+    }
+
+    @Test
     public void copy() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("cat", 1);
@@ -281,7 +291,7 @@ public class AdaptiveRadixTreeTest {
     @Test
     public void insertAndSearch_NullKey() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
-        assertThatThrownBy(() -> tree.insert(null, 1))
+        assertThatThrownBy(() -> tree.insert((String) null, 1))
           .isInstanceOf(NullPointerException.class);
     }
 
