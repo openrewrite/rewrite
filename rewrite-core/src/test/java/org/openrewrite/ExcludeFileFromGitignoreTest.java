@@ -382,9 +382,9 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               """,
             """
               test.yml
-              !/nested/test.yml
               otherfile.yml
               nested/test.yml
+              !/nested/test.yml
               """,
             spec -> spec.path(".gitignore")
           )
@@ -414,6 +414,43 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               # comment 3
               end-of-file/file.yml
               !/end-of-file/file.yml
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void wrongExactNegationPositionedBeforeIgnoreMovesToCorrectPosition() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/test.yml"))),
+          text(
+            """
+              !/directory/test.yml
+              /directory/*
+              """,
+            """
+              /directory/*
+              !/directory/test.yml
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void wrongNonExactNegationPositionedBeforeIgnoreDoesNotGetChanged() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/test.yml"))),
+          text(
+            """
+              !directory/test.yml
+              /directory/*
+              """,
+            """
+              !directory/test.yml
+              /directory/*
+              !/directory/test.yml
               """,
             spec -> spec.path(".gitignore")
           )
