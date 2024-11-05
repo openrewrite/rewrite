@@ -84,14 +84,14 @@ public class ChangeType extends Recipe {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    JavaSourceFile cu = (JavaSourceFile) tree;
                     if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
                 if (tree instanceof SourceFileWithTypeReferences) {
-                    SourceFileWithTypeReferences cu = (SourceFileWithTypeReferences) requireNonNull(tree);
+                    SourceFileWithTypeReferences cu = (SourceFileWithTypeReferences) tree;
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
                 return tree;

@@ -90,7 +90,7 @@ public class ChangePackage extends Recipe {
             @Override
             public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    JavaSourceFile cu = (JavaSourceFile) tree;
                     if (cu.getPackageDeclaration() != null) {
                         String original = cu.getPackageDeclaration().getExpression()
                                 .printTrimmed(getCursor()).replaceAll("\\s", "");
@@ -117,12 +117,15 @@ public class ChangePackage extends Recipe {
                     stopAfterPreVisit();
                 }
                 if (tree instanceof SourceFileWithTypeReferences) {
-                    SourceFileWithTypeReferences cu = (SourceFileWithTypeReferences) requireNonNull(tree);
+                    SourceFileWithTypeReferences cu = (SourceFileWithTypeReferences) tree;
+                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
+                    String recursivePackageNamePrefix = oldPackageName + ".";
                     for (TypeReference ref : cu.getTypeReferences().getTypeReferences()) {
-                        if (ref.getName().startsWith(oldPackageName)) {
+                        if (ref.getName().equals(oldPackageName) || recursive && ref.getName().startsWith(recursivePackageNamePrefix)) {
                             return SearchResult.found(cu);
                         }
                     }
+                    stopAfterPreVisit();
                 }
                 return super.preVisit(tree, ctx);
             }
