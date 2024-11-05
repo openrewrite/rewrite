@@ -121,7 +121,21 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                     }
                     resultsIndexCurrentlyAt++;
                 }
-                return results;
+
+                return distinctValuesStartingReversed(results);
+            }
+
+            private <T> List<T> distinctValuesStartingReversed(List<T> list) {
+                Set<T> set = new LinkedHashSet<>();
+                ListIterator<T> iterator = list.listIterator(list.size());
+
+                while (iterator.hasPrevious()) {
+                    set.add(iterator.previous());
+                }
+
+                List<T> result = new ArrayList<>(set);
+                Collections.reverse(result);
+                return result;
             }
         });
     }
@@ -148,24 +162,39 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 }
                 if (IGNORED == isIgnored) {
                     LinkedHashSet<FastIgnoreRule> remainingRules = new LinkedHashSet<>();
-                    for (FastIgnoreRule rule : ignoreNode.getRules()) {
-                        if (!rule.getResult() || !isMatch(rule, nestedPath)) {
-                            // If this rule has nothing to do with the path to remove / it is a negated rule, we keep it.
+                    boolean negated = false;
+                    for (int i = ignoreNode.getRules().size() - 1; i > -1; i--) {
+                        FastIgnoreRule rule = ignoreNode.getRules().get(i);
+                        if (!isMatch(rule, nestedPath)) {
+                            // If this rule has nothing to do with the path to remove, we keep it.
                             remainingRules.add(rule);
                             continue;
                         } else if (rule.toString().equals(nestedPath)) {
                             // If this rule is an exact match to the path to remove, we remove it.
                             continue;
+                        } else if (rule.toString().equals("!" + nestedPath)) {
+                            // If we've already negated the path, we remove this negated occurance. Probably the initial order was wrong.
+                            if (!negated) {
+                                remainingRules.add(rule);
+                                negated = true;
+                            }
+                            continue;
                         } else if (isMatch(rule, nestedPath)) {
                             StringBuilder rulePath = new StringBuilder(rule.toString());
                             if (rulePath.toString().contains("*") || ("/" + rule).equals(nestedPath)) {
+                                if (!negated) {
+                                    remainingRules.add(new FastIgnoreRule("!" + nestedPath));
+                                    negated = true;
+                                }
                                 remainingRules.add(rule);
-                                remainingRules.add(new FastIgnoreRule("!" + nestedPath));
                                 continue;
                             }
                             if (!rule.dirOnly()) {
+                                if (!negated) {
+                                    remainingRules.add(new FastIgnoreRule("!" + normalizedPath));
+                                    negated = true;
+                                }
                                 remainingRules.add(rule);
-                                remainingRules.add(new FastIgnoreRule("!" + normalizedPath));
                                 continue;
                             }
                             String pathToTraverse = nestedPath.substring(rule.toString().length());
@@ -175,19 +204,25 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                             String pathToSplit = pathToTraverse.startsWith("/") ? pathToTraverse.substring(1) : pathToTraverse;
                             pathToSplit = pathToSplit.endsWith("/") ? pathToSplit.substring(0, pathToSplit.length() - 1) : pathToSplit;
                             String[] splitPath = pathToSplit.split("/");
-                            for (int i = 0; i < splitPath.length; i++) {
-                                String s = splitPath[i];
-                                remainingRules.add(new FastIgnoreRule(rulePath + "*"));
+                            ArrayList<FastIgnoreRule> traversedRemainingRules = new ArrayList<>();
+                            for (int j = 0; j < splitPath.length; j++) {
+                                String s = splitPath[j];
+                                traversedRemainingRules.add(new FastIgnoreRule(rulePath + "*"));
                                 rulePath.append(s);
-                                remainingRules.add(new FastIgnoreRule("!" + rulePath + (i < splitPath.length - 1 || nestedPath.endsWith("/") ? "/" : "")));
+                                traversedRemainingRules.add(new FastIgnoreRule("!" + rulePath + (j < splitPath.length - 1 || nestedPath.endsWith("/") ? "/" : "")));
                                 rulePath.append("/");
                             }
+                            Collections.reverse(traversedRemainingRules);
+                            remainingRules.addAll(traversedRemainingRules);
+                            negated = true;
                             continue;
                         }
                         // If we still have the rule, we keep it. --> not making changes to an unknown flow.
                         remainingRules.add(rule);
                     }
-                    IgnoreNode replacedNode = new IgnoreNode(new ArrayList<>(remainingRules));
+                    ArrayList<FastIgnoreRule> ignoreRules = new ArrayList<>(remainingRules);
+                    Collections.reverse(ignoreRules);
+                    IgnoreNode replacedNode = new IgnoreNode(ignoreRules);
                     rules.put(impactingFile, replacedNode);
                     if (CHECK_PARENT == isIgnored(replacedNode, nestedPath)) {
                         continue;
@@ -220,18 +255,17 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
         }
 
         private IgnoreNode.MatchResult isIgnored(IgnoreNode ignoreNode, String path) {
-            IgnoreNode.MatchResult isIgnored = CHECK_PARENT;
             for (int i = ignoreNode.getRules().size() - 1; i > -1; i--) {
                 FastIgnoreRule rule = ignoreNode.getRules().get(i);
                 if (isMatch(rule, path)) {
                     if (rule.getResult()) {
-                        isIgnored = IGNORED;
+                        return IGNORED;
                     } else {
                         return NOT_IGNORED;
                     }
                 }
             }
-            return isIgnored;
+            return CHECK_PARENT;
         }
     }
 }
