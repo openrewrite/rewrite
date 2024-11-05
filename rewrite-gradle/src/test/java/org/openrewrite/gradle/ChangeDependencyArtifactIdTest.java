@@ -195,7 +195,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
           )
         );
     }
-    
+
     @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void worksWithClassifier(String group, String artifact) {

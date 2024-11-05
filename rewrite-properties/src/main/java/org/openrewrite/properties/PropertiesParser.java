@@ -195,7 +195,7 @@ public class PropertiesParser implements Parser {
                 equalsPrefix = new StringBuilder(),
                 valuePrefix = new StringBuilder(),
                 value = new StringBuilder();
-        
+
         Properties.Entry.Delimiter delimiter = Properties.Entry.Delimiter.NONE;
         char prev = '$';
         State state = State.WHITESPACE_BEFORE_KEY;

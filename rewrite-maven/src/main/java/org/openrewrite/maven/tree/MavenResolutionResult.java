@@ -210,7 +210,7 @@ public class MavenResolutionResult implements Marker {
     }
 
     public boolean isMultiModulePom() {
-        return !getPom().getSubprojects().isEmpty();
+        return getPom().getSubprojects() == null || !getPom().getSubprojects().isEmpty();
     }
 
     private Map<Path, Pom> getProjectPomsRecursive(Map<Path, Pom> projectPoms) {

@@ -4823,7 +4823,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.util.List;
-              @Deprecated("version" /* some comment */)
+              @Deprecated(since = "version" /* some comment */)
               class Test {
                   void foo() {
                       List.of( // another comment

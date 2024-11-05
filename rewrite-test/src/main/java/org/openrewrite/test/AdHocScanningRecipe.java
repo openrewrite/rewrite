@@ -90,7 +90,7 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
     }
 
     @Override
-    public Void getInitialValue(ExecutionContext ctx) {
+    public @Nullable Void getInitialValue(ExecutionContext ctx) {
         return null;
     }
 

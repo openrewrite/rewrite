@@ -233,7 +233,7 @@ public class Space {
     }
 
     @SuppressWarnings("ConstantConditions")
-    public static <J2 extends J> List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,
+    public static <J2 extends J> @Nullable List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,
                                                                          Space suffix) {
         if (trees == null) {
             return null;

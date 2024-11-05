@@ -118,8 +118,9 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
         Path dest = Paths.get(destinationPath);
 
         return Preconditions.check(acc.toMove != null, new HclIsoVisitor<ExecutionContext>() {
+
             @Override
-            public BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
+            public @Nullable BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
                 BodyContent b = super.visitBodyContent(bodyContent, ctx);
                 Path sourcePath = getCursor().firstEnclosingOrThrow(Hcl.ConfigFile.class).getSourcePath();
                 if (sourcePath.equals(from) && pathMatcher.matches(getCursor())) {
