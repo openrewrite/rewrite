@@ -24,6 +24,7 @@ import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.trait.TypeReference;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -89,14 +90,36 @@ public class ChangeType extends Recipe {
                     }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
+                if (tree instanceof SourceFileWithTypeReferences) {
+                    SourceFileWithTypeReferences cu = (SourceFileWithTypeReferences) requireNonNull(tree);
+                    return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
+                }
                 return tree;
             }
         };
 
-        return Preconditions.check(condition, new ChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition));
+        return Preconditions.check(condition, new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+                return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithTypeReferences;
+            }
+
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx);
+                } else if (tree instanceof SourceFileWithTypeReferences) {
+                    SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
+                    SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
+                    TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
+                    Set<TypeReference> matches = new HashSet<>(typeReferences.findMatches(matcher));
+                    return new TypeReferenceVisitor(matches, newFullyQualifiedTypeName).visit(tree, ctx);
+                }
+                return tree;
+            }
+        });
     }
 
-    private static class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
+    private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
 
@@ -109,7 +132,7 @@ public class ChangeType extends Recipe {
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
 
-        private ChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
+        private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
             this.ignoreDefinition = ignoreDefinition;
@@ -527,6 +550,24 @@ public class ChangeType extends Recipe {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class TypeReferenceVisitor extends TreeVisitor<Tree, ExecutionContext> {
+        Set<TypeReference> matches;
+        String newFullyQualifiedName;
+
+        @Override
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            Tree tree1 = super.visit(tree, ctx);
+            for (TypeReference ref : matches) {
+                if (ref.getTree().equals(tree)) {
+                    return ref.renameTo(newFullyQualifiedName).visit(tree, ctx);
+                }
+            }
+            return tree1;
+        }
+    }
+
     private static class ChangeClassDefinition extends JavaIsoVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType.Class targetType;
@@ -579,7 +620,7 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public  J.@Nullable Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+        public J.@Nullable Package visitPackage(J.Package pkg, ExecutionContext ctx) {
             Boolean updatePackage = getCursor().pollNearestMessage("UPDATE_PACKAGE");
             if (updatePackage != null && updatePackage) {
                 String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");

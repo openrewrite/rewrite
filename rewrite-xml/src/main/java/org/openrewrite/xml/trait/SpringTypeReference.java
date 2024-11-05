@@ -17,9 +17,7 @@ package org.openrewrite.xml.trait;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.TypeReference;
 import org.openrewrite.xml.XPathMatcher;
@@ -50,6 +48,27 @@ class SpringTypeReference implements TypeReference {
             }
         }
         throw new IllegalArgumentException("getTree() must be an Xml.Attribute or Xml.Tag: " + getTree().getClass());
+    }
+
+    @Override
+    public boolean supportsRename() {
+        return true;
+    }
+
+    @Override
+    public TreeVisitor<Tree, ExecutionContext> renameTo(String name) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                if (tree instanceof Xml.Attribute) {
+                    return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(name));
+                }
+                if (tree instanceof Xml.Tag) {
+                    return ((Xml.Tag) tree).withValue(name);
+                }
+                return super.visit(tree, executionContext);
+            }
+        };
     }
 
     static class Matcher extends SimpleTraitMatcher<SpringTypeReference> {

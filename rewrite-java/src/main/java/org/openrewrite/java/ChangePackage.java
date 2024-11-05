@@ -23,10 +23,13 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.trait.TypeReference;
 
 import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -83,9 +86,9 @@ public class ChangePackage extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable J preVisit(J tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
                     if (cu.getPackageDeclaration() != null) {
@@ -113,14 +116,44 @@ public class ChangePackage extends Recipe {
                     }
                     stopAfterPreVisit();
                 }
+                if (tree instanceof SourceFileWithTypeReferences) {
+                    SourceFileWithTypeReferences cu = (SourceFileWithTypeReferences) requireNonNull(tree);
+                    for (TypeReference ref : cu.getTypeReferences().getTypeReferences()) {
+                        if (ref.getName().startsWith(oldPackageName)) {
+                            return SearchResult.found(cu);
+                        }
+                    }
+                }
                 return super.preVisit(tree, ctx);
             }
         };
 
-        return Preconditions.check(condition, new ChangePackageVisitor());
+        return Preconditions.check(condition, new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+                return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithTypeReferences;
+            }
+
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    return new JavaChangePackageVisitor().visit(tree, ctx);
+                } else if (tree instanceof SourceFileWithTypeReferences) {
+                    SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
+                    SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
+                    Set<TypeReference> matches = new HashSet<>();
+                    for (TypeReference ref : typeReferences.getTypeReferences()) {
+                        if (ref.getName().startsWith(oldPackageName)) {
+                            matches.add(ref);
+                        }
+                    }
+                    return new TypeReferenceVisitor(matches, oldPackageName, newPackageName).visit(tree, ctx);
+                }
+                return tree;
+            }
+        });
     }
 
-    private class ChangePackageVisitor extends JavaVisitor<ExecutionContext> {
+    private class JavaChangePackageVisitor extends JavaVisitor<ExecutionContext> {
         private static final String RENAME_TO_KEY = "renameTo";
         private static final String RENAME_FROM_KEY = "renameFrom";
 
@@ -349,4 +382,24 @@ public class ChangePackage extends Recipe {
         }
 
     }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class TypeReferenceVisitor extends TreeVisitor<Tree, ExecutionContext> {
+        Set<TypeReference> matches;
+        String oldPackageName;
+        String newPackageName;
+
+        @Override
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            Tree tree1 = super.visit(tree, ctx);
+            for (TypeReference ref : matches) {
+                if (ref.getTree().equals(tree)) {
+                    return ref.renameTo(ref.getName().replace(oldPackageName, newPackageName)).visit(tree, ctx);
+                }
+            }
+            return tree1;
+        }
+    }
+
 }

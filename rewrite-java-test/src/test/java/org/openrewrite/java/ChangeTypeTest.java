@@ -29,6 +29,7 @@ import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.xml.Assertions.xml;
 
 @SuppressWarnings("ConstantConditions")
 class ChangeTypeTest implements RewriteTest {
@@ -1981,27 +1982,27 @@ class ChangeTypeTest implements RewriteTest {
             true)),
           java(
             """
-            package org.a;
-
-            public class A {
-              public static String A = "A";
-            }
-            """),
+              package org.a;
+              
+              public class A {
+                public static String A = "A";
+              }
+              """),
           java(
             """
-            package org.ab;
-
-            public class AB {
-              public static String A = "A";
-              public static String B = "B";
-            }
-            """),
+              package org.ab;
+              
+              public class AB {
+                public static String A = "A";
+                public static String B = "B";
+              }
+              """),
           // language=java
           java(
             """
               import org.a.A;
               import org.ab.AB;
-
+              
               class Letters {
                 String a = A.A;
                 String b = AB.B;
@@ -2009,7 +2010,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import org.ab.AB;
-
+              
               class Letters {
                 String a = AB.A;
                 String b = AB.B;
@@ -2017,6 +2018,28 @@ class ChangeTypeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void changeTypeInSpringXml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("test.type.A", "test.type.B", true)),
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="abc" class="test.type.A"/>
+              </beans>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="abc" class="test.type.B"/>
+              </beans>
+              """
+          )
+        );
+
     }
 
 }
