@@ -680,7 +680,7 @@ class LombokTest implements RewriteTest {
         @Test
         void extensionMethod() {
             rewriteRun(
-//              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              spec -> spec.typeValidationOptions(TypeValidation.none()),
               java(
                 """
                   import lombok.experimental.ExtensionMethod;
