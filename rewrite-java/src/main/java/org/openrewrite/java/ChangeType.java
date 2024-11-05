@@ -79,9 +79,9 @@ public class ChangeType extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
                     if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
@@ -89,7 +89,7 @@ public class ChangeType extends Recipe {
                     }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
-                return (J) tree;
+                return tree;
             }
         };
 
@@ -573,7 +573,7 @@ public class ChangeType extends Recipe {
 
         private boolean updatePath(JavaSourceFile sf, String oldPath, String newPath) {
             return !oldPath.equals(newPath) && sf.getClasses().stream()
-                    .anyMatch(o -> !J.Modifier.hasModifier(o.getModifiers(), J.Modifier.Type.Private) &&
+                    .anyMatch(o -> !o.hasModifier(J.Modifier.Type.Private) &&
                                    o.getType() != null && !o.getType().getFullyQualifiedName().contains("$") &&
                                    TypeUtils.isOfClassType(o.getType(), getTopLevelClassName(originalType).getFullyQualifiedName()));
         }

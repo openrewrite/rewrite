@@ -26,13 +26,14 @@ import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.trait.TypeReference;
 
 import java.util.regex.Pattern;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 @Getter
-public class TypeMatcher {
+public class TypeMatcher implements TypeReference.Matcher {
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
 
     @SuppressWarnings("NotNullFieldNotInitialized")
@@ -54,7 +55,7 @@ public class TypeMatcher {
         this(fieldType, false);
     }
 
-    public @Nullable TypeMatcher(@Nullable String fieldType, boolean matchInherited) {
+    public TypeMatcher(@Nullable String fieldType, boolean matchInherited) {
         this.signature = fieldType == null ? ".*" : fieldType;
         this.matchInherited = matchInherited;
 
@@ -108,5 +109,10 @@ public class TypeMatcher {
                context.OR() == null &&
                context.classNameOrInterface().DOTDOT().isEmpty() &&
                context.classNameOrInterface().WILDCARD().isEmpty();
+    }
+
+    @Override
+    public boolean matchesName(String name) {
+        return matchesTargetTypeName(name);
     }
 }

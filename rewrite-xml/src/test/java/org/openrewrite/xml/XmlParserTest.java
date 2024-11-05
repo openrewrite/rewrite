@@ -119,6 +119,34 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void javaTypeReferenceDocument() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xmlns="http://www.springframework.org/schema/beans"
+                  xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+                <bean id="testBean" class="org.springframework.beans.TestBean" scope="prototype">
+                  <property name="age" value="10"/>
+                  <property name="sibling">
+                      <bean class="org.springframework.beans.TestBean">
+                          <property name="age" value="11" class="java.lang.Integer"/>
+                          <property name="someName">
+                              <value>java.lang.String</value>
+                          </property>
+                      </bean>
+                  </property>
+                </bean>
+              </beans>
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                assertThat(doc.getTypeReferences().getTypeReferences().stream().anyMatch(typeRef -> typeRef.getName().equals("java.lang.String")));
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2290")
     @Test
     void cdataTagWhitespace() {
