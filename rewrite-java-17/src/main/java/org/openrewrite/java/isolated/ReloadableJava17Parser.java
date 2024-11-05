@@ -54,6 +54,7 @@ import javax.tools.StandardLocation;
 import java.io.*;
 import java.lang.reflect.Constructor;
 import java.net.URI;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
@@ -119,27 +120,31 @@ public class ReloadableJava17Parser implements JavaParser {
             Processor lombokProcessor = null;
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
-                String systemClasspath = System.getProperty("java.class.path");
-                if (systemClasspath != null && !systemClasspath.isEmpty()) {
-                    List<String> overrideClasspath = new ArrayList<>();
-                    for (String part : systemClasspath.split("\\s*" + (File.pathSeparatorChar == ';' ? ";" : ":") + "\\s*")) {
-                        if (part.contains("lombok")) {
-                            overrideClasspath.add(part);
-                        }
+                List<String> overrideClasspath = new ArrayList<>();
+                for (Path part : classpath) {
+                    if (part.toString().contains("lombok")) {
+                        overrideClasspath.add(part.toString());
                     }
-                    // make sure the rewrite-java-lombok dependency comes first
-                    boolean found = false;
-                    for (int i = 0; i < overrideClasspath.size(); i++) {
-                        if (overrideClasspath.get(i).contains("rewrite-java-lombok")) {
-                            overrideClasspath.add(0, overrideClasspath.remove(i));
-                            found = true;
-                        }
+                }
+                // make sure the rewrite-java-lombok dependency comes first
+                boolean found = false;
+                for (int i = 0; i < overrideClasspath.size(); i++) {
+                    if (overrideClasspath.get(i).contains("rewrite-java-lombok")) {
+                        overrideClasspath.add(0, overrideClasspath.remove(i));
+                        found = true;
                     }
-                    if (!found) {
+                }
+                if (!found) {
+                    // try to find `rewrite-java-lombok` using class loader
+                    URL resource = getClass().getClassLoader().getResource("org/openrewrite/java/lombok/OpenRewriteConfigurationKeysLoader.class");
+                    if (resource != null && resource.getProtocol().equals("jar") && resource.getPath().startsWith("file:")) {
+                        String path = resource.getPath().substring(5, resource.getPath().indexOf("!"));
+                        overrideClasspath.add(0, path);
+                    } else {
                         break LOMBOK;
                     }
-                    System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
                 }
+                System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
 
                 Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, getClass().getClassLoader());
                 Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
