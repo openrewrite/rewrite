@@ -82,7 +82,7 @@ public class ChangeType extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
                     if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
@@ -105,7 +105,7 @@ public class ChangeType extends Recipe {
             }
 
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx);
                 } else if (tree instanceof SourceFileWithTypeReferences) {
@@ -113,7 +113,7 @@ public class ChangeType extends Recipe {
                     SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
                     TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
                     Set<TypeReference> matches = new HashSet<>(typeReferences.findMatches(matcher));
-                    return new TypeReferenceChangeTypeVisitor(matches, newFullyQualifiedTypeName).visit(tree, ctx);
+                    return new TypeReferenceChangeTypeVisitor(matches, newFullyQualifiedTypeName).visit(tree, ctx, getCursor().getParent());
                 }
                 return tree;
             }
@@ -558,11 +558,11 @@ public class ChangeType extends Recipe {
         String newFullyQualifiedName;
 
         @Override
-        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
             Tree tree1 = super.visit(tree, ctx);
             for (TypeReference ref : matches) {
                 if (ref.getTree().equals(tree) && ref.supportsRename()) {
-                    return ref.renameTo(newFullyQualifiedName).visit(tree, ctx);
+                    return ref.renameTo(newFullyQualifiedName).visit(tree, ctx, getCursor().getParent());
                 }
             }
             return tree1;

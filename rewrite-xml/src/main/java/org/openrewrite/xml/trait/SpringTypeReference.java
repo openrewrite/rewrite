@@ -59,14 +59,14 @@ class SpringTypeReference implements TypeReference {
     public TreeVisitor<Tree, ExecutionContext> renameTo(String name) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof Xml.Attribute) {
                     return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(name));
                 }
                 if (tree instanceof Xml.Tag) {
                     return ((Xml.Tag) tree).withValue(name);
                 }
-                return super.visit(tree, executionContext);
+                return super.visit(tree, ctx);
             }
         };
     }

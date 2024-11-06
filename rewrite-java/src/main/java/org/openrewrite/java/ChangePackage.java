@@ -26,12 +26,9 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.TypeReference;
 
 import java.nio.file.Paths;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.Set;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * A recipe that will rename a package name in package statements, imports, and fully-qualified types (see: NOTE).
@@ -138,19 +135,23 @@ public class ChangePackage extends Recipe {
             }
 
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     return new JavaChangePackageVisitor().visit(tree, ctx);
                 } else if (tree instanceof SourceFileWithTypeReferences) {
                     SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
                     SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
-                    Set<TypeReference> matches = new HashSet<>();
+                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
+                    String recursivePackageNamePrefix = oldPackageName + ".";
+                    Map<Tree, TypeReference> matches = new HashMap<>();
                     for (TypeReference ref : typeReferences.getTypeReferences()) {
-                        if (ref.getName().startsWith(oldPackageName)) {
-                            matches.add(ref);
+                        if (ref.supportsRename()) {
+                            if (ref.getName().equals(oldPackageName) || recursive && ref.getName().startsWith(recursivePackageNamePrefix)) {
+                                matches.put(tree, ref);
+                            }
                         }
                     }
-                    return new TypeReferenceChangePackageVisitor(matches, oldPackageName, newPackageName).visit(tree, ctx);
+                    return new TypeReferenceChangePackageVisitor(matches, oldPackageName, newPackageName).visit(tree, ctx, getCursor().getParent());
                 }
                 return tree;
             }
@@ -390,17 +391,16 @@ public class ChangePackage extends Recipe {
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class TypeReferenceChangePackageVisitor extends TreeVisitor<Tree, ExecutionContext> {
-        Set<TypeReference> matches;
+        Map<Tree, TypeReference> matches;
         String oldPackageName;
         String newPackageName;
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
             Tree tree1 = super.visit(tree, ctx);
-            for (TypeReference ref : matches) {
-                if (ref.getTree().equals(tree) && ref.supportsRename()) {
-                    return ref.renameTo(ref.getName().replace(oldPackageName, newPackageName)).visit(tree, ctx);
-                }
+            TypeReference ref = matches.get(tree);
+            if (ref != null) {
+                return ref.renameTo(ref.getName().replace(oldPackageName, newPackageName)).visit(tree, ctx, getCursor().getParent());
             }
             return tree1;
         }
