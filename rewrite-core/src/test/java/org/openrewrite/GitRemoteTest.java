@@ -31,7 +31,9 @@ public class GitRemoteTest {
     @ParameterizedTest
     @CsvSource(textBlock = """
       https://github.com/org/repo, github.com, org/repo, org, repo
+      https://github.com/1org/repo, github.com, 1org/repo, 1org, repo
       git@github.com:org/repo.git, github.com, org/repo, org, repo
+      git@github.com:1org/1repo.git, github.com, 1org/1repo, 1org, 1repo
       ssh://github.com/org/repo.git, github.com, org/repo, org, repo
       
       https://gitlab.com/group/repo.git, gitlab.com, group/repo, group, repo
@@ -41,6 +43,7 @@ public class GitRemoteTest {
       
       https://bitbucket.org/PRJ/repo, bitbucket.org, PRJ/repo, PRJ, repo
       git@bitbucket.org:PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
+      git@bitbucket.org:1PRJ/repo.git, bitbucket.org, 1PRJ/repo, 1PRJ, repo
       ssh://bitbucket.org/PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
       
       https://org@dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
