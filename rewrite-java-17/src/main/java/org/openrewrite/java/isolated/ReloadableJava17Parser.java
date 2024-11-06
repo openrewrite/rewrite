@@ -57,6 +57,7 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
@@ -138,7 +139,7 @@ public class ReloadableJava17Parser implements JavaParser {
                     // try to find `rewrite-java-lombok` using class loader
                     URL resource = getClass().getClassLoader().getResource("org/openrewrite/java/lombok/OpenRewriteConfigurationKeysLoader.class");
                     if (resource != null && resource.getProtocol().equals("jar") && resource.getPath().startsWith("file:")) {
-                        String path = resource.getPath().substring(5, resource.getPath().indexOf("!"));
+                        String path = Paths.get(URI.create(resource.getPath().substring(0, resource.getPath().indexOf("!")))).toString();
                         overrideClasspath.add(0, path);
                     } else {
                         break LOMBOK;
