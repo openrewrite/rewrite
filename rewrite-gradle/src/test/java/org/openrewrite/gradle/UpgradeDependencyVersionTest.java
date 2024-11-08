@@ -1054,8 +1054,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4655")
     void issue4655() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi())
-            .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.0.1", null)),
           buildGradle(
             """
               plugins {
