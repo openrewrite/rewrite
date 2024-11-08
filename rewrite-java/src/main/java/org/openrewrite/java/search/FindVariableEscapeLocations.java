@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
 
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -112,15 +113,9 @@ public class FindVariableEscapeLocations extends JavaIsoVisitor<ExecutionContext
         Function<? super Tree, Set<J.Identifier>> extractIdentifiers = t -> {
             Set<J.Identifier> identifiers = new HashSet<>();
             if (t instanceof J.Return) {
-                Expression expr = ((J.Return) t).getExpression();
-                if (expr instanceof J.Identifier) {
-                    identifiers.add((J.Identifier) expr);
-                }
+                identifiers.addAll(extractIdentifiers(((J.Return) t).getExpression()));
             } else if (t instanceof J.Assignment) {
-                Expression expr = ((J.Assignment) t).getAssignment();
-                if (expr instanceof J.Identifier) {
-                    identifiers.add((J.Identifier) expr);
-                }
+                identifiers.addAll(extractIdentifiers(((J.Assignment) t).getAssignment()));
             } else if (t instanceof J.NewClass) {
                 identifiers.addAll(findLocalArguments(((J.NewClass) t).getArguments()));
             } else if(t instanceof J.MethodInvocation) {
@@ -141,7 +136,7 @@ public class FindVariableEscapeLocations extends JavaIsoVisitor<ExecutionContext
      * Extracts Set of Identifiers from J.Identifiers and Ternary operators.
      * These two potentially participate in very case but will not lead to escaping themselves.
      */
-    private static Set<J.Identifier> extractIdentifiers(Expression assignment) {
+    private static Set<J.Identifier> extractIdentifiers(@Nullable Expression assignment) {
         Set<J.Identifier> identifiers = new HashSet<>();
         // fast return if already an J.Identifier
         if (assignment instanceof J.Identifier) {
