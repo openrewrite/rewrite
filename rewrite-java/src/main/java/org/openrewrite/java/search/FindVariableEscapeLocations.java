@@ -38,8 +38,7 @@ import java.util.stream.Collectors;
  * In some situation such escaping is wanted, think of getters, but everytime its importent to rethink.
  * Is mutability, synchronization or information hiding a problem here?
  */
-//todo ternary operator support needed
-public class FindVariablesEscapeLocation extends JavaIsoVisitor<ExecutionContext> {
+public class FindVariableEscapeLocations extends JavaIsoVisitor<ExecutionContext> {
 
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
@@ -54,13 +53,15 @@ public class FindVariablesEscapeLocation extends JavaIsoVisitor<ExecutionContext
     public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
         assignment = super.visitAssignment(assignment, executionContext);
 
-        J.Identifier identifier = (J.Identifier) assignment.getVariable();
-        if (isPrimitive(identifier)) {
+        J.Identifier assigmentTarget = (J.Identifier) assignment.getVariable();
+        if (isPrimitive(assigmentTarget)) {
             return assignment;
         }
 
-        boolean targetIsOutsider = isNotLocalVar(identifier);
-        boolean assignedByLocalVar = assignment.getAssignment() instanceof J.Identifier && isLocalVar(((J.Identifier) assignment.getAssignment()));
+        boolean targetIsOutsider = isNotLocalVar(assigmentTarget);
+        boolean assignedByLocalVar = extractIdentifiers(assignment.getAssignment()).stream()
+                .map(FindVariableEscapeLocations::isLocalVar)
+                .reduce(false, Boolean::logicalOr);
         boolean leaksVariable = targetIsOutsider && assignedByLocalVar;
 
         return leaksVariable ? SearchResult.found(assignment) : assignment;
@@ -70,9 +71,16 @@ public class FindVariablesEscapeLocation extends JavaIsoVisitor<ExecutionContext
     public J.Return visitReturn(J.Return _return, ExecutionContext executionContext) {
         _return = super.visitReturn(_return, executionContext);
 
-        boolean returnsLocalVar = _return.getExpression() instanceof J.Identifier
-                                  && !isPrimitive(((J.Identifier) _return.getExpression()))
-                                  && isLocalVar(((J.Identifier) _return.getExpression()));
+        if (_return.getExpression() == null) {
+            return _return;
+        }
+
+        boolean returnsLocalVar = extractIdentifiers(_return.getExpression()).stream()
+                .map(FindVariableEscapeLocations::extractIdentifiers)
+                .flatMap(Collection::stream)
+                .filter(i -> !isPrimitive(i))
+                .map(FindVariableEscapeLocations::isLocalVar)
+                .reduce(false, Boolean::logicalOr);
 
         return returnsLocalVar ? SearchResult.found(_return) : _return;
     }
@@ -90,7 +98,7 @@ public class FindVariablesEscapeLocation extends JavaIsoVisitor<ExecutionContext
      * Finds statements that enable escaping of local variables from the given subtree
      */
     public static Set<J> find(J subtree) {
-        return TreeVisitor.collect(new FindVariablesEscapeLocation(), subtree, new HashSet<>())
+        return TreeVisitor.collect(new FindVariableEscapeLocations(), subtree, new HashSet<>())
                 .stream()
                 .filter(Statement.class::isInstance)
                 .map(Statement.class::cast)
@@ -122,11 +130,35 @@ public class FindVariablesEscapeLocation extends JavaIsoVisitor<ExecutionContext
             return identifiers;
         };
 
-        return TreeVisitor.collect(new FindVariablesEscapeLocation(), subtree, new HashSet<>())
+        return TreeVisitor.collect(new FindVariableEscapeLocations(), subtree, new HashSet<>())
                 .stream()
                 .map(extractIdentifiers)
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());
+    }
+
+    /**
+     * Extracts Set of Identifiers from J.Identifiers and Ternary operators.
+     * These two potentially participate in very case but will not lead to escaping themselves.
+     */
+    private static Set<J.Identifier> extractIdentifiers(Expression assignment) {
+        Set<J.Identifier> identifiers = new HashSet<>();
+        // fast return if already an J.Identifier
+        if (assignment instanceof J.Identifier) {
+            identifiers.add((J.Identifier) assignment);
+        }
+        if (assignment instanceof J.Ternary) {
+            // if ternary we only need to care about direct assigment.
+            // the other possibilities (J.MethodInvocation, J.NewClass) are handled by the visitor itself.
+            if (((J.Ternary) assignment).getFalsePart() instanceof J.Identifier) {
+                identifiers.add((J.Identifier) ((J.Ternary) assignment).getFalsePart());
+            }
+            if (((J.Ternary) assignment).getTruePart() instanceof J.Identifier) {
+                identifiers.add((J.Identifier) ((J.Ternary) assignment).getTruePart());
+            }
+        }
+
+        return identifiers;
     }
 
     private static boolean isLocalVar(J.Identifier identifier) {
@@ -160,10 +192,10 @@ public class FindVariablesEscapeLocation extends JavaIsoVisitor<ExecutionContext
 
     private static List<J.Identifier> findLocalArguments(List<Expression> arguments) {
         return arguments.stream()
-                .filter(J.Identifier.class::isInstance)
-                .map(J.Identifier.class::cast)
-                .filter(FindVariablesEscapeLocation::isNotPrimitive)
-                .filter(FindVariablesEscapeLocation::isLocalVar)
+                .map(FindVariableEscapeLocations::extractIdentifiers)
+                .flatMap(Collection::stream)
+                .filter(FindVariableEscapeLocations::isNotPrimitive)
+                .filter(FindVariableEscapeLocations::isLocalVar)
                 .collect(Collectors.toList());
     }
 }

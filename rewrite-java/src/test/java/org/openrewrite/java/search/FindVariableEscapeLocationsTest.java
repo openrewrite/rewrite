@@ -23,28 +23,30 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class FindVariablesEscapeLocationTest implements RewriteTest {
+public class FindVariableEscapeLocationsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(RewriteTest.toRecipe(FindVariablesEscapeLocation::new));
+        spec.recipe(RewriteTest.toRecipe(FindVariableEscapeLocations::new));
     }
 
     @Nested
     class Escaping {
-        @Test
-        @DocumentExample
-        void viaReturnValue() {
-            rewriteRun(java(
-              """
-                package com.sample;
-                public class Foo{
-                    Object test() {
-                        Object o = new Object();
-                        return o;
+        @Nested
+        class Directly {
+            @Test
+            @DocumentExample
+            void viaReturnValue() {
+                rewriteRun(java(
+                  """
+                    package com.sample;
+                    public class Foo{
+                        Object test() {
+                            Object o = new Object();
+                            return o;
+                        }
                     }
-                }
-                """, """
+                    """, """
                 package com.sample;
                 public class Foo{
                     Object test() {
@@ -53,21 +55,21 @@ public class FindVariablesEscapeLocationTest implements RewriteTest {
                     }
                 }
                 """));
-        }
+            }
 
-        @Test
-        void viaField() {
-            rewriteRun(java(
-              """
-                package com.sample;
-                public class Foo{
-                    Object someField;
-                    void test() {
-                        Object o = new Object();
-                        someField = o;
+            @Test
+            void viaField() {
+                rewriteRun(java(
+                  """
+                    package com.sample;
+                    public class Foo{
+                        Object someField;
+                        void test() {
+                            Object o = new Object();
+                            someField = o;
+                        }
                     }
-                }
-                """, """
+                    """, """
                 package com.sample;
                 public class Foo{
                     Object someField;
@@ -77,20 +79,20 @@ public class FindVariablesEscapeLocationTest implements RewriteTest {
                     }
                 }
                 """));
-        }
+            }
 
-        @Test
-        void viaMethodCall() {
-            rewriteRun(java(
-              """
-                package com.sample;
-                public class Foo{
-                    void test() {
-                        Object o = new Object();
-                        System.out.print(o);
+            @Test
+            void viaMethodCall() {
+                rewriteRun(java(
+                  """
+                    package com.sample;
+                    public class Foo{
+                        void test() {
+                            Object o = new Object();
+                            System.out.print(o);
+                        }
                     }
-                }
-                """, """
+                    """, """
                 package com.sample;
                 public class Foo{
                     void test() {
@@ -99,20 +101,20 @@ public class FindVariablesEscapeLocationTest implements RewriteTest {
                     }
                 }
                 """));
-        }
+            }
 
-        @Test
-        void viaLambdaBody() {
-            rewriteRun(java(
-              """
-                package com.sample;
-                public class Foo{
-                    Runnable test() {
-                        Object o = new Object();
-                        Runnable r = () -> System.out.print(o);
+            @Test
+            void viaLambdaBody() {
+                rewriteRun(java(
+                  """
+                    package com.sample;
+                    public class Foo{
+                        Runnable test() {
+                            Object o = new Object();
+                            Runnable r = () -> System.out.print(o);
+                        }
                     }
-                }
-                """, """
+                    """, """
                 package com.sample;
                 public class Foo{
                     Runnable test() {
@@ -121,20 +123,20 @@ public class FindVariablesEscapeLocationTest implements RewriteTest {
                     }
                 }
                 """));
-        }
+            }
 
-        @Test
-        void viaNew() {
-            rewriteRun(java(
-              """
-                package com.sample;
-                public class Foo{
-                    void test() {
-                        StringBuilder sb = new StringBuilder();
-                        StringBuilder other = new StringBuilder(sb);
+            @Test
+            void viaNew() {
+                rewriteRun(java(
+                  """
+                    package com.sample;
+                    public class Foo{
+                        void test() {
+                            StringBuilder sb = new StringBuilder();
+                            StringBuilder other = new StringBuilder(sb);
+                        }
                     }
-                }
-                """, """
+                    """, """
                 package com.sample;
                 public class Foo{
                     void test() {
@@ -143,6 +145,123 @@ public class FindVariablesEscapeLocationTest implements RewriteTest {
                     }
                 }
                 """));
+            }
+        }
+
+        @Nested
+        class WrappedInTernary {
+            @Test
+            @DocumentExample
+            void viaReturnValue() {
+                rewriteRun(java(
+                  """
+                    package com.sample;
+                    public class Foo{
+                        Object test() {
+                            Object o = new Object();
+                            return o != null ? o : "null";
+                        }
+                    }
+                    """, """
+                package com.sample;
+                public class Foo{
+                    Object test() {
+                        Object o = new Object();
+                        /*~~>*/return o != null ? o : "null";
+                    }
+                }
+                """));
+            }
+
+            @Test
+            void viaField() {
+                rewriteRun(java(
+                  """
+                    package com.sample;
+                    public class Foo{
+                        Object someField;
+                        void test() {
+                            Object o = new Object();
+                            someField = o != null ? o : "null";
+                        }
+                    }
+                    """, """
+                package com.sample;
+                public class Foo{
+                    Object someField;
+                    void test() {
+                        Object o = new Object();
+                        /*~~>*/someField = o != null ? o : "null";
+                    }
+                }
+                """));
+            }
+
+            @Test
+            void viaMethodCall() {
+                rewriteRun(java(
+                  """
+                    package com.sample;
+                    public class Foo{
+                        void test() {
+                            Object o = new Object();
+                            System.out.print(o != null ? o : "null");
+                        }
+                    }
+                    """, """
+                package com.sample;
+                public class Foo{
+                    void test() {
+                        Object o = new Object();
+                        /*~~>*/System.out.print(o != null ? o : "null");
+                    }
+                }
+                """));
+            }
+
+            @Test
+            void viaLambdaBody() {
+                rewriteRun(java(
+                  """
+                    package com.sample;
+                    public class Foo{
+                        Runnable test() {
+                            Object o = new Object();
+                            Runnable r = () -> System.out.print(o != null ? o : "null");
+                        }
+                    }
+                    """, """
+                package com.sample;
+                public class Foo{
+                    Runnable test() {
+                        Object o = new Object();
+                        Runnable r = () -> /*~~>*/System.out.print(o != null ? o : "null");
+                    }
+                }
+                """));
+            }
+
+            @Test
+            void viaNew() {
+                rewriteRun(java(
+                  """
+                    package com.sample;
+                    public class Foo{
+                        void test() {
+                            StringBuilder sb = new StringBuilder();
+                            StringBuilder other = new StringBuilder(sb != null ? sb : new StringBuilder());
+                        }
+                    }
+                    """, """
+                package com.sample;
+                public class Foo{
+                    void test() {
+                        StringBuilder sb = new StringBuilder();
+                        StringBuilder other = /*~~>*/new StringBuilder(sb != null ? sb : new StringBuilder());
+                    }
+                }
+                """));
+            }
         }
     }
 
