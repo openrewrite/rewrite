@@ -262,7 +262,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                         acc.versionPropNameToGA.put(versionVariableName, ga);
                                         acc.gaToNewVersion.put(ga, resolvedVersion);
                                     }
-                                } catch (MavenDownloadingException e) {
+                                } catch (IllegalStateException | MavenDownloadingException e) {
                                     acc.gaToNewVersion.put(ga, e);
                                 }
                             }
