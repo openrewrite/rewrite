@@ -117,12 +117,18 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               # comment
               
               test.yml
+              # Another comment
+              
+              file.yaml
               """,
             """
               # comment
               
               test.yml
               !/directory/test.yml
+              # Another comment
+              
+              file.yaml
               """,
             spec -> spec.path(".gitignore")
           )
@@ -410,7 +416,6 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
           )
         );
     }
-
 
     @Test
     void ignoreWildcardedFile() {
