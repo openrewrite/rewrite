@@ -33,7 +33,7 @@ public class RemoveSettingsPluginManagement extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove Gradle settings pluginManagement";
+        return "Remove Gradle settings `pluginManagement`";
     }
 
     @Override
