@@ -17,16 +17,22 @@ package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 class RemoveSettingsPluginManagementTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new RemoveSettingsPluginManagement());
+    }
+
     @DocumentExample
     @Test
     void existingPluginManagementBlock() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveSettingsPluginManagement()),
           settingsGradle(
             """
               pluginManagement {
@@ -45,7 +51,6 @@ class RemoveSettingsPluginManagementTest implements RewriteTest {
     @Test
     void twoPluginManagementBlocks() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveSettingsPluginManagement()),
           settingsGradle(
             """
               pluginManagement {
@@ -72,7 +77,6 @@ class RemoveSettingsPluginManagementTest implements RewriteTest {
     @Test
     void noPluginManagementBlock() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveSettingsPluginManagement()),
           settingsGradle(
             """
               plugins {
@@ -87,7 +91,6 @@ class RemoveSettingsPluginManagementTest implements RewriteTest {
     @Test
     void emptySettingsFile() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveSettingsPluginManagement()),
           settingsGradle(
             ""
           )
@@ -97,13 +100,12 @@ class RemoveSettingsPluginManagementTest implements RewriteTest {
     @Test
     void emptyPluginManagementBlock() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveSettingsPluginManagement()),
           settingsGradle(
             """
               pluginManagement {
               }
               """,
-              ""
+            ""
           )
         );
     }
