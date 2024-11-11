@@ -36,14 +36,14 @@ public class VersionRangeParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		COMMA=1, PROPERTY_OPEN=2, PROPERTY_CLOSE=3, OPEN_RANGE_OPEN=4, OPEN_RANGE_CLOSE=5, 
+		COMMA=1, PROPERTY_OPEN=2, PROPERTY_CLOSE=3, OPEN_RANGE_OPEN=4, OPEN_RANGE_CLOSE=5,
 		CLOSED_RANGE_OPEN=6, CLOSED_RANGE_CLOSE=7, Version=8, WS=9;
 	public static final int
-		RULE_versionRequirement = 0, RULE_range = 1, RULE_bounds = 2, RULE_exactly = 3, 
+		RULE_versionRequirement = 0, RULE_range = 1, RULE_bounds = 2, RULE_exactly = 3,
 		RULE_boundedLower = 4, RULE_unboundedLower = 5, RULE_version = 6;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"versionRequirement", "range", "bounds", "exactly", "boundedLower", "unboundedLower", 
+			"versionRequirement", "range", "bounds", "exactly", "boundedLower", "unboundedLower",
 			"version"
 		};
 	}
@@ -57,8 +57,8 @@ public class VersionRangeParser extends Parser {
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "COMMA", "PROPERTY_OPEN", "PROPERTY_CLOSE", "OPEN_RANGE_OPEN", 
-			"OPEN_RANGE_CLOSE", "CLOSED_RANGE_OPEN", "CLOSED_RANGE_CLOSE", "Version", 
+			null, "COMMA", "PROPERTY_OPEN", "PROPERTY_CLOSE", "OPEN_RANGE_OPEN",
+			"OPEN_RANGE_CLOSE", "CLOSED_RANGE_OPEN", "CLOSED_RANGE_CLOSE", "Version",
 			"WS"
 		};
 	}

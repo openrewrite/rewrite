@@ -36,23 +36,23 @@ public class JsonPathParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		WS=1, UTF_8_BOM=2, MATCHES_REGEX_OPEN=3, LBRACE=4, RBRACE=5, LBRACK=6, 
-		RBRACK=7, LPAREN=8, RPAREN=9, AT=10, DOT=11, DOT_DOT=12, ROOT=13, WILDCARD=14, 
-		COLON=15, QUESTION=16, CONTAINS=17, Identifier=18, StringLiteral=19, PositiveNumber=20, 
-		NegativeNumber=21, NumericLiteral=22, COMMA=23, TICK=24, QUOTE=25, MATCHES=26, 
-		LOGICAL_OPERATOR=27, AND=28, OR=29, EQUALITY_OPERATOR=30, EQ=31, NE=32, 
+		WS=1, UTF_8_BOM=2, MATCHES_REGEX_OPEN=3, LBRACE=4, RBRACE=5, LBRACK=6,
+		RBRACK=7, LPAREN=8, RPAREN=9, AT=10, DOT=11, DOT_DOT=12, ROOT=13, WILDCARD=14,
+		COLON=15, QUESTION=16, CONTAINS=17, Identifier=18, StringLiteral=19, PositiveNumber=20,
+		NegativeNumber=21, NumericLiteral=22, COMMA=23, TICK=24, QUOTE=25, MATCHES=26,
+		LOGICAL_OPERATOR=27, AND=28, OR=29, EQUALITY_OPERATOR=30, EQ=31, NE=32,
 		TRUE=33, FALSE=34, NULL=35, MATCHES_REGEX_CLOSE=36, S=37, REGEX=38;
 	public static final int
-		RULE_jsonPath = 0, RULE_expression = 1, RULE_dotOperator = 2, RULE_recursiveDecent = 3, 
-		RULE_bracketOperator = 4, RULE_filter = 5, RULE_filterExpression = 6, 
-		RULE_binaryExpression = 7, RULE_containsExpression = 8, RULE_regexExpression = 9, 
-		RULE_unaryExpression = 10, RULE_literalExpression = 11, RULE_property = 12, 
+		RULE_jsonPath = 0, RULE_expression = 1, RULE_dotOperator = 2, RULE_recursiveDecent = 3,
+		RULE_bracketOperator = 4, RULE_filter = 5, RULE_filterExpression = 6,
+		RULE_binaryExpression = 7, RULE_containsExpression = 8, RULE_regexExpression = 9,
+		RULE_unaryExpression = 10, RULE_literalExpression = 11, RULE_property = 12,
 		RULE_wildcard = 13, RULE_slice = 14, RULE_start = 15, RULE_end = 16, RULE_indexes = 17;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"jsonPath", "expression", "dotOperator", "recursiveDecent", "bracketOperator", 
-			"filter", "filterExpression", "binaryExpression", "containsExpression", 
-			"regexExpression", "unaryExpression", "literalExpression", "property", 
+			"jsonPath", "expression", "dotOperator", "recursiveDecent", "bracketOperator",
+			"filter", "filterExpression", "binaryExpression", "containsExpression",
+			"regexExpression", "unaryExpression", "literalExpression", "property",
 			"wildcard", "slice", "start", "end", "indexes"
 		};
 	}
@@ -60,20 +60,20 @@ public class JsonPathParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, "'\\uFEFF'", null, "'{'", "'}'", "'['", "']'", "'('", "')'", 
-			"'@'", "'.'", "'..'", "'$'", "'*'", "':'", "'?'", "'contains'", null, 
-			null, null, null, null, "','", "'''", "'\"'", "'=~'", null, "'&&'", "'||'", 
+			null, null, "'\\uFEFF'", null, "'{'", "'}'", "'['", "']'", "'('", "')'",
+			"'@'", "'.'", "'..'", "'$'", "'*'", "':'", "'?'", "'contains'", null,
+			null, null, null, null, "','", "'''", "'\"'", "'=~'", null, "'&&'", "'||'",
 			null, "'=='", "'!='", "'true'", "'false'", "'null'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK", 
-			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD", 
-			"COLON", "QUESTION", "CONTAINS", "Identifier", "StringLiteral", "PositiveNumber", 
-			"NegativeNumber", "NumericLiteral", "COMMA", "TICK", "QUOTE", "MATCHES", 
-			"LOGICAL_OPERATOR", "AND", "OR", "EQUALITY_OPERATOR", "EQ", "NE", "TRUE", 
+			null, "WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK",
+			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD",
+			"COLON", "QUESTION", "CONTAINS", "Identifier", "StringLiteral", "PositiveNumber",
+			"NegativeNumber", "NumericLiteral", "COMMA", "TICK", "QUOTE", "MATCHES",
+			"LOGICAL_OPERATOR", "AND", "OR", "EQUALITY_OPERATOR", "EQ", "NE", "TRUE",
 			"FALSE", "NULL", "MATCHES_REGEX_CLOSE", "S", "REGEX"
 		};
 	}
@@ -174,7 +174,7 @@ public class JsonPathParser extends Parser {
 				}
 			}
 
-			setState(40); 
+			setState(40);
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -190,7 +190,7 @@ public class JsonPathParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(42); 
+				setState(42);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -475,7 +475,7 @@ public class JsonPathParser extends Parser {
 				break;
 			case 4:
 				{
-				setState(63); 
+				setState(63);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				do {
@@ -485,7 +485,7 @@ public class JsonPathParser extends Parser {
 					property();
 					}
 					}
-					setState(65); 
+					setState(65);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				} while ( _la==Identifier || _la==StringLiteral );
@@ -548,7 +548,7 @@ public class JsonPathParser extends Parser {
 			match(QUESTION);
 			setState(72);
 			match(LPAREN);
-			setState(74); 
+			setState(74);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -558,7 +558,7 @@ public class JsonPathParser extends Parser {
 				filterExpression();
 				}
 				}
-				setState(76); 
+				setState(76);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( ((_la) & ~0x3f) == 0 && ((1L << _la) & 60137421888L) != 0 );
@@ -853,7 +853,7 @@ public class JsonPathParser extends Parser {
 						}
 						break;
 					}
-					} 
+					}
 				}
 				setState(134);
 				_errHandler.sync(this);
@@ -1482,7 +1482,7 @@ public class JsonPathParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(187); 
+			setState(187);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -1492,7 +1492,7 @@ public class JsonPathParser extends Parser {
 				match(PositiveNumber);
 				}
 				}
-				setState(189); 
+				setState(189);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==PositiveNumber );

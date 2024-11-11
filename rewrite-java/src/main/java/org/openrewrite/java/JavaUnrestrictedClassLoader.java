@@ -20,14 +20,18 @@ import org.jspecify.annotations.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Rewrite's JavaParser is reliant on java's compiler internal classes that are now encapsulated within Java's
@@ -38,7 +42,7 @@ import java.util.List;
  * <p>
  * NOTE: Any classes in the package "org.openrewrite.java.isolated" will be loaded into this isolated classloader.
  */
-public class JavaUnrestrictedClassLoader extends ClassLoader {
+public class JavaUnrestrictedClassLoader extends URLClassLoader {
 
     static {
         ClassLoader.registerAsParallelCapable();
@@ -47,7 +51,25 @@ public class JavaUnrestrictedClassLoader extends ClassLoader {
     final List<Path> modules;
 
     public JavaUnrestrictedClassLoader(ClassLoader parentClassloader) {
-        super(parentClassloader);
+        this(parentClassloader, getLombok());
+    }
+
+    private static List<URL> getLombok() {
+        try {
+            return JavaParser.dependenciesFromClasspath("lombok").stream().map(it -> {
+                try {
+                    return it.toUri().toURL();
+                } catch (MalformedURLException e) {
+                    throw new RuntimeException(e);
+                }
+            }).collect(Collectors.toList());
+        } catch (Exception e) {
+            return emptyList();
+        }
+    }
+
+    public JavaUnrestrictedClassLoader(ClassLoader parentClassloader, List<URL> jars) {
+        super(jars.toArray(new URL[0]), parentClassloader);
 
         //A list of modules to load internal classes from
         final FileSystem fs = FileSystems.getFileSystem(URI.create("jrt:/"));
@@ -90,7 +112,57 @@ public class JavaUnrestrictedClassLoader extends ClassLoader {
                     throw new RuntimeException(e);
                 }
             }
+            if (name.startsWith("lombok")) {
+                return findClass(name);
+            }
             return super.loadClass(name);
+        }
+    }
+
+    @Override
+    public Enumeration<URL> getResources(String name) throws IOException {
+        // Give precedence to our own Lombok handlers
+        if (name.startsWith("META-INF/services/lombok.")) {
+            Objects.requireNonNull(name);
+            @SuppressWarnings("unchecked")
+            Enumeration<URL>[] tmp = (Enumeration<URL>[]) new Enumeration<?>[2];
+            tmp[0] = findResources(name);
+            tmp[1] = getParent().getResources(name);
+
+            return new CompoundEnumeration<>(tmp);
+        }
+        return super.getResources(name);
+    }
+
+    private static final class CompoundEnumeration<E> implements Enumeration<E> {
+        private final Enumeration<E>[] enums;
+        private int index;
+
+        public CompoundEnumeration(Enumeration<E>[] enums) {
+            this.enums = enums;
+        }
+
+        private boolean next() {
+            while (index < enums.length) {
+                if (enums[index].hasMoreElements()) {
+                    return true;
+                }
+                index++;
+            }
+            return false;
+        }
+
+        @Override
+        public boolean hasMoreElements() {
+            return next();
+        }
+
+        @Override
+        public E nextElement() {
+            if (!next()) {
+                throw new NoSuchElementException();
+            }
+            return enums[index].nextElement();
         }
     }
 

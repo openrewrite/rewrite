@@ -91,7 +91,7 @@ public class MethodMatcher {
         this(signature, Boolean.TRUE.equals(matchOverrides));
     }
 
-    public @Nullable MethodMatcher(String signature, boolean matchOverrides) {
+    public MethodMatcher(String signature, boolean matchOverrides) {
         this.matchOverrides = matchOverrides;
 
         MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
@@ -138,7 +138,7 @@ public class MethodMatcher {
     }
 
     private static boolean matchAllArguments(MethodSignatureParser.FormalsPatternContext context) {
-        return context.dotDot() != null && context.formalsPatternAfterDotDot() == null;
+        return context.dotDot() != null && context.formalsPatternAfterDotDot().isEmpty();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
@@ -342,6 +342,10 @@ public class MethodMatcher {
             method.getSelect() instanceof J.Identifier &&
             !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
+        }
+
+        if (argumentPattern == ANY_ARGUMENTS_PATTERN) {
+            return true;
         }
 
         final String argumentSignature = argumentsFromExpressionTypes(method);
