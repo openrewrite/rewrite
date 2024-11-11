@@ -38,7 +38,7 @@ public class RemoveSettingsPluginManagement extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove Gradle settings pluginManagement from `settings.gradle(.kts)`.";
+        return "Remove Gradle settings pluginManagement from `settings.gradle`.";
     }
 
     @Override
