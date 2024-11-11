@@ -26,12 +26,43 @@ import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
 
+import static java.util.Comparator.comparing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnnecessaryBoxing", "StatementWithEmptyBody", "UnusedAssignment", "SizeReplaceableByIsEmpty", "ResultOfMethodCallIgnored", "RedundantOperationOnEmptyContainer"})
 class JavaTemplateTest implements RewriteTest {
+
+    @Test
+    void addAnnotation() {
+       rewriteRun(
+            spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                private final JavaTemplate template = JavaTemplate.builder("@SuppressWarnings({\"ALL\"})")
+                  .build();
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+                    J.ClassDeclaration cd = classDecl;
+                    if(!cd.getLeadingAnnotations().isEmpty()) {
+                        return cd;
+                    }
+                    cd = template.apply(updateCursor(cd), cd.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                    return cd;
+                }
+            })),
+         java(
+           """
+             public class A {
+             }
+             """,
+           """
+             @SuppressWarnings({"ALL"})
+             public class A {
+             }
+             """
+         )
+       );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
@@ -371,7 +402,7 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import java.util.Arrays;
-
+              
               class T {
                   void m() {
                       Object l = Arrays.asList(new java.util.HashMap<String, String>() {
@@ -383,7 +414,7 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Collections;
-
+              
               class T {
                   void m() {
                       Object l = Collections.singletonList(new java.util.HashMap<String, String>() {
@@ -427,7 +458,7 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import java.util.Arrays;
-
+              
               class T<T> {
                   void m(T o) {
                       Object l = Arrays.asList(o);
@@ -436,7 +467,7 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Collections;
-
+              
               class T<T> {
                   void m(T o) {
                       Object l = Collections.singletonList(o);
@@ -480,7 +511,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.util.Arrays;
               import java.util.Collection;
-
+              
               class T<T> {
                   void m(Collection<T> o) {
                       Object l = Arrays.asList(o);
@@ -490,7 +521,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.util.Collection;
               import java.util.Collections;
-
+              
               class T<T> {
                   void m(Collection<T> o) {
                       Object l = Collections.singletonList(o);
