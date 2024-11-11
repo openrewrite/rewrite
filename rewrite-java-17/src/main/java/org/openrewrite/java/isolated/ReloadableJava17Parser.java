@@ -117,7 +117,8 @@ public class ReloadableJava17Parser implements JavaParser {
         Options.instance(context).put("-proc", "none");
 
         LOMBOK:
-        if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+        if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
+            classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             Processor lombokProcessor = null;
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
