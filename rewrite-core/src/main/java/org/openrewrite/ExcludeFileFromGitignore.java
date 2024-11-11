@@ -103,7 +103,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             private List<String> sortRules(String[] originalRules, List<String> newRules) {
                 LinkedList<String> results = new LinkedList<>();
                 Arrays.stream(originalRules).filter(line -> {
-                    if (line.startsWith("#") || StringUtils.isBlank(line)) {
+                    if (StringUtils.isBlank(line) || line.startsWith("#")) {
                         return true;
                     }
                     return newRules.stream().anyMatch(line::equalsIgnoreCase);
@@ -127,17 +127,18 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 return distinctValuesStartingReversed(results);
             }
 
-            private <T> List<T> distinctValuesStartingReversed(List<T> list) {
-                Set<T> set = new LinkedHashSet<>();
-                ListIterator<T> iterator = list.listIterator(list.size());
+            private List<String> distinctValuesStartingReversed(List<String> list) {
+                LinkedList<String> filteredList = new LinkedList<>();
+                ListIterator<String> iterator = list.listIterator(list.size());
 
                 while (iterator.hasPrevious()) {
-                    set.add(iterator.previous());
+                    String previous = iterator.previous();
+                    if (StringUtils.isBlank(previous) || previous.startsWith("#") || !filteredList.contains(previous)) {
+                        filteredList.addFirst(previous);
+                    }
                 }
 
-                List<T> result = new ArrayList<>(set);
-                Collections.reverse(result);
-                return result;
+                return filteredList;
             }
         });
     }
