@@ -23,11 +23,74 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import static org.openrewrite.java.Assertions.java;
+
 class Java21ParserTest implements RewriteTest {
 
     @Test
     void shouldLoadResourceFromClasspath() throws IOException {
         Files.deleteIfExists(Paths.get(System.getProperty("user.home"), ".rewrite", "classpath", "jackson-annotations-2.17.1.jar"));
         rewriteRun(spec -> spec.parser(JavaParser.fromJavaVersion().classpathFromResources(new InMemoryExecutionContext(), "jackson-annotations")));
+    }
+
+    @Test
+    void shouldParseJava21PatternSwitch() {
+        rewriteRun(
+          java(
+            //language=java
+            """
+              class Test {
+                  String formatterPatternSwitch(Object obj) {
+                      return switch (obj) {
+                          case Integer i -> String.format("int %d", i);
+                          case Long l    -> String.format("long %d", l);
+                          case Double d  -> String.format("double %f", d);
+                          case String s  -> String.format("String %s", s);
+                          default        -> obj.toString();
+                      };
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void shouldParseJava21PatternMatchForRecords() {
+        rewriteRun(
+          java(
+            //language=java
+            """
+              record Point(int x, int y) {}
+              class Test {
+                  void printSum(Object obj) {
+                      if (obj instanceof Point(int x, int y)) {
+                          System.out.println(x+y);
+                      }
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void shouldParseJava21NestedPatternMatchForRecords() {
+        rewriteRun(
+          java(
+            //language=java
+            """
+              record Point(int x, int y) {}
+              enum Color { RED, GREEN, BLUE }
+              record ColoredPoint(Point p, Color c) {}
+              record Rectangle(ColoredPoint upperLeft, ColoredPoint lowerRight) {}
+              class Test {
+                  void printColorOfUpperLeftPoint(Rectangle r) {
+                      if (r instanceof Rectangle(ColoredPoint(Point p, Color c),
+                                                 ColoredPoint lr)) {
+                          System.out.println(c);
+                      }
+                  }
+              }
+              """
+          ));
     }
 }
