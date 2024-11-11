@@ -117,7 +117,7 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               # comment
               
               test.yml
-              # Another comment
+              # comment
               
               file.yaml
               """,
@@ -126,7 +126,7 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               
               test.yml
               !/directory/test.yml
-              # Another comment
+              # comment
               
               file.yaml
               """,
