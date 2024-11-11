@@ -35,6 +35,7 @@ class ExtendInterfaceTest implements RewriteTest {
         @Language("java")
         String childInterface = """
           package child;
+          import parent.parentInterface;
           public interface childInterface extends parentInterface {}
           """;
 
