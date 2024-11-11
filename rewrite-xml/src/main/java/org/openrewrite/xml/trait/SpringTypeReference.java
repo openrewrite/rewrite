@@ -72,7 +72,7 @@ class SpringTypeReference implements TypeReference {
     }
 
     static class Matcher extends SimpleTraitMatcher<SpringTypeReference> {
-        private final Pattern typeReference = Pattern.compile("(?:[a-zA-Z_][a-zA-Z0-9_]*\\.)+[A-Z*][a-zA-Z0-9_]*(?:<[a-zA-Z0-9_,?<> ]*>)?");
+        private final Pattern typeReference = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
         private final XPathMatcher classXPath = new XPathMatcher("//@class");
         private final XPathMatcher typeXPath = new XPathMatcher("//@type");
         private final XPathMatcher tags = new XPathMatcher("//value");

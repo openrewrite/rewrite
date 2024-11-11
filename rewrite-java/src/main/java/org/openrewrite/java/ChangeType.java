@@ -107,13 +107,13 @@ public class ChangeType extends Recipe {
             @Override
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx);
+                    return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 } else if (tree instanceof SourceFileWithTypeReferences) {
                     SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
                     SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
                     TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
                     Set<TypeReference> matches = new HashSet<>(typeReferences.findMatches(matcher));
-                    return new TypeReferenceChangeTypeVisitor(matches, newFullyQualifiedTypeName).visit(tree, ctx, getCursor().getParent());
+                    return new TypeReferenceChangeTypeVisitor(matches, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }

@@ -29,6 +29,9 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Objects;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * A recipe that will rename a package name in package statements, imports, and fully-qualified types (see: NOTE).
@@ -137,7 +140,7 @@ public class ChangePackage extends Recipe {
             @Override
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    return new JavaChangePackageVisitor().visit(tree, ctx);
+                    return new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 } else if (tree instanceof SourceFileWithTypeReferences) {
                     SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
                     SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
@@ -151,7 +154,7 @@ public class ChangePackage extends Recipe {
                             }
                         }
                     }
-                    return new TypeReferenceChangePackageVisitor(matches, oldPackageName, newPackageName).visit(tree, ctx, getCursor().getParent());
+                    return new TypeReferenceChangePackageVisitor(matches, oldPackageName, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
