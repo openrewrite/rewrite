@@ -62,37 +62,6 @@ class SpringTypeReference implements Reference {
         return true;
     }
 
-    @Override
-    public TreeVisitor<Tree, ExecutionContext> rename(String oldValue, String newValue, boolean recursive) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                String replacement = "";
-                switch(getKind()) {
-                    case TYPE:
-                        replacement = newValue;
-                        break;
-                    case PACKAGE:
-                        if (recursive) {
-                            replacement = getValue().replace(oldValue, newValue);
-                        } else if (getValue().startsWith(oldValue) && Character.isUpperCase(getValue().charAt(oldValue.length()+1))) {
-                            replacement = getValue().replace(oldValue, newValue);
-                        }
-                        break;
-                }
-                if (StringUtils.isNotEmpty(replacement)) {
-                    if (tree instanceof Xml.Attribute) {
-                        return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(replacement));
-                    }
-                    if (tree instanceof Xml.Tag) {
-                        return ((Xml.Tag) tree).withValue(replacement);
-                    }
-                }
-                return super.visit(tree, ctx);
-            }
-        };
-    }
-
     static class Matcher extends SimpleTraitMatcher<SpringTypeReference> {
         private final Pattern typeReference = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
         private final XPathMatcher classXPath = new XPathMatcher("//@class");

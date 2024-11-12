@@ -36,12 +36,12 @@ public interface Reference extends Trait<Tree> {
         return false;
     }
 
-    default TreeVisitor<Tree, ExecutionContext> rename(String oldValue, String newValue, boolean recursive) {
-        throw new UnsupportedOperationException();
+    default boolean matches(MatcherMutator matcher) {
+        return matcher.matchesReference(this);
     }
 
-    default boolean matches(Matcher matcher) {
-        return matcher.matchesReference(getValue());
+    default TreeVisitor<Tree, ExecutionContext>  rename(MatcherMutator renamer, String replacement) {
+        return renamer.rename(replacement);
     }
 
     interface Provider {
@@ -51,7 +51,20 @@ public interface Reference extends Trait<Tree> {
         boolean isAcceptable(SourceFile sourceFile);
     }
 
+    interface MatcherMutator extends Matcher, Renamer {
+    }
+
     interface Matcher {
-        boolean matchesReference(String value);
+        boolean matchesReference(Reference value);
+    }
+
+    interface Renamer {
+        default TreeVisitor<Tree, ExecutionContext> rename(String replacement) {
+            return rename(replacement, false);
+        }
+
+        default TreeVisitor<Tree, ExecutionContext> rename(String replacement, boolean recursive) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

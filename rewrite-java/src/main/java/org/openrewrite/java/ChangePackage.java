@@ -26,9 +26,7 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.reference.Reference;
 
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.Map;
+import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 
@@ -144,16 +142,9 @@ public class ChangePackage extends Recipe {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
-                    String recursivePackageNamePrefix = oldPackageName + ".";
-                    Map<Tree, Reference> matches = new HashMap<>();
-                    for (Reference ref : typeReferences.getReferences()) {
-                        if (ref.supportsRename()) {
-                            if (ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
-                                matches.put(tree, ref);
-                            }
-                        }
-                    }
-                    return new ReferenceChangePackageVisitor(matches, oldPackageName, newPackageName, recursive).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    Reference.MatcherMutator matcherMutator = new PackageMatcher(oldPackageName, recursive);
+                    Set<Reference> matches = new HashSet<>(typeReferences.findMatches(matcherMutator));
+                    return new ReferenceChangePackageVisitor(matches, matcherMutator, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
@@ -393,17 +384,17 @@ public class ChangePackage extends Recipe {
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class ReferenceChangePackageVisitor extends TreeVisitor<Tree, ExecutionContext> {
-        Map<Tree, Reference> matches;
-        String oldPackageName;
+        Set<Reference> matches;
+        Reference.MatcherMutator matcherMutator;
         String newPackageName;
-        Boolean recursive;
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
             Tree tree1 = super.visit(tree, ctx);
-            Reference ref = matches.get(tree);
-            if (ref != null) {
-                return ref.rename(oldPackageName, newPackageName, recursive).visit(tree, ctx, getCursor().getParent());
+            for (Reference ref : matches) {
+                if (ref.getTree().equals(tree) && ref.supportsRename()) {
+                    return ref.rename(matcherMutator, newPackageName).visit(tree, ctx, getCursor().getParent());
+                }
             }
             return tree1;
         }

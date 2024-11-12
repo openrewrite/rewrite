@@ -111,9 +111,9 @@ public class ChangeType extends Recipe {
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
-                    TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
-                    Set<Reference> matches = new HashSet<>(typeReferences.findMatches(matcher));
-                    return new ReferenceChangeTypeVisitor(matches, oldFullyQualifiedTypeName, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    Reference.MatcherMutator matcherMutator = new TypeMatcher(oldFullyQualifiedTypeName);
+                    Set<Reference> matches = new HashSet<>(typeReferences.findMatches(matcherMutator));
+                    return new ReferenceChangeTypeVisitor(matches, matcherMutator, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
@@ -555,7 +555,7 @@ public class ChangeType extends Recipe {
     @EqualsAndHashCode(callSuper = false)
     private static class ReferenceChangeTypeVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Set<Reference> matches;
-        String oldFullyQualifiedName;
+        Reference.MatcherMutator matcherMutator;
         String newFullyQualifiedName;
 
         @Override
@@ -563,7 +563,7 @@ public class ChangeType extends Recipe {
             Tree tree1 = super.visit(tree, ctx);
             for (Reference ref : matches) {
                 if (ref.getTree().equals(tree) && ref.supportsRename()) {
-                    return ref.rename(oldFullyQualifiedName, newFullyQualifiedName, false).visit(tree, ctx, getCursor().getParent());
+                    return ref.rename(matcherMutator, newFullyQualifiedName).visit(tree, ctx, getCursor().getParent());
                 }
             }
             return tree1;

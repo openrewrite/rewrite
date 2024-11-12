@@ -19,6 +19,9 @@ import lombok.Getter;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
@@ -27,13 +30,14 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.trait.reference.Reference;
+import org.openrewrite.xml.tree.Xml;
 
 import java.util.regex.Pattern;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 @Getter
-public class TypeMatcher implements Reference.Matcher {
+public class TypeMatcher implements Reference.MatcherMutator {
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
 
     @SuppressWarnings("NotNullFieldNotInitialized")
@@ -112,8 +116,26 @@ public class TypeMatcher implements Reference.Matcher {
     }
 
     @Override
-    public boolean matchesReference(String name) {
-        return matchesTargetTypeName(name);
+    public boolean matchesReference(Reference reference) {
+        return matchesTargetTypeName(reference.getValue());
+    }
+
+    @Override
+    public TreeVisitor<Tree, ExecutionContext> rename(String newValue, boolean recursive) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (StringUtils.isNotEmpty(newValue)) {
+                    if (tree instanceof Xml.Attribute) {
+                        return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(newValue));
+                    }
+                    if (tree instanceof Xml.Tag) {
+                        return ((Xml.Tag) tree).withValue(newValue);
+                    }
+                }
+                return super.visit(tree, ctx);
+            }
+        };
     }
 
 }
