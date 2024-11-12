@@ -113,7 +113,7 @@ public class ChangeType extends Recipe {
                     SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
                     TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
                     Set<Reference> matches = new HashSet<>(typeReferences.findMatches(matcher));
-                    return new TypeReferenceChangeTypeVisitor(matches, oldFullyQualifiedTypeName, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    return new ReferenceChangeTypeVisitor(matches, oldFullyQualifiedTypeName, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
@@ -553,7 +553,7 @@ public class ChangeType extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class TypeReferenceChangeTypeVisitor extends TreeVisitor<Tree, ExecutionContext> {
+    private static class ReferenceChangeTypeVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Set<Reference> matches;
         String oldFullyQualifiedName;
         String newFullyQualifiedName;

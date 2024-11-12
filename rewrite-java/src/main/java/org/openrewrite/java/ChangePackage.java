@@ -153,7 +153,7 @@ public class ChangePackage extends Recipe {
                             }
                         }
                     }
-                    return new TypeReferenceChangePackageVisitor(matches, oldPackageName, newPackageName, recursive).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    return new ReferenceChangePackageVisitor(matches, oldPackageName, newPackageName, recursive).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
@@ -392,7 +392,7 @@ public class ChangePackage extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class TypeReferenceChangePackageVisitor extends TreeVisitor<Tree, ExecutionContext> {
+    private static class ReferenceChangePackageVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Map<Tree, Reference> matches;
         String oldPackageName;
         String newPackageName;
