@@ -15,13 +15,13 @@
  */
 package org.openrewrite;
 
-import org.openrewrite.trait.TypeReference;
+import org.openrewrite.trait.reference.Reference;
 
 import java.util.Set;
 
 public interface TypeReferenceProvider {
 
-    Set<TypeReference> getTypeReferences(SourceFile sourceFile);
+    Set<Reference> getTypeReferences(SourceFile sourceFile);
 
     boolean isAcceptable(SourceFile sourceFile);
 }

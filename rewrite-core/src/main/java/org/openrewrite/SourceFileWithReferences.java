@@ -18,12 +18,12 @@ package org.openrewrite;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.trait.TypeReference;
+import org.openrewrite.trait.reference.Reference;
 
 import java.util.*;
 
 @Incubating(since = "8.39.0")
-public interface SourceFileWithTypeReferences extends SourceFile {
+public interface SourceFileWithReferences extends SourceFile {
 
     TypeReferences getTypeReferences();
 
@@ -31,11 +31,11 @@ public interface SourceFileWithTypeReferences extends SourceFile {
     @Getter
     class TypeReferences {
         private final SourceFile sourceFile;
-        private final Set<TypeReference> typeReferences;
+        private final Set<Reference> references;
 
-        public Collection<TypeReference> findMatches(TypeReference.Matcher matcher) {
-            List<TypeReference> list = new ArrayList<>();
-            for (TypeReference ref : typeReferences) {
+        public Collection<Reference> findMatches(Reference.Matcher matcher) {
+            List<Reference> list = new ArrayList<>();
+            for (Reference ref : references) {
                 if (ref.matches(matcher)) {
                     list.add(ref);
                 }
@@ -44,14 +44,14 @@ public interface SourceFileWithTypeReferences extends SourceFile {
         }
 
         public static TypeReferences build(SourceFile sourceFile) {
-            Set<TypeReference> typeReferences = new HashSet<>();
-            ServiceLoader<TypeReference.Provider> loader = ServiceLoader.load(TypeReference.Provider.class);
+            Set<Reference> references = new HashSet<>();
+            ServiceLoader<Reference.Provider> loader = ServiceLoader.load(Reference.Provider.class);
             loader.forEach(provider -> {
                 if (provider.isAcceptable(sourceFile)) {
-                    typeReferences.addAll(provider.getTypeReferences(sourceFile));
+                    references.addAll(provider.getTypeReferences(sourceFile));
                 }
             });
-            return new TypeReferences(sourceFile, typeReferences);
+            return new TypeReferences(sourceFile, references);
         }
     }
 }

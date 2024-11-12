@@ -18,7 +18,7 @@ package org.openrewrite.java.search;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
-import org.openrewrite.SourceFileWithTypeReferences;
+import org.openrewrite.SourceFileWithReferences;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
@@ -28,7 +28,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.trait.TypeReference;
+import org.openrewrite.trait.reference.Reference;
 
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -77,7 +77,7 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {
-        return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithTypeReferences;
+        return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithReferences;
     }
 
     @Override
@@ -119,11 +119,11 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
                     }
                 }
             }
-        } else if (tree instanceof SourceFileWithTypeReferences) {
-            SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
-            SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
+        } else if (tree instanceof SourceFileWithReferences) {
+            SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
+            SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
             TypeMatcher matcher = typeMatcher != null ? typeMatcher : new TypeMatcher(fullyQualifiedType);
-            for (TypeReference ignored : typeReferences.findMatches(matcher)) {
+            for (Reference ignored : typeReferences.findMatches(matcher)) {
                 return SearchResult.found(sourceFile);
             }
         }

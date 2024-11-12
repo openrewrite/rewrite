@@ -18,8 +18,9 @@ package org.openrewrite.xml.trait;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.trait.SimpleTraitMatcher;
-import org.openrewrite.trait.TypeReference;
+import org.openrewrite.trait.reference.Reference;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -28,16 +29,22 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 @Value
-class SpringTypeReference implements TypeReference {
+class SpringTypeReference implements Reference {
     Cursor cursor;
+    Kind kind;
 
     @Override
     public Tree getTree() {
-        return TypeReference.super.getTree();
+        return Reference.super.getTree();
     }
 
     @Override
-    public String getName() {
+    public Kind getKind() {
+        return kind;
+    }
+
+    @Override
+    public String getValue() {
         if (getTree() instanceof Xml.Attribute) {
             Xml.Attribute attribute = (Xml.Attribute) getTree();
             return attribute.getValueAsString();
@@ -56,15 +63,30 @@ class SpringTypeReference implements TypeReference {
     }
 
     @Override
-    public TreeVisitor<Tree, ExecutionContext> renameTo(String name) {
+    public TreeVisitor<Tree, ExecutionContext> rename(String oldValue, String newValue, boolean recursive) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof Xml.Attribute) {
-                    return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(name));
+                String replacement = "";
+                switch(getKind()) {
+                    case TYPE:
+                        replacement = newValue;
+                        break;
+                    case PACKAGE:
+                        if (recursive) {
+                            replacement = getValue().replace(oldValue, newValue);
+                        } else if (getValue().startsWith(oldValue) && Character.isUpperCase(getValue().charAt(oldValue.length()+1))) {
+                            replacement = getValue().replace(oldValue, newValue);
+                        }
+                        break;
                 }
-                if (tree instanceof Xml.Tag) {
-                    return ((Xml.Tag) tree).withValue(name);
+                if (StringUtils.isNotEmpty(replacement)) {
+                    if (tree instanceof Xml.Attribute) {
+                        return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(replacement));
+                    }
+                    if (tree instanceof Xml.Tag) {
+                        return ((Xml.Tag) tree).withValue(replacement);
+                    }
                 }
                 return super.visit(tree, ctx);
             }
@@ -83,33 +105,39 @@ class SpringTypeReference implements TypeReference {
             if (value instanceof Xml.Attribute) {
                 Xml.Attribute attrib = (Xml.Attribute) value;
                 if (classXPath.matches(cursor) || typeXPath.matches(cursor)) {
-                    if (typeReference.matcher(attrib.getValueAsString()).matches()) {
-                        return new SpringTypeReference(cursor);
+                    String stringVal = attrib.getValueAsString();
+                    if (typeReference.matcher(stringVal).matches()) {
+                        return new SpringTypeReference(cursor, determineKind(stringVal));
                     }
                 }
             } else if (value instanceof Xml.Tag) {
                 Xml.Tag tag = (Xml.Tag) value;
                 if (tags.matches(cursor)) {
-                    if (tag.getValue().isPresent() && typeReference.matcher(tag.getValue().get()).matches()) {
-                        return new SpringTypeReference(cursor);
+                    String stringVal = tag.getValue().get();
+                    if (tag.getValue().isPresent() && typeReference.matcher(stringVal).matches()) {
+                        return new SpringTypeReference(cursor, determineKind(stringVal));
                     }
                 }
             }
             return null;
         }
+
+        Kind determineKind(String value) {
+            return Character.isUpperCase(value.charAt(value.lastIndexOf('.')+1)) ? Kind.TYPE : Kind.PACKAGE;
+        }
     }
 
     @SuppressWarnings("unused")
-    public static class Provider implements TypeReference.Provider {
+    public static class Provider implements Reference.Provider {
 
         @Override
-        public Set<TypeReference> getTypeReferences(SourceFile sourceFile) {
-            Set<TypeReference> typeReferences = new HashSet<>();
+        public Set<Reference> getTypeReferences(SourceFile sourceFile) {
+            Set<Reference> references = new HashSet<>();
             new Matcher().asVisitor(reference -> {
-                typeReferences.add(reference);
+                references.add(reference);
                 return reference.getTree();
             }).visit(sourceFile, 0);
-            return typeReferences;
+            return references;
         }
 
         @Override

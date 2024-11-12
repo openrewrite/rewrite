@@ -13,37 +13,45 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.trait;
+package org.openrewrite.trait.reference;
 
 import org.openrewrite.*;
+import org.openrewrite.trait.Trait;
 
 import java.util.Set;
 
 @Incubating(since = "8.39.0")
-public interface TypeReference extends Trait<Tree> {
+public interface Reference extends Trait<Tree> {
 
-    String getName();
+    enum Kind {
+        TYPE,
+        PACKAGE
+    }
+
+    Kind getKind();
+
+    String getValue();
 
     default boolean supportsRename() {
         return false;
     }
 
-    default TreeVisitor<Tree, ExecutionContext> renameTo(String name) {
+    default TreeVisitor<Tree, ExecutionContext> rename(String oldValue, String newValue, boolean recursive) {
         throw new UnsupportedOperationException();
     }
 
     default boolean matches(Matcher matcher) {
-        return matcher.matchesName(getName());
+        return matcher.matchesReference(getValue());
     }
 
     interface Provider {
 
-        Set<TypeReference> getTypeReferences(SourceFile sourceFile);
+        Set<Reference> getTypeReferences(SourceFile sourceFile);
 
         boolean isAcceptable(SourceFile sourceFile);
     }
 
     interface Matcher {
-        boolean matchesName(String name);
+        boolean matchesReference(String value);
     }
 }

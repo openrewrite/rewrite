@@ -23,13 +23,12 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.trait.TypeReference;
+import org.openrewrite.trait.reference.Reference;
 
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
@@ -116,12 +115,12 @@ public class ChangePackage extends Recipe {
                     }
                     stopAfterPreVisit();
                 }
-                if (tree instanceof SourceFileWithTypeReferences) {
-                    SourceFileWithTypeReferences cu = (SourceFileWithTypeReferences) tree;
+                if (tree instanceof SourceFileWithReferences) {
+                    SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     String recursivePackageNamePrefix = oldPackageName + ".";
-                    for (TypeReference ref : cu.getTypeReferences().getTypeReferences()) {
-                        if (ref.getName().equals(oldPackageName) || recursive && ref.getName().startsWith(recursivePackageNamePrefix)) {
+                    for (Reference ref : cu.getTypeReferences().getReferences()) {
+                        if (ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
                             return SearchResult.found(cu);
                         }
                     }
@@ -134,27 +133,27 @@ public class ChangePackage extends Recipe {
         return Preconditions.check(condition, new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithTypeReferences;
+                return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithReferences;
             }
 
             @Override
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     return new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
-                } else if (tree instanceof SourceFileWithTypeReferences) {
-                    SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
-                    SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
+                } else if (tree instanceof SourceFileWithReferences) {
+                    SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
+                    SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     String recursivePackageNamePrefix = oldPackageName + ".";
-                    Map<Tree, TypeReference> matches = new HashMap<>();
-                    for (TypeReference ref : typeReferences.getTypeReferences()) {
+                    Map<Tree, Reference> matches = new HashMap<>();
+                    for (Reference ref : typeReferences.getReferences()) {
                         if (ref.supportsRename()) {
-                            if (ref.getName().equals(oldPackageName) || recursive && ref.getName().startsWith(recursivePackageNamePrefix)) {
+                            if (ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
                                 matches.put(tree, ref);
                             }
                         }
                     }
-                    return new TypeReferenceChangePackageVisitor(matches, oldPackageName, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    return new TypeReferenceChangePackageVisitor(matches, oldPackageName, newPackageName, recursive).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
@@ -394,16 +393,17 @@ public class ChangePackage extends Recipe {
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class TypeReferenceChangePackageVisitor extends TreeVisitor<Tree, ExecutionContext> {
-        Map<Tree, TypeReference> matches;
+        Map<Tree, Reference> matches;
         String oldPackageName;
         String newPackageName;
+        Boolean recursive;
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
             Tree tree1 = super.visit(tree, ctx);
-            TypeReference ref = matches.get(tree);
+            Reference ref = matches.get(tree);
             if (ref != null) {
-                return ref.renameTo(ref.getName().replace(oldPackageName, newPackageName)).visit(tree, ctx, getCursor().getParent());
+                return ref.rename(oldPackageName, newPackageName, recursive).visit(tree, ctx, getCursor().getParent());
             }
             return tree1;
         }

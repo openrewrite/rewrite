@@ -28,7 +28,7 @@ class SpringTypeReferenceTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(RewriteTest.toRecipe(() -> new SpringTypeReference.Matcher()
-          .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getName()))));
+          .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getValue()))));
     }
 
     @SuppressWarnings("SpringXmlModelInspection")
@@ -50,6 +50,9 @@ class SpringTypeReferenceTest implements RewriteTest {
                           <property name="someName">
                               <value>java.lang.String</value>
                           </property>
+                          <property name="someOtherName">
+                              <value>java.lang</value>
+                          </property>
                       </bean>
                   </property>
                 </bean>
@@ -67,6 +70,9 @@ class SpringTypeReferenceTest implements RewriteTest {
                           <property name="age" value="11" <!--~~(java.lang.Integer)~~>-->class="java.lang.Integer"/>
                           <property name="someName">
                               <!--~~(java.lang.String)~~>--><value>java.lang.String</value>
+                          </property>
+                          <property name="someOtherName">
+                              <!--~~(java.lang)~~>--><value>java.lang</value>
                           </property>
                       </bean>
                   </property>

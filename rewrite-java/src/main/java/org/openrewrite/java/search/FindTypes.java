@@ -68,16 +68,16 @@ public class FindTypes extends Recipe {
         return Preconditions.check(new UsesType<>(fullyQualifiedTypeName, false), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithTypeReferences;
+                return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithReferences;
             }
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     return new JavaSourceFileVisitor(fullyQualifiedType).visit(tree, ctx);
-                } else if (tree instanceof SourceFileWithTypeReferences) {
-                    SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
-                    SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
+                } else if (tree instanceof SourceFileWithReferences) {
+                    SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
+                    SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
                     TypeMatcher matcher = new TypeMatcher(fullyQualifiedTypeName);
                     Set<Tree> matches = typeReferences.findMatches(matcher).stream().map(Trait::getTree).collect(Collectors.toSet());
                     return new TypeReferenceVisitor(matches).visit(tree, ctx);

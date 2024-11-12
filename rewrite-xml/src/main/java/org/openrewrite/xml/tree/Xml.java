@@ -83,7 +83,7 @@ public interface Xml extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class Document implements Xml, SourceFileWithTypeReferences {
+    class Document implements Xml, SourceFileWithReferences {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -164,7 +164,7 @@ public interface Xml extends Tree {
             if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 return (T) new XmlWhitespaceValidationService();
             }
-            return SourceFileWithTypeReferences.super.service(service);
+            return SourceFileWithReferences.super.service(service);
         }
 
         @Nullable

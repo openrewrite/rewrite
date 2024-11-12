@@ -26,14 +26,14 @@ import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.trait.TypeReference;
+import org.openrewrite.trait.reference.Reference;
 
 import java.util.regex.Pattern;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 @Getter
-public class TypeMatcher implements TypeReference.Matcher {
+public class TypeMatcher implements Reference.Matcher {
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
 
     @SuppressWarnings("NotNullFieldNotInitialized")
@@ -112,7 +112,8 @@ public class TypeMatcher implements TypeReference.Matcher {
     }
 
     @Override
-    public boolean matchesName(String name) {
+    public boolean matchesReference(String name) {
         return matchesTargetTypeName(name);
     }
+
 }
