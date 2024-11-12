@@ -134,19 +134,24 @@ public class DependencyVersionSelector {
                                                "current version.");
         }
 
-        VersionComparator versionComparator = StringUtils.isBlank(version) ?
-                new LatestRelease(versionPattern) :
-                requireNonNull(Semver.validate(version, versionPattern).getValue());
+        try {
+            VersionComparator versionComparator = StringUtils.isBlank(version) ?
+                    new LatestRelease(versionPattern) :
+                    requireNonNull(Semver.validate(version, versionPattern).getValue());
 
-        if (versionComparator instanceof ExactVersion) {
-            return versionComparator.upgrade(gav.getVersion(), singletonList(version)).orElse(null);
-        } else if (versionComparator instanceof LatestPatch &&
-                   !versionComparator.isValid(gav.getVersion(), gav.getVersion())) {
-            // in the case of "latest.patch", a new version can only be derived if the
-            // current version is a semantic version
+            if (versionComparator instanceof ExactVersion) {
+                return versionComparator.upgrade(gav.getVersion(), singletonList(version)).orElse(null);
+            } else if (versionComparator instanceof LatestPatch &&
+                    !versionComparator.isValid(gav.getVersion(), gav.getVersion())) {
+                // in the case of "latest.patch", a new version can only be derived if the
+                // current version is a semantic version
+                return null;
+            } else {
+                return findNewerVersion(gav, configuration, versionComparator, ctx).orElse(null);
+            }
+        } catch (IllegalStateException e) {
+            // this can happen when we encounter exotic versions
             return null;
-        } else {
-            return findNewerVersion(gav, configuration, versionComparator, ctx).orElse(null);
         }
     }
 
