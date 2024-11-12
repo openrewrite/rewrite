@@ -48,6 +48,7 @@ public class FindProperty extends Recipe {
     Boolean relaxedBinding;
 
     @Option(displayName = "Property value",
+            example = "false",
             description = "If provided, only properties specified in propertyKey having this value will be found. Works only for scalar values",
             required = false)
     @Nullable
