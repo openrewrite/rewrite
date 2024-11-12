@@ -33,10 +33,10 @@ public interface SourceFileWithReferences extends SourceFile {
         private final SourceFile sourceFile;
         private final Set<Reference> references;
 
-        public Collection<Reference> findMatches(Reference.MatcherMutator matcherMutator) {
+        public Collection<Reference> findMatches(Reference.Matcher matcher) {
             List<Reference> list = new ArrayList<>();
             for (Reference ref : references) {
-                if (ref.matches(matcherMutator)) {
+                if (ref.matches(matcher)) {
                     list.add(ref);
                 }
             }

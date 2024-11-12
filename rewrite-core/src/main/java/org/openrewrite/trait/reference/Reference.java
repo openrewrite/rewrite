@@ -36,11 +36,11 @@ public interface Reference extends Trait<Tree> {
         return false;
     }
 
-    default boolean matches(MatcherMutator matcher) {
+    default boolean matches(Matcher matcher) {
         return matcher.matchesReference(this);
     }
 
-    default TreeVisitor<Tree, ExecutionContext>  rename(MatcherMutator renamer, String replacement) {
+    default TreeVisitor<Tree, ExecutionContext>  rename(Renamer renamer, String replacement) {
         return renamer.rename(replacement);
     }
 

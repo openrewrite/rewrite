@@ -385,7 +385,7 @@ public class ChangePackage extends Recipe {
     @EqualsAndHashCode(callSuper = false)
     private static class ReferenceChangePackageVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Set<Reference> matches;
-        Reference.MatcherMutator matcherMutator;
+        Reference.Renamer renamer;
         String newPackageName;
 
         @Override
@@ -393,7 +393,7 @@ public class ChangePackage extends Recipe {
             Tree tree1 = super.visit(tree, ctx);
             for (Reference ref : matches) {
                 if (ref.getTree().equals(tree) && ref.supportsRename()) {
-                    return ref.rename(matcherMutator, newPackageName).visit(tree, ctx, getCursor().getParent());
+                    return ref.rename(renamer, newPackageName).visit(tree, ctx, getCursor().getParent());
                 }
             }
             return tree1;
