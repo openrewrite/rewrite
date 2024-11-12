@@ -18,10 +18,10 @@ package org.openrewrite;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.trait.reference.Reference;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Incubating(since = "8.39.0")
 public interface SourceFileWithReferences extends SourceFile {
@@ -35,17 +35,21 @@ public interface SourceFileWithReferences extends SourceFile {
         private final Set<Reference> references;
 
         public Collection<Reference> findMatches(Reference.Matcher matcher) {
+            return findMatchesInternal(matcher, null);
+        }
+
+        public Collection<Reference> findMatches(Reference.Matcher matcher, Reference.Kind kind) {
+            return findMatchesInternal(matcher, kind);
+        }
+
+        private List<Reference> findMatchesInternal(Reference.Matcher matcher, Reference.@Nullable Kind kind) {
             List<Reference> list = new ArrayList<>();
             for (Reference ref : references) {
-                if (ref.matches(matcher)) {
+                if (ref.matches(matcher) && (kind == null || ref.getKind().equals(kind))) {
                     list.add(ref);
                 }
             }
             return list;
-        }
-
-        public Collection<Reference> findMatches(Reference.Matcher matcher, Reference.Kind kind) {
-            return findMatches(matcher).stream().filter(ref -> ref.getKind().equals(kind)).collect(Collectors.toList());
         }
 
         public static References build(SourceFile sourceFile) {
