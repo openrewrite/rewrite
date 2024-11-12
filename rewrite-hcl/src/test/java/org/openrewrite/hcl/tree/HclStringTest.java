@@ -16,7 +16,6 @@
 package org.openrewrite.hcl.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -24,7 +23,6 @@ import static org.openrewrite.hcl.Assertions.hcl;
 
 class HclStringTest implements RewriteTest {
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/4612")
     @Test
     void quoteEscaping() {
@@ -32,7 +30,7 @@ class HclStringTest implements RewriteTest {
           hcl(
             """
               locals {
-                quotedText = "this is a double quote: \". Look at me"
+                quotedText = "this is a double quote: \\". Look at me"
               }
               """
           )
