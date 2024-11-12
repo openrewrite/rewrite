@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class FindEscapingVariablesTest implements RewriteTest {
+class FindEscapingVariablesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
