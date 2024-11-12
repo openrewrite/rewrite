@@ -123,7 +123,7 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
             SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
             SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
             TypeMatcher matcher = typeMatcher != null ? typeMatcher : new TypeMatcher(fullyQualifiedType);
-            for (Reference ignored : typeReferences.findMatches(matcher)) {
+            for (Reference ignored : typeReferences.findMatches(matcher, Reference.Kind.TYPE)) {
                 return SearchResult.found(sourceFile);
             }
         }

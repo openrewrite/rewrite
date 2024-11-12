@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.trait.reference.Reference;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Incubating(since = "8.39.0")
 public interface SourceFileWithReferences extends SourceFile {
@@ -41,6 +42,10 @@ public interface SourceFileWithReferences extends SourceFile {
                 }
             }
             return list;
+        }
+
+        public Collection<Reference> findMatches(Reference.Matcher matcher, Reference.Kind kind) {
+            return findMatches(matcher).stream().filter(ref -> ref.getKind().equals(kind)).collect(Collectors.toList());
         }
 
         public static TypeReferences build(SourceFile sourceFile) {

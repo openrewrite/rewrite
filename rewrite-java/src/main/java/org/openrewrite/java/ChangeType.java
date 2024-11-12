@@ -112,7 +112,7 @@ public class ChangeType extends Recipe {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
                     Reference.MatcherMutator matcherMutator = new TypeMatcher(oldFullyQualifiedTypeName);
-                    Set<Reference> matches = new HashSet<>(typeReferences.findMatches(matcherMutator));
+                    Set<Reference> matches = new HashSet<>(typeReferences.findMatches(matcherMutator, Reference.Kind.TYPE));
                     return new ReferenceChangeTypeVisitor(matches, matcherMutator, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;

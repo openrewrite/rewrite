@@ -26,7 +26,10 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.reference.Reference;
 
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Map;
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -118,7 +121,7 @@ public class ChangePackage extends Recipe {
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     String recursivePackageNamePrefix = oldPackageName + ".";
                     for (Reference ref : cu.getTypeReferences().getReferences()) {
-                        if (ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
+                        if (ref.getKind().equals(Reference.Kind.PACKAGE) && ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
                             return SearchResult.found(cu);
                         }
                     }
@@ -143,7 +146,7 @@ public class ChangePackage extends Recipe {
                     SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     Reference.MatcherMutator matcherMutator = new PackageMatcher(oldPackageName, recursive);
-                    Set<Reference> matches = new HashSet<>(typeReferences.findMatches(matcherMutator));
+                    Set<Reference> matches = new HashSet<>(typeReferences.findMatches(matcherMutator, Reference.Kind.PACKAGE));
                     return new ReferenceChangePackageVisitor(matches, matcherMutator, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
