@@ -120,7 +120,7 @@ public class ChangePackage extends Recipe {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     String recursivePackageNamePrefix = oldPackageName + ".";
-                    for (Reference ref : cu.getTypeReferences().getReferences()) {
+                    for (Reference ref : cu.getReferences().getReferences()) {
                         if (ref.getKind().equals(Reference.Kind.PACKAGE) && ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
                             return SearchResult.found(cu);
                         }
@@ -143,10 +143,10 @@ public class ChangePackage extends Recipe {
                     return new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
-                    SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
+                    SourceFileWithReferences.References references = sourceFile.getReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     Reference.MatcherMutator matcherMutator = new PackageMatcher(oldPackageName, recursive);
-                    Set<Reference> matches = new HashSet<>(typeReferences.findMatches(matcherMutator, Reference.Kind.PACKAGE));
+                    Set<Reference> matches = new HashSet<>(references.findMatches(matcherMutator, Reference.Kind.PACKAGE));
                     return new ReferenceChangePackageVisitor(matches, matcherMutator, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;

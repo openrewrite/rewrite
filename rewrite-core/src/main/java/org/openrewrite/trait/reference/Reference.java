@@ -46,7 +46,7 @@ public interface Reference extends Trait<Tree> {
 
     interface Provider {
 
-        Set<Reference> getTypeReferences(SourceFile sourceFile);
+        Set<Reference> getReferences(SourceFile sourceFile);
 
         boolean isAcceptable(SourceFile sourceFile);
     }

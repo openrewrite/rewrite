@@ -23,11 +23,11 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
-class SpringTypeReferenceTest implements RewriteTest {
+class SpringTypeOrPackageReferenceTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(RewriteTest.toRecipe(() -> new SpringTypeReference.Matcher()
+        spec.recipe(RewriteTest.toRecipe(() -> new SpringTypeOrPackageReference.Matcher()
           .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getValue()))));
     }
 

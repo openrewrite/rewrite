@@ -78,10 +78,10 @@ public class FindTypes extends Recipe {
                     return new JavaSourceFileVisitor(fullyQualifiedType).visit(tree, ctx);
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
-                    SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
+                    SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(fullyQualifiedTypeName);
-                    Set<Tree> matches = typeReferences.findMatches(matcher, Reference.Kind.TYPE).stream().map(Trait::getTree).collect(Collectors.toSet());
-                    return new TypeReferenceVisitor(matches).visit(tree, ctx);
+                    Set<Tree> matches = references.findMatches(matcher, Reference.Kind.TYPE).stream().map(Trait::getTree).collect(Collectors.toSet());
+                    return new ReferenceVisitor(matches).visit(tree, ctx);
                 }
                 return tree;
             }
@@ -150,7 +150,7 @@ public class FindTypes extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class TypeReferenceVisitor extends TreeVisitor<Tree, ExecutionContext> {
+    private static class ReferenceVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Set<Tree> matches;
 
         @Override

@@ -169,20 +169,20 @@ public interface Xml extends Tree {
 
         @Nullable
         @NonFinal
-        transient SoftReference<TypeReferences> typeReferences;
+        transient SoftReference<References> references;
 
         @Transient
         @Override
-        public TypeReferences getTypeReferences() {
-            TypeReferences cache;
-            if (this.typeReferences == null) {
-                cache = TypeReferences.build(this);
-                this.typeReferences = new SoftReference<>(cache);
+        public References getReferences() {
+            References cache;
+            if (this.references == null) {
+                cache = References.build(this);
+                this.references = new SoftReference<>(cache);
             } else {
-                cache = this.typeReferences.get();
+                cache = this.references.get();
                 if (cache == null || cache.getSourceFile() != this) {
-                    cache = TypeReferences.build(this);
-                    this.typeReferences = new SoftReference<>(cache);
+                    cache = References.build(this);
+                    this.references = new SoftReference<>(cache);
                 }
             }
             return cache;

@@ -110,9 +110,9 @@ public class ChangeType extends Recipe {
                     return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
-                    SourceFileWithReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
+                    SourceFileWithReferences.References references = sourceFile.getReferences();
                     Reference.MatcherMutator matcherMutator = new TypeMatcher(oldFullyQualifiedTypeName);
-                    Set<Reference> matches = new HashSet<>(typeReferences.findMatches(matcherMutator, Reference.Kind.TYPE));
+                    Set<Reference> matches = new HashSet<>(references.findMatches(matcherMutator, Reference.Kind.TYPE));
                     return new ReferenceChangeTypeVisitor(matches, matcherMutator, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;

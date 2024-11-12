@@ -18,7 +18,6 @@ package org.openrewrite.xml.trait;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.reference.Reference;
 import org.openrewrite.xml.XPathMatcher;
@@ -29,7 +28,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 @Value
-class SpringTypeReference implements Reference {
+class SpringTypeOrPackageReference implements Reference {
     Cursor cursor;
     Kind kind;
 
@@ -62,21 +61,21 @@ class SpringTypeReference implements Reference {
         return true;
     }
 
-    static class Matcher extends SimpleTraitMatcher<SpringTypeReference> {
+    static class Matcher extends SimpleTraitMatcher<SpringTypeOrPackageReference> {
         private final Pattern typeReference = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
         private final XPathMatcher classXPath = new XPathMatcher("//@class");
         private final XPathMatcher typeXPath = new XPathMatcher("//@type");
         private final XPathMatcher tags = new XPathMatcher("//value");
 
         @Override
-        protected @Nullable SpringTypeReference test(Cursor cursor) {
+        protected @Nullable SpringTypeOrPackageReference test(Cursor cursor) {
             Object value = cursor.getValue();
             if (value instanceof Xml.Attribute) {
                 Xml.Attribute attrib = (Xml.Attribute) value;
                 if (classXPath.matches(cursor) || typeXPath.matches(cursor)) {
                     String stringVal = attrib.getValueAsString();
                     if (typeReference.matcher(stringVal).matches()) {
-                        return new SpringTypeReference(cursor, determineKind(stringVal));
+                        return new SpringTypeOrPackageReference(cursor, determineKind(stringVal));
                     }
                 }
             } else if (value instanceof Xml.Tag) {
@@ -84,7 +83,7 @@ class SpringTypeReference implements Reference {
                 if (tags.matches(cursor)) {
                     String stringVal = tag.getValue().get();
                     if (tag.getValue().isPresent() && typeReference.matcher(stringVal).matches()) {
-                        return new SpringTypeReference(cursor, determineKind(stringVal));
+                        return new SpringTypeOrPackageReference(cursor, determineKind(stringVal));
                     }
                 }
             }
@@ -100,7 +99,7 @@ class SpringTypeReference implements Reference {
     public static class Provider implements Reference.Provider {
 
         @Override
-        public Set<Reference> getTypeReferences(SourceFile sourceFile) {
+        public Set<Reference> getReferences(SourceFile sourceFile) {
             Set<Reference> references = new HashSet<>();
             new Matcher().asVisitor(reference -> {
                 references.add(reference);

@@ -26,11 +26,11 @@ import java.util.stream.Collectors;
 @Incubating(since = "8.39.0")
 public interface SourceFileWithReferences extends SourceFile {
 
-    TypeReferences getTypeReferences();
+    References getReferences();
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     @Getter
-    class TypeReferences {
+    class References {
         private final SourceFile sourceFile;
         private final Set<Reference> references;
 
@@ -48,15 +48,15 @@ public interface SourceFileWithReferences extends SourceFile {
             return findMatches(matcher).stream().filter(ref -> ref.getKind().equals(kind)).collect(Collectors.toList());
         }
 
-        public static TypeReferences build(SourceFile sourceFile) {
+        public static References build(SourceFile sourceFile) {
             Set<Reference> references = new HashSet<>();
             ServiceLoader<Reference.Provider> loader = ServiceLoader.load(Reference.Provider.class);
             loader.forEach(provider -> {
                 if (provider.isAcceptable(sourceFile)) {
-                    references.addAll(provider.getTypeReferences(sourceFile));
+                    references.addAll(provider.getReferences(sourceFile));
                 }
             });
-            return new TypeReferences(sourceFile, references);
+            return new References(sourceFile, references);
         }
     }
 }
