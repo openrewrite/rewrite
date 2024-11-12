@@ -38,7 +38,9 @@ public class AllArgsConstructorHandler extends JavacAnnotationHandler<AllArgsCon
                 if (originalArg instanceof JCTree.JCAssign && ((JCTree.JCAssign) originalArg).getVariable() instanceof JCTree.JCIdent) {
                     JCTree.JCAssign assign = (JCTree.JCAssign) originalArg;
                     JCTree.JCIdent ident = (JCTree.JCIdent) assign.getVariable();
-                    if ("onConstructor".equals(ident.getName().toString())) {
+                    String name = ident.getName().toString();
+                    if (name.equals("onConstructor") || name.equals("onConstructor_")) {
+                        // In Java 1.8+ the parameter is `onConstructor_`
                         continue;
                     }
                 }
