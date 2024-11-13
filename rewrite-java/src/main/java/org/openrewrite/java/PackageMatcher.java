@@ -25,7 +25,7 @@ import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
 @Getter
-public class PackageMatcher implements Reference.MatcherMutator {
+public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
 
     @Nullable
     private String targetPackage;

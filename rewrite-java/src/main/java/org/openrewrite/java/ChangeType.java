@@ -111,9 +111,9 @@ public class ChangeType extends Recipe {
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
-                    Reference.MatcherMutator matcherMutator = new TypeMatcher(oldFullyQualifiedTypeName);
-                    Set<Reference> matches = new HashSet<>(references.findMatches(matcherMutator, Reference.Kind.TYPE));
-                    return new ReferenceChangeTypeVisitor(matches, matcherMutator, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
+                    Set<Reference> matches = new HashSet<>(references.findMatches(matcher, Reference.Kind.TYPE));
+                    return new ReferenceChangeTypeVisitor(matches, matcher, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
@@ -560,7 +560,7 @@ public class ChangeType extends Recipe {
 
         @Override
         public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
-            Tree tree1 = super.visit(tree, ctx);
+            Tree tree1 = super.preVisit(tree, ctx);
             for (Reference ref : matches) {
                 if (ref.getTree().equals(tree) && ref.supportsRename()) {
                     return ref.rename(renamer, newFullyQualifiedName).visit(tree, ctx, getCursor().getParent());

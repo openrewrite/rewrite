@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 @Getter
-public class TypeMatcher implements Reference.MatcherMutator {
+public class TypeMatcher implements Reference.Renamer, Reference.Matcher {
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
 
     @SuppressWarnings("NotNullFieldNotInitialized")

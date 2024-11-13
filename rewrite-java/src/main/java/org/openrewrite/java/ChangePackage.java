@@ -145,9 +145,9 @@ public class ChangePackage extends Recipe {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
-                    Reference.MatcherMutator matcherMutator = new PackageMatcher(oldPackageName, recursive);
-                    Set<Reference> matches = new HashSet<>(references.findMatches(matcherMutator, Reference.Kind.PACKAGE));
-                    return new ReferenceChangePackageVisitor(matches, matcherMutator, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    PackageMatcher matcher = new PackageMatcher(oldPackageName, recursive);
+                    Set<Reference> matches = new HashSet<>(references.findMatches(matcher));
+                    return new ReferenceChangePackageVisitor(matches, matcher, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
@@ -392,8 +392,8 @@ public class ChangePackage extends Recipe {
         String newPackageName;
 
         @Override
-        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-            Tree tree1 = super.visit(tree, ctx);
+        public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+            Tree tree1 = super.preVisit(tree, ctx);
             for (Reference ref : matches) {
                 if (ref.getTree().equals(tree) && ref.supportsRename()) {
                     return ref.rename(renamer, newPackageName).visit(tree, ctx, getCursor().getParent());

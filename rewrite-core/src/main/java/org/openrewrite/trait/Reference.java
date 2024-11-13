@@ -50,9 +50,6 @@ public interface Reference extends Trait<Tree> {
         boolean isAcceptable(SourceFile sourceFile);
     }
 
-    interface MatcherMutator extends Matcher, Renamer {
-    }
-
     interface Matcher {
         boolean matchesReference(Reference value);
     }
