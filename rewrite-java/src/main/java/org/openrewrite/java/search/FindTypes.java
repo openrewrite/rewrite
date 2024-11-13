@@ -28,6 +28,7 @@ import org.openrewrite.java.table.TypeUses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Trait;
+import org.openrewrite.trait.Reference;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -68,19 +69,19 @@ public class FindTypes extends Recipe {
         return Preconditions.check(new UsesType<>(fullyQualifiedTypeName, false), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithTypeReferences;
+                return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithReferences;
             }
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     return new JavaSourceFileVisitor(fullyQualifiedType).visit(tree, ctx);
-                } else if (tree instanceof SourceFileWithTypeReferences) {
-                    SourceFileWithTypeReferences sourceFile = (SourceFileWithTypeReferences) tree;
-                    SourceFileWithTypeReferences.TypeReferences typeReferences = sourceFile.getTypeReferences();
+                } else if (tree instanceof SourceFileWithReferences) {
+                    SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
+                    SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(fullyQualifiedTypeName);
-                    Set<Tree> matches = typeReferences.findMatches(matcher).stream().map(Trait::getTree).collect(Collectors.toSet());
-                    return new TypeReferenceVisitor(matches).visit(tree, ctx);
+                    Set<Tree> matches = references.findMatches(matcher, Reference.Kind.TYPE).stream().map(Trait::getTree).collect(Collectors.toSet());
+                    return new ReferenceVisitor(matches).visit(tree, ctx);
                 }
                 return tree;
             }
@@ -149,7 +150,7 @@ public class FindTypes extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class TypeReferenceVisitor extends TreeVisitor<Tree, ExecutionContext> {
+    private static class ReferenceVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Set<Tree> matches;
 
         @Override
