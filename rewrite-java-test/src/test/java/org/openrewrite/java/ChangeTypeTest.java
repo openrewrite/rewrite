@@ -2063,7 +2063,7 @@ class ChangeTypeTest implements RewriteTest {
 
         // Check that ChangeType changes the class name for a J.CompilationUnit
         compilationUnit = (J.CompilationUnit) new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor().visit(compilationUnit, new InMemoryExecutionContext());
-        assertEquals(compilationUnit.getClasses().get(0).getSimpleName(), "GoodbyeClass");
+        assertEquals("GoodbyeClass", compilationUnit.getClasses().get(0).getSimpleName());
     }
 
     @Test
@@ -2084,6 +2084,6 @@ class ChangeTypeTest implements RewriteTest {
 
         // Check that ChangeType changes the class name for a J.ClassDeclaration
         classDeclaration = (J.ClassDeclaration) new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor().visit(classDeclaration, new InMemoryExecutionContext());
-        assertEquals(classDeclaration.getSimpleName(), "GoodbyeClass");
+        assertEquals("GoodbyeClass", classDeclaration.getSimpleName());
     }
 }
