@@ -87,7 +87,7 @@ public class ChangePackage extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
@@ -124,7 +124,7 @@ public class ChangePackage extends Recipe {
                         }
                     }
                 }
-                return super.preVisit(tree, ctx);
+                return tree;
             }
         };
 
@@ -135,7 +135,7 @@ public class ChangePackage extends Recipe {
             }
 
             @Override
-            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     return new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
@@ -150,7 +150,7 @@ public class ChangePackage extends Recipe {
                     }
                     return new ReferenceChangePackageVisitor(matches, matcher, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
-                return super.preVisit(tree, ctx);
+                return tree;
             }
         });
     }
@@ -393,13 +393,13 @@ public class ChangePackage extends Recipe {
         String newPackageName;
 
         @Override
-        public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+        public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
             stopAfterPreVisit();
             Reference reference = matches.get(tree);
             if (reference != null && reference.supportsRename()) {
                 return reference.rename(renamer, newPackageName).visit(tree, ctx, getCursor().getParent());
             }
-            return super.preVisit(tree, ctx);
+            return tree;
         }
     }
 
