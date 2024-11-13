@@ -18,12 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
@@ -38,12 +33,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -76,14 +66,14 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
             Map<String, Set<MavenResolutionResult>> result = new HashMap<>();
             filteredResourcePathsToDeclaringPoms.forEach((filteredResourcePath, mrr) ->
                     nonPomPathsToUsages.forEach((usagePath, properties) -> {
-                        if (usagePath.startsWith(filteredResourcePath)) {
-                            properties.forEach(property -> {
-                                result.putIfAbsent(property, new HashSet<>());
-                                result.get(property).add(mrr);
-                            });
-                        }
-                    }
-            ));
+                                if (usagePath.startsWith(filteredResourcePath)) {
+                                    properties.forEach(property -> {
+                                        result.putIfAbsent(property, new HashSet<>());
+                                        result.get(property).add(mrr);
+                                    });
+                                }
+                            }
+                    ));
             return result;
         }
     }
@@ -99,15 +89,10 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(RemoveUnusedProperties.Accumulator acc) {
-        Pattern propertyMatcher = Pattern.compile(getPropertyPattern());
-        Pattern propertyUsageMatcher = Pattern.compile("[^$]*\\$\\{(" + propertyMatcher.pattern() + ")}[^$]*");
-
-        MavenIsoVisitor<ExecutionContext> findPomUsagesVisitor =
-                new FindPomUsagesVisitor(propertyUsageMatcher, acc);
-        MavenIsoVisitor<ExecutionContext> findFilteredResourcePathsVisitor =
-                new FindFilteredResourcePathsVisitor(acc);
-        PlainTextVisitor<ExecutionContext> findResourceUsagesVisitor =
-                new FindResourceUsagesVisitor(propertyUsageMatcher, acc);
+        String patternOrDefault = getPropertyPattern();
+        MavenIsoVisitor<ExecutionContext> findPomUsagesVisitor = new FindPomUsagesVisitor(dollarPropertyMatcher(patternOrDefault), acc);
+        MavenIsoVisitor<ExecutionContext> findFilteredResourcePathsVisitor = new FindFilteredResourcePathsVisitor(acc);
+        PlainTextVisitor<ExecutionContext> findResourceUsagesVisitor = new FindResourceUsagesVisitor(patternOrDefault, acc);
 
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
@@ -124,6 +109,14 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
                 return tree;
             }
         };
+    }
+
+    private static Pattern dollarPropertyMatcher(String patternOrDefault) {
+        return Pattern.compile("[^$]*\\$\\{(" + patternOrDefault + ")}[^$]*");
+    }
+
+    private static Pattern atPropertyMatcher(String patternOrDefault) {
+        return Pattern.compile("@(" + patternOrDefault + ")@");
     }
 
     @Override
@@ -182,7 +175,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
             }
 
             private boolean parentHasProperty(MavenResolutionResult resolutionResult, String propertyName,
-                    ExecutionContext ctx) {
+                                              ExecutionContext ctx) {
                 MavenPomDownloader downloader = new MavenPomDownloader(resolutionResult.getProjectPoms(), ctx,
                         resolutionResult.getMavenSettings(), resolutionResult.getActiveProfiles());
                 try {
@@ -239,11 +232,12 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
             if (resourceMatcher.matches(getCursor())) {
                 String directory = tag.getChildValue("directory").orElse(null);
                 if (tag.getChildValue("filtering").map(Boolean::valueOf).orElse(false)
-                        && directory != null) {
+                    && directory != null) {
                     Path path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
                     try {
                         acc.filteredResourcePathsToDeclaringPoms.put(path.getParent().resolve(directory), getResolutionResult());
-                    } catch (InvalidPathException ignored) {} // fail quietly
+                    } catch (InvalidPathException ignored) {
+                    } // fail quietly
                 }
                 return tag;
             } else {
@@ -253,17 +247,24 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     }
 
     private static class FindResourceUsagesVisitor extends PlainTextVisitor<ExecutionContext> {
-        private final Pattern propertyUsageMatcher;
+        private final Pattern dollarMatcher;
+        private final Pattern atMatcher;
         private final Accumulator acc;
 
-        public FindResourceUsagesVisitor(Pattern propertyUsageMatcher, Accumulator acc) {
-            this.propertyUsageMatcher = propertyUsageMatcher;
+        public FindResourceUsagesVisitor(String pattern, Accumulator acc) {
+            this.dollarMatcher = dollarPropertyMatcher(pattern);
+            this.atMatcher = atPropertyMatcher(pattern);
             this.acc = acc;
         }
 
         @Override
         public PlainText visitText(PlainText text, ExecutionContext ctx) {
-            Matcher matcher = propertyUsageMatcher.matcher(text.getText());
+            Matcher matcher = dollarMatcher.matcher(text.getText());
+            while (matcher.find()) {
+                acc.nonPomPathsToUsages.putIfAbsent(text.getSourcePath(), new HashSet<>());
+                acc.nonPomPathsToUsages.get(text.getSourcePath()).add(matcher.group(1));
+            }
+            matcher = atMatcher.matcher(text.getText());
             while (matcher.find()) {
                 acc.nonPomPathsToUsages.putIfAbsent(text.getSourcePath(), new HashSet<>());
                 acc.nonPomPathsToUsages.get(text.getSourcePath()).add(matcher.group(1));
