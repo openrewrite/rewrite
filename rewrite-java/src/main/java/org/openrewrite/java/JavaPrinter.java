@@ -849,16 +849,10 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         }
         if (multiVariable.getVarargs() != null) {
             if (!(multiVariable.getTypeExpression() instanceof ArrayType)) {
-                // The `visit(multiVariable.getTypeExpression(), p);` statement above does not know the
-                // enclosing VariableDeclarations is a vararg therefore we have to remove unnecessary dimensions here
                 if (p.out.charAt(p.out.length() - 1) == ']') {
                     int posToCheck = p.out.length() - 2;
                     while (p.out.charAt(posToCheck) != '[') {
-                        if (Character.isWhitespace(p.out.charAt(posToCheck))) {
-                            posToCheck--;
-                        } else {
-                            throw new IllegalStateException("Vararg was interpreted with non empty dimensions");
-                        }
+                        posToCheck--;
                     }
                     p.out.delete(posToCheck, p.out.length());
                 }
