@@ -394,7 +394,6 @@ public class ChangePackage extends Recipe {
 
         @Override
         public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
-            stopAfterPreVisit();
             Reference reference = matches.get(tree);
             if (reference != null && reference.supportsRename()) {
                 return reference.rename(renamer, newPackageName).visit(tree, ctx, getCursor().getParent());
