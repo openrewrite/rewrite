@@ -46,7 +46,7 @@ class SpringReferenceTest implements RewriteTest {
                   <property name="age" value="10"/>
                   <property name="sibling">
                       <bean class="org.springframework.beans.TestBean">
-                          <property name="age" value="11" class="java.lang.int"/>
+                          <property name="age" value="11" class="java.lang.Integer"/>
                           <property name="someName">
                               <value>java.lang.String</value>
                           </property>
@@ -70,7 +70,7 @@ class SpringReferenceTest implements RewriteTest {
                   <property name="age" value="10"/>
                   <property name="sibling">
                       <bean <!--~~(org.springframework.beans.TestBean)~~>-->class="org.springframework.beans.TestBean">
-                          <property name="age" value="11" <!--~~(java.lang.int)~~>-->class="java.lang.int"/>
+                          <property name="age" value="11" <!--~~(java.lang.Integer)~~>-->class="java.lang.Integer"/>
                           <property name="someName">
                               <!--~~(java.lang.String)~~>--><value>java.lang.String</value>
                           </property>
