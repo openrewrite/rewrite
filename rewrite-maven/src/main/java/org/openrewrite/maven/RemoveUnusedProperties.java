@@ -17,7 +17,6 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -112,11 +111,11 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
         };
     }
 
-    private static @NotNull Pattern dollarPropertyMatcher(String patternOrDefault) {
+    private static Pattern dollarPropertyMatcher(String patternOrDefault) {
         return Pattern.compile("[^$]*\\$\\{(" + patternOrDefault + ")}[^$]*");
     }
 
-    private static @NotNull Pattern atPropertyMatcher(String patternOrDefault) {
+    private static Pattern atPropertyMatcher(String patternOrDefault) {
         return Pattern.compile("@(" + patternOrDefault + ")@");
     }
 
