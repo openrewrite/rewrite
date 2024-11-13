@@ -148,8 +148,8 @@ class Java21ParserTest implements RewriteTest {
               class Test {
                   void switchEnumExtendedType(I c) {
                       switch (c) {
-                          case Foo.CLUBS -> System.out.println("It's Foo A");
-                          case Foo.DIAMONDS -> System.out.println("It's Foo B");
+                          case Foo.A -> System.out.println("It's Foo A");
+                          case Foo.B -> System.out.println("It's Foo B");
                           case Bar b -> System.out.println("It's Bar");
                       }
                   }
