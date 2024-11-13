@@ -46,12 +46,15 @@ class SpringReferenceTest implements RewriteTest {
                   <property name="age" value="10"/>
                   <property name="sibling">
                       <bean class="org.springframework.beans.TestBean">
-                          <property name="age" value="11" class="java.lang.Integer"/>
+                          <property name="age" value="11" class="java.lang.int"/>
                           <property name="someName">
                               <value>java.lang.String</value>
                           </property>
                           <property name="someOtherName">
                               <value>java.lang</value>
+                          </property>
+                          <property name="nameMap">
+                              <map key-type="java.lang.String" value-type="java.lang.String"/>
                           </property>
                       </bean>
                   </property>
@@ -67,12 +70,15 @@ class SpringReferenceTest implements RewriteTest {
                   <property name="age" value="10"/>
                   <property name="sibling">
                       <bean <!--~~(org.springframework.beans.TestBean)~~>-->class="org.springframework.beans.TestBean">
-                          <property name="age" value="11" <!--~~(java.lang.Integer)~~>-->class="java.lang.Integer"/>
+                          <property name="age" value="11" <!--~~(java.lang.int)~~>-->class="java.lang.int"/>
                           <property name="someName">
                               <!--~~(java.lang.String)~~>--><value>java.lang.String</value>
                           </property>
                           <property name="someOtherName">
                               <!--~~(java.lang)~~>--><value>java.lang</value>
+                          </property>
+                          <property name="nameMap">
+                              <map <!--~~(java.lang.String)~~>-->key-type="java.lang.String" <!--~~(java.lang.String)~~>-->value-type="java.lang.String"/>
                           </property>
                       </bean>
                   </property>

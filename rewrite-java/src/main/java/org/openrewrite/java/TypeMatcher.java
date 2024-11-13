@@ -117,11 +117,11 @@ public class TypeMatcher implements Reference.Renamer, Reference.Matcher {
 
     @Override
     public boolean matchesReference(Reference reference) {
-        return matchesTargetTypeName(reference.getValue());
+        return reference.getKind().equals(Reference.Kind.TYPE) && matchesTargetTypeName(reference.getValue());
     }
 
     @Override
-    public TreeVisitor<Tree, ExecutionContext> rename(String newValue, boolean recursive) {
+    public TreeVisitor<Tree, ExecutionContext> rename(String newValue) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {

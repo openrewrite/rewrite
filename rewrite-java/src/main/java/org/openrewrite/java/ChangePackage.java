@@ -26,10 +26,9 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
 import java.nio.file.Paths;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -115,13 +114,12 @@ public class ChangePackage extends Recipe {
                         }
                     }
                     stopAfterPreVisit();
-                }
-                if (tree instanceof SourceFileWithReferences) {
+                } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     String recursivePackageNamePrefix = oldPackageName + ".";
                     for (Reference ref : cu.getReferences().getReferences()) {
-                        if (ref.getKind().equals(Reference.Kind.PACKAGE) && ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
+                        if (ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
                             return SearchResult.found(cu);
                         }
                     }
@@ -146,7 +144,10 @@ public class ChangePackage extends Recipe {
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     PackageMatcher matcher = new PackageMatcher(oldPackageName, recursive);
-                    Set<Reference> matches = new HashSet<>(references.findMatches(matcher));
+                    Map<Tree, Reference> matches = new HashMap<>();
+                    for (Reference ref : references.findMatches(matcher)) {
+                        matches.put(ref.getTree(), ref);
+                    }
                     return new ReferenceChangePackageVisitor(matches, matcher, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
@@ -387,19 +388,17 @@ public class ChangePackage extends Recipe {
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class ReferenceChangePackageVisitor extends TreeVisitor<Tree, ExecutionContext> {
-        Set<Reference> matches;
+        Map<Tree, Reference> matches;
         Reference.Renamer renamer;
         String newPackageName;
 
         @Override
         public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
-            Tree tree1 = super.preVisit(tree, ctx);
-            for (Reference ref : matches) {
-                if (ref.getTree().equals(tree) && ref.supportsRename()) {
-                    return ref.rename(renamer, newPackageName).visit(tree, ctx, getCursor().getParent());
-                }
+            Reference reference = matches.get(tree);
+            if (reference != null && reference.supportsRename()) {
+                return reference.rename(renamer, newPackageName).visit(tree, ctx, getCursor().getParent());
             }
-            return tree1;
+            return tree;
         }
     }
 

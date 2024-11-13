@@ -24,6 +24,7 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -62,9 +63,11 @@ class SpringReference implements Reference {
     }
 
     static class Matcher extends SimpleTraitMatcher<SpringReference> {
-        private final Pattern typeReference = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
+        private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
         private final XPathMatcher classXPath = new XPathMatcher("//@class");
         private final XPathMatcher typeXPath = new XPathMatcher("//@type");
+        private final XPathMatcher keyTypeXPath = new XPathMatcher("//@key-type");
+        private final XPathMatcher valueTypeXPath = new XPathMatcher("//@value-type");
         private final XPathMatcher tags = new XPathMatcher("//value");
 
         @Override
@@ -72,18 +75,18 @@ class SpringReference implements Reference {
             Object value = cursor.getValue();
             if (value instanceof Xml.Attribute) {
                 Xml.Attribute attrib = (Xml.Attribute) value;
-                if (classXPath.matches(cursor) || typeXPath.matches(cursor)) {
+                if (classXPath.matches(cursor) || typeXPath.matches(cursor) || keyTypeXPath.matches(cursor) || valueTypeXPath.matches(cursor)) {
                     String stringVal = attrib.getValueAsString();
-                    if (typeReference.matcher(stringVal).matches()) {
+                    if (referencePattern.matcher(stringVal).matches()) {
                         return new SpringReference(cursor, determineKind(stringVal));
                     }
                 }
             } else if (value instanceof Xml.Tag) {
                 Xml.Tag tag = (Xml.Tag) value;
                 if (tags.matches(cursor)) {
-                    String stringVal = tag.getValue().get();
-                    if (tag.getValue().isPresent() && typeReference.matcher(stringVal).matches()) {
-                        return new SpringReference(cursor, determineKind(stringVal));
+                    Optional<String> stringVal = tag.getValue();
+                    if (stringVal.isPresent() && referencePattern.matcher(stringVal.get()).matches()) {
+                        return new SpringReference(cursor, determineKind(stringVal.get()));
                     }
                 }
             }
@@ -91,7 +94,7 @@ class SpringReference implements Reference {
         }
 
         Kind determineKind(String value) {
-            return Character.isUpperCase(value.charAt(value.lastIndexOf('.')+1)) ? Kind.TYPE : Kind.PACKAGE;
+            return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
         }
     }
 

@@ -89,8 +89,7 @@ public class ChangeType extends Recipe {
                         return SearchResult.found(cu);
                     }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
-                }
-                if (tree instanceof SourceFileWithReferences) {
+                } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
@@ -112,7 +111,10 @@ public class ChangeType extends Recipe {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
-                    Set<Reference> matches = new HashSet<>(references.findMatches(matcher, Reference.Kind.TYPE));
+                    Map<Tree, Reference> matches = new HashMap<>();
+                    for (Reference ref : references.findMatches(matcher, Reference.Kind.TYPE)) {
+                        matches.put(ref.getTree(), ref);
+                    }
                     return new ReferenceChangeTypeVisitor(matches, matcher, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
@@ -554,19 +556,17 @@ public class ChangeType extends Recipe {
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class ReferenceChangeTypeVisitor extends TreeVisitor<Tree, ExecutionContext> {
-        Set<Reference> matches;
+        Map<Tree, Reference> matches;
         Reference.Renamer renamer;
         String newFullyQualifiedName;
 
         @Override
         public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
-            Tree tree1 = super.preVisit(tree, ctx);
-            for (Reference ref : matches) {
-                if (ref.getTree().equals(tree) && ref.supportsRename()) {
-                    return ref.rename(renamer, newFullyQualifiedName).visit(tree, ctx, getCursor().getParent());
-                }
+            Reference reference = matches.get(tree);
+            if (reference != null && reference.supportsRename()) {
+                return reference.rename(renamer, newFullyQualifiedName).visit(tree, ctx, getCursor().getParent());
             }
-            return tree1;
+            return tree;
         }
     }
 

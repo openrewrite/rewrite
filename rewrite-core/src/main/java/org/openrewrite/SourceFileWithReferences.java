@@ -45,7 +45,7 @@ public interface SourceFileWithReferences extends SourceFile {
         private List<Reference> findMatchesInternal(Reference.Matcher matcher, Reference.@Nullable Kind kind) {
             List<Reference> list = new ArrayList<>();
             for (Reference ref : references) {
-                if (ref.matches(matcher) && (kind == null || ref.getKind().equals(kind))) {
+                if ((kind == null || ref.getKind().equals(kind)) && ref.matches(matcher) ) {
                     list.add(ref);
                 }
             }

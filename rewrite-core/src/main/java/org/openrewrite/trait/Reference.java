@@ -39,7 +39,7 @@ public interface Reference extends Trait<Tree> {
         return matcher.matchesReference(this);
     }
 
-    default TreeVisitor<Tree, ExecutionContext>  rename(Renamer renamer, String replacement) {
+    default TreeVisitor<Tree, ExecutionContext> rename(Renamer renamer, String replacement) {
         return renamer.rename(replacement);
     }
 
@@ -56,10 +56,6 @@ public interface Reference extends Trait<Tree> {
 
     interface Renamer {
         default TreeVisitor<Tree, ExecutionContext> rename(String replacement) {
-            return rename(replacement, false);
-        }
-
-        default TreeVisitor<Tree, ExecutionContext> rename(String replacement, boolean recursive) {
             throw new UnsupportedOperationException();
         }
     }

@@ -27,32 +27,33 @@ import org.openrewrite.xml.tree.Xml;
 @Getter
 public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
 
-    @Nullable
-    private String targetPackage;
+    private final @Nullable String targetPackage;
 
     @Getter
     private final Boolean recursive;
 
-    public PackageMatcher(@Nullable String fieldType) {
-        this(fieldType, false);
+    public PackageMatcher(@Nullable String targetPackage) {
+        this(targetPackage, false);
     }
 
-    public PackageMatcher(@Nullable String fieldType, @Nullable boolean recursive) {
-        this.targetPackage = fieldType;
+    public PackageMatcher(@Nullable String targetPackage, boolean recursive) {
+        this.targetPackage = targetPackage;
         this.recursive = recursive;
     }
 
     @Override
     public boolean matchesReference(Reference reference) {
-        String recursivePackageNamePrefix = targetPackage + ".";
-        if (reference.getValue().equals(targetPackage) || recursive && reference.getValue().startsWith(recursivePackageNamePrefix)) {
-            return true;
+        if (reference.getKind().equals(Reference.Kind.TYPE) || reference.getKind().equals(Reference.Kind.PACKAGE)) {
+            String recursivePackageNamePrefix = targetPackage + ".";
+            if (reference.getValue().equals(targetPackage) || recursive && reference.getValue().startsWith(recursivePackageNamePrefix)) {
+                return true;
+            }
         }
         return false;
     }
 
     @Override
-    public TreeVisitor<Tree, ExecutionContext> rename(String newValue, boolean recursive) {
+    public TreeVisitor<Tree, ExecutionContext> rename(String newValue) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -71,11 +72,13 @@ public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
         };
     }
 
-    String getReplacement(String value, String oldValue, String newValue) {
-        if (recursive) {
-            return value.replace(oldValue, newValue);
-        } else if (value.startsWith(oldValue) && Character.isUpperCase(value.charAt(oldValue.length() + 1))) {
-            return value.replace(oldValue, newValue);
+    String getReplacement(String value, @Nullable String oldValue, String newValue) {
+        if (oldValue != null) {
+            if (recursive) {
+                return value.replace(oldValue, newValue);
+            } else if (value.startsWith(oldValue) && Character.isUpperCase(value.charAt(oldValue.length() + 1))) {
+                return value.replace(oldValue, newValue);
+            }
         }
         return value;
     }
