@@ -30,6 +30,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.xml.Assertions.xml;
@@ -2053,14 +2054,36 @@ class ChangeTypeTest implements RewriteTest {
           public class HelloClass {}
           """;
 
-        J.CompilationUnit sourceJavaFile = (J.CompilationUnit) JavaParser.fromJavaVersion()
+        J.CompilationUnit compilationUnit = (J.CompilationUnit) JavaParser
+          .fromJavaVersion()
           .build()
-          .parse(helloClass).findFirst().get();
+          .parse(helloClass)
+          .findFirst()
+          .get();
 
-        J.ClassDeclaration cd = sourceJavaFile.getClasses().get(0);
+        // Check that ChangeType changes the class name for a J.CompilationUnit
+        compilationUnit = (J.CompilationUnit) new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor().visit(compilationUnit, new InMemoryExecutionContext());
+        assertEquals(compilationUnit.getClasses().get(0).getSimpleName(), "GoodbyeClass");
+    }
 
-        cd = (J.ClassDeclaration) new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor().visit(cd, new InMemoryExecutionContext());
+    @Test
+    void classDeclarationTest() {
+        @Language("java")
+        String helloClass = """
+          package hello;
+          public class HelloClass {}
+          """;
 
-        assertTrue(cd.getSimpleName().equals("GoodbyeClass"));
+        J.CompilationUnit compilationUnit = (J.CompilationUnit) JavaParser
+          .fromJavaVersion()
+          .build()
+          .parse(helloClass)
+          .findFirst()
+          .get();
+        J.ClassDeclaration classDeclaration = compilationUnit.getClasses().get(0);
+
+        // Check that ChangeType changes the class name for a J.ClassDeclaration
+        classDeclaration = (J.ClassDeclaration) new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor().visit(classDeclaration, new InMemoryExecutionContext());
+        assertEquals(classDeclaration.getSimpleName(), "GoodbyeClass");
     }
 }
