@@ -28,7 +28,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.trait.reference.Reference;
+import org.openrewrite.trait.Reference;
 
 import java.util.function.Predicate;
 import java.util.regex.Pattern;

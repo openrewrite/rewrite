@@ -21,7 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.trait.reference.Reference;
+import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
 @Getter

@@ -24,7 +24,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.trait.reference.Reference;
+import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;

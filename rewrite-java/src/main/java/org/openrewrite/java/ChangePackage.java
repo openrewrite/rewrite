@@ -23,7 +23,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.trait.reference.Reference;
+import org.openrewrite.trait.Reference;
 
 import java.nio.file.Paths;
 import java.util.HashSet;

@@ -28,7 +28,7 @@ import org.openrewrite.java.table.TypeUses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Trait;
-import org.openrewrite.trait.reference.Reference;
+import org.openrewrite.trait.Reference;
 
 import java.util.HashSet;
 import java.util.Set;

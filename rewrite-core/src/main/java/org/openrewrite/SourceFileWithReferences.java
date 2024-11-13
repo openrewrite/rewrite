@@ -19,7 +19,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.trait.reference.Reference;
+import org.openrewrite.trait.Reference;
 
 import java.util.*;
 

@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.trait.reference;
+package org.openrewrite.trait;
 
 import org.openrewrite.*;
-import org.openrewrite.trait.Trait;
 
 import java.util.Set;
 

@@ -24,7 +24,7 @@ import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.trait.reference.Reference;
+import org.openrewrite.trait.Reference;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;

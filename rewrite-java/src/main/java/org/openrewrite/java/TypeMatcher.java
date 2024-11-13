@@ -29,7 +29,7 @@ import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.trait.reference.Reference;
+import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.regex.Pattern;
