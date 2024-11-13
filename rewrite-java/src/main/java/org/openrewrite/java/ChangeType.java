@@ -564,7 +564,6 @@ public class ChangeType extends Recipe {
 
         @Override
         public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
-            stopAfterPreVisit();
             Reference reference = matches.get(tree);
             if (reference != null && reference.supportsRename()) {
                 return reference.rename(renamer, newFullyQualifiedName).visit(tree, ctx, getCursor().getParent());
