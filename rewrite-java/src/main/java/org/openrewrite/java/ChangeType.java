@@ -82,7 +82,8 @@ public class ChangeType extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
                     if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
@@ -93,7 +94,7 @@ public class ChangeType extends Recipe {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
-                return tree;
+                return super.preVisit(tree, ctx);
             }
         };
 
@@ -104,7 +105,8 @@ public class ChangeType extends Recipe {
             }
 
             @Override
-            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 } else if (tree instanceof SourceFileWithReferences) {
@@ -117,7 +119,7 @@ public class ChangeType extends Recipe {
                     }
                     return new ReferenceChangeTypeVisitor(matches, matcher, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
-                return tree;
+                return super.preVisit(tree, ctx);
             }
         });
     }
@@ -561,12 +563,13 @@ public class ChangeType extends Recipe {
         String newFullyQualifiedName;
 
         @Override
-        public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
             Reference reference = matches.get(tree);
             if (reference != null && reference.supportsRename()) {
                 return reference.rename(renamer, newFullyQualifiedName).visit(tree, ctx, getCursor().getParent());
             }
-            return tree;
+            return super.preVisit(tree, ctx);
         }
     }
 

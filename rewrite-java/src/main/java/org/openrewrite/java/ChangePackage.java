@@ -88,6 +88,7 @@ public class ChangePackage extends Recipe {
         TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
                     if (cu.getPackageDeclaration() != null) {
@@ -113,7 +114,6 @@ public class ChangePackage extends Recipe {
                             }
                         }
                     }
-                    stopAfterPreVisit();
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
@@ -123,7 +123,6 @@ public class ChangePackage extends Recipe {
                             return SearchResult.found(cu);
                         }
                     }
-                    stopAfterPreVisit();
                 }
                 return super.preVisit(tree, ctx);
             }
@@ -136,7 +135,8 @@ public class ChangePackage extends Recipe {
             }
 
             @Override
-            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     return new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 } else if (tree instanceof SourceFileWithReferences) {
@@ -150,7 +150,7 @@ public class ChangePackage extends Recipe {
                     }
                     return new ReferenceChangePackageVisitor(matches, matcher, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
-                return tree;
+                return super.preVisit(tree, ctx);
             }
         });
     }
@@ -393,12 +393,13 @@ public class ChangePackage extends Recipe {
         String newPackageName;
 
         @Override
-        public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
             Reference reference = matches.get(tree);
             if (reference != null && reference.supportsRename()) {
                 return reference.rename(renamer, newPackageName).visit(tree, ctx, getCursor().getParent());
             }
-            return tree;
+            return super.preVisit(tree, ctx);
         }
     }
 
