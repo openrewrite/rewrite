@@ -431,15 +431,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         JContainer<TypeTree> implementings = null;
         if (node.getImplementsClause() != null && !node.getImplementsClause().isEmpty()) {
-            if (kind.getType() == J.ClassDeclaration.Kind.Type.Interface) {
-                extendings = padLeft(sourceBefore("extends"), convert(node.getImplementsClause().get(0)));
-            } else {
-                implementings = JContainer.build(
-                        sourceBefore("implements"),
-                        convertAll(node.getImplementsClause(), commaDelim, noDelim),
-                        Markers.EMPTY
-                );
-            }
+            Space implementsPrefix = sourceBefore(kind.getType() == J.ClassDeclaration.Kind.Type.Interface ?
+                    "extends" : "implements");
+
+            implementings = JContainer.build(
+                    implementsPrefix,
+                    convertAll(node.getImplementsClause(), commaDelim, noDelim),
+                    Markers.EMPTY
+            );
         }
 
         JContainer<TypeTree> permitting = null;
