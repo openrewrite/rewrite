@@ -17,29 +17,34 @@ package org.openrewrite.xml.trait;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.trait.SimpleTraitMatcher;
-import org.openrewrite.trait.TypeReference;
+import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 @Value
-class SpringTypeReference implements TypeReference {
+class SpringReference implements Reference {
     Cursor cursor;
+    Kind kind;
 
     @Override
     public Tree getTree() {
-        return TypeReference.super.getTree();
+        return Reference.super.getTree();
     }
 
     @Override
-    public String getName() {
+    public Kind getKind() {
+        return kind;
+    }
+
+    @Override
+    public String getValue() {
         if (getTree() instanceof Xml.Attribute) {
             Xml.Attribute attribute = (Xml.Attribute) getTree();
             return attribute.getValueAsString();
@@ -52,45 +57,58 @@ class SpringTypeReference implements TypeReference {
         throw new IllegalArgumentException("getTree() must be an Xml.Attribute or Xml.Tag: " + getTree().getClass());
     }
 
-    static class Matcher extends SimpleTraitMatcher<SpringTypeReference> {
-        private final Pattern typeReference = Pattern.compile("(?:[a-zA-Z_][a-zA-Z0-9_]*\\.)+[A-Z*][a-zA-Z0-9_]*(?:<[a-zA-Z0-9_,?<> ]*>)?");
+    @Override
+    public boolean supportsRename() {
+        return true;
+    }
+
+    static class Matcher extends SimpleTraitMatcher<SpringReference> {
+        private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
         private final XPathMatcher classXPath = new XPathMatcher("//@class");
         private final XPathMatcher typeXPath = new XPathMatcher("//@type");
+        private final XPathMatcher keyTypeXPath = new XPathMatcher("//@key-type");
+        private final XPathMatcher valueTypeXPath = new XPathMatcher("//@value-type");
         private final XPathMatcher tags = new XPathMatcher("//value");
 
         @Override
-        protected @Nullable SpringTypeReference test(Cursor cursor) {
+        protected @Nullable SpringReference test(Cursor cursor) {
             Object value = cursor.getValue();
             if (value instanceof Xml.Attribute) {
                 Xml.Attribute attrib = (Xml.Attribute) value;
-                if (classXPath.matches(cursor) || typeXPath.matches(cursor)) {
-                    if (typeReference.matcher(attrib.getValueAsString()).matches()) {
-                        return new SpringTypeReference(cursor);
+                if (classXPath.matches(cursor) || typeXPath.matches(cursor) || keyTypeXPath.matches(cursor) || valueTypeXPath.matches(cursor)) {
+                    String stringVal = attrib.getValueAsString();
+                    if (referencePattern.matcher(stringVal).matches()) {
+                        return new SpringReference(cursor, determineKind(stringVal));
                     }
                 }
             } else if (value instanceof Xml.Tag) {
                 Xml.Tag tag = (Xml.Tag) value;
                 if (tags.matches(cursor)) {
-                    if (tag.getValue().isPresent() && typeReference.matcher(tag.getValue().get()).matches()) {
-                        return new SpringTypeReference(cursor);
+                    Optional<String> stringVal = tag.getValue();
+                    if (stringVal.isPresent() && referencePattern.matcher(stringVal.get()).matches()) {
+                        return new SpringReference(cursor, determineKind(stringVal.get()));
                     }
                 }
             }
             return null;
         }
+
+        Kind determineKind(String value) {
+            return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
+        }
     }
 
     @SuppressWarnings("unused")
-    public static class Provider implements TypeReference.Provider {
+    public static class Provider implements Reference.Provider {
 
         @Override
-        public Set<TypeReference> getTypeReferences(SourceFile sourceFile) {
-            Set<TypeReference> typeReferences = new HashSet<>();
+        public Set<Reference> getReferences(SourceFile sourceFile) {
+            Set<Reference> references = new HashSet<>();
             new Matcher().asVisitor(reference -> {
-                typeReferences.add(reference);
+                references.add(reference);
                 return reference.getTree();
             }).visit(sourceFile, 0);
-            return typeReferences;
+            return references;
         }
 
         @Override

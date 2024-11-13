@@ -15,29 +15,48 @@
  */
 package org.openrewrite.trait;
 
-import org.openrewrite.Incubating;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 
 import java.util.Set;
 
 @Incubating(since = "8.39.0")
-public interface TypeReference extends Trait<Tree> {
+public interface Reference extends Trait<Tree> {
 
-    String getName();
+    enum Kind {
+        TYPE,
+        PACKAGE
+    }
+
+    Kind getKind();
+
+    String getValue();
+
+    default boolean supportsRename() {
+        return false;
+    }
 
     default boolean matches(Matcher matcher) {
-        return matcher.matchesName(getName());
+        return matcher.matchesReference(this);
+    }
+
+    default TreeVisitor<Tree, ExecutionContext> rename(Renamer renamer, String replacement) {
+        return renamer.rename(replacement);
     }
 
     interface Provider {
 
-        Set<TypeReference> getTypeReferences(SourceFile sourceFile);
+        Set<Reference> getReferences(SourceFile sourceFile);
 
         boolean isAcceptable(SourceFile sourceFile);
     }
 
     interface Matcher {
-        boolean matchesName(String name);
+        boolean matchesReference(Reference value);
+    }
+
+    interface Renamer {
+        default TreeVisitor<Tree, ExecutionContext> rename(String replacement) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

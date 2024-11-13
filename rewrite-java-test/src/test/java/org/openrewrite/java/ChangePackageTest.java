@@ -30,6 +30,7 @@ import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.xml.Assertions.xml;
 
 @SuppressWarnings("ConstantConditions")
 class ChangePackageTest implements RewriteTest {
@@ -1701,5 +1702,27 @@ class ChangePackageTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    void changePackageInSpringXml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true)),
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="abc" class="test.type.A"/>
+              </beans>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="abc" class="test.test.type.A"/>
+              </beans>
+              """
+          )
+        );
+
     }
 }

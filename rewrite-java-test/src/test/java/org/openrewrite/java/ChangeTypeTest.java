@@ -29,6 +29,7 @@ import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.xml.Assertions.xml;
 
 @SuppressWarnings("ConstantConditions")
 class ChangeTypeTest implements RewriteTest {
@@ -2017,6 +2018,28 @@ class ChangeTypeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void changeTypeInSpringXml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("test.type.A", "test.type.B", true)),
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="abc" class="test.type.A"/>
+              </beans>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="abc" class="test.type.B"/>
+              </beans>
+              """
+          )
+        );
+
     }
 
 }
