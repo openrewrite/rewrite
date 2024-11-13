@@ -361,7 +361,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
 
     @Override
     @SuppressWarnings("ConstantConditions")
-    public JavaType type(@Nullable Tree tree) {
+    public @Nullable JavaType type(@Nullable Tree tree) {
         if (tree == null) {
             return null;
         }
@@ -381,7 +381,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private @Nullable JavaType type(Type type, Symbol symbol) {
-        if (type instanceof Type.MethodType) {
+        if (type instanceof Type.MethodType || type instanceof Type.ForAll) {
             return methodInvocationType(type, symbol);
         }
         return type(type);

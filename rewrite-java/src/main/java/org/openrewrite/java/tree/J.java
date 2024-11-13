@@ -1222,6 +1222,12 @@ public interface J extends Tree {
         @Nullable
         JLeftPadded<TypeTree> extendings;
 
+        /**
+         * This is used to access the parent class.
+         *
+         * @return The parent class of the ClassDeclaration. If the ClassDeclaration is a class, this will return the
+         * class specified by the 'extends' keyword. If the ClassDeclaration is an interface, this will return null.
+         */
         public @Nullable TypeTree getExtends() {
             return extendings == null ? null : extendings.getElement();
         }
@@ -1233,6 +1239,13 @@ public interface J extends Tree {
         @Nullable
         JContainer<TypeTree> implementings;
 
+        /**
+         * This is used to access the parent interfaces.
+         *
+         * @return A list of the parent interfaces of the ClassDeclaration. If the ClassDeclaration is a class, this
+         * will return the interfaces specified by the 'implements' keyword. If the ClassDeclaration is an interface,
+         * this will return the interfaces specified by the 'extends' keyword.
+         */
         public @Nullable List<TypeTree> getImplements() {
             return implementings == null ? null : implementings.getElements();
         }
@@ -1760,7 +1773,7 @@ public interface J extends Tree {
         Markers markers;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 
@@ -4835,7 +4848,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             J2 element = tree.getElement();
             if (element instanceof Expression) {
                 return ((Expression) element).getType();
@@ -6101,7 +6114,7 @@ public interface J extends Tree {
         NameTree boundedType;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 

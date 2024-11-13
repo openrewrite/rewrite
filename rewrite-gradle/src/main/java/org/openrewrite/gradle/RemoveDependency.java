@@ -123,7 +123,7 @@ public class RemoveDependency extends Recipe {
             }
 
             @Override
-            public J visitReturn(J.Return return_, ExecutionContext ctx) {
+            public @Nullable J visitReturn(J.Return return_, ExecutionContext ctx) {
                 boolean dependencyInvocation = return_.getExpression() instanceof J.MethodInvocation && dependencyDsl.matches((J.MethodInvocation) return_.getExpression());
                 J.Return r = (J.Return) super.visitReturn(return_, ctx);
                 if (dependencyInvocation && r.getExpression() == null) {
@@ -134,7 +134,7 @@ public class RemoveDependency extends Recipe {
             }
 
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();

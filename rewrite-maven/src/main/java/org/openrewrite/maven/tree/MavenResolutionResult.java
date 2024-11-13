@@ -209,6 +209,10 @@ public class MavenResolutionResult implements Marker {
                 .anyMatch(gav -> gav.equals(parentGav));
     }
 
+    public boolean isMultiModulePom() {
+        return getPom().getSubprojects() == null || !getPom().getSubprojects().isEmpty();
+    }
+
     private Map<Path, Pom> getProjectPomsRecursive(Map<Path, Pom> projectPoms) {
         projectPoms.put(requireNonNull(pom.getRequested().getSourcePath()), pom.getRequested());
         if (parent != null) {

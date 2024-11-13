@@ -24,6 +24,7 @@ import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.trait.Reference;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -79,24 +80,51 @@ public class ChangeType extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    JavaSourceFile cu = (JavaSourceFile) tree;
                     if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
+                } else if (tree instanceof SourceFileWithReferences) {
+                    SourceFileWithReferences cu = (SourceFileWithReferences) tree;
+                    return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
-                return (J) tree;
+                return tree;
             }
         };
 
-        return Preconditions.check(condition, new ChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition));
+        return Preconditions.check(condition, new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithReferences;
+            }
+
+            @Override
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                if (tree instanceof JavaSourceFile) {
+                    return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                } else if (tree instanceof SourceFileWithReferences) {
+                    SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
+                    SourceFileWithReferences.References references = sourceFile.getReferences();
+                    TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
+                    Map<Tree, Reference> matches = new HashMap<>();
+                    for (Reference ref : references.findMatches(matcher, Reference.Kind.TYPE)) {
+                        matches.put(ref.getTree(), ref);
+                    }
+                    return new ReferenceChangeTypeVisitor(matches, matcher, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                }
+                return tree;
+            }
+        });
     }
 
-    private static class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
+    private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
 
@@ -109,7 +137,7 @@ public class ChangeType extends Recipe {
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
 
-        private ChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
+        private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
             this.ignoreDefinition = ignoreDefinition;
@@ -527,6 +555,23 @@ public class ChangeType extends Recipe {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class ReferenceChangeTypeVisitor extends TreeVisitor<Tree, ExecutionContext> {
+        Map<Tree, Reference> matches;
+        Reference.Renamer renamer;
+        String newFullyQualifiedName;
+
+        @Override
+        public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+            Reference reference = matches.get(tree);
+            if (reference != null && reference.supportsRename()) {
+                return reference.rename(renamer, newFullyQualifiedName).visit(tree, ctx, getCursor().getParent());
+            }
+            return tree;
+        }
+    }
+
     private static class ChangeClassDefinition extends JavaIsoVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType.Class targetType;
@@ -573,13 +618,13 @@ public class ChangeType extends Recipe {
 
         private boolean updatePath(JavaSourceFile sf, String oldPath, String newPath) {
             return !oldPath.equals(newPath) && sf.getClasses().stream()
-                    .anyMatch(o -> !J.Modifier.hasModifier(o.getModifiers(), J.Modifier.Type.Private) &&
+                    .anyMatch(o -> !o.hasModifier(J.Modifier.Type.Private) &&
                                    o.getType() != null && !o.getType().getFullyQualifiedName().contains("$") &&
                                    TypeUtils.isOfClassType(o.getType(), getTopLevelClassName(originalType).getFullyQualifiedName()));
         }
 
         @Override
-        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+        public J.@Nullable Package visitPackage(J.Package pkg, ExecutionContext ctx) {
             Boolean updatePackage = getCursor().pollNearestMessage("UPDATE_PACKAGE");
             if (updatePackage != null && updatePackage) {
                 String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");

@@ -60,7 +60,7 @@ public class DependencyUseMapNotation extends Recipe {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
-                
+
                 if (!(gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m))) {
                     return m;
                 }

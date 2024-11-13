@@ -157,8 +157,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                             getComparatorOrThrow()));
                                 }
                             }
-                            return autoFormat(c, c.getLeadingAnnotations().get(c.getLeadingAnnotations().size() - 1), p,
-                                    getCursor().getParentOrThrow());
+                            return autoFormat(c, c.getName(), p, getCursor().getParentOrThrow());
                         }
                         case EXTENDS: {
                             TypeTree anExtends = substitutions.unsubstitute(templateParser.parseExtends(getCursor(), substitutedTemplate));

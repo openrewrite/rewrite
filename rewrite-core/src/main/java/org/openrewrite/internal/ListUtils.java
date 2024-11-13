@@ -273,7 +273,7 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> concat(@Nullable T t, @Nullable List<T> ls) {
+    public static <T> @Nullable List<T> concat(@Nullable T t, @Nullable List<T> ls) {
         if (t == null && ls == null) {
             //noinspection ConstantConditions
             return null;
@@ -288,7 +288,7 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> concatAll(@Nullable List<T> ls, @Nullable List<? extends T> t) {
+    public static <T> @Nullable List<T> concatAll(@Nullable List<T> ls, @Nullable List<? extends T> t) {
         if (ls == null && t == null) {
             //noinspection ConstantConditions
             return null;
