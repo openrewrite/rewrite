@@ -668,4 +668,113 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void appendSingleValueToExistingArrayAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "b",
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"a"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"a", "b"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendMultipleValuesToExistingArrayAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "b,c",
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"a"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"a", "b", "c"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+
+
+    @Test
+    void appendMultipleValuesToExistingArrayAttributeWithOverlap() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "b,c",
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"a", "b"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              // What would be desired here????
+              @Foo(array = {"a", "b", "c"})
+              @Foo(array = {"a", "b", "b", "c"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
 }
