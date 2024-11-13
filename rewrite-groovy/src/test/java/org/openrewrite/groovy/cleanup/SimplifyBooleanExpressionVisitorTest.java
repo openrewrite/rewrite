@@ -414,6 +414,23 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mapFields() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  def foo(boolean a, Map m) {
+                      if (a || m.foo || m.bar) {
+                          System.out.println("")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @Issue("https://github.com/openrewrite/rewrite-templating/issues/28")
     // Mimic what would be inserted by a Refaster template using two nullable parameters, with the second one a literal
@@ -468,7 +485,6 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       a == null || !a.isEmpty() && "b" != null && !"b".isEmpty() // a == null || !a.isEmpty()
       """)
     void simplifyLiteralNull(String before, String after) {
-        //language=java
         String template = """
           class A {
               void foo(String a) {
