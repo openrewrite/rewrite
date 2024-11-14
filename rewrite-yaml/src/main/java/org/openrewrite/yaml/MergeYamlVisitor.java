@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @RequiredArgsConstructor
 public class MergeYamlVisitor<P> extends YamlVisitor<P> {
-    private final Yaml scope;
+    private final Yaml existing;
     private final Yaml incoming;
     private final boolean acceptTheirs;
 
@@ -48,7 +48,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         .map(docs -> {
                             // Any comments will have been put on the parent Document node, preserve by copying to the mapping
                             Yaml.Document doc = docs.getDocuments().get(0);
-                            if(doc.getBlock() instanceof Yaml.Mapping) {
+                            if (doc.getBlock() instanceof Yaml.Mapping) {
                                 Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
                                 return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
                             } else if (doc.getBlock() instanceof Yaml.Sequence) {
@@ -64,7 +64,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitScalar(Yaml.Scalar existingScalar, P p) {
-        if (scope.isScope(existingScalar) && incoming instanceof Yaml.Scalar) {
+        if (existing.isScope(existingScalar) && incoming instanceof Yaml.Scalar) {
             return mergeScalar(existingScalar, (Yaml.Scalar) incoming);
         }
         return super.visitScalar(existingScalar, p);
@@ -72,15 +72,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitSequence(Yaml.Sequence existingSeq, P p) {
-        if (scope.isScope(existingSeq)) {
+        if (existing.isScope(existingSeq)) {
             if (incoming instanceof Yaml.Mapping) {
                 // Distribute the incoming mapping to each entry in the sequence
-                return existingSeq.withEntries(ListUtils.map(existingSeq.getEntries(), (i, existingSeqEntry) -> {
-                    Yaml.Block b = (Yaml.Block) new MergeYamlVisitor<>(existingSeqEntry.getBlock(), incoming,
-                            acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
-                            .visitNonNull(existingSeqEntry.getBlock(), p, new Cursor(getCursor(), existingSeqEntry));
-                    return existingSeqEntry.withBlock(b);
-                }));
+                return existingSeq.withEntries(ListUtils.map(existingSeq.getEntries(), (i, existingSeqEntry) ->
+                        existingSeqEntry.withBlock((Yaml.Block)
+                                new MergeYamlVisitor<>(existingSeqEntry.getBlock(), incoming, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
+                                        .visitNonNull(existingSeqEntry.getBlock(), p, new Cursor(getCursor(), existingSeqEntry))
+                        )
+                ));
             } else if (incoming instanceof Yaml.Sequence) {
                 return mergeSequence(existingSeq, (Yaml.Sequence) incoming, p, getCursor());
             }
@@ -90,14 +90,14 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitMapping(Yaml.Mapping existingMapping, P p) {
-        if (scope.isScope(existingMapping) && incoming instanceof Yaml.Mapping) {
+        if (existing.isScope(existingMapping) && incoming instanceof Yaml.Mapping) {
             return mergeMapping(existingMapping, (Yaml.Mapping) incoming, p, getCursor());
         }
         return super.visitMapping(existingMapping, p);
     }
 
-    private static boolean keyMatches(Yaml.Mapping.Entry e1, Yaml.Mapping.Entry e2) {
-        return e1.getKey().getValue().equals(e2.getKey().getValue());
+    private static boolean keyMatches(Yaml.Mapping.@Nullable Entry e1, Yaml.Mapping.@Nullable Entry e2) {
+        return e1 != null && e2 != null && e1.getKey().getValue().equals(e2.getKey().getValue());
     }
 
     private boolean keyMatches(Yaml.Mapping m1, Yaml.Mapping m2) {
@@ -117,9 +117,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         List<Yaml.Mapping.Entry> mutatedEntries = ListUtils.map(m1.getEntries(), existingEntry -> {
             for (Yaml.Mapping.Entry incomingEntry : m2.getEntries()) {
                 if (keyMatches(existingEntry, incomingEntry)) {
-                    return existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(),
-                            incomingEntry.getValue(), acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
-                            .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
+                    return existingEntry.withValue((Yaml.Block)
+                            new MergeYamlVisitor<>(existingEntry.getValue(), incomingEntry.getValue(), acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
+                                    .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
                 }
             }
             return existingEntry;
@@ -176,7 +176,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         Yaml.Mapping existingMapping = (Yaml.Mapping) existingEntry.getBlock();
                         if (keyMatches(existingMapping, incomingMapping)) {
                             Yaml.Sequence.Entry e1 = existingEntry.withBlock(mergeMapping(existingMapping, incomingMapping, p, cursor));
-                            if(e1 == existingEntry) {
+                            if (e1 == existingEntry) {
                                 // Made no change, no need to consider the entry "mutated"
                                 //noinspection DataFlowIssue
                                 return null;
