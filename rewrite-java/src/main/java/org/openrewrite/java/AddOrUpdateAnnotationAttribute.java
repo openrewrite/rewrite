@@ -95,7 +95,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 String newAttributeValue = maybeQuoteStringArgument(attributeName, attributeValue, a);
                 List<Expression> currentArgs = a.getArguments();
-                if (currentArgs == null || currentArgs.isEmpty()) {
+                if (currentArgs == null || currentArgs.isEmpty() || currentArgs.get(0) instanceof J.Empty) {
                     if (newAttributeValue == null) {
                         return a;
                     }
