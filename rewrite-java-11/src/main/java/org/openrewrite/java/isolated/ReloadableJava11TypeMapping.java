@@ -364,7 +364,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private @Nullable JavaType type(Type type, Symbol symbol) {
-        if (type instanceof Type.MethodType) {
+        if (type instanceof Type.MethodType || type instanceof Type.ForAll) {
             return methodInvocationType(type, symbol);
         }
         return type(type);
@@ -579,7 +579,11 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                             .map(attr -> attr.getValue().toString())
                             .collect(Collectors.toList());
                 } else {
-                    defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    try {
+                        defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    } catch(UnsupportedOperationException e) {
+                        // not all Attribute implementations define `getValue()`
+                    }
                 }
             }
             JavaType.Method method = new JavaType.Method(
