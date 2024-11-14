@@ -22,17 +22,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -101,6 +95,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return false;
     }
 
+    private static J.Literal constructLiteral(String attributeValue, Space prefix) {
+        return new J.Literal(randomId(), prefix, Markers.EMPTY, attributeValue, attributeValue, null, JavaType.Primitive.String);
+    }
+
+//    private static List<String> getAttributeListValues(List<String> attributeList, J.Annotation finalA) {
+//        return attributeList.stream().map(attribute -> maybeQuoteStringArgument(finalA, attribute)).collect(Collectors.toList());
+//    }
+
     @Override
     public String getDisplayName() {
         return "Add or update annotation attribute";
@@ -166,57 +168,52 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             }
 
                             if (as.getAssignment() instanceof J.NewArray) {
-                                List<Expression> jLiteralList = ((J.NewArray) as.getAssignment()).getInitializer();
-                                String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
-                                List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
-
                                 for (Marker m : as.getMarkers().getMarkers()) {
-                                    if (m instanceof AlreadyAppended && ((AlreadyAppended) m).getValues().equals(newAttributeValue)) {
+                                    if (m instanceof AlreadyAppended) {
                                         return as;
                                     }
                                 }
 
+                                List<Expression> jLiteralList = ((J.NewArray) as.getAssignment()).getInitializer();
+                                String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
+                                List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
+                                List<String> newAttributeListValues = attributeList.stream().map(attribute -> maybeQuoteStringArgument(attributeName, attribute, finalA)).collect(Collectors.toList());
+
                                 if (Boolean.TRUE.equals(appendArray)) {
-                                    for (int i = 0, j = jLiteralList.size(); i < attributeList.size(); j++, i++) {
-                                        String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(i), finalA);
-                                        if (Boolean.FALSE.equals(addOnly) && attributeValIsAlreadyPresentOrNull(jLiteralList, newAttributeListValue)) {
-                                            j--;
-                                            continue;
-                                        }
-                                        jLiteralList.add(j, new J.Literal(randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
+                                    if (Boolean.FALSE.equals(addOnly)) {
+                                        newAttributeListValues = newAttributeListValues.stream()
+                                                .filter(attribute -> !attributeValIsAlreadyPresentOrNull(jLiteralList, attribute)).collect(Collectors.toList());
                                     }
+
+                                    // In case of annotation with empty array.
+                                    if (jLiteralList.size() == 1 && jLiteralList.get(0) instanceof J.Empty) {
+                                        jLiteralList.clear();
+                                    }
+
+                                    for (int i = 0, j = jLiteralList.size(); i < newAttributeListValues.size(); j++, i++) {
+                                        Space prefix = (j == 0) ? Space.EMPTY : jLiteralList.get(j - 1).getPrefix();
+                                        jLiteralList.add(j, new J.Literal(randomId(), prefix, Markers.EMPTY, newAttributeListValues.get(i), newAttributeListValues.get(i), null, JavaType.Primitive.String));
+                                    }
+
                                     return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList)).withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue)));
+                                } else if (Boolean.FALSE.equals(addOnly) || jLiteralList == null || jLiteralList.isEmpty()) {
+                                    List<Expression> newAttributeLiterals = new ArrayList<>();
+                                    boolean hasChanged = jLiteralList == null || newAttributeListValues.size() != jLiteralList.size();
+                                    for (int i = 0; i < newAttributeListValues.size(); i++) {
+                                        if (!hasChanged && !newAttributeListValues.get(i).equals(((J.Literal) jLiteralList.get(i)).getValueSource())) {
+                                            hasChanged = true;
+                                        }
+                                        newAttributeLiterals.add(constructLiteral(newAttributeListValues.get(i), Space.EMPTY));
+                                    }
+
+                                    if (hasChanged) {
+                                        return as.withAssignment(((J.NewArray) as.getAssignment())
+                                                        .withInitializer(newAttributeLiterals))
+                                                .withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue)));
+                                    }
+                                    return as;
                                 }
-                                int m = 0;
-                                for (int i = 0; i < Objects.requireNonNull(jLiteralList).size(); i++) {
-                                    if (i >= attributeList.size()) {
-                                        jLiteralList.remove(i);
-                                        i--;
-                                        continue;
-                                    }
-
-                                    String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(i), finalA);
-                                    if (jLiteralList.size() == i + 1) {
-                                        m = i + 1;
-                                    }
-
-                                    if (newAttributeListValue != null && newAttributeListValue.equals(((J.Literal) jLiteralList.get(i)).getValueSource()) || Boolean.TRUE.equals(addOnly)) {
-                                        continue;
-                                    }
-
-                                    jLiteralList.set(i, ((J.Literal) jLiteralList.get(i)).withValue(newAttributeListValue).withValueSource(newAttributeListValue).withPrefix(jLiteralList.get(i).getPrefix()));
-                                }
-                                if (jLiteralList.size() < attributeList.size() || Boolean.TRUE.equals(addOnly)) {
-                                    if (Boolean.TRUE.equals(addOnly)) {
-                                        m = 0;
-                                    }
-                                    for (int j = m; j < attributeList.size(); j++) {
-                                        String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(j), finalA);
-                                        jLiteralList.add(j, new J.Literal(randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
-                                    }
-                                }
-
-                                return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList));
+                                return as;
                             } else {
                                 J.Literal value = (J.Literal) as.getAssignment();
                                 if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
