@@ -607,7 +607,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             "org.example.Foo",
             "array",
             "newTest1,newTest2",
-            false)),
+            false, null)),
           java(
             """
               package org.example;
