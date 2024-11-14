@@ -125,6 +125,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             return existingEntry;
         });
 
+        int x = mutatedEntries.size();
         mutatedEntries = ListUtils.concatAll(mutatedEntries, ListUtils.map(m2.getEntries(), incomingEntry -> {
             for (Yaml.Mapping.Entry existingEntry : m1.getEntries()) {
                 if (keyMatches(existingEntry, incomingEntry)) {
@@ -136,6 +137,70 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             }
             return incomingEntry;
         }));
+        boolean hasNewElements = x < mutatedEntries.size();
+
+        if (hasNewElements) {
+            System.out.println(">>>>");
+
+            Cursor currCursor = getCursor();
+            Cursor c = cursor.dropParentWhile(it -> {
+                if (it instanceof Yaml.Document) {
+                    return false;
+                }
+
+                if (it instanceof Yaml.Mapping) {
+                    boolean xx = ((Yaml.Mapping) it).getEntries().size() == 1;
+
+                    if (!xx) {
+
+                    }
+
+                    return xx;
+                }
+
+                return true;
+            });
+
+            if (c.getValue() instanceof Yaml.Document || c.getValue() instanceof Yaml.Mapping) {
+                Yaml.Mapping.Entry lastEntry = mutatedEntries.get(mutatedEntries.size() - 1);
+                String comment = "";
+
+                if (c.getValue() instanceof Yaml.Document) {
+                    comment = ((Yaml.Document) c.getValue()).getEnd().getPrefix();
+
+                }
+                if (c.getValue() instanceof Yaml.Mapping) {
+                    List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
+
+
+                    int index = entries.size() - 1;
+
+                    if (currCursor.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) currCursor.getValue()).getEntries().size() == 1) {
+                        for (int i = 0; i < entries.size(); i++) {
+                            if (((Yaml.Mapping) entries.get(i).getValue()).getEntries().get(0).equals(((Yaml.Mapping) currCursor.getValue()).getEntries().get(0))) {
+                                index = i + 1;
+                                System.out.println(entries.size() == index);
+                                break;
+                            }
+                        }
+                    }
+
+                    // tenporary check
+                    if (index < entries.size()) {
+                        comment = entries.get(index).getPrefix().split("\n")[0];
+                    }
+                }
+
+
+                //mutatedEntries.set(mutatedEntries.size() - 1, lastEntry.withPrefix(comment + lastEntry.getPrefix()));
+                c.putMessage("RemovePrefix", true);
+            }
+
+
+        }
+
+        //System.out.println((String) cursor.getMessage("RemovePrefix"));
+
 
         return m1.withEntries(mutatedEntries);
     }

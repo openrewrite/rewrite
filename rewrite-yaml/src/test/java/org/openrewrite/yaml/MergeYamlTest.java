@@ -1030,12 +1030,12 @@ class MergeYamlTest implements RewriteTest {
             """
               spring:
                 application:
-                  name: main # Some comment
+                  name: main # some comment
               """,
             """
               spring:
                 application:
-                  name: main # Some comment
+                  name: main # some comment
                   description: a description
               """
           )
@@ -1045,6 +1045,75 @@ class MergeYamlTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2218")
     @Test
     void existingEntryBlockWithCommentVariant() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A:
+                B:
+                  C:
+                    D:
+                      3: new desc
+                    D2:
+                      2: new description
+                    D3:
+                      2: new text
+              """,
+            false,
+            null,
+            null
+          )),
+          yaml(
+            """
+              A: # Some comment
+                B: # Some comment 2
+                  C: # Some comment 3
+                    D: # Some comment 4
+                      1: something else
+                      2: old desc # Some comment 5
+                    D2: # Some comment 6
+                      1: old description # Some comment 7
+                    D3: # Some comment 8
+                      1: old text # Some comment 9
+              """,
+            """
+              A: # Some comment
+                B: # Some comment 2
+                  C: # Some comment 3
+                    D: # Some comment 4
+                      1: something else
+                      2: old desc # Some comment 5
+                      3: new desc
+                    D2: # Some comment 6
+                      1: old description # Some comment 7
+                      2: new description
+                    D3: # Some comment 8
+                      1: old text # Some comment 9
+                      2: new text
+              """
+          )
+        );
+    }
+
+    /* VAN:
+    spring: # Some comment
+        application: # Some comment 2
+          name: main # Some comment 3
+
+    NAAR
+
+    spring:> # Some comment
+        <application:> # Some comment 2
+          <name: main> # Some comment 3
+        <key: value
+
+
+     */
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
+    @Test
+    void existingEntryBlockWithCommentVariant2() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
