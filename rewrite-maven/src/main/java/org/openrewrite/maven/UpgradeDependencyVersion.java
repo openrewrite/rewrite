@@ -27,7 +27,6 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
@@ -202,7 +201,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator accumulator) {
         return new MavenIsoVisitor<ExecutionContext>() {
-            private final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
             private final VersionComparator versionComparator =
                     requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
@@ -242,7 +240,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return e.warn(t);
                 }
 
-                if (t != tag && PROJECT_MATCHER.matches(getCursor())) {
+                if (t != tag && isProjectTag()) {
                     maybeUpdateModel();
                     doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
                 }

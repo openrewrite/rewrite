@@ -26,7 +26,6 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedPom;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -38,7 +37,6 @@ import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangePackaging extends Recipe {
-    private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
 
     @Option(displayName = "Group",
             description = "The groupId of the project whose packaging should be changed. Accepts glob patterns.",
@@ -102,7 +100,7 @@ public class ChangePackaging extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if (PROJECT_MATCHER.matches(getCursor())) {
+                if (isProjectTag()) {
                     Optional<Xml.Tag> maybePackaging = t.getChild("packaging");
                     if (!maybePackaging.isPresent() || oldPackaging == null || oldPackaging.equals(maybePackaging.get().getValue().orElse(null))) {
                         if (packaging == null || "jar".equals(packaging)) {
