@@ -41,6 +41,66 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddOrUpdateAnnotationAttribute extends Recipe {
+    @Option(displayName = "Annotation type",
+            description = "The fully qualified name of the annotation.",
+            example = "org.junit.Test")
+    String annotationType;
+    @Option(displayName = "Attribute name",
+            description = "The name of attribute to change. If omitted defaults to 'value'.",
+            required = false,
+            example = "timeout")
+    @Nullable
+    String attributeName;
+    @Option(displayName = "Attribute value",
+            description = "The value to set the attribute to. Set to `null` to remove the attribute.",
+            example = "500")
+    @Nullable
+    String attributeValue;
+    @Option(displayName = "Add only",
+            description = "When set to `true` will not change existing annotation attribute values.")
+    @Nullable
+    Boolean addOnly;
+    @Option(displayName = "Append array",
+            description = "If the attribute is an array, setting this option to `true` will append the value(s). " +
+                          "In conjunction with `addOnly`, it is possible to control duplicates:" +
+                          "`addOnly=true`, always append. " +
+                          "`addOnly=false`, only append if the value is not already present.")
+    @Nullable
+    Boolean appendArray;
+
+    private static @Nullable String maybeQuoteStringArgument(@Nullable String attributeName, @Nullable String attributeValue, J.Annotation annotation) {
+        if ((attributeValue != null) && attributeIsString(attributeName, annotation)) {
+            return "\"" + attributeValue + "\"";
+        } else {
+            return attributeValue;
+        }
+    }
+
+    private static boolean attributeIsString(@Nullable String attributeName, J.Annotation annotation) {
+        String actualAttributeName = (attributeName == null) ? "value" : attributeName;
+        JavaType.Class annotationType = (JavaType.Class) annotation.getType();
+        if (annotationType != null) {
+            for (JavaType.Method m : annotationType.getMethods()) {
+                if (m.getName().equals(actualAttributeName)) {
+                    return TypeUtils.isOfClassType(m.getReturnType(), "java.lang.String");
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean attributeValIsAlreadyPresentOrNull(List<Expression> expression, @Nullable String attributeValue) {
+        for (Expression e : expression) {
+            if (e instanceof J.Literal) {
+                J.Literal literal = (J.Literal) e;
+                if (literal.getValueSource() != null && literal.getValueSource().equals(attributeValue)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     @Override
     public String getDisplayName() {
         return "Add or update annotation attribute";
@@ -51,37 +111,6 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return "Some annotations accept arguments. This recipe sets an existing argument to the specified value, " +
                "or adds the argument if it is not already set.";
     }
-
-    @Option(displayName = "Annotation type",
-            description = "The fully qualified name of the annotation.",
-            example = "org.junit.Test")
-    String annotationType;
-
-    @Option(displayName = "Attribute name",
-            description = "The name of attribute to change. If omitted defaults to 'value'.",
-            required = false,
-            example = "timeout")
-    @Nullable
-    String attributeName;
-
-    @Option(displayName = "Attribute value",
-            description = "The value to set the attribute to. Set to `null` to remove the attribute.",
-            example = "500")
-    @Nullable
-    String attributeValue;
-
-    @Option(displayName = "Add only",
-            description = "When set to `true` will not change existing annotation attribute values.")
-    @Nullable
-    Boolean addOnly;
-
-    @Option(displayName = "Append array",
-            description = "If the attribute is an array, setting this option to `true` will append the value(s). " +
-                          "In conjunction with `addOnly`, it is possible to control duplicates:" +
-                          "`addOnly=true`, always append. " +
-                          "`addOnly=false`, only append if the value is not already present.")
-    @Nullable
-    Boolean appendArray;
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -108,7 +137,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     } else {
                         String newAttributeValueResult = newAttributeValue;
                         if (((JavaType.FullyQualified) Objects.requireNonNull(a.getAnnotationType().getType())).getMethods().stream().anyMatch(method -> method.getReturnType().toString().equals("java.lang.String[]"))) {
-                            String attributeValueCleanedUp = attributeValue.replaceAll("\\s+","").replaceAll("[\\s+{}\"]","");
+                            String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
                             List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
                             newAttributeValueResult = attributeList.stream()
                                     .map(String::valueOf)
@@ -138,7 +167,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                             if (as.getAssignment() instanceof J.NewArray) {
                                 List<Expression> jLiteralList = ((J.NewArray) as.getAssignment()).getInitializer();
-                                String attributeValueCleanedUp = attributeValue.replaceAll("\\s+","").replaceAll("[\\s+{}\"]","");
+                                String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
                                 List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
 
                                 for (Marker m : as.getMarkers().getMarkers()) {
@@ -159,16 +188,16 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList)).withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue)));
                                 }
                                 int m = 0;
-                                for (int i = 0; i< Objects.requireNonNull(jLiteralList).size(); i++){
-                                    if (i >= attributeList.size()){
+                                for (int i = 0; i < Objects.requireNonNull(jLiteralList).size(); i++) {
+                                    if (i >= attributeList.size()) {
                                         jLiteralList.remove(i);
                                         i--;
                                         continue;
                                     }
 
                                     String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(i), finalA);
-                                    if (jLiteralList.size() == i+1){
-                                        m = i+1;
+                                    if (jLiteralList.size() == i + 1) {
+                                        m = i + 1;
                                     }
 
                                     if (newAttributeListValue != null && newAttributeListValue.equals(((J.Literal) jLiteralList.get(i)).getValueSource()) || Boolean.TRUE.equals(addOnly)) {
@@ -177,11 +206,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                                     jLiteralList.set(i, ((J.Literal) jLiteralList.get(i)).withValue(newAttributeListValue).withValueSource(newAttributeListValue).withPrefix(jLiteralList.get(i).getPrefix()));
                                 }
-                                if (jLiteralList.size() < attributeList.size() || Boolean.TRUE.equals(addOnly)){
-                                    if (Boolean.TRUE.equals(addOnly)){
+                                if (jLiteralList.size() < attributeList.size() || Boolean.TRUE.equals(addOnly)) {
+                                    if (Boolean.TRUE.equals(addOnly)) {
                                         m = 0;
                                     }
-                                    for (int j = m; j < attributeList.size(); j++){
+                                    for (int j = m; j < attributeList.size(); j++) {
                                         String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(j), finalA);
                                         jLiteralList.add(j, new J.Literal(randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
                                     }
@@ -264,39 +293,6 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 return a;
             }
         });
-    }
-
-    private static @Nullable String maybeQuoteStringArgument(@Nullable String attributeName, @Nullable String attributeValue, J.Annotation annotation) {
-        if ((attributeValue != null) && attributeIsString(attributeName, annotation)) {
-            return "\"" + attributeValue + "\"";
-        } else {
-            return attributeValue;
-        }
-    }
-
-    private static boolean attributeIsString(@Nullable String attributeName, J.Annotation annotation) {
-        String actualAttributeName = (attributeName == null) ? "value" : attributeName;
-        JavaType.Class annotationType = (JavaType.Class) annotation.getType();
-        if (annotationType != null) {
-            for (JavaType.Method m : annotationType.getMethods()) {
-                if (m.getName().equals(actualAttributeName)) {
-                    return TypeUtils.isOfClassType(m.getReturnType(), "java.lang.String");
-                }
-            }
-        }
-        return false;
-    }
-
-    private static boolean attributeValIsAlreadyPresentOrNull(List<Expression> expression, @Nullable String attributeValue) {
-        for (Expression e : expression) {
-            if (e instanceof J.Literal) {
-                J.Literal literal = (J.Literal) e;
-                if (literal.getValueSource() != null && literal.getValueSource().equals(attributeValue)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     @Value
