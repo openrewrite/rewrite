@@ -134,7 +134,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         public List<Annotation> getAllAnnotations() {
@@ -1292,7 +1292,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -3687,7 +3687,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -5810,7 +5810,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
