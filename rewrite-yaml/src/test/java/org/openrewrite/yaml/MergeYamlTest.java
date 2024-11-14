@@ -1054,6 +1054,62 @@ class MergeYamlTest implements RewriteTest {
                 B:
                   C:
                     D:
+                      4: new desc
+                    D2:
+                      2: new description
+                    D3:
+                      2: new text
+              """,
+            false,
+            null,
+            null
+          )),
+          yaml(
+            """
+              A: # Some comment
+                B:
+                  C:
+                    D:
+                      1: something else
+                      2: something else
+                      3: old desc
+                    D2:
+                      1: old description
+                    D3:
+                      1: old text
+              """,
+            """
+              A: # Some comment
+                B:
+                  C:
+                    D:
+                      1: something else
+                      2: something else
+                      3: old desc
+                      4: new desc
+                    D2:
+                      1: old description
+                      2: new description
+                    D3:
+                      1: old text
+                      2: new text
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
+    @Test
+    void existingEntryBlockWithCommentVariant2() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A:
+                B:
+                  C:
+                    D:
                       3: new desc
                     D2:
                       2: new description
@@ -1113,7 +1169,7 @@ class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2218")
     @Test
-    void existingEntryBlockWithCommentVariant2() {
+    void existingEntryBlockWithCommentVariant3() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
