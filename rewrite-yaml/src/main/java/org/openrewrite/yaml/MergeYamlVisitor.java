@@ -149,13 +149,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
 
                 if (it instanceof Yaml.Mapping) {
-                    boolean xx = ((Yaml.Mapping) it).getEntries().size() == 1;
-
-                    if (!xx) {
-
-                    }
-
-                    return xx;
+                    return ((Yaml.Mapping) it).getEntries().size() == 1;
                 }
 
                 return true;
@@ -192,7 +186,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
 
 
-                //mutatedEntries.set(mutatedEntries.size() - 1, lastEntry.withPrefix(comment + lastEntry.getPrefix()));
+                mutatedEntries.set(mutatedEntries.size() - 1, lastEntry.withPrefix(comment + lastEntry.getPrefix()));
                 c.putMessage("RemovePrefix", true);
             }
 
