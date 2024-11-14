@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -25,13 +26,17 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -131,10 +136,17 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 return null;
                             }
 
-                            if (as.getAssignment() instanceof J.NewArray){
+                            if (as.getAssignment() instanceof J.NewArray) {
                                 List<Expression> jLiteralList = ((J.NewArray) as.getAssignment()).getInitializer();
                                 String attributeValueCleanedUp = attributeValue.replaceAll("\\s+","").replaceAll("[\\s+{}\"]","");
                                 List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
+
+                                for (Marker m : as.getMarkers().getMarkers()) {
+                                    if (m instanceof AlreadyAppended && ((AlreadyAppended) m).getValues().equals(newAttributeValue)) {
+                                        return as;
+                                    }
+                                }
+
                                 if (Boolean.TRUE.equals(appendArray)) {
                                     for (int i = 0, j = jLiteralList.size(); i < attributeList.size(); j++, i++) {
                                         String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(i), finalA);
@@ -142,9 +154,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                             j--;
                                             continue;
                                         }
-                                        jLiteralList.add(j, new J.Literal(Tree.randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
+                                        jLiteralList.add(j, new J.Literal(randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
                                     }
-                                    return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList));
+                                    return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList)).withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue)));
                                 }
                                 int m = 0;
                                 for (int i = 0; i< Objects.requireNonNull(jLiteralList).size(); i++){
@@ -171,7 +183,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     }
                                     for (int j = m; j < attributeList.size(); j++){
                                         String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(j), finalA);
-                                        jLiteralList.add(j, new J.Literal(Tree.randomId(), jLiteralList.get(j-1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
+                                        jLiteralList.add(j, new J.Literal(randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
                                     }
                                 }
 
@@ -285,5 +297,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             }
         }
         return false;
+    }
+
+    @Value
+    @With
+    private static class AlreadyAppended implements Marker {
+        UUID id;
+        String values;
     }
 }

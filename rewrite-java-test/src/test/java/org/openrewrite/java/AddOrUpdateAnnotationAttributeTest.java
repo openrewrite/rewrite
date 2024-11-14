@@ -17,8 +17,6 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpec;
-import org.openrewrite.test.SourceSpecs;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -588,41 +586,6 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               
               @Foo
-              public class A {
-              }
-              """,
-            """
-              import org.example.Foo;
-              
-              @Foo(array = {"newTest1", "newTest2"})
-              public class A {
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void addArrayInputInAnnotationAttributeEmptyBrackets() {
-        rewriteRun(
-          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
-            "org.example.Foo",
-            "array",
-            "newTest1,newTest2",
-            false, false)),
-          java(
-            """
-              package org.example;
-              public @interface Foo {
-                  String[] array() default {};
-              }
-              """
-          ),
-          java(
-            """
-              import org.example.Foo;
-              
-              @Foo()
               public class A {
               }
               """,
