@@ -70,6 +70,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Nullable
     Boolean addOnly;
 
+    @Option(displayName = "Append array",
+            description = "If the attribute is an array, setting this option to `true` will append the value(s). " +
+                          "In conjunction with `addOnly`, it is possible to control duplicates:" +
+                          "`addOnly=true`, always append. " +
+                          "`addOnly=false`, only append if the value is not already present.")
+    @Nullable
+    Boolean appendArray;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
@@ -127,6 +135,17 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 List<Expression> jLiteralList = ((J.NewArray) as.getAssignment()).getInitializer();
                                 String attributeValueCleanedUp = attributeValue.replaceAll("\\s+","").replaceAll("[\\s+{}\"]","");
                                 List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
+                                if (Boolean.TRUE.equals(appendArray)) {
+                                    for (int i = 0, j = jLiteralList.size(); i < attributeList.size(); j++, i++) {
+                                        String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(i), finalA);
+                                        if (Boolean.FALSE.equals(addOnly) && attributeValIsAlreadyPresentOrNull(jLiteralList, newAttributeListValue)) {
+                                            j--;
+                                            continue;
+                                        }
+                                        jLiteralList.add(j, new J.Literal(Tree.randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
+                                    }
+                                    return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList));
+                                }
                                 int m = 0;
                                 for (int i = 0; i< Objects.requireNonNull(jLiteralList).size(); i++){
                                     if (i >= attributeList.size()){
@@ -250,6 +269,18 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             for (JavaType.Method m : annotationType.getMethods()) {
                 if (m.getName().equals(actualAttributeName)) {
                     return TypeUtils.isOfClassType(m.getReturnType(), "java.lang.String");
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean attributeValIsAlreadyPresentOrNull(List<Expression> expression, @Nullable String attributeValue) {
+        for (Expression e : expression) {
+            if (e instanceof J.Literal) {
+                J.Literal literal = (J.Literal) e;
+                if (literal.getValueSource() != null && literal.getValueSource().equals(attributeValue)) {
+                    return true;
                 }
             }
         }
