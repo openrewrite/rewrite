@@ -45,6 +45,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
     static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
+    static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
 
     private transient Xml.@Nullable Document document;
 
@@ -257,6 +258,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     public boolean isParentTag() {
         return isTag("parent") && PARENT_MATCHER.matches(getCursor());
+    }
+
+    public boolean isProjectTag() {
+        return isTag("project") && PROJECT_MATCHER.matches(getCursor());
     }
 
     private boolean isTag(String name) {
