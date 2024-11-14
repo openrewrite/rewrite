@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -111,7 +112,6 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void nonExistentBlock() {
         rewriteRun(
@@ -1005,6 +1005,72 @@ class MergeYamlTest implements RewriteTest {
                       apiVersion: sql.tanzu.vmware.com/v2
                       kind: MySQL
                       name: relation-profile-database
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
+    @Test
+    void existingEntryBlockWithComment() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              spring:
+                application:
+                  description: a description
+              """,
+            false,
+            null,
+            null
+          )),
+          yaml(
+            """
+              spring:
+                application:
+                  name: main # Some comment
+              """,
+            """
+              spring:
+                application:
+                  name: main # Some comment
+                  description: a description
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
+    @Test
+    void existingEntryBlockWithCommentVariant() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              spring:
+                application:
+                  description: a description
+              """,
+            false,
+            null,
+            null
+          )),
+          yaml(
+            """
+              spring:
+                application:
+                  name: main # Some comment
+                  name2: main
+              """,
+            """
+              spring:
+                application:
+                  name: main # Some comment
+                  name2: main
+                  description: a description
               """
           )
         );
