@@ -18,10 +18,7 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Issue;
-import org.openrewrite.PathUtils;
+import org.openrewrite.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -31,7 +28,6 @@ import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.xml.Assertions.xml;
 
@@ -1986,27 +1982,27 @@ class ChangeTypeTest implements RewriteTest {
             true)),
           java(
             """
-            package org.a;
-
-            public class A {
-              public static String A = "A";
-            }
-            """),
+              package org.a;
+              
+              public class A {
+                public static String A = "A";
+              }
+              """),
           java(
             """
-            package org.ab;
-
-            public class AB {
-              public static String A = "A";
-              public static String B = "B";
-            }
-            """),
+              package org.ab;
+              
+              public class AB {
+                public static String A = "A";
+                public static String B = "B";
+              }
+              """),
           // language=java
           java(
             """
               import org.a.A;
               import org.ab.AB;
-
+              
               class Letters {
                 String a = A.A;
                 String b = AB.B;
@@ -2014,7 +2010,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import org.ab.AB;
-
+              
               class Letters {
                 String a = AB.A;
                 String b = AB.B;
@@ -2047,43 +2043,23 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
-    void compilationUnitTest() {
-        @Language("java")
-        String helloClass = """
-          package hello;
-          public class HelloClass {}
-          """;
+    void changeTypeWorksOnDirectInvocations() {
+        rewriteRun(
+          spec -> spec.recipe(Recipe.noop()), // do not run the default recipe
+          java(
+            """
+              package hello;
+              public class HelloClass {}
+              """,
+            spec -> spec.beforeRecipe((source) -> {
+                TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
 
-        J.CompilationUnit compilationUnit = (J.CompilationUnit) JavaParser
-          .fromJavaVersion()
-          .build()
-          .parse(helloClass)
-          .findFirst()
-          .get();
+                J.CompilationUnit cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
+                assertEquals("GoodbyeClass", cu.getClasses().get(0).getSimpleName());
 
-        // Check that ChangeType changes the class name for a J.CompilationUnit
-        compilationUnit = (J.CompilationUnit) new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor().visit(compilationUnit, new InMemoryExecutionContext());
-        assertEquals("GoodbyeClass", compilationUnit.getClasses().get(0).getSimpleName());
-    }
-
-    @Test
-    void classDeclarationTest() {
-        @Language("java")
-        String helloClass = """
-          package hello;
-          public class HelloClass {}
-          """;
-
-        J.CompilationUnit compilationUnit = (J.CompilationUnit) JavaParser
-          .fromJavaVersion()
-          .build()
-          .parse(helloClass)
-          .findFirst()
-          .get();
-        J.ClassDeclaration classDeclaration = compilationUnit.getClasses().get(0);
-
-        // Check that ChangeType changes the class name for a J.ClassDeclaration
-        classDeclaration = (J.ClassDeclaration) new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor().visit(classDeclaration, new InMemoryExecutionContext());
-        assertEquals("GoodbyeClass", classDeclaration.getSimpleName());
+                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().get(0), new InMemoryExecutionContext());
+                assertEquals("GoodbyeClass", cd.getSimpleName());
+            }))
+        );
     }
 }
