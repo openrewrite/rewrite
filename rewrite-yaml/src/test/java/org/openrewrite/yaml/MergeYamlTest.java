@@ -1059,6 +1059,8 @@ class MergeYamlTest implements RewriteTest {
                       2: new description
                     D3:
                       2: new text
+                      3: more new text
+                  E: description
               """,
             false,
             null,
@@ -1093,6 +1095,8 @@ class MergeYamlTest implements RewriteTest {
                     D3:
                       1: old text
                       2: new text
+                      3: more new text
+                  E: description
               """
           )
         );
