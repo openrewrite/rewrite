@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -101,6 +102,19 @@ class DeleteMethodArgumentTest implements RewriteTest {
           java(
             "public class A { B b = new B(0); }",
             "public class A { B b = new B(); }"
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4676")
+    @Test
+    void deleteFirstArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteMethodArgument("B foo(int, int, int)", 0)),
+          java(b),
+          java(
+            "public class A {{ B.foo(0, 1, 2); }}",
+            "public class A {{ B.foo(1, 2); }}"
           )
         );
     }
