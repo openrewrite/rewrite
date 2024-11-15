@@ -69,7 +69,8 @@ class FindPluginsTest implements RewriteTest {
     void settingsResolutionStrategy() {
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi()),
-          settingsGradle("""
+          settingsGradle(
+              """
             pluginManagement {
                 repositories {
                     mavenLocal()
@@ -83,7 +84,8 @@ class FindPluginsTest implements RewriteTest {
                     }
                 }
             }
-            """),
+            """
+          ),
           buildGradle(
             """
               plugins {
