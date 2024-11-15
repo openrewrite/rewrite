@@ -599,7 +599,11 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                             .map(attr -> attr.getValue().toString())
                             .collect(Collectors.toList());
                 } else {
-                    defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    try {
+                        defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    } catch(UnsupportedOperationException e) {
+                        // not all Attribute implementations define `getValue()`
+                    }
                 }
             }
             JavaType.Method method = new JavaType.Method(
