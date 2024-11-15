@@ -15,7 +15,6 @@
  */
 package org.openrewrite.yaml;
 
-import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -112,6 +111,7 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void nonExistentBlock() {
         rewriteRun(
@@ -1012,39 +1012,7 @@ class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2218")
     @Test
-    void existingEntryBlockWithComment() {
-        rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
-              spring:
-                application:
-                  description: a description
-              """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
-              spring:
-                application:
-                  name: main # some comment
-              """,
-            """
-              spring:
-                application:
-                  name: main # some comment
-                  description: a description
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
-    @Test
-    void existingEntryBlockWithCommentVariant() {
+    void existingEntryBlockWithCommentAtFirstLine() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
@@ -1104,7 +1072,39 @@ class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2218")
     @Test
-    void existingEntryBlockWithCommentVariant2() {
+    void existingEntryBlockWithCommentAtLastLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              spring:
+                application:
+                  description: a description
+              """,
+            false,
+            null,
+            null
+          )),
+          yaml(
+            """
+              spring:
+                application:
+                  name: main # some comment
+              """,
+            """
+              spring:
+                application:
+                  name: main # some comment
+                  description: a description
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
+    @Test
+    void existingEntryBlockWithCommentAllOverThePlace() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
@@ -1156,24 +1156,46 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
-    /* VAN:
-    spring: # Some comment
-        application: # Some comment 2
-          name: main # Some comment 3
-
-    NAAR
-
-    spring:> # Some comment
-        <application:> # Some comment 2
-          <name: main> # Some comment 3
-        <key: value
-
-
-     */
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
+    @Test
+    void existingEntryBlockWithCommentAllOverThePlaceWEGG() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A:
+                B:
+                  C:
+                    2: new desc
+              """,
+            false,
+            null,
+            null
+          )),
+          yaml(
+            """
+              A: # Some comment
+                B: # Some comment 2
+                  C: # Some comment 3
+                    1: old desc # Some comment 4
+              D: whatever
+              """,
+            """
+              A: # Some comment
+                B: # Some comment 2
+                  C: # Some comment 3
+                    1: old desc # Some comment 4
+                    2: new desc
+              D: whatever
+              """
+          )
+        );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2218")
     @Test
-    void existingEntryBlockWithCommentVariant3() {
+    void existingEntryBlockWithCommentNotAtLastLine() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",

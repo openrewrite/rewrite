@@ -28,6 +28,7 @@ import org.openrewrite.yaml.tree.Yaml.Scalar;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.openrewrite.internal.ListUtils.concatAll;
@@ -37,6 +38,9 @@ import static org.openrewrite.internal.StringUtils.isNotEmpty;
 @AllArgsConstructor
 @RequiredArgsConstructor
 public class MergeYamlVisitor<P> extends YamlVisitor<P> {
+
+    private final Pattern linebreakPattern = Pattern.compile("\\R");
+
     private final Yaml existing;
     private final Yaml incoming;
     private final boolean acceptTheirs;
@@ -139,8 +143,12 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
             // workaround: autoFormat put sometimes extra spaces before elements
-            if (!mergedEntries.isEmpty() && mergedEntries.get(0).getPrefix().contains("\n") && it.getValue() instanceof Scalar) {
-                return it.withPrefix("\n" + mergedEntries.get(0).getPrefix().split("\n")[1]);
+            if (!mergedEntries.isEmpty() && linebreakPattern.matcher(mergedEntries.get(0).getPrefix()).find() && it.getValue() instanceof Scalar) {
+                String[] parts = linebreakPattern.split(mergedEntries.get(0).getPrefix());
+                if (parts.length > 1) { // why?
+                    return it.withPrefix("\n" + parts[1]);
+                }
+
             }
             return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
         }));
@@ -149,22 +157,26 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         Cursor currCursor = getCursor();
 
         if (hasNewElements) {
-            Cursor c = cursor.dropParentWhile(it -> {
+            /*if (currCursor.getValue() instanceof Yaml.Mapping) {
+                List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) currCursor.getValue()).getEntries();
+                System.out.println("d");
+            }*/
+
+            Cursor c = getCursor().dropParentUntil(it -> {
                 if (it instanceof Yaml.Document) {
-                    return false;
+                    return true;
                 }
 
                 if (it instanceof Yaml.Mapping) {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) it).getEntries();
-
-                    // direct parent -> child with last member should search further upwards
+                    // last member should search further upwards until two entries are found
                     if (entries.get(entries.size() - 1).equals(currCursor.getParentOrThrow().getValue())) {
-                        return true;
+                        return false;
                     }
-                    return entries.size() == 1;
+                    return entries.size() > 1;
                 }
 
-                return true;
+                return false;
             });
 
             //  int index2 = ((Yaml.Mapping) currCursor.getValue()).getEntries().size() -1;
@@ -189,6 +201,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                             break;
                         }
                     }
+                    if (comment.isEmpty() && linebreakPattern.matcher(entries.get(entries.size() - 1).getPrefix()).find()) {
+                        String[] parts = linebreakPattern.split(entries.get(entries.size() - 1).getPrefix());
+                        if (parts.length > 0) { // why???
+                            comment = entries.get(entries.size() - 1).getPrefix().split("\n")[0];
+                        }
+                    }
+                    //
                     // }
                 }
 
