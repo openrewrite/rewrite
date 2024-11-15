@@ -170,24 +170,18 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
                 if (c.getValue() instanceof Yaml.Document) {
                     comment = ((Yaml.Document) c.getValue()).getEnd().getPrefix();
-
                 }
                 if (c.getValue() instanceof Yaml.Mapping) {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
-                    int index = /*entries.size() */- 1;
 
                     //if (currCursor.getValue() instanceof Yaml.Mapping) { // the `if` can be possible be removed
-                        for (int i = 0; i < entries.size(); i++) {
+                        //for (int i = 0; i < entries.size(); i++) {
+                        for (int i = 0; i < entries.size() - 1; i++) {
                             if (entries.get(i).getValue().equals(currCursor.getValue())) {
-                                index = i + 1;
+                                comment = entries.get(i + 1).getPrefix().split("\n")[0];
                                 break;
                             }
                         }
-                   // }
-
-                    // temporary check
-                   // if (index < entries.size()) {
-                        comment = entries.get(index).getPrefix().split("\n")[0];
                    // }
                 }
 
