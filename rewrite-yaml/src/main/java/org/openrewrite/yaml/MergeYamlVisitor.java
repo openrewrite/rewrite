@@ -139,8 +139,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         }));
         boolean hasNewElements = x < mutatedEntries.size();
 
+        Cursor currCursor = getCursor();
+
         if (hasNewElements) {
-            Cursor currCursor = getCursor();
             Cursor c = cursor.dropParentWhile(it -> {
                 if (it instanceof Yaml.Document) {
                     return false;
@@ -194,11 +195,36 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 mutatedEntries.set(mutatedEntries.size() - 1, lastEntry.withPrefix(comment + lastEntry.getPrefix()));
                 c.putMessage("RemovePrefix", true);
             }
-
-
         }
 
-        //System.out.println((String) cursor.getMessage("RemovePrefix"));
+       /* System.out.println("----");
+        System.out.println((Boolean) cursor.getMessage("RemovePrefix", null));
+        System.out.println((Boolean) currCursor.getMessage("RemovePrefix", null));
+        System.out.println("----");*/
+
+        if (cursor.getMessage("RemovePrefix", false)) {
+            System.out.println("Waarom niet ");
+        }
+
+        for (int i = 0; i < m1.getEntries().size(); i++) {
+            if (m1.getEntries().get(i).getValue() instanceof Yaml.Mapping &&
+                    mutatedEntries.get(i).getValue() instanceof Yaml.Mapping &&
+                    ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size() > ((Yaml.Mapping) m1.getEntries().get(i).getValue()).getEntries().size()) {
+                System.out.println("yawel!!");
+
+                // temporary if
+                if ((i + 1) < mutatedEntries.size()) {
+                    System.out.println("en goo......");
+                    // maybe do this in a more immutable way instead of a `set action`.
+                    mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix("\n" + mutatedEntries.get(i + 1).getPrefix().split("\n")[1]));
+                }
+            }
+
+
+            if(!m1.getEntries().get(i).equals(mutatedEntries.get(i))) {
+
+            }
+        }
 
 
         return m1.withEntries(mutatedEntries);
