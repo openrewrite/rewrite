@@ -147,7 +147,21 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
 
     @Override
     public Toml.Table visitTable(TomlParser.TableContext ctx) {
-        return (Toml.Table) super.visitTable(ctx);
+        return convert(ctx, (c, prefix) -> {
+            Object value = null;
+            if (c.standard_table() != null) {
+                value = c.standard_table();
+            } else if (c.array_table() != null) {
+                value = c.array_table();
+            }
+            return new Toml.Table(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    null
+//                    value
+            );
+        });
     }
 
     @Override

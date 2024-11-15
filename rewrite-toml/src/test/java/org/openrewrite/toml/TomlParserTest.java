@@ -98,7 +98,7 @@ public class TomlParserTest implements RewriteTest {
     }
 
     @Test
-    void MultilineBasicString1() {
+    void MultilineBasicString() {
         rewriteRun(toml("""
                 str2 = ""\"
                 Roses are red
@@ -107,7 +107,7 @@ public class TomlParserTest implements RewriteTest {
     }
 
     @Test
-    void MultilineBasicString2() {
+    void MultilineBasicString_With_Extra_Newlines_And_Space_Trims() {
         rewriteRun(toml("""
                 str3 = ""\"
                 The quick brown \\
@@ -119,7 +119,7 @@ public class TomlParserTest implements RewriteTest {
     }
 
     @Test
-    void MultilineBasicString3() {
+    void MultilineBasicString_With_Space_Trims() {
         rewriteRun(toml("""
                 str4 = ""\"\\
                       The quick brown \\
@@ -130,7 +130,7 @@ public class TomlParserTest implements RewriteTest {
     }
 
     @Test
-    void MultilineBasicString4() {
+    void MultilineBasicString_On_One_Line() {
         rewriteRun(toml("""
                 str5 = ""\"Here is an in-line multiline string.""\"
                 """));
