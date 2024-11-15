@@ -140,8 +140,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         boolean hasNewElements = x < mutatedEntries.size();
 
         if (hasNewElements) {
-            System.out.println(">>>>");
-
             Cursor currCursor = getCursor();
             Cursor c = cursor.dropParentWhile(it -> {
                 if (it instanceof Yaml.Document) {
@@ -149,11 +147,21 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
 
                 if (it instanceof Yaml.Mapping) {
-                    return ((Yaml.Mapping) it).getEntries().size() == 1;
+                    List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) it).getEntries();
+
+                    // direct parent -> child with last member should search further upwards
+                    if (entries.get(entries.size() - 1).equals(currCursor.getParentOrThrow().getValue())) {
+                        return true;
+                    }
+                    return entries.size() == 1;
                 }
 
                 return true;
             });
+
+            //  int index2 = ((Yaml.Mapping) currCursor.getValue()).getEntries().size() -1;
+            System.out.println(">>>");
+            System.out.println(c);
 
             if (c.getValue() instanceof Yaml.Document || c.getValue() instanceof Yaml.Mapping) {
                 Yaml.Mapping.Entry lastEntry = mutatedEntries.get(mutatedEntries.size() - 1);
@@ -165,23 +173,21 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
                 if (c.getValue() instanceof Yaml.Mapping) {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
+                    int index = /*entries.size() */- 1;
 
-                    int index = entries.size() - 1;
-
-                    if (currCursor.getValue() instanceof Yaml.Mapping) {
+                    //if (currCursor.getValue() instanceof Yaml.Mapping) { // the `if` can be possible be removed
                         for (int i = 0; i < entries.size(); i++) {
                             if (entries.get(i).getValue().equals(currCursor.getValue())) {
                                 index = i + 1;
-                                System.out.println(entries.size() == index);
                                 break;
                             }
                         }
-                    }
+                   // }
 
                     // temporary check
-                    if (index < entries.size()) {
+                   // if (index < entries.size()) {
                         comment = entries.get(index).getPrefix().split("\n")[0];
-                    }
+                   // }
                 }
 
 
