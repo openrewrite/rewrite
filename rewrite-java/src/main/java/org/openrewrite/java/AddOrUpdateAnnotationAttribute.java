@@ -22,10 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
@@ -148,13 +145,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 }
 
                                 if (Boolean.TRUE.equals(appendArray)) {
-                                    for (int i = 0, j = jLiteralList.size(); i < attributeList.size(); j++, i++) {
-                                        String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(i), finalA);
+                                    for (String attrListValues : attributeList) {
+                                        String newAttributeListValue = maybeQuoteStringArgument(attributeName, attrListValues, finalA);
                                         if (Boolean.FALSE.equals(addOnly) && attributeValIsAlreadyPresentOrNull(jLiteralList, newAttributeListValue)) {
-                                            j--;
                                             continue;
                                         }
-                                        jLiteralList.add(j, new J.Literal(randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
+                                        jLiteralList.add(new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
                                     }
                                     return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList)).withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue)));
                                 }
