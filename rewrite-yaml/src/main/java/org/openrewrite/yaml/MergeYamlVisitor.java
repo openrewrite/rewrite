@@ -166,12 +166,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 if (c.getValue() instanceof Yaml.Mapping) {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
 
-
                     int index = entries.size() - 1;
 
-                    if (currCursor.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) currCursor.getValue()).getEntries().size() == 1) {
+                    if (currCursor.getValue() instanceof Yaml.Mapping) {
                         for (int i = 0; i < entries.size(); i++) {
-                            if (((Yaml.Mapping) entries.get(i).getValue()).getEntries().get(0).equals(((Yaml.Mapping) currCursor.getValue()).getEntries().get(0))) {
+                            if (entries.get(i).getValue().equals(currCursor.getValue())) {
                                 index = i + 1;
                                 System.out.println(entries.size() == index);
                                 break;
@@ -179,7 +178,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         }
                     }
 
-                    // tenporary check
+                    // temporary check
                     if (index < entries.size()) {
                         comment = entries.get(index).getPrefix().split("\n")[0];
                     }
