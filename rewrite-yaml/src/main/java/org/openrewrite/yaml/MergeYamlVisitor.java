@@ -21,7 +21,6 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.tree.Yaml;
 import org.openrewrite.yaml.tree.Yaml.Scalar;
 
@@ -33,13 +32,12 @@ import java.util.stream.Collectors;
 
 import static org.openrewrite.internal.ListUtils.concatAll;
 import static org.openrewrite.internal.ListUtils.map;
-import static org.openrewrite.internal.StringUtils.isNotEmpty;
 
 @AllArgsConstructor
 @RequiredArgsConstructor
 public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
-    private final Pattern linebreakPattern = Pattern.compile("\\R");
+    private final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     private final Yaml existing;
     private final Yaml incoming;
@@ -143,12 +141,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
             // workaround: autoFormat put sometimes extra spaces before elements
-            if (!mergedEntries.isEmpty() && linebreakPattern.matcher(mergedEntries.get(0).getPrefix()).find() && it.getValue() instanceof Scalar) {
-                String[] parts = linebreakPattern.split(mergedEntries.get(0).getPrefix());
-                if (parts.length > 1) { // why?
-                    return it.withPrefix("\n" + parts[1]);
-                }
-
+            if (!mergedEntries.isEmpty() && it.getValue() instanceof Scalar && hasLineBreakPieces(mergedEntries.get(0), 2)) {
+                return it.withPrefix("\n" + grabPartLineBreak(mergedEntries.get(0), 1));
             }
             return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
         }));
@@ -201,11 +195,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                             break;
                         }
                     }
-                    if (comment.isEmpty() && linebreakPattern.matcher(entries.get(entries.size() - 1).getPrefix()).find()) {
-                        String[] parts = linebreakPattern.split(entries.get(entries.size() - 1).getPrefix());
-                        if (parts.length > 0) { // why???
-                            comment = entries.get(entries.size() - 1).getPrefix().split("\n")[0];
-                        }
+                    if (comment.isEmpty() && hasLineBreakPieces(entries.get(entries.size() - 1), 1)) {
+                        comment = grabPartLineBreak(entries.get(entries.size() - 1), 0);
                     }
                     //
                     // }
@@ -311,6 +302,16 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 return s1;
             }
         }
+    }
+
+    private boolean hasLineBreakPieces(Yaml.Mapping.Entry entry, int atLeast) {
+        boolean a = LINE_BREAK.matcher(entry.getPrefix()).find();
+        return a && !grabPartLineBreak(entry, atLeast - 1).isEmpty();
+    }
+
+    private String grabPartLineBreak(Yaml.Mapping.Entry entry, int index) {
+        String[] parts = LINE_BREAK.split(entry.getPrefix());
+        return parts.length > index ? parts[index] : "";
     }
 
     private Scalar mergeScalar(Scalar y1, Scalar y2) {
