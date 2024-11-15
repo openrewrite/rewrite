@@ -30,8 +30,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static org.openrewrite.internal.ListUtils.concatAll;
-import static org.openrewrite.internal.ListUtils.map;
+import static org.openrewrite.internal.ListUtils.*;
 
 @AllArgsConstructor
 @RequiredArgsConstructor
@@ -72,6 +71,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitScalar(Scalar existingScalar, P p) {
+        System.out.println((boolean) (getCursor().getMessage("RemovePrefix", false)));
         if (existing.isScope(existingScalar) && incoming instanceof Scalar) {
             return mergeScalar(existingScalar, (Scalar) incoming);
         }
@@ -80,6 +80,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitSequence(Yaml.Sequence existingSeq, P p) {
+        System.out.println((boolean) (getCursor().getMessage("RemovePrefix", false)));
+
         if (existing.isScope(existingSeq)) {
             if (incoming instanceof Yaml.Mapping) {
                 // Distribute the incoming mapping to each entry in the sequence
@@ -98,10 +100,22 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitMapping(Yaml.Mapping existingMapping, P p) {
+        System.out.println("<<< visitMapping");
+        if (getCursor().toString().equals("Cursor{Mapping->Document->Documents->root}")) {
+            System.out.println("ja!!");
+        }
+        System.out.println(getCursor());
+        System.out.println((boolean) (getCursor().getMessage("RemovePrefix", false)));
         if (existing.isScope(existingMapping) && incoming instanceof Yaml.Mapping) {
             return mergeMapping(existingMapping, (Yaml.Mapping) incoming, p, getCursor());
         }
         return super.visitMapping(existingMapping, p);
+    }
+
+    @Override
+    public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
+        System.out.println((boolean) (getCursor().getMessage("RemovePrefix", false)));
+        return super.visitMappingEntry(entry, p);
     }
 
     private static boolean keyMatches(Yaml.Mapping.@Nullable Entry e1, Yaml.Mapping.@Nullable Entry e2) {
@@ -173,10 +187,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 return false;
             });
 
-            //  int index2 = ((Yaml.Mapping) currCursor.getValue()).getEntries().size() -1;
-            System.out.println(">>>");
-            System.out.println(c);
-
             if (c.getValue() instanceof Yaml.Document || c.getValue() instanceof Yaml.Mapping) {
                 Yaml.Mapping.Entry lastEntry = mutatedEntries.get(mutatedEntries.size() - 1);
                 String comment = "";
@@ -203,6 +213,12 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
 
                 mutatedEntries.set(mutatedEntries.size() - 1, lastEntry.withPrefix(comment + lastEntry.getPrefix()));
+
+
+
+                //  int index2 = ((Yaml.Mapping) currCursor.getValue()).getEntries().size() -1;
+                System.out.println(">>>");
+                System.out.println(c);
                 c.putMessage("RemovePrefix", true);
             }
         }
@@ -212,21 +228,23 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         System.out.println((Boolean) currCursor.getMessage("RemovePrefix", null));
         System.out.println("----");*/
 
-        if (cursor.getMessage("RemovePrefix", false)) {
-            System.out.println("Waarom niet ");
-        }
-
         for (int i = 0; i < m1.getEntries().size(); i++) {
             if (m1.getEntries().get(i).getValue() instanceof Yaml.Mapping &&
                     mutatedEntries.get(i).getValue() instanceof Yaml.Mapping &&
                     ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size() > ((Yaml.Mapping) m1.getEntries().get(i).getValue()).getEntries().size()) {
                 System.out.println("yawel!!");
 
-                // temporary if
                 if ((i + 1) < mutatedEntries.size()) {
                     System.out.println("en go......");
                     mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix("\n" + mutatedEntries.get(i + 1).getPrefix().split("\n")[1]));
                 }
+
+                //Entry s = mutatedEntries.get(i).getValue().withPrefix("Whatever");
+                /*Yaml.Mapping xdx = (Yaml.Mapping) mutatedEntries.get(i).getValue();
+                Yaml.Mapping xxxx= xdx.withEntries(mapLast(xdx.getEntries(), it -> it.withPrefix("boom\n")));
+
+                mutatedEntries.set(i, mutatedEntries.get(i).withValue(xxxx));*/
+
             }
 
 
