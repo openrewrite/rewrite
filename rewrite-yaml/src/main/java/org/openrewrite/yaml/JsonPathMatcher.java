@@ -94,12 +94,35 @@ public class JsonPathMatcher {
 
     private static List<Tree> resolvedAncestors(Cursor cursor) {
         ArrayDeque<Tree> deque = new ArrayDeque<>();
+        Map<Tree, Tree> resolved = new IdentityHashMap<>();
         for (Iterator<Object> it = cursor.getPath(Tree.class::isInstance); it.hasNext(); ) {
             Tree tree = (Tree) it.next();
-            tree = tree instanceof Yaml ? new ReplaceAliasWithAnchorValueVisitor<Integer>().visitNonNull(tree, 0) : tree;
+            if (tree instanceof Yaml.Document) {
+                tree = new ReplaceAliasWithAnchorValueVisitor<Integer>() {
+                    @Override
+                    public @Nullable Yaml visit(@Nullable Tree tree, Integer p) {
+                        Yaml updated = super.visit(tree, p);
+                        if (tree != null && updated != tree) {
+                            resolved.put(tree, updated);
+                        }
+                        return updated;
+                    }
+                }.visitNonNull(tree, 0);
+                deque.addFirst(tree);
+                break;
+            }
             deque.addFirst(tree);
         }
-        return new ArrayList<>(deque);
+        ArrayList<Tree> list = new ArrayList<>(deque);
+        if (!resolved.isEmpty()) {
+            for (int i = 0; i < list.size(); i++) {
+                Tree tree = list.get(i);
+                if (resolved.containsKey(tree)) {
+                    list.set(i, resolved.get(tree));
+                }
+            }
+        }
+        return list;
     }
 
     private JsonPathParser jsonPath() {
