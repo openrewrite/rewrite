@@ -286,7 +286,7 @@ class JsonPathMatcherTest {
     @Test
     void relativePath() {
         assertMatched(
-          ".root.literal",
+          ".literal",
           simple,
           List.of("literal: $.root.literal",
             "literal: $.root.object.literal",
