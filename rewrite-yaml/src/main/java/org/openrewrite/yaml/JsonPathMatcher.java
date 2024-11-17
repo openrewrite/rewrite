@@ -48,6 +48,7 @@ import static java.util.Collections.disjoint;
 public class JsonPathMatcher {
 
     private final String jsonPath;
+    private JsonPathParser.@Nullable JsonPathContext parsed;
 
     public JsonPathMatcher(String jsonPath) {
         this.jsonPath = jsonPath;
@@ -68,7 +69,7 @@ public class JsonPathMatcher {
         } else {
             start = cursorPath.get(0);
         }
-        JsonPathParser.JsonPathContext ctx = jsonPath().jsonPath();
+        JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
         JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
         @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, start, stop, false);
@@ -125,6 +126,13 @@ public class JsonPathMatcher {
         return list;
     }
 
+    private JsonPathParser.JsonPathContext parse() {
+        if (parsed == null) {
+            parsed = jsonPath().jsonPath();
+        }
+        return parsed;
+    }
+
     private JsonPathParser jsonPath() {
         return new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(this.jsonPath))));
     }
@@ -156,7 +164,7 @@ public class JsonPathMatcher {
 
         @Override
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
-            if (ctx.ROOT() != null || "[".equals(ctx.start.getText())) {
+            if (ctx.ROOT() != null || ctx.start.getType() == JsonPathLexer.LBRACK) {
                 scope = cursorPath.stream()
                         .filter(t -> t instanceof Yaml.Mapping)
                         .findFirst()
