@@ -113,6 +113,33 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void complex() {
+        assertMatched(
+          "..spec.containers[:1].resources.limits.cpu",
+          List.of(
+            //language=yaml
+            """
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                labels:
+                  app: application
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - image: nginx:latest
+                        name: nginx
+                        resources:
+                          limits:
+                            cpu: "64Mi"
+            """
+          ),
+          List.of("cpu: \"64Mi\"")
+        );
+    }
+
+    @Test
     void doesNotMatchMissingProperty() {
         assertNotMatched(
           "$.none",
@@ -259,7 +286,7 @@ class JsonPathMatcherTest {
     @Test
     void relativePath() {
         assertMatched(
-          ".literal",
+          ".root.literal",
           simple,
           List.of("literal: $.root.literal",
             "literal: $.root.object.literal",
@@ -777,8 +804,8 @@ class JsonPathMatcherTest {
         var results = visit(before, jsonPath, printMatches);
         assertThat(results).hasSize(after.size());
         for (int i = 0; i < results.size(); i++) {
-            assertThat(StringUtils.trimIndent(results.get(i)).replaceAll("\s+", "  "))
-              .isEqualTo(StringUtils.trimIndent(after.get(i)).replaceAll("\s+", "  "));
+            assertThat(StringUtils.trimIndent(results.get(i)).replaceAll("\\s+", "  "))
+              .isEqualTo(StringUtils.trimIndent(after.get(i)).replaceAll("\\s+", "  "));
         }
     }
 
