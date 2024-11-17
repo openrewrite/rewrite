@@ -20,6 +20,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -135,6 +136,11 @@ public class JsonPathMatcher {
         @Override
         protected Object aggregateResult(Object aggregate, Object nextResult) {
             return (scope = nextResult);
+        }
+
+        @Override
+        protected boolean shouldVisitNextChild(RuleNode node, Object currentResult) {
+            return scope != null;
         }
 
         @Override
