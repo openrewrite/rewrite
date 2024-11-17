@@ -384,11 +384,13 @@ public class JsonPathMatcher {
                 for (Object object : ((List<Object>) scope)) {
                     scope = object;
                     Object result = visitProperty(ctx);
-                    if (result instanceof List) {
-                        // Unwrap lists of results from visitProperty to match the position of the cursor.
-                        matches.addAll(((List<Object>) result));
-                    } else {
-                        matches.add(result);
+                    if (result != null) {
+                        if (result instanceof List) {
+                            // Unwrap lists of results from visitProperty to match the position of the cursor.
+                            matches.addAll(((List<Object>) result));
+                        } else {
+                            matches.add(result);
+                        }
                     }
                 }
                 return getResultFromList(matches);
@@ -621,8 +623,8 @@ public class JsonPathMatcher {
                 scope = scopeOfLogicalOp;
                 rhs = getBinaryExpressionResult(rhs);
                 if ("&&".equals(operator) &&
-                    ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) &&
-                     (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
+                        ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) &&
+                                (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     // Return the result of the evaluated expression.
                     if (lhs instanceof Yaml) {
                         return rhs;
@@ -636,8 +638,8 @@ public class JsonPathMatcher {
                     }
                     return scopeOfLogicalOp;
                 } else if ("||".equals(operator) &&
-                           ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) ||
-                            (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
+                        ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) ||
+                                (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     return scopeOfLogicalOp;
                 }
             } else if (ctx.EQUALITY_OPERATOR() != null) {
@@ -708,14 +710,14 @@ public class JsonPathMatcher {
                 Yaml.Mapping mapping = (Yaml.Mapping) lhs;
                 for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
                     if (entry.getValue() instanceof Yaml.Scalar &&
-                        checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
+                            checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
                         return mapping;
                     }
                 }
             } else if (lhs instanceof Yaml.Mapping.Entry) {
                 Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) lhs;
                 if (entry.getValue() instanceof Yaml.Scalar &&
-                    checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
+                        checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
                     return entry;
                 }
             } else if (lhs instanceof Yaml.Scalar) {
