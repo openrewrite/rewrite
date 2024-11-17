@@ -48,6 +48,7 @@ import static java.util.Collections.disjoint;
 public class JsonPathMatcher {
 
     private final String jsonPath;
+    private JsonPathParser.@Nullable JsonPathContext parsed;
 
     public JsonPathMatcher(String jsonPath) {
         this.jsonPath = jsonPath;
@@ -68,7 +69,7 @@ public class JsonPathMatcher {
         } else {
             start = cursorPath.get(0);
         }
-        JsonPathParser.JsonPathContext ctx = jsonPath().jsonPath();
+        JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
         JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
         @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, stop, false);
@@ -98,6 +99,13 @@ public class JsonPathMatcher {
             deque.addFirst(tree);
         }
         return new ArrayList<>(deque);
+    }
+
+    private JsonPathParser.JsonPathContext parse() {
+        if (parsed == null) {
+            parsed = jsonPath().jsonPath();
+        }
+        return parsed;
     }
 
     private JsonPathParser jsonPath() {
