@@ -116,8 +116,6 @@ public class MergeYaml extends Recipe {
                     );
 
                     if (getCursor().getMessage("RemovePrefix", false)) {
-                        System.out.println("|||| after visit document");
-                        System.out.println(System.identityHashCode(getCursor()));
                         return d.withEnd(d.getEnd().withPrefix(""));
                     }
 
