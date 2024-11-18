@@ -102,11 +102,15 @@ public class JsonPathMatcher {
                 tree = new ReplaceAliasWithAnchorValueVisitor<Integer>() {
                     @Override
                     public @Nullable Yaml visit(@Nullable Tree tree, Integer p) {
-                        Yaml updated = super.visit(tree, p);
-                        if (tree != null && updated != tree) {
-                            resolved.put(tree, updated);
+                        // NOTE: not calling `super.visit()` for performance reasons
+                        if (tree != null) {
+                            Yaml updated = tree.accept(this, p);
+                            if (updated != tree) {
+                                resolved.put(tree, updated);
+                            }
+                            return updated;
                         }
-                        return updated;
+                        return (Yaml) tree;
                     }
                 }.visitNonNull(tree, 0);
                 deque.addFirst(tree);
