@@ -141,23 +141,23 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     }
 
     @Override
-    public Toml visitArray_(TomlParser.Array_Context ctx) {
-        return super.visitArray_(ctx);
+    public Toml visitArray(TomlParser.Array_Context ctx) {
+        return super.visitArray(ctx);
     }
 
     @Override
-    public Toml visitArray_values(TomlParser.Array_valuesContext ctx) {
-        return super.visitArray_values(ctx);
+    public Toml visitArrayValues(TomlParser.Array_valuesContext ctx) {
+        return super.visitArrayValues(ctx);
     }
 
     @Override
-    public Toml visitComment_or_nl(TomlParser.Comment_or_nlContext ctx) {
-        return super.visitComment_or_nl(ctx);
+    public Toml visitCommentOrNl(TomlParser.Comment_or_nlContext ctx) {
+        return super.visitCommentOrNl(ctx);
     }
 
     @Override
-    public Toml visitNl_or_comment(TomlParser.Nl_or_commentContext ctx) {
-        return super.visitNl_or_comment(ctx);
+    public Toml visitNlOrComment(TomlParser.Nl_or_commentContext ctx) {
+        return super.visitNlOrComment(ctx);
     }
 
     @Override
@@ -180,28 +180,28 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     }
 
     @Override
-    public Toml visitStandard_table(TomlParser.Standard_tableContext ctx) {
-        return super.visitStandard_table(ctx);
+    public Toml visitStandardTable(TomlParser.Standard_tableContext ctx) {
+        return super.visitStandardTable(ctx);
     }
 
     @Override
-    public Toml visitInline_table(TomlParser.Inline_tableContext ctx) {
-        return super.visitInline_table(ctx);
+    public Toml visitInlineTable(TomlParser.Inline_tableContext ctx) {
+        return super.visitInlineTable(ctx);
     }
 
     @Override
-    public Toml visitInline_table_keyvals(TomlParser.Inline_table_keyvalsContext ctx) {
-        return super.visitInline_table_keyvals(ctx);
+    public Toml visitInlineTableKeyvals(TomlParser.Inline_table_keyvalsContext ctx) {
+        return super.visitInlineTableKeyvals(ctx);
     }
 
     @Override
-    public Toml visitInline_table_keyvals_non_empty(TomlParser.Inline_table_keyvals_non_emptyContext ctx) {
-        return super.visitInline_table_keyvals_non_empty(ctx);
+    public Toml visitInlineTableKeyvalsNonEmpty(TomlParser.Inline_table_keyvals_non_emptyContext ctx) {
+        return super.visitInlineTableKeyvalsNonEmpty(ctx);
     }
 
     @Override
-    public Toml visitArray_table(TomlParser.Array_tableContext ctx) {
-        return super.visitArray_table(ctx);
+    public Toml visitArrayTable(TomlParser.Array_tableContext ctx) {
+        return super.visitArrayTable(ctx);
     }
 
     private Space prefix(ParserRuleContext ctx) {

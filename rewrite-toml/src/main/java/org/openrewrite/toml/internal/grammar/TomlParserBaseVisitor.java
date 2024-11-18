@@ -68,28 +68,28 @@ public class TomlParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> implem
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitSimple_key(TomlParser.Simple_keyContext ctx) { return visitChildren(ctx); }
+	@Override public T visitSimpleKey(TomlParser.Simple_keyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitUnquoted_key(TomlParser.Unquoted_keyContext ctx) { return visitChildren(ctx); }
+	@Override public T visitUnquotedKey(TomlParser.Unquoted_keyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitQuoted_key(TomlParser.Quoted_keyContext ctx) { return visitChildren(ctx); }
+	@Override public T visitQuotedKey(TomlParser.Quoted_keyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDotted_key(TomlParser.Dotted_keyContext ctx) { return visitChildren(ctx); }
+	@Override public T visitDottedKey(TomlParser.Dotted_keyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -117,49 +117,49 @@ public class TomlParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> implem
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFloating_point(TomlParser.Floating_pointContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFloatingPoint(TomlParser.Floating_pointContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitBool_(TomlParser.Bool_Context ctx) { return visitChildren(ctx); }
+	@Override public T visitBool(TomlParser.Bool_Context ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDate_time(TomlParser.Date_timeContext ctx) { return visitChildren(ctx); }
+	@Override public T visitDateTime(TomlParser.Date_timeContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitArray_(TomlParser.Array_Context ctx) { return visitChildren(ctx); }
+	@Override public T visitArray(TomlParser.Array_Context ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitArray_values(TomlParser.Array_valuesContext ctx) { return visitChildren(ctx); }
+	@Override public T visitArrayValues(TomlParser.Array_valuesContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitComment_or_nl(TomlParser.Comment_or_nlContext ctx) { return visitChildren(ctx); }
+	@Override public T visitCommentOrNl(TomlParser.Comment_or_nlContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitNl_or_comment(TomlParser.Nl_or_commentContext ctx) { return visitChildren(ctx); }
+	@Override public T visitNlOrComment(TomlParser.Nl_or_commentContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -173,33 +173,33 @@ public class TomlParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> implem
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitStandard_table(TomlParser.Standard_tableContext ctx) { return visitChildren(ctx); }
+	@Override public T visitStandardTable(TomlParser.Standard_tableContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInline_table(TomlParser.Inline_tableContext ctx) { return visitChildren(ctx); }
+	@Override public T visitInlineTable(TomlParser.Inline_tableContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInline_table_keyvals(TomlParser.Inline_table_keyvalsContext ctx) { return visitChildren(ctx); }
+	@Override public T visitInlineTableKeyvals(TomlParser.Inline_table_keyvalsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInline_table_keyvals_non_empty(TomlParser.Inline_table_keyvals_non_emptyContext ctx) { return visitChildren(ctx); }
+	@Override public T visitInlineTableKeyvalsNonEmpty(TomlParser.Inline_table_keyvals_non_emptyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitArray_table(TomlParser.Array_tableContext ctx) { return visitChildren(ctx); }
+	@Override public T visitArrayTable(TomlParser.Array_tableContext ctx) { return visitChildren(ctx); }
 }
