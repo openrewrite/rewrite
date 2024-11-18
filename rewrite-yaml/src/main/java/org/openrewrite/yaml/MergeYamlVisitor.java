@@ -100,12 +100,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitMapping(Yaml.Mapping existingMapping, P p) {
-        System.out.println("<<< visitMapping");
+        //System.out.println("<<< visitMapping");
         if (getCursor().toString().equals("Cursor{Mapping->Document->Documents->root}")) {
-            System.out.println("ja!!");
+            System.out.println(System.identityHashCode(getCursor()));
+            System.out.println(getCursor());
+            System.out.println((boolean) (getCursor().getMessage("RemovePrefix", false)));
         }
-        System.out.println(getCursor());
-        System.out.println((boolean) (getCursor().getMessage("RemovePrefix", false)));
+
         if (existing.isScope(existingMapping) && incoming instanceof Yaml.Mapping) {
             return mergeMapping(existingMapping, (Yaml.Mapping) incoming, p, getCursor());
         }
@@ -217,9 +218,10 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
 
                 //  int index2 = ((Yaml.Mapping) currCursor.getValue()).getEntries().size() -1;
-                System.out.println(">>>");
-                System.out.println(c);
+                System.out.println(">>> RemovePrefix");
+                System.out.println(System.identityHashCode(c));
                 c.putMessage("RemovePrefix", true);
+                System.out.println(c);
             }
         }
 
