@@ -103,8 +103,8 @@ public class JsonPathMatcher {
                     @Override
                     public @Nullable Yaml visit(@Nullable Tree tree, Integer p) {
                         // NOTE: not calling `super.visit()` for performance reasons
-                        if (tree != null) {
-                            Yaml updated = tree.accept(this, p);
+                        if (tree instanceof Yaml) {
+                            Yaml updated = ((Yaml) tree).acceptYaml(this, p);
                             if (updated != tree) {
                                 resolved.put(tree, updated);
                             }
