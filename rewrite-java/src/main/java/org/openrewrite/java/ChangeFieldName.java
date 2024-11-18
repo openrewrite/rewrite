@@ -24,9 +24,7 @@ import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Value
@@ -56,7 +54,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
             return v;
         }
         if (scopedVariableMap.get(variable.getName()).isField(getCursor()) && matchesClass(enclosingClass.getType()) &&
-                variable.getSimpleName().equals(hasName)) {
+            variable.getSimpleName().equals(hasName)) {
             if (v.getVariableType() != null) {
                 v = v.withVariableType(v.getVariableType().withName(toName));
             }
@@ -72,7 +70,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, P p) {
         J.FieldAccess f = super.visitFieldAccess(fieldAccess, p);
         if (matchesClass(fieldAccess.getTarget().getType()) &&
-                fieldAccess.getSimpleName().equals(hasName)) {
+            fieldAccess.getSimpleName().equals(hasName)) {
             f = f.getPadding().withName(f.getPadding().getName().withElement(f.getPadding().getName().getElement().withSimpleName(toName)));
         }
         return f;
