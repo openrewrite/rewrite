@@ -142,7 +142,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             return existingEntry;
         });
 
-        int x = mergedEntries.size();
         List<Entry> mutatedEntries = concatAll(mergedEntries, map(m2.getEntries(), (i, it) -> {
             for (Entry existingEntry : m1.getEntries()) {
                 if (keyMatches(existingEntry, it)) {
@@ -155,11 +154,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             }
             return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
         }));
-        boolean hasNewElements = x < mutatedEntries.size();
 
-        Cursor currCursor = getCursor();
-
-        if (hasNewElements) {
+        if (m1.getEntries().size() < mutatedEntries.size()) {
             Cursor c = getCursor().dropParentUntil(it -> {
                 if (it instanceof Document) {
                     return true;
@@ -168,7 +164,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 if (it instanceof Mapping) {
                     List<Entry> entries = ((Mapping) it).getEntries();
                     // last member should search further upwards until two entries are found
-                    if (entries.get(entries.size() - 1).equals(currCursor.getParentOrThrow().getValue())) {
+                    if (entries.get(entries.size() - 1).equals(getCursor().getParentOrThrow().getValue())) {
                         return false;
                     }
                     return entries.size() > 1;
@@ -178,17 +174,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             });
 
             if (c.getValue() instanceof Document || c.getValue() instanceof Mapping) {
-                Entry lastEntry = mutatedEntries.get(mutatedEntries.size() - 1);
                 String comment = "";
 
                 if (c.getValue() instanceof Document) {
                     comment = ((Document) c.getValue()).getEnd().getPrefix();
-                }
-                if (c.getValue() instanceof Mapping) {
+                } else {
                     List<Entry> entries = ((Mapping) c.getValue()).getEntries();
 
                     for (int i = 0; i < entries.size() - 1; i++) {
-                        if (entries.get(i).getValue().equals(currCursor.getValue())) {
+                        if (entries.get(i).getValue().equals(getCursor().getValue())) {
                             comment = grabPartLineBreak(entries.get(i + 1), 0);
                             break;
                         }
@@ -198,24 +192,24 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     }
                 }
 
-                mutatedEntries.set(mutatedEntries.size() - 1, lastEntry.withPrefix(comment + lastEntry.getPrefix()));
+                Entry last = mutatedEntries.get(mutatedEntries.size() - 1);
+                mutatedEntries.set(mutatedEntries.size() - 1, last.withPrefix(comment + last.getPrefix()));
                 c.putMessage("RemovePrefix", true);
             }
         }
 
-        //Works only for direct children, needs a better way (with cursor messages probably)
-        for (int i = 0; i < m1.getEntries().size(); i++) {
-            if (m1.getEntries().get(i).getValue() instanceof Yaml.Mapping &&
-                    mutatedEntries.get(i).getValue() instanceof Yaml.Mapping &&
-                    ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size() > ((Yaml.Mapping) m1.getEntries().get(i).getValue()).getEntries().size()) {
-                if ((i + 1) < mutatedEntries.size()) {
-                    mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix("\n" + mutatedEntries.get(i + 1).getPrefix().split("\n")[1]));
-                }
-            }
-        }
-
+        removePrefixDirectChildren(m1.getEntries(), mutatedEntries);
 
         return m1.withEntries(mutatedEntries);
+    }
+
+    private void removePrefixDirectChildren(List<Entry> m1Entries, List<Entry> mutatedEntries) {
+        for (int i = 0; i < m1Entries.size() - 1; i++) {
+            if (m1Entries.get(i).getValue() instanceof Mapping && mutatedEntries.get(i).getValue() instanceof Mapping &&
+                    ((Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
+                mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix("\n" + grabPartLineBreak(mutatedEntries.get(i + 1), 1)));
+            }
+        }
     }
 
     private Yaml.Sequence mergeSequence(Yaml.Sequence s1, Yaml.Sequence s2, P p, Cursor cursor) {
