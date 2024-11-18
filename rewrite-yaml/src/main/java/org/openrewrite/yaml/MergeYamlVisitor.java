@@ -34,6 +34,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.openrewrite.internal.ListUtils.*;
+import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
 @AllArgsConstructor
 @RequiredArgsConstructor
@@ -103,7 +104,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         if (existing.isScope(existingMapping) && incoming instanceof Mapping) {
             Mapping mapping = mergeMapping(existingMapping, (Mapping) incoming, p, getCursor());
 
-            if (getCursor().getMessage("RemovePrefix", false)) {
+            if (getCursor().getMessage(REMOVE_PREFIX, false)) {
                 List<Entry> entries = ((Mapping) getCursor().getValue()).getEntries();
                 return mapping.withEntries(mapLast(mapping.getEntries(), it -> it.withPrefix("\n" + grabPartLineBreak(entries.get(entries.size() - 1), 1))));
             }
@@ -149,7 +150,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
             // workaround: autoFormat put sometimes extra spaces before elements
-            if (!mergedEntries.isEmpty() && it.getValue() instanceof Scalar && hasLineBreakPieces(mergedEntries.get(0), 2)) {
+            if (!mergedEntries.isEmpty() && it.getValue() instanceof Scalar && hasLineBreak(mergedEntries.get(0), 2)) {
                 return it.withPrefix("\n" + grabPartLineBreak(mergedEntries.get(0), 1));
             }
             return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
@@ -187,14 +188,14 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                             break;
                         }
                     }
-                    if (comment.isEmpty() && hasLineBreakPieces(entries.get(entries.size() - 1), 1)) {
+                    if (comment.isEmpty() && hasLineBreak(entries.get(entries.size() - 1), 1)) {
                         comment = grabPartLineBreak(entries.get(entries.size() - 1), 0);
                     }
                 }
 
                 Entry last = mutatedEntries.get(mutatedEntries.size() - 1);
                 mutatedEntries.set(mutatedEntries.size() - 1, last.withPrefix(comment + last.getPrefix()));
-                c.putMessage("RemovePrefix", true);
+                c.putMessage(REMOVE_PREFIX, true);
             }
         }
 
@@ -277,9 +278,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         }
     }
 
-    private boolean hasLineBreakPieces(Entry entry, int atLeast) {
+    private boolean hasLineBreak(Entry entry, int atLeastParts) {
         boolean a = LINE_BREAK.matcher(entry.getPrefix()).find();
-        return a && !grabPartLineBreak(entry, atLeast - 1).isEmpty();
+        return a && !grabPartLineBreak(entry, atLeastParts - 1).isEmpty();
     }
 
     private String grabPartLineBreak(Entry entry, int index) {
