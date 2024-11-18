@@ -175,15 +175,14 @@ public class JsonPathMatcher {
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
             MATCH:
             if (ctx.ROOT() != null || ctx.start.getType() == JsonPathLexer.LBRACK) {
+                Tree first = cursorPath.get(0);
+                if (first instanceof Yaml.Document) {
+                    scope = ((Yaml.Document) first).getBlock();
+                    break MATCH;
+                }
                 for (Tree tree : cursorPath) {
                     if (tree instanceof Yaml.Mapping) {
                         scope = tree;
-                        break MATCH;
-                    }
-                }
-                for (Tree t : cursorPath) {
-                    if (t instanceof Yaml.Document && ((Yaml.Document) t).getBlock() instanceof Yaml.Mapping) {
-                        scope = ((Yaml.Document) t).getBlock();
                         break MATCH;
                     }
                 }
@@ -213,7 +212,7 @@ public class JsonPathMatcher {
             if (previous.indexOf(current) - 1 < 0 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
-                    JsonPathMatcher.JsonPathYamlVisitor v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, path, null, false);
+                    JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, path, null, false);
                     for (int i = 1; i < ctx.getChildCount(); i++) {
                         result = v.visit(ctx.getChild(i));
                         if (result != null) {
@@ -224,7 +223,7 @@ public class JsonPathMatcher {
                 return results;
                 // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
             } else {
-                JsonPathMatcher.JsonPathYamlVisitor v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, scope, null, true);
+                JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, scope, null, true);
                 for (int i = 1; i < ctx.getChildCount(); i++) {
                     result = v.visit(ctx.getChild(i));
                     if (result != null) {

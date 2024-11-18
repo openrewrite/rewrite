@@ -484,6 +484,36 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void documentLevelSequenceWildcard() {
+        assertMatched(
+          "$[*].id",
+          List.of(
+            """
+              - id: 0
+              - id: 1
+              - id: 2
+              """
+          ),
+          List.of("id: 0", "id: 1", "id: 2")
+        );
+    }
+
+    @Test
+    void documentLevelSequenceSingle() {
+        assertMatched(
+          "$[1].id",
+          List.of(
+            """
+              - id: 0
+              - id: 1
+              - id: 2
+              """
+          ),
+          List.of("id: 1")
+        );
+    }
+
+    @Test
     void bracketOperatorByNames() {
         assertMatched(
           "$.root['literal', 'object']",
