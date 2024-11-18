@@ -46,7 +46,7 @@ public class ScopedVariable implements Trait<J.VariableDeclarations.NamedVariabl
             return null;
         }
 
-        public Cursor getDeclaringScope(Cursor cursor) {
+        private Cursor getDeclaringScope(Cursor cursor) {
             return cursor.dropParentUntil(it ->
                     it instanceof J.Block ||
                     it instanceof J.Lambda ||
