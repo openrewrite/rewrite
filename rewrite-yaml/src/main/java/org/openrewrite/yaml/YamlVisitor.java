@@ -66,11 +66,13 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public Yaml visitDocuments(Yaml.Documents documents, P p) {
+        System.out.println("visitDocumentSSSSSS");
         return documents.withDocuments(ListUtils.map(documents.getDocuments(), d -> visitAndCast(d, p)))
                 .withMarkers(visitMarkers(documents.getMarkers(), p));
     }
 
     public Yaml visitDocument(Yaml.Document document, P p) {
+        System.out.println("visitDocument");
         return document.withBlock((Yaml.Block) visit(document.getBlock(), p))
                 .withMarkers(visitMarkers(document.getMarkers(), p));
     }
