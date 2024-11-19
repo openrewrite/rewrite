@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
@@ -156,9 +157,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
         }));
 
-        if (m1.getEntries().size() < mutatedEntries.size()) {
+        if (m1.getEntries().size() < mutatedEntries.size() && !getCursor().isRoot()) {
             Cursor c = getCursor().dropParentUntil(it -> {
-                if (it instanceof Document) {
+                if (ROOT_VALUE.equals(it) || it instanceof Document) {
                     return true;
                 }
 

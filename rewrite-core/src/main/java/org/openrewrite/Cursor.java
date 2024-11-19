@@ -57,7 +57,7 @@ public class Cursor {
     /**
      * @return true if this cursor is the root of the tree, false otherwise
      */
-    final boolean isRoot() {
+    final public boolean isRoot() {
         return ROOT_VALUE.equals(value);
     }
 
