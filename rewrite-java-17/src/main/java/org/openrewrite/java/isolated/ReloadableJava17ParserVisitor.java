@@ -1299,9 +1299,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, annotatedTypeTree(node.getUnderlyingType(), annotationPosTable));
             } else if (node.getUnderlyingType() instanceof JCArrayTypeTree) {
                 J.AnnotatedType annotatedType = new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, arrayTypeTree(node, annotationPosTable));
-                if (((JCArrayTypeTree) node.getUnderlyingType()).getType() instanceof JCAnnotatedType) {
-                    visitAnnotatedType((AnnotatedTypeTree) ((JCArrayTypeTree) node.getUnderlyingType()).getType(), fmt);
-                }
+//                if (((JCArrayTypeTree) node.getUnderlyingType()).getType() instanceof JCAnnotatedType) {
+//                    visitAnnotatedType((AnnotatedTypeTree) ((JCArrayTypeTree) node.getUnderlyingType()).getType(), fmt);
+//                }
                 return annotatedType;
             }
         }
@@ -1391,7 +1391,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         if (typeIdent instanceof JCArrayTypeTree) {
             List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
             int saveCursor = cursor;
-            whitespace();
+            Space space = whitespace();
             if (source.startsWith("[", cursor)) {
                 cursor = saveCursor;
                 JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
@@ -1404,6 +1404,18 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                         dimension,
                         typeMapping.type(tree)
                 );
+            } else if (source.startsWith("...", cursor)) {
+                J.ArrayType type = new J.ArrayType(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
+                        annotations,
+                        JLeftPadded.build(space),
+                        typeMapping.type(tree)
+                );
+                cursor = saveCursor;
+                return type;
             }
             cursor = saveCursor;
         }
