@@ -151,11 +151,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
             // workaround: autoFormat cannot handle new inserted values very well
-            if (!mergedEntries.isEmpty() && it.getValue() instanceof Scalar && MergeYamlVisitor.this.hasLineBreak(mergedEntries.get(0), 2)) {
-                String prefix = MergeYamlVisitor.this.grabPartLineBreak(mergedEntries.get(0), 1);
-                String newValue = ((Scalar) it.getValue()).getValue().replaceAll("\\R", prefix + "\n");
-                return it.withPrefix("\n" + prefix)
-                        .withValue(((Scalar) it.getValue()).withValue(newValue));
+            if (!mergedEntries.isEmpty() && it.getValue() instanceof Yaml.Scalar && hasLineBreak(mergedEntries.get(0), 2)) {
+                return it.withPrefix("\n" + grabPartLineBreak(mergedEntries.get(0), 1));
             }
             return shouldAutoFormat ? MergeYamlVisitor.this.autoFormat(it, p, cursor) : it;
         }));
