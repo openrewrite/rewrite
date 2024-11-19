@@ -138,10 +138,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 String attributeValueCleanedUp = attributeValue.replaceAll("\\s+","").replaceAll("[\\s+{}\"]","");
                                 List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
 
-                                for (Marker m : as.getMarkers().getMarkers()) {
-                                    if (m instanceof AlreadyAppended && ((AlreadyAppended) m).getValues().equals(newAttributeValue)) {
-                                        return as;
-                                    }
+                                if (as.getMarkers().findFirst(AlreadyAppended.class).filter(ap -> ap.getValues().equals(newAttributeValue)).isPresent()) {
+                                    return as;
                                 }
 
                                 if (Boolean.TRUE.equals(appendArray)) {
