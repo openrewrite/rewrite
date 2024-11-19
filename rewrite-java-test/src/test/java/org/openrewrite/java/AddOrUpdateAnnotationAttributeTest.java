@@ -25,7 +25,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     @Test
     void addValueAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", null, false)),
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", null, null)),
           java(
             """
               package org.example;
@@ -56,7 +56,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     @Test
     void addValueAttributeClass() {
         rewriteRun(
-          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", null, false)),
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", null, null)),
           java(
             """
               package org.example;
@@ -150,7 +150,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     @Test
     void updateValueAttributeClass() {
         rewriteRun(
-          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", null, false)),
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", null, null)),
           java(
             """
               package org.example;
@@ -214,7 +214,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     @Test
     void removeValueAttributeClass() {
         rewriteRun(
-          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, null, null, false)),
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, null, null, null)),
           java(
             """
               package org.example;
@@ -245,7 +245,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
     @Test
     void addNamedAttribute() {
-        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null, false)),
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null, null)),
           java(
             """
               package org.junit;
@@ -282,7 +282,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     @Test
     void replaceAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null, false)),
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null, null)),
           java(
             """
               package org.junit;
@@ -319,7 +319,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     @Test
     void removeAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", null, null, false)),
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", null, null, null)),
           java(
             """
               package org.junit;
@@ -394,7 +394,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
     @Test
     void implicitValueToExplicitValue() {
-        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null, false)),
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null, null)),
           java(
             """
               package org.junit;
@@ -431,7 +431,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
     @Test
     void implicitValueToExplicitValueClass() {
-        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null, false)),
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null, null)),
           java(
             """
               package org.junit;
@@ -572,7 +572,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             "org.example.Foo",
             "array",
             "newTest1,newTest2",
-            false, false)),
+            false,
+            false)),
           java(
             """
               package org.example;
@@ -607,7 +608,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             "org.example.Foo",
             "array",
             "newTest1,newTest2",
-            false, null)),
+            false,
+            null)),
           java(
             """
               package org.example;
@@ -642,7 +644,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             "org.example.Foo",
             "array",
             null,
-            null, false)),
+            null,
+            false)),
           java(
             """
               package org.example;
@@ -677,7 +680,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             "org.example.Foo",
             "string",
             "test",
-            null, false)),
+            null,
+            false)),
           java(
             """
               package org.example;
