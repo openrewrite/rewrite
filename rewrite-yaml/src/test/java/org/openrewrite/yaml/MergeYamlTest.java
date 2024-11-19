@@ -1134,14 +1134,16 @@ class MergeYamlTest implements RewriteTest {
                     D: # Comment untouched 4
                       1: something else
                       2: old desc # Comment moved from prefix D2 to prefix D->3
+                                  # This is also part of prefix D2, but should NOT be moved to D->3
                     D2:
                       1: a
-                      # Above comment untouched 1
-                      2: b # Comment untouched 5
+                      # Comment above tag untouched 1
+                      2: b                             # Comment with a lot of spaces untouched 5
                       3: c
-                    # Above comment untouched 2
+                    # Comment above tag untouched 2
+              # with multilines
                     D3: # Comment untouched 6
-                      1: old description # Comment moved from prefix D4 to prefix D3->2
+                      1: old description                           # Comment with a lot of spaces moved from prefix D4 to prefix D3->2
                     D4: # Comment untouched 7
                       1: old text # Comment moved from end document to prefix D4->2
               """,
@@ -1153,15 +1155,17 @@ class MergeYamlTest implements RewriteTest {
                       1: something else
                       2: old desc # Comment moved from prefix D2 to prefix D->3
                       3: new desc
+                                  # This is also part of prefix D2, but should NOT be moved to D->3
                     D2:
                       1: a
-                      # Above comment untouched 1
-                      2: b # Comment untouched 5
+                      # Comment above tag untouched 1
+                      2: b                             # Comment with a lot of spaces untouched 5
                       3: c
                       4: d
-                    # Above comment untouched 2
+                    # Comment above tag untouched 2
+              # with multilines
                     D3: # Comment untouched 6
-                      1: old description # Comment moved from prefix D4 to prefix D3->2
+                      1: old description                           # Comment with a lot of spaces moved from prefix D4 to prefix D3->2
                       2: new description
                     D4: # Comment untouched 7
                       1: old text # Comment moved from end document to prefix D4->2
