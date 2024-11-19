@@ -1136,7 +1136,7 @@ class MergeYamlTest implements RewriteTest {
                       2: old desc # Some comment 5
                     D2:
                       1: a
-                      2: b
+                      2: b # Some comment 10
                       3: c
                     D3: # Some comment 6
                       1: old description # Some comment 7
@@ -1153,7 +1153,7 @@ class MergeYamlTest implements RewriteTest {
                       3: new desc
                     D2:
                       1: a
-                      2: b
+                      2: b # Some comment 10
                       3: c
                       4: d
                     D3: # Some comment 6
@@ -1162,45 +1162,6 @@ class MergeYamlTest implements RewriteTest {
                     D4: # Some comment 8
                       1: old text # Some comment 9
                       2: new text
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
-    @Test
-    void existingEntryBlockWithCommentAllOverThePlaceWEGG() {
-        rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
-              A:
-                B:
-                  C:
-                    2: new desc
-              """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
-              A: # Some comment
-                B: # Some comment 2
-                  C: # Some comment 3
-                    BOE: JE
-                    1: old desc # Some comment 4
-              D: whatever
-              """,
-            """
-              A: # Some comment
-                B: # Some comment 2
-                  C: # Some comment 3
-                    BOE: JE
-                    1: old desc # Some comment 4
-                    2: new desc
-              D: whatever
               """
           )
         );
