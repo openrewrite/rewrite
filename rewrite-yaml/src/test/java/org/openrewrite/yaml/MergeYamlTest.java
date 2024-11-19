@@ -1116,8 +1116,10 @@ class MergeYamlTest implements RewriteTest {
                     D:
                       3: new desc
                     D2:
-                      2: new description
+                      4: d
                     D3:
+                      2: new description
+                    D4:
                       2: new text
               """,
             false,
@@ -1132,9 +1134,13 @@ class MergeYamlTest implements RewriteTest {
                     D: # Some comment 4
                       1: something else
                       2: old desc # Some comment 5
-                    D2: # Some comment 6
+                    D2:
+                      1: a
+                      2: b
+                      3: c
+                    D3: # Some comment 6
                       1: old description # Some comment 7
-                    D3: # Some comment 8
+                    D4: # Some comment 8
                       1: old text # Some comment 9
               """,
             """
@@ -1144,64 +1150,16 @@ class MergeYamlTest implements RewriteTest {
                     D: # Some comment 4
                       1: something else
                       2: old desc # Some comment 5
-                      3: new desc
-                    D2: # Some comment 6
-                      1: old description # Some comment 7
-                      2: new description
-                    D3: # Some comment 8
-                      1: old text # Some comment 9
-                      2: new text
-              """
-          )
-        );
-    }
-
-    @Test
-    void fixThisTestAsWell() {
-        rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
-              A:
-                B:
-                  C:
-                    D:
                       3: new desc
                     D2:
-                      2: new description
-                    D3:
-                      2: new text
-              """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
-              A: # Some comment
-                B: # Some comment 2
-                  C: # Some comment 3
-                    D: # Some comment 4
-                      1: something else # Some comment 5
-                      2: old desc
-                    D2: # Some comment 6
-                      1: old description # Some comment 7
-                    D3: # Some comment 8
-                      1: old text # Some comment 9
-              """,
-            """
-              A: # Some comment
-                B: # Some comment 2
-                  C: # Some comment 3
-                    D: # Some comment 4
-                      1: something else # Some comment 5
-                      2: old desc
-                      3: new desc
-                    D2: # Some comment 6
+                      1: a
+                      2: b
+                      3: c
+                      4: d
+                    D3: # Some comment 6
                       1: old description # Some comment 7
                       2: new description
-                    D3: # Some comment 8
+                    D4: # Some comment 8
                       1: old text # Some comment 9
                       2: new text
               """
@@ -1231,6 +1189,7 @@ class MergeYamlTest implements RewriteTest {
               A: # Some comment
                 B: # Some comment 2
                   C: # Some comment 3
+                    BOE: JE
                     1: old desc # Some comment 4
               D: whatever
               """,
@@ -1238,6 +1197,7 @@ class MergeYamlTest implements RewriteTest {
               A: # Some comment
                 B: # Some comment 2
                   C: # Some comment 3
+                    BOE: JE
                     1: old desc # Some comment 4
                     2: new desc
               D: whatever
