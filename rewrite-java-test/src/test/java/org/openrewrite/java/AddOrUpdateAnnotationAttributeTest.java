@@ -602,6 +602,42 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void addArrayInputInAnnotationAttributeWithAppendTrue() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "newTest1,newTest2",
+            false,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addArrayInputInAnnotationAttributeEmptyBraces() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
