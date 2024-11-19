@@ -143,17 +143,17 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 }
 
                                 if (Boolean.TRUE.equals(appendArray)) {
-                                    boolean unchanged = true;
+                                    boolean changed = false;
                                     for (String attrListValues : attributeList) {
                                         String newAttributeListValue = maybeQuoteStringArgument(attributeName, attrListValues, finalA);
                                         if (Boolean.FALSE.equals(addOnly) && attributeValIsAlreadyPresent(jLiteralList, newAttributeListValue)) {
                                             continue;
                                         }
-                                        unchanged = false;
+                                        changed = true;
                                         jLiteralList.add(new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
                                     }
-                                    return unchanged ? as : as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList))
-                                            .withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue)));
+                                    return changed ? as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList))
+                                            .withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue))) : as;
                                 }
                                 int m = 0;
                                 for (int i = 0; i< Objects.requireNonNull(jLiteralList).size(); i++){
