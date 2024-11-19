@@ -175,36 +175,40 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             });
 
             if (c.getValue() instanceof Document || c.getValue() instanceof Mapping) {
-                String comment = "";
+                String comment = null;
 
                 if (c.getValue() instanceof Document) {
                     comment = ((Document) c.getValue()).getEnd().getPrefix();
                 } else {
                     List<Entry> entries = ((Mapping) c.getValue()).getEntries();
 
+                    // get comment from next element in same mapping block
                     for (int i = 0; i < entries.size() - 1; i++) {
                         if (entries.get(i).getValue().equals(getCursor().getValue())) {
                             comment = grabPartLineBreak(entries.get(i + 1), 0);
                             break;
                         }
                     }
-                    if (comment.isEmpty() && hasLineBreak(entries.get(entries.size() - 1), 1)) {
+                    // or retrieve it for last item from next element (could potentially be much higher in the tree)
+                    if (comment == null && hasLineBreak(entries.get(entries.size() - 1), 1)) {
                         comment = grabPartLineBreak(entries.get(entries.size() - 1), 0);
                     }
                 }
 
-                Entry last = mutatedEntries.get(mutatedEntries.size() - 1);
-                mutatedEntries.set(mutatedEntries.size() - 1, last.withPrefix(comment + last.getPrefix()));
-                c.putMessage(REMOVE_PREFIX, true);
+                if (comment != null) {
+                    Entry last = mutatedEntries.get(mutatedEntries.size() - 1);
+                    mutatedEntries.set(mutatedEntries.size() - 1, last.withPrefix(comment + last.getPrefix()));
+                    c.putMessage(REMOVE_PREFIX, true);
+                }
             }
         }
 
-        removePrefixDirectChildren(m1.getEntries(), mutatedEntries);
+        removePrefixForDirectChildren(m1.getEntries(), mutatedEntries);
 
         return m1.withEntries(mutatedEntries);
     }
 
-    private void removePrefixDirectChildren(List<Entry> m1Entries, List<Entry> mutatedEntries) {
+    private void removePrefixForDirectChildren(List<Entry> m1Entries, List<Entry> mutatedEntries) {
         for (int i = 0; i < m1Entries.size() - 1; i++) {
             if (m1Entries.get(i).getValue() instanceof Mapping && mutatedEntries.get(i).getValue() instanceof Mapping &&
                     ((Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
