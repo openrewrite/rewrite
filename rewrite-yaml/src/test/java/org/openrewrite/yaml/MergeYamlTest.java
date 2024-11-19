@@ -1104,7 +1104,7 @@ class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2218")
     @Test
-    void existingEntryBlockWithCommentAllOverThePlace() {
+    void existingEntryBlockWithCommentsAllOverThePlace() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
@@ -1133,7 +1133,7 @@ class MergeYamlTest implements RewriteTest {
                   C: # Comment untouched 3
                     D: # Comment untouched 4
                       1: something else
-                      2: old desc # Comment moved from next block to previous element 1
+                      2: old desc # Comment moved from prefix D2 to prefix D->3
                     D2:
                       1: a
                       # Above comment untouched 1
@@ -1141,9 +1141,9 @@ class MergeYamlTest implements RewriteTest {
                       3: c
                     # Above comment untouched 2
                     D3: # Comment untouched 6
-                      1: old description # Comment moved from next block to previous element 2
+                      1: old description # Comment moved from prefix D4 to prefix D3->2
                     D4: # Comment untouched 7
-                      1: old text # Comment moved from root to previous element
+                      1: old text # Comment moved from end document to prefix D4->2
               """,
             """
               A: # Comment untouched 1
@@ -1151,7 +1151,7 @@ class MergeYamlTest implements RewriteTest {
                   C: # Comment untouched 3
                     D: # Comment untouched 4
                       1: something else
-                      2: old desc # Comment moved from next block to previous element 1
+                      2: old desc # Comment moved from prefix D2 to prefix D->3
                       3: new desc
                     D2:
                       1: a
@@ -1161,10 +1161,10 @@ class MergeYamlTest implements RewriteTest {
                       4: d
                     # Above comment untouched 2
                     D3: # Comment untouched 6
-                      1: old description # Comment moved from next block to previous element 2
+                      1: old description # Comment moved from prefix D4 to prefix D3->2
                       2: new description
                     D4: # Comment untouched 7
-                      1: old text # Comment moved from root to previous element
+                      1: old text # Comment moved from end document to prefix D4->2
                       2: new text
               """
           )

@@ -28,6 +28,7 @@ import org.openrewrite.yaml.tree.Yaml.Mapping.Entry;
 import org.openrewrite.yaml.tree.Yaml.Scalar;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -107,7 +108,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
             if (getCursor().getMessage(REMOVE_PREFIX, false)) {
                 List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) getCursor().getValue()).getEntries();
-                return mapping.withEntries(mapLast(mapping.getEntries(), it -> it.withPrefix("\n" + grabPartLineBreak(entries.get(entries.size() - 1), 1))));
+                return mapping.withEntries(mapLast(mapping.getEntries(), it -> it.withPrefix("\n" + grabAfterFirstLineBreak(entries.get(entries.size() - 1)))));
             }
 
             return mapping;
@@ -152,7 +153,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             }
             // workaround: autoFormat cannot handle new inserted values very well
             if (!mergedEntries.isEmpty() && it.getValue() instanceof Yaml.Scalar && hasLineBreak(mergedEntries.get(0), 2)) {
-                return it.withPrefix("\n" + grabPartLineBreak(mergedEntries.get(0), 1));
+                return it.withPrefix("\n" + grabAfterFirstLineBreak(mergedEntries.get(0)));
             }
             return shouldAutoFormat ? MergeYamlVisitor.this.autoFormat(it, p, cursor) : it;
         }));
@@ -186,13 +187,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     // get comment from next element in same mapping block
                     for (int i = 0; i < entries.size() - 1; i++) {
                         if (entries.get(i).getValue().equals(getCursor().getValue())) {
-                            comment = grabPartLineBreak(entries.get(i + 1), 0);
+                            comment = grabBeforeFirstLineBreak(entries.get(i + 1));
                             break;
                         }
                     }
                     // or retrieve it for last item from next element (could potentially be much higher in the tree)
                     if (comment == null && hasLineBreak(entries.get(entries.size() - 1), 1)) {
-                        comment = grabPartLineBreak(entries.get(entries.size() - 1), 0);
+                        comment = grabBeforeFirstLineBreak(entries.get(entries.size() - 1));
                     }
                 }
 
@@ -213,7 +214,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         for (int i = 0; i < m1Entries.size() - 1; i++) {
             if (m1Entries.get(i).getValue() instanceof Yaml.Mapping && mutatedEntries.get(i).getValue() instanceof Yaml.Mapping &&
                     ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
-                mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix("\n" + grabPartLineBreak(mutatedEntries.get(i + 1), 1)));
+                mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix("\n" + grabAfterFirstLineBreak(mutatedEntries.get(i + 1))));
             }
         }
     }
@@ -284,13 +285,17 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     private boolean hasLineBreak(Yaml.Mapping.Entry entry, int atLeastParts) {
-        boolean a = LINE_BREAK.matcher(entry.getPrefix()).find();
-        return a && !grabPartLineBreak(entry, atLeastParts - 1).isEmpty();
+        return LINE_BREAK.matcher(entry.getPrefix()).find() && LINE_BREAK.split(entry.getPrefix()).length >= atLeastParts;
     }
 
-    private String grabPartLineBreak(Yaml.Mapping.Entry entry, int index) {
+    private String grabBeforeFirstLineBreak(Yaml.Mapping.Entry entry) {
         String[] parts = LINE_BREAK.split(entry.getPrefix());
-        return parts.length > index ? parts[index] : "";
+        return parts.length > 0 ? parts[0] : "";
+    }
+
+    private String grabAfterFirstLineBreak(Yaml.Mapping.Entry entry) {
+        String[] parts = LINE_BREAK.split(entry.getPrefix());
+        return parts.length > 1 ? String.join("\n", Arrays.copyOfRange(parts, 1, parts.length)) : "";
     }
 
     private Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
