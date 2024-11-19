@@ -150,7 +150,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                         }
                                         jLiteralList.add(new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
                                     }
-                                    return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList)).withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue)));
+                                    return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList))
+                                            .withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue)));
                                 }
                                 int m = 0;
                                 for (int i = 0; i< Objects.requireNonNull(jLiteralList).size(); i++){
