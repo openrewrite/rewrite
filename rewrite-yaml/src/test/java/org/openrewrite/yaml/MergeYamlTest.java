@@ -1036,7 +1036,7 @@ class MergeYamlTest implements RewriteTest {
           )),
           yaml(
             """
-              A: # Some comment
+              A: # Comment untouched
                 B:
                   C:
                     D:
@@ -1049,7 +1049,7 @@ class MergeYamlTest implements RewriteTest {
                       1: old text
               """,
             """
-              A: # Some comment
+              A: # Comment untouched
                 B:
                   C:
                     D:
@@ -1090,12 +1090,12 @@ class MergeYamlTest implements RewriteTest {
             """
               spring:
                 application:
-                  name: main # some comment
+                  name: main # Comment moved from root to previous element
               """,
             """
               spring:
                 application:
-                  name: main # some comment
+                  name: main # Comment moved from root to previous element
                   description: a description
               """
           )
@@ -1128,39 +1128,43 @@ class MergeYamlTest implements RewriteTest {
           )),
           yaml(
             """
-              A: # Some comment
-                B: # Some comment 2
-                  C: # Some comment 3
-                    D: # Some comment 4
+              A: # Comment untouched 1
+                B: # Comment untouched 2
+                  C: # Comment untouched 3
+                    D: # Comment untouched 4
                       1: something else
-                      2: old desc # Some comment 5
+                      2: old desc # Comment moved from next block to previous element 1
                     D2:
                       1: a
-                      2: b # Some comment 10
+                      # Above comment untouched 1
+                      2: b # Comment untouched 5
                       3: c
-                    D3: # Some comment 6
-                      1: old description # Some comment 7
-                    D4: # Some comment 8
-                      1: old text # Some comment 9
+                    # Above comment untouched 2
+                    D3: # Comment untouched 6
+                      1: old description # Comment moved from next block to previous element 2
+                    D4: # Comment untouched 7
+                      1: old text # Comment moved from root to previous element
               """,
             """
-              A: # Some comment
-                B: # Some comment 2
-                  C: # Some comment 3
-                    D: # Some comment 4
+              A: # Comment untouched 1
+                B: # Comment untouched 2
+                  C: # Comment untouched 3
+                    D: # Comment untouched 4
                       1: something else
-                      2: old desc # Some comment 5
+                      2: old desc # Comment moved from next block to previous element 1
                       3: new desc
                     D2:
                       1: a
-                      2: b # Some comment 10
+                      # Above comment untouched 1
+                      2: b # Comment untouched 5
                       3: c
                       4: d
-                    D3: # Some comment 6
-                      1: old description # Some comment 7
+                    # Above comment untouched 2
+                    D3: # Comment untouched 6
+                      1: old description # Comment moved from next block to previous element 2
                       2: new description
-                    D4: # Some comment 8
-                      1: old text # Some comment 9
+                    D4: # Comment untouched 7
+                      1: old text # Comment moved from root to previous element
                       2: new text
               """
           )
