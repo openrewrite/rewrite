@@ -40,7 +40,7 @@ import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 @RequiredArgsConstructor
 public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
-    private final Pattern LINE_BREAK = Pattern.compile("\\R");
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     private final Yaml existing;
     private final Yaml incoming;
@@ -143,7 +143,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             return existingEntry;
         });
 
-        List<Entry> mutatedEntries = concatAll(mergedEntries, map(m2.getEntries(), (i, it) -> {
+        List<Entry> mutatedEntries = concatAll(mergedEntries, map(m2.getEntries(), it -> {
             for (Entry existingEntry : m1.getEntries()) {
                 if (keyMatches(existingEntry, it)) {
                     return null;
