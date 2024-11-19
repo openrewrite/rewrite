@@ -74,7 +74,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     @Option(displayName = "Append array",
             description = "If the attribute is an array, setting this option to `true` will append the value(s). " +
-                          "In conjunction with `addOnly`, it is possible to control duplicates:" +
+                          "In conjunction with `addOnly`, it is possible to control duplicates: " +
                           "`addOnly=true`, always append. " +
                           "`addOnly=false`, only append if the value is not already present.")
     @Nullable
@@ -143,14 +143,16 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 }
 
                                 if (Boolean.TRUE.equals(appendArray)) {
+                                    boolean unchanged = true;
                                     for (String attrListValues : attributeList) {
                                         String newAttributeListValue = maybeQuoteStringArgument(attributeName, attrListValues, finalA);
-                                        if (Boolean.FALSE.equals(addOnly) && attributeValIsAlreadyPresentOrNull(jLiteralList, newAttributeListValue)) {
+                                        if (Boolean.FALSE.equals(addOnly) && attributeValIsAlreadyPresent(jLiteralList, newAttributeListValue)) {
                                             continue;
                                         }
+                                        unchanged = false;
                                         jLiteralList.add(new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
                                     }
-                                    return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList))
+                                    return unchanged ? as : as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList))
                                             .withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue)));
                                 }
                                 int m = 0;
@@ -282,7 +284,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return false;
     }
 
-    private static boolean attributeValIsAlreadyPresentOrNull(List<Expression> expression, @Nullable String attributeValue) {
+    private static boolean attributeValIsAlreadyPresent(List<Expression> expression, @Nullable String attributeValue) {
         for (Expression e : expression) {
             if (e instanceof J.Literal) {
                 J.Literal literal = (J.Literal) e;
