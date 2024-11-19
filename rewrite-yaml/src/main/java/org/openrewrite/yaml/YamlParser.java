@@ -50,7 +50,6 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.marker.Markers.EMPTY;
 
 public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s*(@[^\n\r@]+@)");
@@ -83,9 +82,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         Yaml.Documents docs = (Yaml.Documents) sourceFile;
                         // ensure there is always at least one Document, even in an empty yaml file
                         if (docs.getDocuments().isEmpty()) {
-                            Yaml.Document.End end = new Yaml.Document.End(randomId(), "", EMPTY, false);
-                            Yaml.Mapping mapping = new Yaml.Mapping(randomId(), EMPTY, null, emptyList(), null, null);
-                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", EMPTY, false, mapping, end)));
+                            Yaml.Document.End end = new Yaml.Document.End(randomId(), "", Markers.EMPTY, false);
+                            Yaml.Mapping mapping = new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null);
+                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY, false, mapping, end)));
                         }
                         return docs;
                     }
@@ -144,7 +143,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         documents.add(document.withEnd(new Yaml.Document.End(
                                 randomId(),
                                 fmt,
-                                EMPTY,
+                                Markers.EMPTY,
                                 ((DocumentEndEvent) event).getExplicit()
                         )));
                         lastEnd = event.getEndMark().getIndex();
@@ -156,10 +155,10 @@ public class YamlParser implements org.openrewrite.Parser {
                         document = new Yaml.Document(
                                 randomId(),
                                 fmt,
-                                EMPTY,
+                                Markers.EMPTY,
                                 ((DocumentStartEvent) event).getExplicit(),
-                                new Yaml.Mapping(randomId(), EMPTY, null, emptyList(), null, null),
-                                new Yaml.Document.End(randomId(), "", EMPTY, false)
+                                new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null),
+                                new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                         );
                         lastEnd = event.getEndMark().getIndex();
                         break;
@@ -256,7 +255,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 }
                                 break;
                         }
-                        Yaml.Scalar finalScalar = new Yaml.Scalar(randomId(), fmt, EMPTY, style, anchor, scalarValue);
+                        Yaml.Scalar finalScalar = new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue);
                         BlockBuilder builder = blockStack.isEmpty() ? null : blockStack.peek();
                         if (builder instanceof SequenceBuilder) {
                             // Inline sequences like [1, 2] need to keep track of any whitespace between the element
@@ -353,7 +352,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             throw new UnsupportedOperationException("Unknown anchor: " + alias.getAnchor());
                         }
                         BlockBuilder builder = blockStack.peek();
-                        builder.push(new Yaml.Alias(randomId(), fmt, EMPTY, anchor));
+                        builder.push(new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor));
                         lastEnd = event.getEndMark().getIndex();
                         break;
                     }
@@ -362,9 +361,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (document == null && !fmt.isEmpty()) {
                             documents.add(
                                     new Yaml.Document(
-                                            randomId(), fmt, EMPTY, false,
-                                            new Yaml.Mapping(randomId(), EMPTY, null, emptyList(), null, null),
-                                            new Yaml.Document.End(randomId(), "", EMPTY, false)
+                                            randomId(), fmt, Markers.EMPTY, false,
+                                            new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null),
+                                            new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                                     ));
                         }
                         break;
@@ -374,7 +373,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             }
 
-            return new Yaml.Documents(randomId(), EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, documents);
+            return new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, documents);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -410,7 +409,7 @@ public class YamlParser implements org.openrewrite.Parser {
         if (!isForScalar) {
             prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
         }
-        return new Yaml.Anchor(randomId(), prefix, postFix.toString(), EMPTY, anchorKey);
+        return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
     }
 
     private static int commentAwareIndexOf(char target, String s) {
@@ -492,7 +491,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 String entryPrefix = originalKeyPrefix.substring(entryPrefixStartIndex);
                 String beforeMappingValueIndicator = keySuffix.substring(0,
                         Math.max(commentAwareIndexOf(':', keySuffix), 0));
-                entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, EMPTY, key, beforeMappingValueIndicator, block));
+                entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, Markers.EMPTY, key, beforeMappingValueIndicator, block));
                 key = null;
             }
         }
@@ -538,7 +537,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 entryPrefix = "";
                 blockPrefix = rawPrefix;
             }
-            entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, EMPTY, block.withPrefix(blockPrefix), hasDash, commaPrefix));
+            entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, block.withPrefix(blockPrefix), hasDash, commaPrefix));
         }
 
         @Override
@@ -568,7 +567,7 @@ public class YamlParser implements org.openrewrite.Parser {
         private String prefix;
 
         public MappingWithPrefix(String prefix, @Nullable String startBracePrefix, List<Yaml.Mapping.Entry> entries, @Nullable String endBracePrefix, @Nullable Anchor anchor) {
-            super(randomId(), EMPTY, startBracePrefix, entries, endBracePrefix, anchor);
+            super(randomId(), Markers.EMPTY, startBracePrefix, entries, endBracePrefix, anchor);
             this.prefix = prefix;
         }
 
@@ -584,7 +583,7 @@ public class YamlParser implements org.openrewrite.Parser {
         private String prefix;
 
         public SequenceWithPrefix(String prefix, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix, @Nullable Anchor anchor) {
-            super(randomId(), EMPTY, startBracketPrefix, entries, endBracketPrefix, anchor);
+            super(randomId(), Markers.EMPTY, startBracketPrefix, entries, endBracketPrefix, anchor);
             this.prefix = prefix;
         }
 
