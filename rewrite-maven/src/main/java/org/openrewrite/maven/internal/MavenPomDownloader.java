@@ -146,6 +146,11 @@ public class MavenPomDownloader {
         this.mirrors = this.ctx.getMirrors(this.ctx.getSettings());
     }
 
+    private boolean allowPomDownloadFailure() {
+        final String propertyValue = System.getProperty("org.openrewrite.allowPomDownloadFailure");
+        return propertyValue != null && !propertyValue.equalsIgnoreCase("false");
+    }
+
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
         long start = System.nanoTime();
         try {
@@ -633,8 +638,13 @@ public class MavenPomDownloader {
         }
         ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
         sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
-        throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
+        if (allowPomDownloadFailure()) {
+            ResolvedGroupArtifactVersion dummy = new ResolvedGroupArtifactVersion(null, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null);
+            return new Pom(null, null, null, dummy, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        } else {
+            throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
                 .setRepositoryResponses(repositoryResponses);
+        }
     }
 
     /**
