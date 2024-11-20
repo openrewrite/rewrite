@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.table.RewriteRecipeSource;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,14 +27,16 @@ import static org.openrewrite.java.Assertions.java;
 
 class FindRecipesTest implements RewriteTest {
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new FindRecipes()).parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
+    }
+
     @DocumentExample
     @Test
     void findRecipes() {
         rewriteRun(
           spec -> spec
-            .recipe(new FindRecipes())
-            .parser(JavaParser.fromJavaVersion()
-              .classpath(JavaParser.runtimeClasspath()))
             .dataTable(RewriteRecipeSource.Row.class, rows -> {
                 assertThat(rows).hasSize(1);
                 RewriteRecipeSource.Row row = rows.get(0);
@@ -66,7 +69,7 @@ class FindRecipesTest implements RewriteTest {
                 public String getDisplayName() {
                     return "My recipe";
                 }
-                
+              
                 @Override
                 public String getDescription() {
                     return "This is my recipe.";
@@ -85,19 +88,19 @@ class FindRecipesTest implements RewriteTest {
                         description = "A method pattern that is used to find matching method declarations/invocations.",
                         example = "org.mockito.Matchers anyVararg()")
                 String methodPattern;
-                
+              
                 @Option(displayName = "New access level",
                         description = "New method access level to apply to the method, like \\"public\\".",
                         example = "public",
                         valid = {"private", "protected", "package", "public"},
                         required = false)
                 String newAccessLevel;
-                
+              
                 @Override
                 public String getDisplayName() {
                     return "My recipe";
                 }
-                
+              
                 @Override
                 public String getDescription() {
                     return "This is my recipe.";
@@ -111,7 +114,6 @@ class FindRecipesTest implements RewriteTest {
     @Test
     void returnInLambda() {
         rewriteRun(
-          spec -> spec.recipe(new FindRecipes()),
           java(
             """
               import java.util.function.UnaryOperator;
@@ -121,6 +123,52 @@ class FindRecipesTest implements RewriteTest {
                       //noinspection CodeBlock2Expr
                       return actual + "\\n";
                   };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findRefasterRecipe() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package org.openrewrite.java.template;
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Target;
+                @Target(ElementType.TYPE)
+                public @interface RecipeDescriptor {
+                    String name();
+                    String description();
+                }
+                """
+            ))
+            .dataTable(RewriteRecipeSource.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                RewriteRecipeSource.Row row = rows.get(0);
+                assertThat(row.getDisplayName()).isEqualTo("Some refaster rule");
+                assertThat(row.getDescription()).isEqualTo("This is a refaster rule.");
+            }),
+          java(
+            """
+              import org.openrewrite.java.template.RecipeDescriptor;
+              
+              @RecipeDescriptor(
+                  name = "Some refaster rule",
+                  description = "This is a refaster rule."
+              )
+              class SomeRefasterRule {
+              }
+              """,
+            """
+              import org.openrewrite.java.template.RecipeDescriptor;
+              
+              /*~~>*/@RecipeDescriptor(
+                  name = "Some refaster rule",
+                  description = "This is a refaster rule."
+              )
+              class SomeRefasterRule {
               }
               """
           )
