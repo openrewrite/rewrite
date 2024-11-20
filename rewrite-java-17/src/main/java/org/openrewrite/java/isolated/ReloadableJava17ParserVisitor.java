@@ -1388,32 +1388,16 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
             int saveCursor = cursor;
             Space space = whitespace();
-            if (source.startsWith("[", cursor)) {
-                cursor = saveCursor;
-                JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
-                return new J.ArrayType(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
-                        annotations,
-                        dimension,
-                        typeMapping.type(tree)
-                );
-            } else if (source.startsWith("...", cursor)) {
-                J.ArrayType type = new J.ArrayType(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
-                        annotations,
-                        JLeftPadded.build(space),
-                        typeMapping.type(tree)
-                );
-                cursor = saveCursor;
-                return type;
-            }
             cursor = saveCursor;
+            return new J.ArrayType(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
+                    annotations,
+                    source.startsWith("...", cursor) ? JLeftPadded.build(space) : padLeft(sourceBefore("["), sourceBefore("]")),
+                    typeMapping.type(tree)
+            );
         }
         return baseType;
     }
@@ -2024,7 +2008,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 } else {
                     leadingAnnotations.add(annotation);
                 }
-                i = cursor -1;
+                i = cursor - 1;
                 lastAnnotationPosition = cursor;
                 continue;
             }
