@@ -156,7 +156,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             if (!mergedEntries.isEmpty() && it.getValue() instanceof Yaml.Scalar && hasLineBreak(mergedEntries.get(0), 2)) {
                 return it.withPrefix(lineSeparator() + grabAfterFirstLineBreak(mergedEntries.get(0)));
             }
-            return shouldAutoFormat ? MergeYamlVisitor.this.autoFormat(it, p, cursor) : it;
+            return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
         }));
 
         if (m1.getEntries().size() < mutatedEntries.size() && !getCursor().isRoot()) {
