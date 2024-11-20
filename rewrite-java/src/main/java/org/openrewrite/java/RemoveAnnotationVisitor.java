@@ -17,9 +17,10 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
@@ -107,7 +108,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
     }
 
     @Override
-    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+    public  J.@Nullable Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
         if (annotationMatcher.matches(annotation)) {
             getCursor().getParentOrThrow().putMessage("annotationRemoved", annotation);
             maybeRemoveImport(TypeUtils.asFullyQualified(annotation.getType()));

@@ -1135,4 +1135,76 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void comment() {
+        rewriteRun(
+          spec -> spec.recipe(
+              new MergeYaml(
+                "$",
+                //language=yaml
+                """
+                  
+                    # new stuff
+                  new-property: value
+                  """,
+                false,
+                null,
+                null
+              )),
+          yaml(
+            """
+              # config
+              activate-auto: true
+              activate-mep: true
+              """,
+            """
+              # config
+              activate-auto: true
+              activate-mep: true
+              # new stuff
+              new-property: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentInList() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$.groups",
+              //language=yaml
+              """
+                
+                # comment
+                - id: 3
+                
+                  # foo bar
+                  foo: bar
+                """,
+              false,
+              "id",
+              null
+            )),
+          yaml(
+            """
+              groups:
+                - id: 1
+                - id: 2
+              """,
+            """
+              groups:
+                - id: 1
+                - id: 2
+                # comment
+                - id: 3
+              
+                  # foo bar
+                  foo: bar
+              """
+          )
+        );
+    }
 }

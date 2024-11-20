@@ -356,8 +356,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         }
 
         return new TreeVisitor<Tree, ExecutionContext>() {
+
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
@@ -471,7 +472,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         }
 
         @Override
-        public Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+        public  Properties.@Nullable Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if (DISTRIBUTION_URL_KEY.equals(entry.getKey())) {
                 Properties.Value value = entry.getValue();
                 if (!mavenWrapper.getDistributionUrl().equals(value.getText())) {
@@ -494,8 +495,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     return null;
                 }
             } else if (WRAPPER_SHA_256_SUM_KEY.equals(entry.getKey())) {
-                if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript
-                        && Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
+                if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript &&
+                        Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
                     Properties.Value value = entry.getValue();
                     Checksum wrapperJarChecksum = mavenWrapper.getWrapperChecksum();
                     if (wrapperJarChecksum != null && !wrapperJarChecksum.getHexValue().equals(value.getText())) {

@@ -33,3 +33,10 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-maven"))
 }
+
+//Javadoc compiler will complain about the use of the internal types.
+tasks.withType<Javadoc> {
+    exclude(
+        "**/Xml**"
+    )
+}

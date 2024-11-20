@@ -40,17 +40,16 @@ public final class SearchResult implements Marker {
     @Nullable
     String description;
 
-    public static <T extends Tree> T found(@Nullable T t) {
+    public static <T extends @Nullable Tree> @Nullable T found(T t) {
         return found(t, null);
     }
 
-    public static <T extends Tree> T found(@Nullable T t, @Nullable String description) {
+    public static <T extends @Nullable Tree> @Nullable T found(T t, @Nullable String description) {
         if (t == null) {
             //noinspection ConstantConditions
             return null;
         }
-        return t.withMarkers(t.getMarkers().computeByType(new SearchResult(randomId(), description),
-                (s1, s2) -> s1 == null ? s2 : s1));
+        return t.withMarkers(t.getMarkers().add(new SearchResult(randomId(), description)));
     }
 
     /**
@@ -59,7 +58,7 @@ public final class SearchResult implements Marker {
      * If the there already exists a search result with the same description, the existing search result is returned.
      */
     @Incubating(since = "8.0.0")
-    public static <T extends Tree> T mergingFound(@Nullable T t, String description) {
+    public static <T extends @Nullable Tree> T mergingFound(@Nullable T t, String description) {
         return mergingFound(t, description, ", ");
     }
 
@@ -71,7 +70,7 @@ public final class SearchResult implements Marker {
      * @param delimiter The delimiter to use when merging descriptions.
      */
     @Incubating(since = "8.0.0")
-    public static <T extends Tree> T mergingFound(@Nullable T t, String description, String delimiter) {
+    public static <T extends Tree> @Nullable T mergingFound(@Nullable T t, String description, String delimiter) {
         Objects.requireNonNull(delimiter, "delimiter must not be null");
         if (t == null) {
             //noinspection ConstantConditions

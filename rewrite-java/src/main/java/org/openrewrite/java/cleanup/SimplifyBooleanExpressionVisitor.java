@@ -143,6 +143,21 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                             .withTruePart(asTernary.getFalsePart())
                             .withFalsePart(asTernary.getTruePart());
                 }
+            } else if (asTernary.getCondition() instanceof J.Literal) {
+                if (isLiteralTrue(asTernary.getCondition())) {
+                    j = asTernary.getTruePart();
+                } else if (isLiteralFalse(asTernary.getCondition())) {
+                    j = asTernary.getFalsePart();
+                }
+            } else if (asTernary.getCondition() instanceof J.Parentheses) {
+                J.Parentheses<Expression> parenthesized = (J.Parentheses<Expression>) asTernary.getCondition();
+                if (parenthesized.getTree() instanceof J.Literal) {
+                    if (isLiteralTrue(parenthesized.getTree())) {
+                        j = asTernary.getTruePart();
+                    } else if (isLiteralFalse(parenthesized.getTree())) {
+                        j = asTernary.getFalsePart();
+                    }
+                }
             }
         }
         return j;
@@ -171,17 +186,11 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 }
             } else if (parenthesized instanceof J.Ternary) {
                 J.Ternary ternary = (J.Ternary) parenthesized;
-                Expression negatedCondition = maybeNegate(ternary.getCondition());
-                if (negatedCondition != ternary.getCondition()) {
-                    j = ternary
-                            .withCondition(negatedCondition)
-                            .withPrefix(j.getPrefix());
-                } else {
-                    j = ternary
-                            .withTruePart(ternary.getFalsePart())
-                            .withFalsePart(ternary.getTruePart())
-                            .withPrefix(j.getPrefix());
-                }
+                j = ternary
+                        .withCondition(maybeNegate(ternary.getCondition()))
+                        .withTruePart(ternary.getFalsePart())
+                        .withFalsePart(ternary.getTruePart())
+                        .withPrefix(j.getPrefix());
             } else if (parenthesized instanceof Expression) {
                 j = unpackExpression((Expression) parenthesized, j);
             }
@@ -237,9 +246,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J j = super.visitMethodInvocation(method, executionContext);
         J.MethodInvocation asMethod = (J.MethodInvocation) j;
         Expression select = asMethod.getSelect();
-        if (isEmpty.matches(asMethod)
-            && select instanceof J.Literal
-            && select.getType() == JavaType.Primitive.String) {
+        if (isEmpty.matches(asMethod) &&
+            select instanceof J.Literal &&
+            select.getType() == JavaType.Primitive.String) {
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
         }
         return j;

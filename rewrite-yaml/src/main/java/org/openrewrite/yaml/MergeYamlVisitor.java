@@ -41,11 +41,25 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private boolean shouldAutoFormat = true;
 
     public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty) {
-        this(scope, new YamlParser().parse(yamlString)
-                .findFirst()
-                .map(Yaml.Documents.class::cast)
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"))
-                .getDocuments().get(0).getBlock(), acceptTheirs, objectIdentifyingProperty);
+        this(scope,
+                new YamlParser().parse(yamlString)
+                        .findFirst()
+                        .map(Yaml.Documents.class::cast)
+                        .map(docs -> {
+                            // Any comments will have been put on the parent Document node, preserve by copying to the mapping
+                            Yaml.Document doc = docs.getDocuments().get(0);
+                            if(doc.getBlock() instanceof Yaml.Mapping) {
+                                Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
+                                return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+                            } else if (doc.getBlock() instanceof Yaml.Sequence) {
+                                Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
+                                return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+                            }
+                            return doc.getBlock().withPrefix(doc.getPrefix());
+                        })
+                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML")),
+                acceptTheirs,
+                objectIdentifyingProperty);
     }
 
     @Override
@@ -105,7 +119,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 if (keyMatches(existingEntry, incomingEntry)) {
                     return existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(),
                             incomingEntry.getValue(), acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
-                            .visit(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
+                            .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
                 }
             }
             return existingEntry;
@@ -118,7 +132,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
             if (shouldAutoFormat) {
-                return autoFormat(incomingEntry, p, cursor);
+                incomingEntry = autoFormat(incomingEntry, p, cursor);
             }
             return incomingEntry;
         }));
@@ -161,11 +175,20 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     for (Yaml.Sequence.Entry existingEntry : s1.getEntries()) {
                         Yaml.Mapping existingMapping = (Yaml.Mapping) existingEntry.getBlock();
                         if (keyMatches(existingMapping, incomingMapping)) {
-                            return existingEntry.withBlock(mergeMapping(existingMapping, incomingMapping, p, cursor));
+                            Yaml.Sequence.Entry e1 = existingEntry.withBlock(mergeMapping(existingMapping, incomingMapping, p, cursor));
+                            if(e1 == existingEntry) {
+                                // Made no change, no need to consider the entry "mutated"
+                                //noinspection DataFlowIssue
+                                return null;
+                            }
+                            return e1;
                         }
                     }
                     return entry;
                 });
+                if (mutatedEntries.isEmpty()) {
+                    return s1;
+                }
 
                 List<Yaml.Sequence.Entry> entries = ListUtils.concatAll(
                         s1.getEntries().stream().filter(entry -> !mutatedEntries.contains(entry))

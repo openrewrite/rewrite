@@ -40,7 +40,7 @@ public class DependencyManagementDependencyRequiresVersion extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isManagedDependencyTag() && tag.getChildValue("version").orElse(null) == null) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                 }
                 return super.visitTag(tag, ctx);
             }

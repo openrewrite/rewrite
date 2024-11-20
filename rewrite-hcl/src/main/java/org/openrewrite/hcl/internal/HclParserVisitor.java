@@ -19,12 +19,12 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
 import org.openrewrite.hcl.internal.grammar.HCLParserBaseVisitor;
 import org.openrewrite.hcl.tree.*;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
@@ -98,7 +98,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             // left can be unaryOp or exprTerm, right can be another operation or exprTerm
             if (c.unaryOp() != null) {
                 left = (Expression) visit(c.unaryOp());
-            }else {
+            } else {
                 left = (Expression) visit(c.exprTerm(0));
             }
 
@@ -150,7 +150,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
 
             if (c.unaryOp() != null) {
                 right = (Expression) visit(c.operation() != null ? c.operation() : c.exprTerm(0));
-            }else {
+            } else {
                 right = (Expression) visit(c.operation() != null ? c.operation() : c.exprTerm(1));
             }
 
@@ -740,13 +740,16 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                         delimIndex++;
                     } else switch (source.substring(delimIndex, delimIndex + 2)) {
                         case "//":
+                            inSingleLineComment = true;
+                            delimIndex += 2;
+                            break;
                         case "/*":
                             inMultiLineComment = true;
-                            delimIndex++;
+                            delimIndex += 2;
                             break;
                         case "*/":
                             inMultiLineComment = false;
-                            delimIndex = delimIndex + 2;
+                            delimIndex += 2;
                             break;
                     }
                 }

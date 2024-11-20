@@ -18,12 +18,15 @@ package org.openrewrite.yaml.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     private final IndentsStyle style;
@@ -73,26 +76,31 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
                 getCursor().getParentOrThrow().putMessage("sequenceEntryIndent", indent);
                 // the +1 is for the '-' character
-                getCursor().getParentOrThrow().putMessage("lastIndent", indent +
-                        firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1);
+                getCursor().getParentOrThrow().putMessage("lastIndent",
+                        indent + firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1);
             } else if (y instanceof Yaml.Mapping.Entry) {
                 y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
                 getCursor().putMessage("lastIndent", indent + style.getIndentSize());
+            } else if (y instanceof Yaml.Document) {
+                y = y.withPrefix(indentComments(y.getPrefix(), 0));
             }
-        } else if (y instanceof Yaml.Mapping.Entry &&
-                getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Sequence.Entry) {
-            // this is a mapping entry that begins a sequence entry and anything below it should be indented further to the right now, e.g.:
-            //
-            // - key:
-            //     value
-            getCursor().putMessage("lastIndent", indent + style.getIndentSize());
+        } else if (y instanceof Yaml.Mapping.Entry) {
+            if (getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Sequence.Entry) {
+                // this is a mapping entry that begins a sequence entry and anything below it should be indented further to the right now, e.g.:
+                //
+                // - key:
+                //     value
+                getCursor().putMessage("lastIndent", indent + style.getIndentSize());
+            } else {
+                y = y.withPrefix(indentComments(y.getPrefix(), indent));
+            }
         }
         return y;
     }
 
     private boolean isUnindentedTopLevel() {
         return getCursor().getParentOrThrow().getValue() instanceof Yaml.Document ||
-                getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
+               getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
     }
 
     @Override
@@ -112,17 +120,50 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     private String indentTo(String prefix, int column) {
-        if (!prefix.contains("\n")) {
-            return prefix;
+        if (prefix.contains("\n")) {
+            int indent = findIndent(prefix);
+            if (indent != column) {
+                int shift = column - indent;
+                prefix = indent(prefix, shift);
+            }
         }
+        return indentComments(prefix, column);
+    }
 
-        int indent = findIndent(prefix);
+    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(\\s*)(.*\n?)", Pattern.MULTILINE);
+    private String indentComments(String prefix, int column) {
+        // If the prefix contains a newline followed by a comment ensure the comment begins at the indentation column
+        if (prefix.contains("#")) {
+            Matcher m = COMMENT_PATTERN.matcher(prefix);
+            StringBuilder result = new StringBuilder();
+            String indent = StringUtils.repeat(" ", column);
+            boolean firstLine = true;
+            while (m.find()) {
+                String whitespace = m.group(1);
+                String comment = m.group(2);
+                int newlineCount = StringUtils.countOccurrences(whitespace, "\n");
+                if (firstLine && newlineCount == 0) {
+                    if(getCursor().getValue() instanceof Yaml.Documents ||
+                       getCursor().getValue() instanceof Yaml.Document) {
+                        // Comments on a top-level
+                        result.append(indent);
+                    } else {
+                        // Comments can be on the end of a line and should not necessarily be moved to their own line
+                        result.append(whitespace);
+                    }
 
-        if (indent != column) {
-            int shift = column - indent;
-            prefix = indent(prefix, shift);
+                    result.append(comment);
+                } else {
+                    result.append(StringUtils.repeat("\n", newlineCount))
+                            .append(indent)
+                            .append(comment);
+                }
+                firstLine = false;
+            }
+            if (!prefix.contentEquals(result)) {
+                prefix = result.toString();
+            }
         }
-
         return prefix;
     }
 
@@ -154,12 +195,13 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     private String firstIndent(Yaml yaml) {
-        AtomicReference<String> indent = new AtomicReference<>();
+        AtomicReference<@Nullable String> indent = new AtomicReference<>();
 
         new YamlIsoVisitor<AtomicReference<String>>() {
             @Override
             public @Nullable Yaml visit(@Nullable Tree tree, AtomicReference<String> indent) {
                 Yaml y = (Yaml) tree;
+                //noinspection ConstantValue
                 if (indent.get() != null) {
                     return y;
                 }

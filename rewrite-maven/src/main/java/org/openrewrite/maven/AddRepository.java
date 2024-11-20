@@ -170,7 +170,7 @@ public class AddRepository extends Recipe {
                                 repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases()))
                                         .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             } else {
-                                repositories = (Xml.Tag) new RemoveContentVisitor<>(releases, true)
+                                repositories = (Xml.Tag) new RemoveContentVisitor<>(releases, true, true)
                                         .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 if (!isNoSnapshots()) {
                                     repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases()))
@@ -184,7 +184,7 @@ public class AddRepository extends Recipe {
                             if (snapshots == null) {
                                 repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleSnapshots())).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             } else {
-                                repositories = (Xml.Tag) new RemoveContentVisitor<>(snapshots, true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
+                                repositories = (Xml.Tag) new RemoveContentVisitor<>(snapshots, true, true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 if (!isNoSnapshots()) {
                                     repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleSnapshots())).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 }
@@ -267,9 +267,9 @@ public class AddRepository extends Recipe {
         if (releases == null) {
             return isNoReleases();
         } else {
-            return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null))
-                   && Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null))
-                   && Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
+            return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null)) &&
+                   Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null)) &&
+                   Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
         }
     }
 
@@ -282,9 +282,9 @@ public class AddRepository extends Recipe {
         if (snapshots == null) {
             return isNoSnapshots();
         } else {
-            return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null))
-                   && Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null))
-                   && Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
+            return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null)) &&
+                   Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null)) &&
+                   Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
         }
     }
 

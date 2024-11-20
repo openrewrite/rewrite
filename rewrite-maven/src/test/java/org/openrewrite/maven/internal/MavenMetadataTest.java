@@ -21,7 +21,9 @@ import org.openrewrite.Issue;
 import org.openrewrite.maven.tree.MavenMetadata;
 
 import java.io.IOException;
+import java.time.ZonedDateTime;
 
+import static java.time.ZoneOffset.UTC;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MavenMetadataTest {
@@ -46,6 +48,7 @@ class MavenMetadataTest {
 
         MavenMetadata parsed = MavenMetadata.parse(metadata.getBytes());
         assertThat(parsed.getVersioning().getVersions()).hasSize(2);
+        assertThat(parsed.getVersioning().getLastUpdated()).isEqualTo(ZonedDateTime.of(2021, 1, 15, 4, 27, 54, 0, UTC));
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -80,6 +83,7 @@ class MavenMetadataTest {
         MavenMetadata parsed = MavenMetadata.parse(metadata.getBytes());
         MavenMetadata.Versioning versioning = parsed.getVersioning();
 
+        assertThat(versioning.getLastUpdated()).isNull();
         assertThat(versioning.getSnapshot().getTimestamp()).isEqualTo("20220927.033510");
         assertThat(versioning.getSnapshot().getBuildNumber()).isEqualTo("223");
         assertThat(versioning.getVersions()).isNotNull();

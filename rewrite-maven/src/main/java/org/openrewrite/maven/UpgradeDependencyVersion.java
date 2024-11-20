@@ -20,14 +20,13 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.utilities.RetainVersions;
-import org.openrewrite.semver.LatestPatch;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
@@ -91,9 +90,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     Boolean overrideManagedVersion;
 
     @Option(displayName = "Retain versions",
-            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed "
-                          + "from dependency management after the changes from this recipe, then it will be retained with an explicit version. "
-                          + "The version can be omitted from the GAV to use the old value from dependency management",
+            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed " +
+                          "from dependency management after the changes from this recipe, then it will be retained with an explicit version. " +
+                          "The version can be omitted from the GAV to use the old value from dependency management",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable
@@ -151,8 +150,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         // if the resolved dependency exists AND it does not represent an artifact that was parsed
                         // as a source file, attempt to find a new version.
                         try {
-                            String newerVersion = findNewerVersion(d.getVersion(),
-                                    () -> downloadMetadata(d.getGroupId(), d.getArtifactId(), ctx), versionComparator, ctx);
+                            String newerVersion = MavenDependency.findNewerVersion(d.getGroupId(), d.getArtifactId(),  d.getVersion(), getResolutionResult(), metadataFailures,
+                                    versionComparator, ctx);
                             if (newerVersion != null) {
                                 Optional<Xml.Tag> version = tag.getChild("version");
                                 if (version.isPresent()) {
@@ -202,7 +201,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator accumulator) {
         return new MavenIsoVisitor<ExecutionContext>() {
-            private final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
             private final VersionComparator versionComparator =
                     requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
@@ -242,7 +240,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return e.warn(t);
                 }
 
-                if (t != tag && PROJECT_MATCHER.matches(getCursor())) {
+                if (t != tag && isProjectTag()) {
                     maybeUpdateModel();
                     doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
                 }
@@ -399,40 +397,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
             private @Nullable String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx)
                     throws MavenDownloadingException {
-                return UpgradeDependencyVersion.this.findNewerVersion(
-                        version, () -> downloadMetadata(groupId, artifactId, ctx), versionComparator, ctx);
+                return MavenDependency.findNewerVersion(groupId, artifactId, version, getResolutionResult(), metadataFailures,
+                        versionComparator, ctx);
             }
         };
-    }
-
-    private @Nullable String findNewerVersion(
-            String version, MavenMetadataFailures.MavenMetadataDownloader download, VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
-        String finalVersion = !Semver.isVersion(version) ? "0.0.0" : version;
-
-        // in the case of "latest.patch", a new version can only be derived if the
-        // current version is a semantic version
-        if (versionComparator instanceof LatestPatch && !versionComparator.isValid(finalVersion, finalVersion)) {
-            return null;
-        }
-
-        try {
-            MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, download);
-            List<String> versions = new ArrayList<>();
-            for (String v : mavenMetadata.getVersioning().getVersions()) {
-                if (versionComparator.isValid(finalVersion, v)) {
-                    versions.add(v);
-                }
-            }
-            // handle upgrades from non semver versions like "org.springframework.cloud:spring-cloud-dependencies:Camden.SR5"
-            if (!Semver.isVersion(finalVersion) && !versions.isEmpty()) {
-                versions.sort(versionComparator);
-                return versions.get(versions.size() - 1);
-            }
-            return versionComparator.upgrade(finalVersion, versions).orElse(null);
-        } catch (IllegalStateException e) {
-            // this can happen when we encounter exotic versions
-            return null;
-        }
     }
 
     @Value

@@ -111,7 +111,7 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
      */
     public static Xml.Tag addToTag(Xml.Tag parentScope, Xml.Tag parent, Xml.Tag newChild, Cursor parentCursor) {
         //noinspection ConstantConditions
-        return (Xml.Tag) new AddToTagVisitor<Void>(parent, newChild)
-                .visitNonNull(parentScope, null, parentCursor);
+        return (Xml.Tag) new AddToTagVisitor<Integer>(parent, newChild)
+                .visitNonNull(parentScope, 0, parentCursor);
     }
 }

@@ -25,6 +25,7 @@ import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -33,13 +34,12 @@ import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.Semicolon;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -149,10 +149,10 @@ public class GroovyParserVisitor {
         }
 
         for (ClassNode aClass : ast.getClasses()) {
-            if (aClass.getSuperClass() == null
-                || !("groovy.lang.Script".equals(aClass.getSuperClass().getName())
-                     || "RewriteGradleProject".equals(aClass.getSuperClass().getName())
-                     || "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
+            if (aClass.getSuperClass() == null ||
+                !("groovy.lang.Script".equals(aClass.getSuperClass().getName()) ||
+                     "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
+                     "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
                 sortedByPosition.computeIfAbsent(pos(aClass), i -> new ArrayList<>()).add(aClass);
             }
         }
@@ -673,10 +673,10 @@ public class GroovyParserVisitor {
             // If the first parameter to a function is a Map, then groovy allows "named parameters" style invocations, see:
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
-            if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression
-                && (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber()
-                    || (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber()
-                        && unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
+            if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression &&
+                (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
+                    (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
+                        unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
 
                 // Figure out the source-code ordering of the expressions
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
@@ -968,9 +968,9 @@ public class GroovyParserVisitor {
             Space paramPrefix = whitespace();
             // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
             // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
-            if ("java.lang.Exception".equals(param.getType().getName())
-                && !source.startsWith("Exception", cursor)
-                && !source.startsWith("java.lang.Exception", cursor)) {
+            if ("java.lang.Exception".equals(param.getType().getName()) &&
+                !source.startsWith("Exception", cursor) &&
+                !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
                         JavaType.ShallowClass.build("java.lang.Exception"), null);
             } else {
@@ -1016,9 +1016,9 @@ public class GroovyParserVisitor {
                     J.Case.Type.Statement,
                     null,
                     JContainer.build(singletonList(JRightPadded.build(visit(statement.getExpression())))),
-                    statement.getCode() instanceof EmptyStatement
-                            ? JContainer.build(sourceBefore(":"), convertStatements(emptyList()), Markers.EMPTY)
-                            : JContainer.build(sourceBefore(":"), convertStatements(((BlockStatement) statement.getCode()).getStatements()), Markers.EMPTY)
+                    statement.getCode() instanceof EmptyStatement ?
+                            JContainer.build(sourceBefore(":"), convertStatements(emptyList()), Markers.EMPTY) :
+                            JContainer.build(sourceBefore(":"), convertStatements(((BlockStatement) statement.getCode()).getStatements()), Markers.EMPTY)
                     , null)
             );
         }
@@ -1205,6 +1205,9 @@ public class GroovyParserVisitor {
                         text = "";
                     }
                     jType = JavaType.Primitive.Null;
+                } else if (expression instanceof AnnotationConstantExpression) {
+                    classVisitor.visitAnnotation((AnnotationNode) value);
+                    return ((Expression) classVisitor.pollQueue()).withPrefix(fmt);
                 } else {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
@@ -1610,8 +1613,8 @@ public class GroovyParserVisitor {
 
                 MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
                 JavaType.Method methodType = null;
-                if (methodNode == null && call.getObjectExpression() instanceof VariableExpression
-                    && ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
+                if (methodNode == null && call.getObjectExpression() instanceof VariableExpression &&
+                    ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
                     // Groovy doesn't know what kind of object this method is being invoked on
                     // But if this invocation is inside a Closure we may have already enriched its parameters with types from the static type checker
                     // Use any such type information to attempt to find a matching method
@@ -2501,7 +2504,7 @@ public class GroovyParserVisitor {
        Can contain a J.FieldAccess, as in a variable declaration with fully qualified type parameterization:
            List<java.lang.String>
      */
-    private JContainer<Expression> visitTypeParameterizations(@Nullable GenericsType[] genericsTypes) {
+    private JContainer<Expression> visitTypeParameterizations(GenericsType @Nullable[] genericsTypes) {
         Space prefix = sourceBefore("<");
         List<JRightPadded<Expression>> parameters;
 

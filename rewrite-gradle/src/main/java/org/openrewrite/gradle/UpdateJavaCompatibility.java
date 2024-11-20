@@ -186,8 +186,8 @@ public class UpdateJavaCompatibility extends Recipe {
                         }
                     }
 
-                    return SearchResult.found(m, "Attempted to update to Java version to " + version
-                            + "  but was unsuccessful, please update manually");
+                    return SearchResult.found(m, "Attempted to update to Java version to " + version +
+                            "  but was unsuccessful, please update manually");
                 }
 
                 if (sourceCompatibilityDsl.matches(m) || targetCompatibilityDsl.matches(m)) {
@@ -208,8 +208,8 @@ public class UpdateJavaCompatibility extends Recipe {
                         }
                     }
 
-                    return SearchResult.found(m, "Attempted to update to Java version to " + version
-                            + "  but was unsuccessful, please update manually");
+                    return SearchResult.found(m, "Attempted to update to Java version to " + version +
+                            "  but was unsuccessful, please update manually");
                 }
 
                 return m;

@@ -19,11 +19,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyExtensionTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi());
+    }
 
     @DocumentExample
     @Test
@@ -153,8 +160,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               }
               
               dependencies {
-                  api 'org.openrewrite:rewrite-core@jar'
-                  api "org.openrewrite:rewrite-core@jar"
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', ext: 'jar'
                   api group: "org.openrewrite", name: "rewrite-core", ext: "jar"
               }
@@ -169,8 +175,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
               }
               
               dependencies {
-                  api 'org.openrewrite:rewrite-core@war'
-                  api "org.openrewrite:rewrite-core@war"
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', ext: 'war'
                   api group: "org.openrewrite", name: "rewrite-core", ext: "war"
               }
@@ -216,6 +221,126 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api group: 'org.eclipse.jetty', name: 'jetty-servlet', version: '9.4.50.v20221201', classifier: 'tests', ext: 'war'
                   api group: "org.eclipse.jetty", name: "jetty-servlet", version: "9.4.50.v20221201", classifier: "tests", ext: "war"
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInJvmTestSuite() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.openrewrite:rewrite-gradle:latest.integration@jar'
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.openrewrite:rewrite-gradle:latest.integration@war'
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInBuildScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.openrewrite:rewrite-gradle:latest.integration@jar'
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.openrewrite:rewrite-gradle:latest.integration@war'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-gradle:latest.integration@jar")
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-gradle:latest.integration@war")
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
               """
           )
         );

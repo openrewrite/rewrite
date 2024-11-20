@@ -36,8 +36,8 @@ public interface BuildEnvironment extends Marker {
         if (environment.apply("GITLAB_CI") != null) {
             return GitlabBuildEnvironment.build(environment);
         }
-        if (environment.apply("CI") != null && environment.apply("GITHUB_ACTION") != null
-                && environment.apply("GITHUB_RUN_ID") != null) {
+        if (environment.apply("CI") != null && environment.apply("GITHUB_ACTION") != null &&
+                environment.apply("GITHUB_RUN_ID") != null) {
             return GithubActionsBuildEnvironment.build(environment);
         }
         if (environment.apply("DRONE") != null) {

@@ -18,8 +18,10 @@ package org.openrewrite.json;
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.json.internal.JsonParserVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Lexer;
 import org.openrewrite.json.internal.grammar.JSON5Parser;
@@ -39,9 +41,11 @@ public class JsonParser implements Parser {
         return acceptedInputs(sourceFiles).map(input -> {
             parsingListener.startedParsing(input);
             try (InputStream sourceStream = input.getSource(ctx)) {
-                JSON5Parser parser = new JSON5Parser(new CommonTokenStream(new JSON5Lexer(
-                        CharStreams.fromStream(sourceStream))));
+                JSON5Lexer lexer = new JSON5Lexer(CharStreams.fromStream(sourceStream));
+                lexer.removeErrorListeners();
+                lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
+                JSON5Parser parser = new JSON5Parser(new CommonTokenStream(lexer));
                 parser.removeErrorListeners();
                 parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 

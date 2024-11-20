@@ -82,7 +82,7 @@ public class ChangeTagAttribute extends Recipe {
                 return t;
             }
 
-            public Xml.Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
+            public  Xml.@Nullable Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
                 if (!attribute.getKeyAsString().equals(attributeName)) {
                     return attribute;
                 }
@@ -102,9 +102,9 @@ public class ChangeTagAttribute extends Recipe {
                     return null;
                 }
 
-                String changedValue = oldValue != null
-                        ? (Boolean.TRUE.equals(regex) ? stringValue.replaceAll(oldValue, newValue) : stringValue.replace(oldValue, newValue))
-                        : newValue;
+                String changedValue = oldValue != null ?
+                        (Boolean.TRUE.equals(regex) ? stringValue.replaceAll(oldValue, newValue) : stringValue.replace(oldValue, newValue)) :
+                        newValue;
 
                 return attribute.withValue(
                         new Xml.Attribute.Value(attribute.getId(),

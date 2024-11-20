@@ -19,11 +19,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyClassifierTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi());
+    }
+
     @DocumentExample
     @Test
     void worksWithEmptyStringConfig() {
@@ -152,8 +160,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               }
               
               dependencies {
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'javadoc'
-                  api group: "org.openrewrite", name: "rewrite-core", classifier: "javadoc"
+                  api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'javadoc'
               }
               """,
             """
@@ -166,8 +175,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               }
               
               dependencies {
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classified'
-                  api group: "org.openrewrite", name: "rewrite-core", classifier: "classified"
+                  api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classified'
               }
               """
           )
@@ -407,6 +417,126 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release")
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInJvmTestSuite() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.openrewrite:rewrite-gradle:latest.release:javadoc'
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.openrewrite:rewrite-gradle:latest.release:classified'
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInBuildScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.openrewrite:rewrite-gradle:latest.release:javadoc'
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.openrewrite:rewrite-gradle:latest.release:classified'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-gradle:latest.release:javadoc")
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-gradle:latest.release:classified")
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
               """
           )
         );

@@ -24,7 +24,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -32,7 +31,6 @@ import java.util.Optional;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddProfile extends Recipe {
-    private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
 
     @Option(displayName = "id",
             description = "The profile id.",
@@ -81,7 +79,7 @@ public class AddProfile extends Recipe {
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
 
-            if (PROJECT_MATCHER.matches(getCursor())) {
+            if (isProjectTag()) {
                 Optional<Xml.Tag> maybeProfiles = t.getChild("profiles");
                 Xml.Tag profiles;
                 if (maybeProfiles.isPresent()) {
@@ -101,7 +99,7 @@ public class AddProfile extends Recipe {
                 if (maybeProfile.isPresent()) {
                     Xml.Tag profile = maybeProfile.get();
 
-                    t = (Xml.Tag) new RemoveContentVisitor(profile, false).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                    t = (Xml.Tag) new RemoveContentVisitor(profile, false, false).visitNonNull(t, ctx, getCursor().getParentOrThrow());
 
                 }
                 Xml.Tag profileTag = Xml.Tag.build("<profile>\n" +

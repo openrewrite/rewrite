@@ -27,14 +27,14 @@ import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -153,10 +153,9 @@ public interface RewriteTest extends SourceSpecs {
 
         PrintOutputCapture<Integer> out = new PrintOutputCapture<>(0, markerPrinter);
 
-        Recipe recipe = testMethodSpec.recipe == null ? testClassSpec.recipe : testMethodSpec.recipe;
-        assertThat(recipe)
-                .as("A recipe must be specified")
-                .isNotNull();
+        Recipe recipe = testMethodSpec.recipe == null ?
+                testClassSpec.recipe == null ? Recipe.noop() : testClassSpec.recipe :
+                testMethodSpec.recipe;
 
         if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof AdHocScanningRecipe) &&
             !(recipe instanceof CompositeRecipe) && !(recipe.equals(Recipe.noop())) &&
@@ -219,9 +218,9 @@ public interface RewriteTest extends SourceSpecs {
         }
         List<Validated<Object>> validations = new ArrayList<>();
         recipe.validateAll(ctx, validations);
-        assertThat(validations)
+        assertThat(validations.stream().filter(Validated::isInvalid))
                 .as("Recipe validation must have no failures")
-                .noneMatch(Validated::isInvalid);
+                .isEmpty();
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
@@ -267,7 +266,7 @@ public interface RewriteTest extends SourceSpecs {
                 for (UncheckedConsumer<SourceSpec<?>> consumer : testClassSpec.allSources) {
                     consumer.accept(sourceSpec);
                 }
-                inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(parser.getCharset(ctx)))));
+                inputs.put(sourceSpec, Parser.Input.fromString(sourcePath, beforeTrimmed, parser.getCharset(ctx)));
             }
 
             Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
@@ -371,6 +370,9 @@ public interface RewriteTest extends SourceSpecs {
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
         }
 
+        CursorValidatingExecutionContextView.view(recipeCtx)
+                .setValidateCursorAcyclic(TypeValidation.before(testMethodSpec, testClassSpec)
+                .cursorAcyclic());
         RecipeRun recipeRun = recipe.run(
                 lss,
                 recipeCtx,
@@ -431,8 +433,8 @@ public interface RewriteTest extends SourceSpecs {
                             return "    " + beforePath + " -> " + afterPath;
                         })
                         .collect(Collectors.joining("\n"));
-                fail("Expected a new source file with the source path: " + sourceSpec.getSourcePath()
-                     +"\nAll source file paths, before and after recipe run:\n" + paths);
+                fail("Expected a new source file with the source path: " + sourceSpec.getSourcePath() +
+                     "\nAll source file paths, before and after recipe run:\n" + paths);
             }
 
             // If the source spec has not defined a source path, look for a result with the exact contents. This logic
@@ -582,11 +584,11 @@ public interface RewriteTest extends SourceSpecs {
         newFilesGenerated.assertAll();
 
         Map<Result, Boolean> resultToUnexpected = allResults.stream()
-                .collect(Collectors.toMap(result -> result, result -> result.getBefore() == null
-                                                                      && !(result.getAfter() instanceof Remote)
-                                                                      && !expectedNewResults.contains(result)
-                                                                      && testMethodSpec.afterRecipes.isEmpty()));
-        if(resultToUnexpected.values().stream().anyMatch(it -> it)) {
+                .collect(Collectors.toMap(result -> result, result -> result.getBefore() == null &&
+                                                                      !(result.getAfter() instanceof Remote) &&
+                                                                      !expectedNewResults.contains(result) &&
+                                                                      testMethodSpec.afterRecipes.isEmpty()));
+        if (resultToUnexpected.values().stream().anyMatch(unexpected -> unexpected)) {
             String paths = resultToUnexpected.entrySet().stream()
                     .map(it -> {
                         Result result = it.getKey();
@@ -594,10 +596,12 @@ public interface RewriteTest extends SourceSpecs {
                         String beforePath = (result.getBefore() == null) ? "null" : result.getAfter().getSourcePath().toString();
                         String afterPath = (result.getAfter() == null) ? "null" : result.getAfter().getSourcePath().toString();
                         String status = it.getValue() ? "❌️" : "✔";
-                        return "    " + beforePath + " -> " + afterPath + " " + status;
+                        return "    " + beforePath + " | " + afterPath + " | " + status;
                     })
                     .collect(Collectors.joining("\n"));
-            fail("The recipe added a source file that was not expected. All source file paths, before and after recipe run:\n" + paths);
+            fail("The recipe generated source files the test did not expect.\n" +
+                 "Source file paths before recipe, after recipe, and whether the test expected that result:\n" +
+                 "    before | after | expected\n" + paths);
         }
     }
 
@@ -629,10 +633,11 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
-        return new InMemoryExecutionContext(t -> fail("Failed to parse sources or run recipe", t));
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> fail("Failed to parse sources or run recipe", t));
+        ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
+        return ctx;
     }
 
-    @NonNull
     @Override
     default Iterator<SourceSpec<?>> iterator() {
         return new Iterator<SourceSpec<?>>() {

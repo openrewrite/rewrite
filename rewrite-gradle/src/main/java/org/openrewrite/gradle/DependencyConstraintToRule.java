@@ -91,9 +91,10 @@ public class DependencyConstraintToRule extends Recipe {
     }
 
     static class RemoveConstraints extends GroovyIsoVisitor<List<GroupArtifactVersionBecause>> {
+
         @SuppressWarnings("DataFlowIssue")
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<GroupArtifactVersionBecause> groupArtifactVersions) {
+        public  J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<GroupArtifactVersionBecause> groupArtifactVersions) {
             J.MethodInvocation m = super.visitMethodInvocation(method, groupArtifactVersions);
             if ("constraints".equals(m.getSimpleName()) && isInDependenciesBlock(getCursor())) {
                 if (!(m.getArguments().get(0) instanceof J.Lambda)) {
@@ -340,15 +341,15 @@ public class DependencyConstraintToRule extends Recipe {
 
     private static boolean isInDependenciesBlock(Cursor cursor) {
         Cursor c = cursor.dropParentUntil(value ->
-                value == Cursor.ROOT_VALUE
-                || (value instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) value)));
+                value == Cursor.ROOT_VALUE ||
+                (value instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) value)));
         return c.getValue() instanceof J.MethodInvocation;
     }
 
     private static boolean isEachDependency(J.MethodInvocation m) {
-        return "eachDependency".equals(m.getSimpleName())
-               && (m.getSelect() instanceof J.Identifier
-                   && "resolutionStrategy".equals(((J.Identifier) m.getSelect()).getSimpleName()));
+        return "eachDependency".equals(m.getSimpleName()) &&
+               (m.getSelect() instanceof J.Identifier &&
+                   "resolutionStrategy".equals(((J.Identifier) m.getSelect()).getSimpleName()));
     }
 
     private static boolean predicateRelatesToGav(J.If iff, GroupArtifactVersionBecause groupArtifactVersion) {

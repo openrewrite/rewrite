@@ -87,20 +87,31 @@ public class MergeYaml extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        JsonPathMatcher matcher = new JsonPathMatcher(key);
-        Yaml incoming = new YamlParser().parse(yaml)
-                .findFirst()
-                .map(Yaml.Documents.class::cast)
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"))
-                .getDocuments().get(0).getBlock();
-
-
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
+            final JsonPathMatcher matcher = new JsonPathMatcher(key);
+
+            final Yaml incoming = new YamlParser().parse(yaml)
+                    .findFirst()
+                    .map(Yaml.Documents.class::cast)
+                    .map(docs -> {
+                        // Any comments will have been put on the parent Document node, preserve by copying to the mapping
+                        Yaml.Document doc = docs.getDocuments().get(0);
+                        if(doc.getBlock() instanceof Yaml.Mapping) {
+                            Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
+                            return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+                        } else if (doc.getBlock() instanceof Yaml.Sequence) {
+                            Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
+                            return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+                        }
+                        return doc.getBlock().withPrefix(doc.getPrefix());
+                    })
+                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"));
+
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
                 if ("$".equals(key)) {
                     return document.withBlock((Yaml.Block) new MergeYamlVisitor<>(document.getBlock(), yaml,
-                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(document.getBlock(),
+                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visitNonNull(document.getBlock(),
                             ctx, getCursor()));
                 }
                 Yaml.Document d = super.visitDocument(document, ctx);
@@ -120,7 +131,7 @@ public class MergeYaml extends Recipe {
                     // No matching element already exists, so it must be constructed
                     //noinspection LanguageMismatch
                     return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), snippet,
-                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(d.getBlock(),
+                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visitNonNull(d.getBlock(),
                             ctx, getCursor()));
                 }
                 return d;
@@ -192,7 +203,7 @@ public class MergeYaml extends Recipe {
                     return sequence.withEntries(ListUtils.map(sequence.getEntries(),
                             entry -> entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
                                     Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty)
-                                    .visit(entry.getBlock(), ctx, new Cursor(getCursor(), entry)))));
+                                    .visitNonNull(entry.getBlock(), ctx, new Cursor(getCursor(), entry)))));
                 }
                 return super.visitSequence(sequence, ctx);
             }

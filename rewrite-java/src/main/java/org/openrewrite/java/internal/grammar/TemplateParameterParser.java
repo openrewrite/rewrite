@@ -16,13 +16,15 @@
 // Generated from java-escape by ANTLR 4.11.1
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.*;
+import org.antlr.v4.runtime.atn.ATN;
+import org.antlr.v4.runtime.atn.ATNDeserializer;
+import org.antlr.v4.runtime.atn.ParserATNSimulator;
+import org.antlr.v4.runtime.atn.PredictionContextCache;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.misc.*;
-import org.antlr.v4.runtime.tree.*;
+import org.antlr.v4.runtime.tree.ParseTreeListener;
+import org.antlr.v4.runtime.tree.ParseTreeVisitor;
+import org.antlr.v4.runtime.tree.TerminalNode;
 
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
@@ -33,15 +35,15 @@ public class TemplateParameterParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8, 
+		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8,
 		Variance=9, FullyQualifiedName=10, Number=11, Identifier=12, S=13;
 	public static final int
-		RULE_matcherPattern = 0, RULE_typedPattern = 1, RULE_patternType = 2, 
-		RULE_type = 3, RULE_typeParameter = 4, RULE_variance = 5, RULE_parameterName = 6, 
+		RULE_matcherPattern = 0, RULE_typedPattern = 1, RULE_patternType = 2,
+		RULE_type = 3, RULE_typeParameter = 4, RULE_variance = 5, RULE_parameterName = 6,
 		RULE_typeName = 7, RULE_matcherName = 8;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"matcherPattern", "typedPattern", "patternType", "type", "typeParameter", 
+			"matcherPattern", "typedPattern", "patternType", "type", "typeParameter",
 			"variance", "parameterName", "typeName", "matcherName"
 		};
 	}
@@ -55,8 +57,8 @@ public class TemplateParameterParser extends Parser {
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", 
-			"WILDCARD", "Variance", "FullyQualifiedName", "Number", "Identifier", 
+			null, "LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK",
+			"WILDCARD", "Variance", "FullyQualifiedName", "Number", "Identifier",
 			"S"
 		};
 	}
@@ -363,7 +365,7 @@ public class TemplateParameterParser extends Parser {
 						setState(39);
 						match(COMMA);
 						}
-						} 
+						}
 					}
 					setState(45);
 					_errHandler.sync(this);
