@@ -688,25 +688,16 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             for (JavaType.Method method : classType.getMethods()) {
                 if (method.getName().equals(ref.memberName.toString())) {
                     if (ref.paramTypes != null) {
-                        for (JCTree param : ref.paramTypes) {
-                            for (JavaType testParamType : method.getParameterTypes()) {
-                                Type paramType = attr.attribType(param, symbol);
-                                if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                    List<JavaType> bounds = ((JavaType.GenericTypeVariable) testParamType).getBounds();
-                                    if (bounds.isEmpty() && paramType.tsym != null && "java.lang.Object".equals(paramType.tsym.getQualifiedName().toString())) {
-                                        return method;
-                                    }
-                                    for (JavaType bound : bounds) {
-                                        if (paramTypeMatches(bound, paramType)) {
-                                            return method;
-                                        }
-                                    }
-                                    continue nextMethod;
-                                }
-
-                                if (paramTypeMatches(testParamType, paramType)) {
-                                    continue nextMethod;
-                                }
+                        List<JavaType> parameterTypes = method.getParameterTypes();
+                        if (ref.paramTypes.size() != parameterTypes.size()) {
+                            continue;
+                        }
+                        for (int i = 0; i < ref.paramTypes.size(); i++) {
+                            JCTree param = ref.paramTypes.get(i);
+                            JavaType testParamType = parameterTypes.get(i);
+                            Type paramType = attr.attribType(param, symbol);
+                            if (!paramTypeMatches(testParamType, paramType)) {
+                                continue nextMethod;
                             }
                         }
                     }
@@ -728,12 +719,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     private boolean paramTypeMatches(JavaType testParamType, Type paramType) {
-        if (paramType instanceof Type.ClassType) {
-            JavaType.FullyQualified fqTestParamType = TypeUtils.asFullyQualified(testParamType);
-            return fqTestParamType == null || !fqTestParamType.getFullyQualifiedName().equals(((Symbol.ClassSymbol) paramType.tsym)
-                    .fullname.toString());
-        }
-        return false;
+        return TypeUtils.isAssignableTo(testParamType, typeMapping.type(paramType));
     }
 
     private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
