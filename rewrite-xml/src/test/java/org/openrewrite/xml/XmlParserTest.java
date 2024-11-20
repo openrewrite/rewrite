@@ -145,9 +145,9 @@ class XmlParserTest implements RewriteTest {
               </beans>
               """,
             spec -> spec.afterRecipe(doc -> {
-                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getValue().equals("java.lang.String")));
-                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.TYPE)));
-                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.PACKAGE)));
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getValue().equals("java.lang.String"))).isTrue();
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.TYPE))).isTrue();
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.PACKAGE))).isTrue();
             })
           )
         );
