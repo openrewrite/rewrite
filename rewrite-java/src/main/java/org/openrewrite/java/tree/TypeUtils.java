@@ -288,8 +288,6 @@ public class TypeUtils {
                         }
                     }
                     return true;
-                } else if (toBounds.isEmpty()) {
-                    return from instanceof JavaType.FullyQualified;
                 }
                 return false;
             } else if (to instanceof JavaType.Variable) {
