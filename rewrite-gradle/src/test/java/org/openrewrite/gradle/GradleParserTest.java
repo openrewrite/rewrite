@@ -188,4 +188,29 @@ class GradleParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void gradleWrapperBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              jacocoTestReport {
+                  // The JaCoCo plugin adds a JacocoTaskExtension extension to all tasks of type Test.
+                  description = "Generates code coverage report for the test task."
+                  executionData { tasks.withType(Test).findAll { it.jacoco.destinationFile.exists() }*.jacoco.destinationFile }
+                  reports {
+                      xml.enabled = true
+                      xml.destination(file("${trainInstallDir}/common/coverage-results/jacoco/jacocoTestReport.xml"))
+                      html.enabled = true
+                      html.destination file("${trainInstallDir}/common/coverage-results/jacoco/jacocoTestReport.html")
+                  }
+              }
+              wrapper {
+                  gradleVersion = "6.9.2"
+                  distributionType = Wrapper.DistributionType.ALL
+              }
+              """
+          )
+        );
+    }
 }
