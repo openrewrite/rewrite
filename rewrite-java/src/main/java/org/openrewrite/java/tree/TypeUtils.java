@@ -272,8 +272,8 @@ public class TypeUtils {
                 }
                 JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
                 List<JavaType> toBounds = toGeneric.getBounds();
-                if (!toGeneric.getName().equals("?")) {
-                    return false;
+                if (toBounds.isEmpty()) {
+                    return from instanceof JavaType.FullyQualified;
                 } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT) {
                     for (JavaType toBound : toBounds) {
                         if (!isAssignableTo(toBound, from)) {
@@ -288,8 +288,6 @@ public class TypeUtils {
                         }
                     }
                     return true;
-                } else if (toBounds.isEmpty()) {
-                    return from instanceof JavaType.FullyQualified;
                 }
                 return false;
             } else if (to instanceof JavaType.Variable) {
