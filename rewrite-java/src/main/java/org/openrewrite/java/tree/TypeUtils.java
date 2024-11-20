@@ -273,7 +273,7 @@ public class TypeUtils {
                 JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
                 List<JavaType> toBounds = toGeneric.getBounds();
                 if (!toGeneric.getName().equals("?")) {
-                    return false;
+                    return !toBounds.isEmpty() && isAssignableTo(toBounds.get(0), from);
                 } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT) {
                     for (JavaType toBound : toBounds) {
                         if (!isAssignableTo(toBound, from)) {
