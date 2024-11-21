@@ -44,6 +44,11 @@ public class AddAnnotationProcessor extends Recipe {
             example = "lombok-mapstruct-binding")
     String artifactId;
 
+    @Option(displayName = "Version",
+            description = "The third part of a coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION' of the processor to add. Note that an exact version is expected",
+            example = "0.2.0")
+    String version;
+
     @Override
     public String getDisplayName() {
         return "Add an annotation processor to the maven compiler plugin";
@@ -78,7 +83,7 @@ public class AddAnnotationProcessor extends Recipe {
                                     if (!found) {
                                         return tg.withContent(
                                                 ListUtils.concat(tg.getChildren(),
-                                                        Xml.Tag.build(String.format("<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n<version>${version.mapstruct-lombok}</version>\n</path>", groupId, artifactId))));
+                                                        Xml.Tag.build(String.format("<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n<version>%s</version>\n</path>", groupId, artifactId, version))));
                                     }
                                 }
                                 return tg;

@@ -25,11 +25,12 @@ class AddAnnotationProcessorTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void addCommentToMavenDependency() {
+    void addAnnotationProcessor() {
         rewriteRun(
           spec -> spec.recipe(new AddAnnotationProcessor(
             "org.projectlombok",
-            "lombok-mapstruct-binding"
+            "lombok-mapstruct-binding",
+            "0.2.0"
           )),
           pomXml(
             """
@@ -98,7 +99,60 @@ class AddAnnotationProcessorTest implements RewriteTest {
                                       <path>
                                           <groupId>org.projectlombok</groupId>
                                           <artifactId>lombok-mapstruct-binding</artifactId>
-                                          <version>${version.mapstruct-lombok}</version>
+                                          <version>0.2.0</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotAddProcessorAlreadyPresent() {
+        rewriteRun(
+          spec -> spec.recipe(new AddAnnotationProcessor(
+            "org.projectlombok",
+            "lombok-mapstruct-binding",
+            "0.2.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+              
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.5.1</version>
+                              <configuration>
+                                  <source>9</source>
+                                  <target>9</target>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.mapstruct</groupId>
+                                          <artifactId>mapstruct-processor</artifactId>
+                                          <version>${version.mapstruct}</version>
+                                      </path>
+                                      <path>
+                                          <groupId>org.projectlombok</groupId>
+                                          <artifactId>lombok</artifactId>
+                                          <version>${version.lombok}</version>
+                                      </path>
+                                      <path>
+                                          <groupId>org.projectlombok</groupId>
+                                          <artifactId>lombok-mapstruct-binding</artifactId>
+                                          <version>0.2.0</version>
                                       </path>
                                   </annotationProcessorPaths>
                               </configuration>
