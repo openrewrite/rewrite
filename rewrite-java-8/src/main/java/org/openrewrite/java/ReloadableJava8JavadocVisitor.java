@@ -682,6 +682,8 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             return paramTypeMatches(((JavaType.Array) parameterType).getElemType(), ((JavaType.Array) mappedJavadocType).getElemType());
         } else if (parameterType instanceof JavaType.GenericTypeVariable && !((JavaType.GenericTypeVariable) parameterType).getBounds().isEmpty()) {
             return paramTypeMatches(((JavaType.GenericTypeVariable) parameterType).getBounds().get(0), mappedJavadocType);
+        } else if (parameterType instanceof JavaType.GenericTypeVariable) {
+            return TypeUtils.isObject(mappedJavadocType);
         } else if (parameterType instanceof JavaType.Parameterized && !(mappedJavadocType instanceof JavaType.Parameterized)) {
             return paramTypeMatches(((JavaType.Parameterized) parameterType).getType(), mappedJavadocType);
         }
