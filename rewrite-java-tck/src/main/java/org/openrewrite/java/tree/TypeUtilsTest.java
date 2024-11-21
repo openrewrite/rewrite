@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.tree.TypeUtils.TypePosition.*;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
@@ -332,6 +333,85 @@ class TypeUtilsTest implements RewriteTest {
                     JavaType argType = method.getArguments().get(0).getType();
                     assertThat(argType).isInstanceOf(JavaType.Parameterized.class);
                     assertThat(TypeUtils.isAssignableTo(paramType, argType)).isTrue();
+                    return method;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    void isAssignableToGenericTypeVariable2() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+              import java.util.List;
+
+              class Test {
+                  public <T extends Collection<String>> T test() {
+                      return (T) get();
+                  }
+                  public List<String> get() {
+                      return List.of("a", "b", "c");
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
+                    if (method.getSimpleName().equals("test")) {
+                        J.Return return_ = (J.Return) method.getBody().getStatements().get(0);
+                        J.TypeCast cast = (J.TypeCast) return_.getExpression();
+                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), Invariant)).isFalse();
+                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), Out)).isTrue();
+                    }
+                    return method;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    void isAssignableToGenericTypeVariable3() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+              import java.util.List;
+              
+              import static java.util.Collections.singletonList;
+              
+              class Test<T extends Collection<String>> {
+              
+                  void consumeClass(T collection) {
+                  }
+              
+                  <T extends Collection<String>> void consumeMethod(T collection) {
+                  }
+              
+                  void test() {
+                      List<String> list = singletonList("hello");
+                      consumeMethod(null);
+                      consumeClass(null);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
+                    if (method.getSimpleName().equals("test")) {
+                        J.Block block = getCursor().getParentTreeCursor().getValue();
+                        J.MethodDeclaration consumeClass = (J.MethodDeclaration) block.getStatements().get(0);
+                        J.MethodDeclaration consumeMethod = (J.MethodDeclaration) block.getStatements().get(1);
+                        J.VariableDeclarations.NamedVariable list = ((J.VariableDeclarations) method.getBody().getStatements().get(0)).getVariables().get(0);
+                        JavaType consumeClassParamType = ((J.VariableDeclarations) consumeClass.getParameters().get(0)).getVariables().get(0).getType();
+                        JavaType consumeMethodParamType = ((J.VariableDeclarations) consumeMethod.getParameters().get(0)).getVariables().get(0).getType();
+
+                        assertThat(TypeUtils.isAssignableTo(consumeClassParamType, list.getType(), Out)).isFalse();
+                        assertThat(TypeUtils.isAssignableTo(consumeMethodParamType, list.getType(), Out)).isFalse();
+                    }
                     return method;
                 }
             }.visit(cu, new InMemoryExecutionContext()))

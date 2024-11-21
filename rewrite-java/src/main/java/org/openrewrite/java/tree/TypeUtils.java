@@ -231,147 +231,234 @@ public class TypeUtils {
         return isAssignableTo(to, from, TypePosition.Invariant);
     }
 
-    public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, TypePosition direction) {
+    public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, TypePosition position) {
         try {
             if (to instanceof JavaType.Unknown || from instanceof JavaType.Unknown) {
                 return false;
             }
             if (to == from) {
                 return true;
-            } else if (to instanceof JavaType.Parameterized) {
+            }
+
+            // Handle parameterized types (e.g., List<String>)
+            if (to instanceof JavaType.Parameterized) {
                 JavaType.Parameterized toParameterized = (JavaType.Parameterized) to;
+
+                // If 'from' is not parameterized but the 'to' type is,
+                // this would be an unsafe raw type conversion - disallow it
                 if (!(from instanceof JavaType.Parameterized)) {
-                    return from instanceof JavaType.FullyQualified &&
-                           isAssignableTo(toParameterized.getType(), from, direction) &&
-                           toParameterized.getTypeParameters().stream()
-                                   .allMatch(p -> (p instanceof JavaType.GenericTypeVariable &&
-                                                   ((JavaType.GenericTypeVariable) p).getName().equals("?")) ||
-                                                  isAssignableTo(p, TYPE_OBJECT, direction));
+                    return false;
                 }
+
                 JavaType.Parameterized fromParameterized = (JavaType.Parameterized) from;
                 List<JavaType> toParameters = toParameterized.getTypeParameters();
                 List<JavaType> fromParameters = fromParameterized.getTypeParameters();
-                int parameterCount = toParameters.size();
-                if (parameterCount != fromParameters.size() ||
-                    !isAssignableTo(toParameterized.getType(), fromParameterized.getType(), direction)) {
+
+                // First check if the raw types are assignable
+                if (toParameters.size() != fromParameters.size() ||
+                    !isAssignableTo(toParameterized.getType(), fromParameterized.getType(), position)) {
                     return false;
                 }
-                for (int i = 0; i < parameterCount; i++) {
-                    if (toParameters.get(i) instanceof JavaType.GenericTypeVariable) {
-                        if (!isAssignableTo(toParameters.get(i), fromParameters.get(i))) {
-                            return false;
+
+                // Check type parameters with appropriate variance
+                for (int i = 0; i < toParameters.size(); i++) {
+                    JavaType toParam = toParameters.get(i);
+                    JavaType fromParam = fromParameters.get(i);
+
+                    if (toParam instanceof JavaType.GenericTypeVariable) {
+                        JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) toParam;
+
+                        // Special handling for wildcards
+                        if (toGeneric.getName().equals("?")) {
+                            // If both are wildcards, check their compatibility
+                            if (fromParam instanceof JavaType.GenericTypeVariable &&
+                                ((JavaType.GenericTypeVariable) fromParam).getName().equals("?")) {
+
+                                // If both are unbounded wildcards, they're compatible
+                                if (toGeneric.getBounds().isEmpty() &&
+                                    ((JavaType.GenericTypeVariable) fromParam).getBounds().isEmpty()) {
+                                    continue;  // Skip to next parameter, these wildcards match
+                                }
+
+                                // If they have bounds, check bound compatibility
+                                return areWildcardBoundsCompatible(toGeneric, (JavaType.GenericTypeVariable) fromParam);
+                            }
+
+                            // Wildcard to non-wildcard case
+                            if (toGeneric.getBounds().isEmpty()) {
+                                // Unbounded wildcard accepts anything
+                                return true;
+                            } else {
+                                // Bounded wildcard - use the variance from the wildcard
+                                TypePosition wildcardPosition = convertVarianceToPosition(toGeneric.getVariance());
+                                return toGeneric.getBounds().stream()
+                                        .allMatch(bound -> isAssignableTo(bound, fromParam, wildcardPosition));
+                            }
                         }
-                    } else if (!isOfType(toParameters.get(i), fromParameters.get(i))) {
+                    }
+
+                    // For all non-wildcard cases, use invariant position
+                    if (!isOfType(toParam, fromParam)) {
                         return false;
                     }
                 }
                 return true;
-            } else if (to instanceof JavaType.FullyQualified) {
+            }
+
+            // Handle generic type variables (e.g., T extends Collection<String>)
+            else if (to instanceof JavaType.GenericTypeVariable) {
+                JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
+
+                switch (position) {
+                    case In:
+                        // In parameter position, we accept any type that satisfies the bounds
+                        for (JavaType bound : toGeneric.getBounds()) {
+                            if (!isAssignableTo(bound, from, TypePosition.Invariant)) {
+                                return false;
+                            }
+                        }
+                        return true;
+
+                    case Out:
+                        // In return position, we cannot safely assign to a type variable
+                        // unless the type is exactly the same type variable
+                        return from instanceof JavaType.GenericTypeVariable &&
+                               toGeneric.getName().equals(((JavaType.GenericTypeVariable) from).getName());
+
+                    case Invariant:
+                        // In invariant position, types must match exactly
+                        if (from instanceof JavaType.GenericTypeVariable) {
+                            return toGeneric.getName().equals(((JavaType.GenericTypeVariable) from).getName());
+                        }
+                        return false;
+                }
+            }
+
+            // Handle fully qualified types (e.g., java.util.List)
+            else if (to instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
                 if (from instanceof JavaType.Primitive) {
                     JavaType.Primitive toPrimitive = JavaType.Primitive.fromClassName(toFq.getFullyQualifiedName());
                     if (toPrimitive != null) {
-                        return isAssignableTo(toPrimitive, from);
-                    } else if (toFq.getFullyQualifiedName().equals("java.lang.Object")) {
+                        return isAssignableTo(toPrimitive, from, position);
+                    } else if (isObject(toFq)) {
                         return true;
                     }
                 } else if (from instanceof JavaType.Intersection) {
                     for (JavaType intersectionType : ((JavaType.Intersection) from).getBounds()) {
-                        if (isAssignableTo(to, intersectionType)) {
+                        if (isAssignableTo(to, intersectionType, position)) {
                             return true;
                         }
                     }
                     return false;
                 }
                 return !(from instanceof JavaType.GenericTypeVariable) && isAssignableTo(toFq.getFullyQualifiedName(), from);
-            } else if (to instanceof JavaType.GenericTypeVariable) {
-                if (from instanceof JavaType.GenericTypeVariable && isOfType(to, from)) {
-                    return true;
-                }
-                JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
-                List<JavaType> toBounds = toGeneric.getBounds();
-                if (toBounds.isEmpty()) {
-                    return from instanceof JavaType.FullyQualified;
-                } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT) {
-                    for (JavaType toBound : toBounds) {
-                        if (!isAssignableTo(toBound, from)) {
-                            return false;
-                        }
-                    }
-                    return true;
-                } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) {
-                    for (JavaType toBound : toBounds) {
-                        if (!isAssignableTo(from, toBound)) {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-                return false;
-            } else if (to instanceof JavaType.Variable) {
-                return isAssignableTo(((JavaType.Variable) to).getType(), from);
+            }
+
+            // Rest of the existing cases, passing through the position parameter
+            else if (to instanceof JavaType.Variable) {
+                return isAssignableTo(((JavaType.Variable) to).getType(), from, position);
             } else if (to instanceof JavaType.Method) {
-                return isAssignableTo(((JavaType.Method) to).getReturnType(), from);
-            } else if (to instanceof JavaType.Primitive) {
-                JavaType.Primitive toPrimitive = (JavaType.Primitive) to;
-                if (from instanceof JavaType.FullyQualified) {
-                    // Account for auto-unboxing
-                    JavaType.FullyQualified boxed = JavaType.ShallowClass.build(toPrimitive.getClassName());
-                    return isAssignableTo(boxed, from);
-                } else if (from instanceof JavaType.Primitive) {
-                    JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
-                    switch (fromPrimitive) {
-                        case Boolean:
-                        case Void:
-                        case None:
-                        case Null:
-                        case String:
-                            return false;
-                        default:
-                            switch (toPrimitive) {
-                                case Char:
-                                    return false;
-                                case Short:
-                                    switch (fromPrimitive) {
-                                        case Byte:
-                                        case Char:
-                                            return true;
-                                    }
-                                    return false;
-                                case Int:
-                                    switch (fromPrimitive) {
-                                        case Byte:
-                                        case Char:
-                                        case Short:
-                                            return true;
-                                    }
-                                    return false;
-                                case Long:
-                                    switch (fromPrimitive) {
-                                        case Byte:
-                                        case Char:
-                                        case Short:
-                                        case Int:
-                                            return true;
-                                    }
-                                    return false;
-                                case Float:
-                                    return fromPrimitive != JavaType.Primitive.Double;
-                                case Double:
-                                    return true;
-                                default:
-                                    return false;
-                            }
-                    }
-                }
+                return isAssignableTo(((JavaType.Method) to).getReturnType(), from, position);
             } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
                 JavaType.Array toArray = (JavaType.Array) to;
+                JavaType.Array fromArray = (JavaType.Array) from;
                 if (toArray.getElemType() instanceof JavaType.Primitive) {
-                    return isOfType(toArray.getElemType(), ((JavaType.Array) from).getElemType());
+                    return isOfType(toArray.getElemType(), fromArray.getElemType());
                 }
-                return isAssignableTo(toArray.getElemType(), ((JavaType.Array) from).getElemType());
+                // Arrays are invariant in Java
+                return isAssignableTo(toArray.getElemType(), fromArray.getElemType(), TypePosition.Invariant);
             }
+
+            // Handle primitives with their existing logic
+            else if (to instanceof JavaType.Primitive) {
+                // Primitive handling remains unchanged as they don't involve variance
+                return handlePrimitiveAssignability((JavaType.Primitive) to, from);
+            }
+
         } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    private static boolean areWildcardBoundsCompatible(JavaType.GenericTypeVariable to,
+                                                       JavaType.GenericTypeVariable from) {
+        // If either wildcard is unbounded, it's compatible
+        if (to.getBounds().isEmpty() || from.getBounds().isEmpty()) {
+            return true;
+        }
+
+        // For bounded wildcards, check variance compatibility
+        if (to.getVariance() == from.getVariance()) {
+            // Same variance - bounds must be equal
+            return to.getBounds().equals(from.getBounds());
+        }
+
+        // Different variance - not compatible
+        return false;
+    }
+
+    private static TypePosition convertVarianceToPosition(JavaType.GenericTypeVariable.Variance variance) {
+        switch (variance) {
+            case COVARIANT:
+                return TypePosition.Out;
+            case CONTRAVARIANT:
+                return TypePosition.In;
+            default:
+                return TypePosition.Invariant;
+        }
+    }
+
+    private static boolean handlePrimitiveAssignability(JavaType.Primitive to, @Nullable JavaType from) {
+        if (from instanceof JavaType.FullyQualified) {
+            // Account for auto-unboxing
+            JavaType.FullyQualified boxed = JavaType.ShallowClass.build(to.getClassName());
+            return isAssignableTo(boxed, from);
+        } else if (from instanceof JavaType.Primitive) {
+            JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
+            switch (fromPrimitive) {
+                case Boolean:
+                case Void:
+                case None:
+                case Null:
+                case String:
+                    return false;
+                default:
+                    switch (to) {
+                        case Char:
+                            return false;
+                        case Short:
+                            switch (fromPrimitive) {
+                                case Byte:
+                                case Char:
+                                    return true;
+                            }
+                            return false;
+                        case Int:
+                            switch (fromPrimitive) {
+                                case Byte:
+                                case Char:
+                                case Short:
+                                    return true;
+                            }
+                            return false;
+                        case Long:
+                            switch (fromPrimitive) {
+                                case Byte:
+                                case Char:
+                                case Short:
+                                case Int:
+                                    return true;
+                            }
+                            return false;
+                        case Float:
+                            return fromPrimitive != JavaType.Primitive.Double;
+                        case Double:
+                            return true;
+                        default:
+                            return false;
+                    }
+            }
         }
         return false;
     }
