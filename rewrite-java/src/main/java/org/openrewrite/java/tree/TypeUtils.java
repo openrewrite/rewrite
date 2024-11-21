@@ -253,7 +253,8 @@ public class TypeUtils {
                         }
                         return false;
                     }
-                    return true;
+                    // all wildcards case
+                    return isAssignableTo(toParameterized.getType(), from);
                 }
 
                 JavaType.Parameterized fromParameterized = (JavaType.Parameterized) from;
