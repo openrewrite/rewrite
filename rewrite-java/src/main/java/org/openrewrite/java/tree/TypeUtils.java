@@ -315,19 +315,23 @@ public class TypeUtils {
 
                 switch (position) {
                     case In:
-                        // In parameter position, we accept any type that satisfies the bounds
+                        // In parameter position (contravariant), the provided type must be a supertype
+                        // of at least one possible type that could satisfy the bounds
+                        for (JavaType bound : toGeneric.getBounds()) {
+                            if (isAssignableTo(from, bound, TypePosition.Invariant)) {
+                                return true;
+                            }
+                        }
+                        return false;
+
+                    case Out:
+                        // In return position (covariant), we can assign any subtype that satisfies the bounds
                         for (JavaType bound : toGeneric.getBounds()) {
                             if (!isAssignableTo(bound, from, TypePosition.Invariant)) {
                                 return false;
                             }
                         }
                         return true;
-
-                    case Out:
-                        // In return position, we cannot safely assign to a type variable
-                        // unless the type is exactly the same type variable
-                        return from instanceof JavaType.GenericTypeVariable &&
-                               toGeneric.getName().equals(((JavaType.GenericTypeVariable) from).getName());
 
                     case Invariant:
                         // In invariant position, types must match exactly
