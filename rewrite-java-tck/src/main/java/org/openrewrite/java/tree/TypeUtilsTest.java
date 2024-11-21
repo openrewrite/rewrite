@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -342,6 +343,7 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    @MinimumJava11
     void isAssignableToGenericTypeVariable2() {
         rewriteRun(
           java(
