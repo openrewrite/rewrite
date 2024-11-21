@@ -20,6 +20,8 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.properties.Assertions.properties;
 
@@ -41,9 +43,17 @@ class PropertiesReferenceTest implements RewriteTest {
               c.type=Integer
               """,
             spec -> spec.afterRecipe(doc -> {
-                assertThat(doc.getReferences().getReferences().stream().filter(typeRef -> typeRef.getValue().equals("java.lang.String") && typeRef.getKind().equals(Reference.Kind.TYPE)).count()).isEqualTo(1);
-                assertThat(doc.getReferences().getReferences().stream().filter(typeRef -> typeRef.getValue().equals("java.lang") && typeRef.getKind().equals(Reference.Kind.PACKAGE)).count()).isEqualTo(1);
-                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getValue().equals("Integer"))).isFalse();
+                assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(
+                  ref -> {
+                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                      assertThat(ref.getValue()).isEqualTo("java.lang.String");
+
+                  },
+                  ref -> {
+                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
+                      assertThat(ref.getValue()).isEqualTo("java.lang");
+                  }
+                );
             })
           ));
     }
