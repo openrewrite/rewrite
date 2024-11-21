@@ -56,7 +56,7 @@ public class AddAnnotationProcessor extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add an annotation processor to the maven compiler plugin, will not do anything if it already exists.";
+        return "Add an annotation processor to the maven compiler plugin. Will not do anything if it already exists. Also doesn't add anything when no other annotation processors are defined yet (Perhaps `ChangePluginConfiguration` can be used).";
     }
 
     @Override

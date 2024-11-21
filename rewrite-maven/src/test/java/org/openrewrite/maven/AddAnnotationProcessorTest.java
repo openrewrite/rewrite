@@ -36,7 +36,6 @@ class AddAnnotationProcessorTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
@@ -46,20 +45,15 @@ class AddAnnotationProcessorTest implements RewriteTest {
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.5.1</version>
                               <configuration>
-                                  <source>9</source>
-                                  <target>9</target>
                                   <annotationProcessorPaths>
                                       <path>
                                           <groupId>org.mapstruct</groupId>
                                           <artifactId>mapstruct-processor</artifactId>
-                                          <version>${version.mapstruct}</version>
                                       </path>
                                       <path>
                                           <groupId>org.projectlombok</groupId>
                                           <artifactId>lombok</artifactId>
-                                          <version>${version.lombok}</version>
                                       </path>
                                   </annotationProcessorPaths>
                               </configuration>
@@ -71,7 +65,6 @@ class AddAnnotationProcessorTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
@@ -81,20 +74,15 @@ class AddAnnotationProcessorTest implements RewriteTest {
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.5.1</version>
                               <configuration>
-                                  <source>9</source>
-                                  <target>9</target>
                                   <annotationProcessorPaths>
                                       <path>
                                           <groupId>org.mapstruct</groupId>
                                           <artifactId>mapstruct-processor</artifactId>
-                                          <version>${version.mapstruct}</version>
                                       </path>
                                       <path>
                                           <groupId>org.projectlombok</groupId>
                                           <artifactId>lombok</artifactId>
-                                          <version>${version.lombok}</version>
                                       </path>
                                       <path>
                                           <groupId>org.projectlombok</groupId>
@@ -124,7 +112,6 @@ class AddAnnotationProcessorTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
@@ -134,20 +121,15 @@ class AddAnnotationProcessorTest implements RewriteTest {
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.5.1</version>
                               <configuration>
-                                  <source>9</source>
-                                  <target>9</target>
                                   <annotationProcessorPaths>
                                       <path>
                                           <groupId>org.mapstruct</groupId>
                                           <artifactId>mapstruct-processor</artifactId>
-                                          <version>${version.mapstruct}</version>
                                       </path>
                                       <path>
                                           <groupId>org.projectlombok</groupId>
                                           <artifactId>lombok</artifactId>
-                                          <version>${version.lombok}</version>
                                       </path>
                                       <path>
                                           <groupId>org.projectlombok</groupId>
