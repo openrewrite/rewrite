@@ -58,11 +58,7 @@ public class PropertiesReference implements Reference {
         protected @Nullable PropertiesReference test(Cursor cursor) {
             Object value = cursor.getValue();
             if (value instanceof Properties.Entry && javaFullyQualifiedTypePattern.matcher(((Properties.Entry) value).getValue().getText()).matches()) {
-                if (determineKind(((Properties.Entry) value).getValue().getText()) == Kind.PACKAGE) {
-                    return new PropertiesReference(cursor, Kind.PACKAGE);
-                } else if (determineKind(((Properties.Entry) value).getValue().getText()) == Kind.TYPE) {
-                    return new PropertiesReference(cursor, Kind.TYPE);
-                }
+                return new PropertiesReference(cursor, determineKind(((Properties.Entry) value).getValue().getText()));
             }
             return null;
         }
