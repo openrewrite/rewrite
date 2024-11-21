@@ -245,9 +245,15 @@ public class TypeUtils {
                 JavaType.Parameterized toParameterized = (JavaType.Parameterized) to;
 
                 // If 'from' is not parameterized but the 'to' type is,
-                // this would be an unsafe raw type conversion - disallow it
+                // this would be an unsafe raw type conversion - disallow it unless for wildcards
                 if (!(from instanceof JavaType.Parameterized)) {
-                    return false;
+                    for (JavaType typeParameter : toParameterized.getTypeParameters()) {
+                        if (typeParameter instanceof JavaType.GenericTypeVariable && ((JavaType.GenericTypeVariable) typeParameter).getName().equals("?")) {
+                            continue;
+                        }
+                        return false;
+                    }
+                    return true;
                 }
 
                 JavaType.Parameterized fromParameterized = (JavaType.Parameterized) from;
@@ -281,7 +287,7 @@ public class TypeUtils {
                                 }
 
                                 // If they have bounds, check bound compatibility
-                                return areWildcardBoundsCompatible(toGeneric, (JavaType.GenericTypeVariable) fromParam);
+                                return areWildcardBoundsCompatible(toGeneric, (JavaType.GenericTypeVariable) fromParam, position);
                             }
 
                             // Wildcard to non-wildcard case
@@ -389,20 +395,44 @@ public class TypeUtils {
         return false;
     }
 
-    private static boolean areWildcardBoundsCompatible(JavaType.GenericTypeVariable to,
-                                                       JavaType.GenericTypeVariable from) {
-        // If either wildcard is unbounded, it's compatible
-        if (to.getBounds().isEmpty() || from.getBounds().isEmpty()) {
+    private static boolean areWildcardBoundsCompatible(JavaType.GenericTypeVariable to, JavaType.GenericTypeVariable from, TypePosition position) {
+        // If both wildcards are unbounded, they're compatible
+        if (to.getBounds().isEmpty() && from.getBounds().isEmpty()) {
             return true;
         }
 
-        // For bounded wildcards, check variance compatibility
-        if (to.getVariance() == from.getVariance()) {
-            // Same variance - bounds must be equal
-            return to.getBounds().equals(from.getBounds());
+        // If we have a bounded and unbounded wildcard:
+        if (to.getBounds().isEmpty()) {
+            // Unbounded target only accepts unbounded source
+            return false;
+        }
+        if (from.getBounds().isEmpty()) {
+            // Source being unbounded is never safe when target is bounded
+            return false;
         }
 
-        // Different variance - not compatible
+        // Both wildcards are bounded
+        switch (position) {
+            case Out:
+                // In covariant position, source bounds must be more specific than target bounds
+                for (JavaType bound : to.getBounds()) {
+                    if (!isAssignableTo(bound, from.getBounds().get(0), TypePosition.Invariant)) {
+                        return false;
+                    }
+                }
+                return true;
+            case In:
+                // In contravariant position, target bounds must be more specific than source bounds
+                for (JavaType bound : from.getBounds()) {
+                    if (!isAssignableTo(bound, to.getBounds().get(0), TypePosition.Invariant)) {
+                        return false;
+                    }
+                }
+                return true;
+            case Invariant:
+                // In invariant position, bounds must match exactly
+                return to.getBounds().equals(from.getBounds());
+        }
         return false;
     }
 

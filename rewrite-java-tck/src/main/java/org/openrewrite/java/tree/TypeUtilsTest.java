@@ -271,12 +271,13 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
-                    JavaType type = variable.getVariableType().getType();
-                    JavaType exprType = variable.getInitializer().getType();
-                    assertThat(type).isInstanceOf(JavaType.Parameterized.class);
-                    assertThat(exprType).isInstanceOf(JavaType.Parameterized.class);
-                    assertThat(TypeUtils.isAssignableTo(type, exprType)).isTrue();
-                    return super.visitVariable(variable, o);
+                    JavaType.Parameterized wildcardList = (JavaType.Parameterized) variable.getVariableType().getType();
+                    JavaType.FullyQualified rawList = wildcardList.getType();
+                    JavaType.Parameterized stringArrayList = (JavaType.Parameterized) variable.getInitializer().getType();
+                    assertThat(TypeUtils.isAssignableTo(wildcardList, stringArrayList)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(wildcardList, stringArrayList)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(wildcardList, rawList)).isTrue();
+                    return variable;
                 }
             }.visit(cu, new InMemoryExecutionContext()))
           )
