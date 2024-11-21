@@ -291,8 +291,12 @@ public class TypeUtils {
                             } else {
                                 // Bounded wildcard - use the variance from the wildcard
                                 TypePosition wildcardPosition = convertVarianceToPosition(toGeneric.getVariance());
-                                return toGeneric.getBounds().stream()
-                                        .allMatch(bound -> isAssignableTo(bound, fromParam, wildcardPosition));
+                                for (JavaType bound : toGeneric.getBounds()) {
+                                    if (!isAssignableTo(bound, fromParam, wildcardPosition)) {
+                                        return false;
+                                    }
+                                }
+                                return true;
                             }
                         }
                     }
