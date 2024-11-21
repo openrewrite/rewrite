@@ -23,14 +23,12 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.maven.trait.MavenPlugin;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddAnnotationProcessor extends Recipe {
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
     private static final String MAVEN_COMPILER_PLUGIN_GROUP_ID = "org.apache.maven.plugins";
     private static final String MAVEN_COMPILER_PLUGIN_ARTIFACT_ID = "maven-compiler-plugin";
 
@@ -91,7 +89,7 @@ public class AddAnnotationProcessor extends Recipe {
                         }.visitTag(plugin.getTree(), ctx);
                     }
                     return plugin.getTree();
-                }).visit(plugins, 0);
+                }).visitNonNull(plugins, 0);
                 if (plugins != tag) {
                     plugins = autoFormat(plugins, ctx);
                 }
