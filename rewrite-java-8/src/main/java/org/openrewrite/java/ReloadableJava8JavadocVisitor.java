@@ -669,8 +669,23 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         return null;
     }
 
-    private boolean paramTypeMatches(JavaType testParamType, Type paramType) {
-        return TypeUtils.isAssignableTo(testParamType, typeMapping.type(paramType));
+    private boolean paramTypeMatches(JavaType parameterType, Type javadocType) {
+        return paramTypeMatches(parameterType, typeMapping.type(javadocType));
+    }
+
+    // Javadoc type references typically don't have generic type parameters
+    private static boolean paramTypeMatches(JavaType parameterType, JavaType mappedJavadocType) {
+        if (parameterType instanceof JavaType.Array && mappedJavadocType instanceof JavaType.Array) {
+            if (((JavaType.Array) parameterType).getElemType() instanceof JavaType.Primitive) {
+                return TypeUtils.isAssignableTo(parameterType, mappedJavadocType, TypeUtils.TypePosition.In);
+            }
+            return paramTypeMatches(((JavaType.Array) parameterType).getElemType(), ((JavaType.Array) mappedJavadocType).getElemType());
+        } else if (parameterType instanceof JavaType.GenericTypeVariable && !((JavaType.GenericTypeVariable) parameterType).getBounds().isEmpty()) {
+            return paramTypeMatches(((JavaType.GenericTypeVariable) parameterType).getBounds().get(0), mappedJavadocType);
+        } else if (parameterType instanceof JavaType.Parameterized && !(mappedJavadocType instanceof JavaType.Parameterized)) {
+            return paramTypeMatches(((JavaType.Parameterized) parameterType).getType(), mappedJavadocType);
+        }
+        return TypeUtils.isAssignableTo(parameterType, mappedJavadocType, TypeUtils.TypePosition.In);
     }
 
     private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
