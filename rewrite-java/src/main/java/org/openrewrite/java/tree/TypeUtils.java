@@ -302,45 +302,48 @@ public class TypeUtils {
                     return isAssignableTo(boxed, from);
                 } else if (from instanceof JavaType.Primitive) {
                     JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
-                    if (fromPrimitive == JavaType.Primitive.Boolean || fromPrimitive == JavaType.Primitive.Void) {
-                        return false;
-                    } else {
-                        switch (toPrimitive) {
-                            case Char:
-                                return fromPrimitive == JavaType.Primitive.Byte;
-                            case Short:
-                                switch (fromPrimitive) {
-                                    case Byte:
-                                    case Char:
-                                        return true;
-                                }
-                                return false;
-                            case Int:
-                                switch (fromPrimitive) {
-                                    case Byte:
-                                    case Char:
-                                    case Short:
-                                        return true;
-                                }
-                                return false;
-                            case Long:
-                                switch (fromPrimitive) {
-                                    case Byte:
-                                    case Char:
-                                    case Short:
-                                    case Int:
-                                        return true;
-                                }
-                                return false;
-                            case Float:
-                                return fromPrimitive != JavaType.Primitive.Double;
-                            case Double:
-                                return true;
-                            case String:
-                                return fromPrimitive == JavaType.Primitive.Null;
-                            default:
-                                return false;
-                        }
+                    switch (fromPrimitive) {
+                        case Boolean:
+                        case Void:
+                        case None:
+                        case Null:
+                        case String:
+                            return false;
+                        default:
+                            switch (toPrimitive) {
+                                case Char:
+                                    return false;
+                                case Short:
+                                    switch (fromPrimitive) {
+                                        case Byte:
+                                        case Char:
+                                            return true;
+                                    }
+                                    return false;
+                                case Int:
+                                    switch (fromPrimitive) {
+                                        case Byte:
+                                        case Char:
+                                        case Short:
+                                            return true;
+                                    }
+                                    return false;
+                                case Long:
+                                    switch (fromPrimitive) {
+                                        case Byte:
+                                        case Char:
+                                        case Short:
+                                        case Int:
+                                            return true;
+                                    }
+                                    return false;
+                                case Float:
+                                    return fromPrimitive != JavaType.Primitive.Double;
+                                case Double:
+                                    return true;
+                                default:
+                                    return false;
+                            }
                     }
                 }
             } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {

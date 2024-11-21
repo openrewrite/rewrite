@@ -23,10 +23,13 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.util.EnumSet;
 import java.util.function.Consumer;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -330,6 +333,154 @@ class TypeUtilsTest implements RewriteTest {
             }.visit(cu, new InMemoryExecutionContext()))
           )
         );
+    }
+
+    @Test
+    void isAssignableToLong() {
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.Long));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.Int));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.Short));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.Char));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.Byte));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.Double));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.Float));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.Boolean));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.None));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.Void));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.String));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Long, JavaType.Primitive.Null));
+    }
+
+    @Test
+    void isAssignableToInt() {
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.Long));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.Int));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.Short));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.Char));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.Byte));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.Double));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.Float));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.Boolean));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.None));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.Void));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.String));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Int, JavaType.Primitive.Null));
+    }
+
+    @Test
+    void isAssignableToShort() {
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Long));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Int));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Short));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Char));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Byte));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Double));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Float));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Boolean));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.None));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Void));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.String));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Null));
+    }
+
+    @Test
+    void isAssignableToChar() {
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.Long));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.Int));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.Short));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.Char));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.Byte));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.Double));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.Float));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.Boolean));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.None));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.Void));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.String));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Char, JavaType.Primitive.Null));
+    }
+
+    @Test
+    void isAssignableToByte() {
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.Long));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.Int));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.Short));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.Char));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.Byte));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.Double));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.Float));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.Boolean));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.None));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.Void));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.String));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Byte, JavaType.Primitive.Null));
+    }
+
+    @Test
+    void isAssignableToDouble() {
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.Long));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.Int));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.Short));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.Char));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.Byte));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.Double));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.Float));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.Boolean));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.None));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.Void));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.String));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Double, JavaType.Primitive.Null));
+    }
+
+    @Test
+    void isAssignableToFloat() {
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.Long));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.Int));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.Short));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.Char));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.Byte));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.Double));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.Float));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.Boolean));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.None));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.Void));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.String));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Float, JavaType.Primitive.Null));
+    }
+
+    @Test
+    void isAssignableToBoolean() {
+        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.Boolean));
+        for (JavaType.Primitive other : others) {
+            assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Boolean, other));
+        }
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Boolean, JavaType.Primitive.Boolean));
+    }
+
+    @Test
+    void isAssignableToNone() {
+        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.None));
+        for (JavaType.Primitive other : others) {
+            assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.None, other));
+        }
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.None, JavaType.Primitive.None));
+    }
+
+    @Test
+    void isAssignableToVoid() {
+        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.Void));
+        for (JavaType.Primitive other : others) {
+            assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Void, other));
+        }
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Void, JavaType.Primitive.Void));
+    }
+
+    @Test
+    void isAssignableToString() {
+        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String));
+        for (JavaType.Primitive other : others) {
+            assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.String, other));
+        }
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.String, JavaType.Primitive.String));
     }
 
     @SuppressWarnings("RedundantCast")
