@@ -25,7 +25,7 @@ import static org.openrewrite.properties.Assertions.properties;
 
 class PropertiesReferenceTest implements RewriteTest {
     @Test
-    void testFindJavaReferences() {
+    void findJavaReferences() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new PropertiesReference.Matcher()
             .asVisitor(ref -> SearchResult.found(ref.getTree(), ref.getValue())))),
