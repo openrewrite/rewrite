@@ -22,13 +22,10 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.maven.trait.MavenPlugin;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.Optional;
-
-import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -49,12 +46,12 @@ public class AddAnnotationProcessor extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change Maven plugin configuration";
+        return "Add an annotation processor to the maven compiler plugin";
     }
 
     @Override
     public String getDescription() {
-        return "Apply the specified configuration to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
+        return "Add an annotation processor to the maven compiler plugin, will not do anything if it already exists.";
     }
 
     @Override
@@ -63,21 +60,14 @@ public class AddAnnotationProcessor extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag plugins = (Xml.Tag) super.visitTag(tag, ctx);
-                if (PLUGINS_MATCHER.matches(getCursor())) {
-                    Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
-                            .filter(plugin ->
-                                    "plugin".equals(plugin.getName()) &&
-                                    MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(plugin.getChildValue("groupId").orElse(null)) &&
-                                    MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getChildValue("artifactId").orElse(null))
-                            )
-                            .findAny();
-                    if (maybePlugin.isPresent()) {
-                        Xml.Tag plugin = maybePlugin.get();
-                        plugin = new XmlIsoVisitor<ExecutionContext>() {
+                plugins = (Xml.Tag) new MavenPlugin.Matcher().asVisitor(plugin -> {
+                    if (MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(plugin.getGroupId())
+                        && MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getArtifactId())) {
+                        return new XmlIsoVisitor<ExecutionContext>() {
                             @Override
                             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                                 Xml.Tag tg = super.visitTag(tag, ctx);
-                                if (tg.getName().equals("annotationProcessorPaths")) {
+                                if ("annotationProcessorPaths".equals(tg.getName())) {
                                     boolean found = false;
                                     for (Xml.Tag child : tg.getChildren()) {
                                         if (groupId.equals(child.getChildValue("groupId").orElse(null))
@@ -93,11 +83,14 @@ public class AddAnnotationProcessor extends Recipe {
                                 }
                                 return tg;
                             }
-                        }.visitTag(plugin, ctx);
-                        plugins = addOrUpdateChild(plugins, plugin, getCursor());
+                        }.visitTag(plugin.getTree(), ctx);
                     }
+                    return plugin.getTree();
+                }).visit(plugins, 0);
+                if (plugins != tag) {
+                    plugins = autoFormat(plugins, ctx);
                 }
-                return autoFormat(plugins, ctx);
+                return plugins;
             }
         };
     }

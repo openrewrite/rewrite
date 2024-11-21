@@ -110,5 +110,4 @@ class AddAnnotationProcessorTest implements RewriteTest {
           )
         );
     }
-
 }

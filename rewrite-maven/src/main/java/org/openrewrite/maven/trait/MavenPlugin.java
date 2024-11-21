@@ -59,7 +59,7 @@ public class MavenPlugin implements Trait<Xml.Tag> {
 
         private Optional<String> getProperty(Cursor cursor, String property) {
             Xml.Tag tag = cursor.getValue();
-            if (getResolutionResult(cursor).getPom().getProperties() != null) {
+            if (getResolutionResult(cursor) != null && getResolutionResult(cursor).getPom().getProperties() != null) {
                 if (tag.getChildValue(property).isPresent() && tag.getChildValue(property).get().trim().startsWith("${")) {
                     String propertyKey = tag.getChildValue(property).get().trim();
                     return Optional.ofNullable(getResolutionResult(cursor).getPom().getValue(propertyKey));
