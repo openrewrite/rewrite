@@ -56,7 +56,7 @@ public interface Properties extends Tree {
     @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    @AllArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class File implements Properties, SourceFileWithReferences {
         @With
         @EqualsAndHashCode.Include
