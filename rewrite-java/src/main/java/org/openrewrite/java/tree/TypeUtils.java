@@ -347,10 +347,13 @@ public class TypeUtils {
                     }
                 }
             } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
-                return isAssignableTo(((JavaType.Array) to).getElemType(), ((JavaType.Array) from).getElemType());
+                JavaType.Array toArray = (JavaType.Array) to;
+                if (toArray.getElemType() instanceof JavaType.Primitive) {
+                    return isOfType(toArray.getElemType(), ((JavaType.Array) from).getElemType());
+                }
+                return isAssignableTo(toArray.getElemType(), ((JavaType.Array) from).getElemType());
             }
-        } catch (Exception e) {
-            return false;
+        } catch (Exception ignored) {
         }
         return false;
     }

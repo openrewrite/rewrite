@@ -483,6 +483,42 @@ class TypeUtilsTest implements RewriteTest {
         assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.String, JavaType.Primitive.String));
     }
 
+    @Test
+    void isAssignableToPrimitiveArrays() {
+        JavaType.Array intArray = new JavaType.Array(null, JavaType.Primitive.Int, null);
+        JavaType.Array longArray = new JavaType.Array(null, JavaType.Primitive.Long, null);
+        assertTrue(TypeUtils.isAssignableTo(intArray, intArray));
+        assertFalse(TypeUtils.isAssignableTo(longArray, intArray));
+        assertFalse(TypeUtils.isAssignableTo(intArray, longArray));
+    }
+
+    @Test
+    void isAssignableToNonPrimitiveArrays() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  Object[] oa;
+                  String[] sa;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
+                    J.VariableDeclarations oa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(0);
+                    J.VariableDeclarations sa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(1);
+                    JavaType objectArray = oa.getType();
+                    JavaType stringArray = sa.getType();
+                    assertTrue(TypeUtils.isAssignableTo(objectArray, objectArray));
+                    assertFalse(TypeUtils.isAssignableTo(stringArray, objectArray));
+                    assertTrue(TypeUtils.isAssignableTo(objectArray, stringArray));
+                    return classDecl;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
     @SuppressWarnings("RedundantCast")
     @Test
     void isAssignableFromIntersection() {
