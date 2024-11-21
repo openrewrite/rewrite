@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.xml.Assertions.xml;
+import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("ConstantConditions")
 class ChangeTypeTest implements RewriteTest {
@@ -2060,6 +2061,22 @@ class ChangeTypeTest implements RewriteTest {
                 J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().get(0), new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cd.getSimpleName());
             }))
+        );
+    }
+
+    @Test
+    void changeTypeInPropertiesFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
+          properties(
+            """
+              a.property=java.lang.String
+              b.property=String
+              """,
+            """
+              a.property=java.lang.Integer
+              b.property=String
+              """)
         );
     }
 }

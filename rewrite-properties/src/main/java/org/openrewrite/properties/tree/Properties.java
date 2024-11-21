@@ -15,16 +15,16 @@
  */
 package org.openrewrite.properties.tree;
 
-import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.With;
+import lombok.*;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
 
+import java.beans.Transient;
+import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -55,7 +55,9 @@ public interface Properties extends Tree {
 
     @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    class File implements Properties, SourceFile {
+    @RequiredArgsConstructor
+    @AllArgsConstructor
+    class File implements Properties, SourceFileWithReferences {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -109,6 +111,27 @@ public interface Properties extends Tree {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new PropertiesPrinter<>();
+        }
+
+        @Nullable
+        @NonFinal
+        transient SoftReference<References> references;
+
+        @Transient
+        @Override
+        public References getReferences() {
+            References cache;
+            if (this.references == null) {
+                cache = References.build(this);
+                this.references = new SoftReference<>(cache);
+            } else {
+                cache = this.references.get();
+                if (cache == null || cache.getSourceFile() != this) {
+                    cache = References.build(this);
+                    this.references = new SoftReference<>(cache);
+                }
+            }
+            return cache;
         }
     }
 
