@@ -17,12 +17,15 @@ package org.openrewrite.yaml.tree;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
 
+import java.beans.Transient;
+import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -60,8 +63,10 @@ public interface Yaml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @With
-    class Documents implements Yaml, SourceFile {
+    class Documents implements Yaml, SourceFileWithReferences {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -124,6 +129,27 @@ public interface Yaml extends Tree {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new YamlPrinter<>();
+        }
+
+        @Nullable
+        @NonFinal
+        transient SoftReference<References> references;
+
+        @Transient
+        @Override
+        public References getReferences() {
+            References cache;
+            if (this.references == null) {
+                cache = References.build(this);
+                this.references = new SoftReference<>(cache);
+            } else {
+                cache = this.references.get();
+                if (cache == null || cache.getSourceFile() != this) {
+                    cache = References.build(this);
+                    this.references = new SoftReference<>(cache);
+                }
+            }
+            return cache;
         }
     }
 

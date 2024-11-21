@@ -23,6 +23,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
+import org.openrewrite.yaml.tree.Yaml;
 
 @Getter
 public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
@@ -65,6 +66,9 @@ public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
                         if (((Xml.Tag) tree).getValue().isPresent()) {
                             return ((Xml.Tag) tree).withValue(getReplacement(((Xml.Tag) tree).getValue().get(), targetPackage, newValue));
                         }
+                    }
+                    if (tree instanceof Yaml.Scalar) {
+                        return ((Yaml.Scalar) tree).withValue(getReplacement(((Yaml.Scalar) tree).getValue(), targetPackage, newValue));
                     }
                 }
                 return super.visit(tree, ctx);

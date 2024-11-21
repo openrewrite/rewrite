@@ -31,6 +31,7 @@ import java.nio.file.Paths;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.xml.Assertions.xml;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 @SuppressWarnings("ConstantConditions")
 class ChangePackageTest implements RewriteTest {
@@ -1723,6 +1724,24 @@ class ChangePackageTest implements RewriteTest {
               """
           )
         );
+    }
 
+    @Test
+    void changePackageInYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("java.lang", "java.cool", true)),
+          yaml(
+            """
+              root:
+                  a: java.lang.String
+                  b: java.lang.test.String
+                  c: String
+              """, """
+              root:
+                  a: java.cool.String
+                  b: java.cool.test.String
+                  c: String
+              """
+          ));
     }
 }

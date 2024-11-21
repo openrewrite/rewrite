@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.regex.Pattern;
 
@@ -131,6 +132,9 @@ public class TypeMatcher implements Reference.Renamer, Reference.Matcher {
                     }
                     if (tree instanceof Xml.Tag) {
                         return ((Xml.Tag) tree).withValue(newValue);
+                    }
+                    if (tree instanceof Yaml.Scalar) {
+                        return ((Yaml.Scalar) tree).withValue(newValue);
                     }
                 }
                 return super.visit(tree, ctx);

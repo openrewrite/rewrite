@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.xml.Assertions.xml;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 @SuppressWarnings("ConstantConditions")
 class ChangeTypeTest implements RewriteTest {
@@ -2061,5 +2062,24 @@ class ChangeTypeTest implements RewriteTest {
                 assertEquals("GoodbyeClass", cd.getSimpleName());
             }))
         );
+    }
+
+    @Test
+    void changeTypeInYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
+          yaml(
+            """
+              root:
+                  a: java.lang.String
+                  b: java.lang.test.String
+                  c: String
+              """, """
+              root:
+                  a: java.lang.Integer
+                  b: java.lang.test.String
+                  c: String
+              """
+          ));
     }
 }
