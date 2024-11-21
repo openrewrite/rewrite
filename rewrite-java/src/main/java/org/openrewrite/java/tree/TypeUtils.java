@@ -23,7 +23,6 @@ import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import java.util.stream.IntStream;
 
 public class TypeUtils {
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
@@ -78,8 +77,8 @@ public class TypeUtils {
 
     public static boolean isString(@Nullable JavaType type) {
         return type == JavaType.Primitive.String ||
-               (type instanceof JavaType.FullyQualified &&
-                "java.lang.String".equals(((JavaType.FullyQualified) type).getFullyQualifiedName())
+               (type instanceof JavaType.Class &&
+                "java.lang.String".equals(((JavaType.Class) type).getFullyQualifiedName())
                );
     }
 
@@ -224,7 +223,15 @@ public class TypeUtils {
         return false;
     }
 
+    public enum TypePosition {
+        In, Out, Invariant
+    }
+
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
+        return isAssignableTo(to, from, TypePosition.Invariant);
+    }
+
+    public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, TypePosition direction) {
         try {
             if (to instanceof JavaType.Unknown || from instanceof JavaType.Unknown) {
                 return false;
@@ -235,19 +242,30 @@ public class TypeUtils {
                 JavaType.Parameterized toParameterized = (JavaType.Parameterized) to;
                 if (!(from instanceof JavaType.Parameterized)) {
                     return from instanceof JavaType.FullyQualified &&
-                           isAssignableTo(toParameterized.getType(), from) &&
+                           isAssignableTo(toParameterized.getType(), from, direction) &&
                            toParameterized.getTypeParameters().stream()
                                    .allMatch(p -> (p instanceof JavaType.GenericTypeVariable &&
                                                    ((JavaType.GenericTypeVariable) p).getName().equals("?")) ||
-                                                  isAssignableTo(p, TYPE_OBJECT));
+                                                  isAssignableTo(p, TYPE_OBJECT, direction));
                 }
                 JavaType.Parameterized fromParameterized = (JavaType.Parameterized) from;
                 List<JavaType> toParameters = toParameterized.getTypeParameters();
                 List<JavaType> fromParameters = fromParameterized.getTypeParameters();
                 int parameterCount = toParameters.size();
-                return parameterCount == fromParameters.size() &&
-                       isAssignableTo(toParameterized.getType(), fromParameterized.getType()) &&
-                       IntStream.range(0, parameterCount).allMatch(i -> isAssignableTo(toParameters.get(i), fromParameters.get(i)));
+                if (parameterCount != fromParameters.size() ||
+                    !isAssignableTo(toParameterized.getType(), fromParameterized.getType(), direction)) {
+                    return false;
+                }
+                for (int i = 0; i < parameterCount; i++) {
+                    if (toParameters.get(i) instanceof JavaType.GenericTypeVariable) {
+                        if (!isAssignableTo(toParameters.get(i), fromParameters.get(i))) {
+                            return false;
+                        }
+                    } else if (!isOfType(toParameters.get(i), fromParameters.get(i))) {
+                        return false;
+                    }
+                }
+                return true;
             } else if (to instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
                 if (from instanceof JavaType.Primitive) {

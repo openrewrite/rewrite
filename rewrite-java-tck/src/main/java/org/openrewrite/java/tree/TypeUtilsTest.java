@@ -236,18 +236,22 @@ class TypeUtilsTest implements RewriteTest {
           java(
             """
               class Test {
-                  java.util.List<Integer> integer;
+                  java.util.List<Integer> li;
+                  java.util.List<Object> lo;
               }
               """,
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
-                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
-                    JavaType type = variable.getVariableType().getType();
-                    assertThat(type).isInstanceOf(JavaType.Parameterized.class);
-                    assertThat(TypeUtils.isAssignableTo("java.util.List", type)).isTrue();
-                    assertThat(TypeUtils.isAssignableTo("java.util.List<java.lang.Integer>", type)).isTrue();
-                    assertThat(TypeUtils.isAssignableTo("java.util.List<java.lang.String>", type)).isFalse();
-                    return super.visitVariable(variable, o);
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
+                    J.VariableDeclarations.NamedVariable li = ((J.VariableDeclarations) classDecl.getBody().getStatements().get(0)).getVariables().get(0);
+                    J.VariableDeclarations.NamedVariable lo = ((J.VariableDeclarations) classDecl.getBody().getStatements().get(1)).getVariables().get(0);
+                    JavaType.Parameterized listIntegerType = ((JavaType.Parameterized) li.getVariableType().getType());
+                    JavaType.Parameterized listObjectType = ((JavaType.Parameterized) lo.getVariableType().getType());
+
+                    assertThat(TypeUtils.isAssignableTo(listIntegerType.getType(), listIntegerType)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(listObjectType, listIntegerType)).isFalse();
+                    assertThat(TypeUtils.isAssignableTo(listIntegerType, listObjectType)).isFalse();
+                    return classDecl;
                 }
             }.visit(cu, new InMemoryExecutionContext()))
           )
