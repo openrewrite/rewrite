@@ -115,9 +115,12 @@ class SpringReference implements Reference {
         public boolean isAcceptable(SourceFile sourceFile) {
             if (sourceFile instanceof Xml.Document) {
                 Xml.Document doc = (Xml.Document) sourceFile;
-                for (Xml.Attribute attrib : doc.getRoot().getAttributes()) {
-                    if (attrib.getKeyAsString().equals("xsi:schemaLocation") && attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
-                        return true;
+                //noinspection ConstantValue
+                if (doc.getRoot() != null) {
+                    for (Xml.Attribute attrib : doc.getRoot().getAttributes()) {
+                        if (attrib.getKeyAsString().equals("xsi:schemaLocation") && attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
+                            return true;
+                        }
                     }
                 }
             }

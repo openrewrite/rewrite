@@ -38,7 +38,18 @@ import static java.lang.System.lineSeparator;
 import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
-
+/**
+ * Visitor class to merge two yaml files.
+ *
+ * @implNote Loops recursively through the documents, for every part a new MergeYamlVisitor instance will be created.
+ * As inline comments are put on the prefix of the next element (which can be an item very much higher in the tree),
+ * the following solutions are chosen to merge the comments as well:
+ * <ul>
+ * <li>when an element has new items, the comment of the next element is copied to the previous element
+ * <li>the original comment will be removed (either by traversing the children or by using cursor messages)
+ *
+ * @param <P> An input object that is passed to every visit method.
+ */
 @AllArgsConstructor
 @RequiredArgsConstructor
 public class MergeYamlVisitor<P> extends YamlVisitor<P> {
