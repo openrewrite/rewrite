@@ -299,28 +299,27 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             ResolvedManagedDependency dm = findManagedDependency(t);
                             // if a managed dependency is expressed as a property, change the property value
                             if (dm != null &&
-                                dm.getRequested().getVersion() != null &&
-                                dm.getRequested().getVersion().startsWith("${") &&
-                                !implicitlyDefinedVersionProperties.contains(dm.getRequested().getVersion())) {
-                                    Parent parent = getResolutionResult().getPom().getRequested().getParent();
-                                    ManagedDependency requestedBom = dm.getRequestedBom();
+                                    dm.getRequested().getVersion() != null &&
+                                    dm.getRequested().getVersion().startsWith("${") &&
+                                    !implicitlyDefinedVersionProperties.contains(dm.getRequested().getVersion())) {
+                                Parent parent = getResolutionResult().getPom().getRequested().getParent();
+                                ManagedDependency requestedBom = dm.getRequestedBom();
 
-                                    // change property only if the dependency is managed by the parent
-                                    if(parent != null && requestedBom != null && requestedBom.getGroupId().equals(parent.getGroupId()) &&
+                                // change property only if the dependency is managed by the parent
+                                if (parent != null && requestedBom != null && requestedBom.getGroupId().equals(parent.getGroupId()) &&
                                         requestedBom.getArtifactId().equals(parent.getArtifactId()) &&
                                         Objects.equals(requestedBom.getVersion(), parent.getVersion())) {
-                                            doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
-                                                    dm.getRequested().getVersion().length() - 1),
-                                                    newerVersion, overrideManagedVersion, false).getVisitor());
-                                    }
-                                    else{
-                                        // add a new explicit version tag
-                                        Xml.Tag versionTag = Xml.Tag.build("<version>" + newerVersion + "</version>");
+                                    doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
+                                            dm.getRequested().getVersion().length() - 1),
+                                            newerVersion, overrideManagedVersion, false).getVisitor());
+                                } else {
+                                    // add a new explicit version tag
+                                    Xml.Tag versionTag = Xml.Tag.build("<version>" + newerVersion + "</version>");
 
-                                        //noinspection ConstantConditions
-                                        t = (Xml.Tag) new AddToTagVisitor<>(t, versionTag, new MavenTagInsertionComparator(t.getChildren()))
-                                                .visitNonNull(t, 0, getCursor().getParent());
-                                    }
+                                    //noinspection ConstantConditions
+                                    t = (Xml.Tag) new AddToTagVisitor<>(t, versionTag, new MavenTagInsertionComparator(t.getChildren()))
+                                            .visitNonNull(t, 0, getCursor().getParent());
+                                }
                             } else {
                                 // if the version is not present and the override managed version is set,
                                 // add a new explicit version tag
