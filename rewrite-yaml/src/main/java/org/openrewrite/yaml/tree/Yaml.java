@@ -179,7 +179,7 @@ public interface Yaml extends Tree {
                     Markers.EMPTY,
                     explicit,
                     block.copyPaste(),
-                    end == null ? null : end.copyPaste()
+                    end.copyPaste()
             );
         }
 
