@@ -53,7 +53,6 @@ public class FindCompileErrors extends Recipe {
                         code
                 ));
 
-                super.visitErroneous(erroneous, ctx);
                 return SearchResult.found(erroneous);
             }
         };
