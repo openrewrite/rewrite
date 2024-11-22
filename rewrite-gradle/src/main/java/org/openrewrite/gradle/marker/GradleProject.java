@@ -135,11 +135,11 @@ public class GradleProject implements Marker, Serializable {
     ) {
         List<GradleDependencyConfiguration> result = new ArrayList<>();
         for (GradleDependencyConfiguration configuration : nameToConfiguration.values()) {
-            if (configuration == parentConfiguration) {
+            if (configuration.equals(parentConfiguration)) {
                 continue;
             }
             for (GradleDependencyConfiguration extendsFrom : configuration.getExtendsFrom()) {
-                if (extendsFrom == parentConfiguration) {
+                if (extendsFrom.equals(parentConfiguration)) {
                     result.add(configuration);
                     if (transitive) {
                         result.addAll(configurationsExtendingFrom(configuration, true));
