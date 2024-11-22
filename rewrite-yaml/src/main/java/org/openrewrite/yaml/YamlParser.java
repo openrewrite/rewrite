@@ -194,9 +194,6 @@ public class YamlParser implements org.openrewrite.Parser {
                     }
                     case Scalar: {
                         String fmt = newLine + reader.prefix(lastEnd, event);
-                        if (!newLine.isEmpty()) {
-                            lastEnd--;
-                        }
                         newLine = "";
 
                         ScalarEvent scalar = (ScalarEvent) event;
