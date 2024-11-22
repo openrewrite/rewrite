@@ -1297,7 +1297,7 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
-        // Mimics `org.openrewrite.java.micronaut.UpdateSecurityYamlIfNeeded`
+    // Mimics `org.openrewrite.java.micronaut.UpdateSecurityYamlIfNeeded`
     void mergeEmptyStructureFollowedByCopyValue() {
         rewriteRun(
           spec -> spec.recipes(

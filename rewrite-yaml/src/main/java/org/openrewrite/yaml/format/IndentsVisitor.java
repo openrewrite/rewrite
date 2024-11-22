@@ -29,8 +29,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.internal.StringUtils.repeat;
-
 public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(\\s*)(.*\n?)", Pattern.MULTILINE);
@@ -103,7 +101,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         }
 
         if (y instanceof Yaml.Scalar && y.getMarkers().findFirst(MultilineScalarAdded.class).isPresent()) {
-            String newValue = ((Yaml.Scalar) y).getValue().replaceAll("\\R", "\n" + repeat(" ", indent));
+            String newValue = ((Yaml.Scalar) y).getValue().replaceAll("\\R", "\n" + StringUtils.repeat(" ", indent));
             y = ((Yaml.Scalar) y).withValue(newValue);
         }
 
@@ -147,7 +145,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         if (prefix.contains("#")) {
             Matcher m = COMMENT_PATTERN.matcher(prefix);
             StringBuilder result = new StringBuilder();
-            String indent = repeat(" ", column);
+            String indent = StringUtils.repeat(" ", column);
             boolean firstLine = true;
             while (m.find()) {
                 String whitespace = m.group(1);
