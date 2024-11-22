@@ -249,7 +249,7 @@ public class SemanticallyEqual {
 
                 visit(_assert.getCondition(), compareTo.getCondition());
                 if (_assert.getDetail() != null && compareTo.getDetail() != null) {
-                    visit(_assert.getDetail().getElement(), compareTo.getDetail().getElement());
+                    visit(_assert.getDetail(), compareTo.getDetail());
                 }
             }
             return _assert;

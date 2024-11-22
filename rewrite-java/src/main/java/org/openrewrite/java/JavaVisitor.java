@@ -315,7 +315,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         a = a.withCondition(visitAndCast(a.getCondition(), p));
         if (a.getDetail() != null) {
-            a = a.withDetail(visitLeftPadded(a.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p));
+            a = a.getPadding().withDetail(visitLeftPadded(a.getPadding().getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p));
         }
         return a;
     }
