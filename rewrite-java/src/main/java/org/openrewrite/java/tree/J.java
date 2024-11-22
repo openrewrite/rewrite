@@ -438,8 +438,7 @@ public interface J extends Tree {
         @Nullable
         JLeftPadded<Expression> detail;
 
-        @Nullable
-        public Expression getDetail() {
+        public @Nullable Expression getDetail() {
             return detail != null ? detail.getElement() : null;
         }
 
@@ -482,8 +481,7 @@ public interface J extends Tree {
         public static class Padding {
             private final Assert t;
 
-            @Nullable
-            public JLeftPadded<Expression> getDetail() {
+            public @Nullable JLeftPadded<Expression> getDetail() {
                 return t.detail;
             }
 
