@@ -52,6 +52,7 @@ public class ResolvedDependency implements Serializable {
     @EqualsAndHashCode.Exclude
     List<ResolvedDependency> dependencies;
 
+    @Nullable
     @NonFinal
     @EqualsAndHashCode.Exclude
     List<GroupArtifactVersion> omitDependencies;
@@ -75,6 +76,21 @@ public class ResolvedDependency implements Serializable {
 
     public List<GroupArtifact> getEffectiveExclusions() {
         return effectiveExclusions == null ? emptyList() : effectiveExclusions;
+    }
+
+    // For backward compatibility
+    public ResolvedDependency(@Nullable MavenRepository repository, ResolvedGroupArtifactVersion gav, Dependency requested, List<ResolvedDependency> dependencies, List<License> licenses, @Nullable String type, @Nullable String classifier, @Nullable Boolean optional, int depth, @Nullable List<GroupArtifact> effectiveExclusions) {
+        this.repository = repository;
+        this.gav = gav;
+        this.requested = requested;
+        this.dependencies = dependencies;
+        this.omitDependencies = emptyList();
+        this.licenses = licenses;
+        this.type = type;
+        this.classifier = classifier;
+        this.optional = optional;
+        this.depth = depth;
+        this.effectiveExclusions = effectiveExclusions;
     }
 
     /**
@@ -176,12 +192,20 @@ public class ResolvedDependency implements Serializable {
             }
         }
 
-        for (GroupArtifactVersion omit : omitDependencies) {
+        for (GroupArtifactVersion omit : getOmitDependencies()) {
             if (matchesGlob(omit.getGroupId(), groupId) && matchesGlob(omit.getArtifactId(), artifactId)) {
                 return this;
             }
         }
         return null;
+    }
+
+    // Always keep it non null
+    public List<GroupArtifactVersion> getOmitDependencies() {
+        if (omitDependencies == null) {
+            omitDependencies = new ArrayList<>();
+        }
+        return omitDependencies;
     }
 
     @Override

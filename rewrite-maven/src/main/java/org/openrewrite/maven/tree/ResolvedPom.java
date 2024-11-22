@@ -918,9 +918,6 @@ public class ResolvedPom {
                             // so just skip and continue on
                             ResolvedDependency includedBy = dd.getDependent();
                             if (includedBy != null) {
-                                if (includedBy.getOmitDependencies().isEmpty()) {
-                                    includedBy.unsafeSetOmitDependencies(new ArrayList<>());
-                                }
                                 includedBy.getOmitDependencies().add(new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion()));
                             }
                             continue;
