@@ -25,12 +25,12 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 public class StringUtils {
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
+
     private StringUtils() {
     }
 
@@ -158,50 +158,6 @@ public class StringUtils {
         return minIndent;
     }
 
-    public static int mostCommonIndent(SortedMap<Integer, Long> indentFrequencies) {
-        // the frequency with which each indent level is an integral divisor of longer indent levels
-        SortedMap<Integer, Integer> indentFrequencyAsDivisors = new TreeMap<>();
-        for (Map.Entry<Integer, Long> indentFrequency : indentFrequencies.entrySet()) {
-            int indent = indentFrequency.getKey();
-            int freq;
-            switch (indent) {
-                case 0:
-                    freq = indentFrequency.getValue().intValue();
-                    break;
-                case 1:
-                    // gcd(1, N) == 1, so we can avoid the test for this case
-                    freq = (int) indentFrequencies.tailMap(indent).values().stream().mapToLong(l -> l).sum();
-                    break;
-                default:
-                    freq = (int) indentFrequencies.tailMap(indent).entrySet().stream()
-                            .filter(inF -> gcd(inF.getKey(), indent) != 0)
-                            .mapToLong(Map.Entry::getValue)
-                            .sum();
-            }
-
-            indentFrequencyAsDivisors.put(indent, freq);
-        }
-
-        if (indentFrequencies.getOrDefault(0, 0L) > 1) {
-            return 0;
-        }
-
-        return indentFrequencyAsDivisors.entrySet().stream()
-                .max((e1, e2) -> {
-                    int valCompare = e1.getValue().compareTo(e2.getValue());
-                    return valCompare != 0 ?
-                            valCompare :
-                            // take the smallest indent otherwise, unless it would be zero
-                            e1.getKey() == 0 ? -1 : e2.getKey().compareTo(e1.getKey());
-                })
-                .map(Map.Entry::getKey)
-                .orElse(0);
-    }
-
-    static int gcd(int n1, int n2) {
-        return n2 == 0 ? n1 : gcd(n2, n1 % n2);
-    }
-
     /**
      * Check if the String is null or has only whitespaces.
      * <p>
@@ -271,7 +227,7 @@ public class StringUtils {
             return value;
         }
         return Character.toUpperCase(value.charAt(0)) +
-               value.substring(1);
+                value.substring(1);
     }
 
     public static String uncapitalize(String value) {
@@ -467,7 +423,7 @@ public class StringUtils {
                 break;
             }
             if (ch != '?' &&
-                different(caseSensitive, ch, str.charAt(strIdxStart))) {
+                    different(caseSensitive, ch, str.charAt(strIdxStart))) {
                 return false; // Character mismatch
             }
             patIdxStart++;
@@ -759,5 +715,9 @@ public class StringUtils {
 
     public static String formatUriForPropertiesFile(String uri) {
         return uri.replaceAll("(?<!\\\\)://", "\\\\://");
+    }
+
+    public static boolean hasLineBreak(@Nullable String s) {
+        return s != null && LINE_BREAK.matcher(s).find();
     }
 }
