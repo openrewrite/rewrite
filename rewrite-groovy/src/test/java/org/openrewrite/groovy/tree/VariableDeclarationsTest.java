@@ -32,7 +32,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings("GroovyUnusedAssignment")
+@SuppressWarnings({"GroovyUnusedAssignment", "DataFlowIssue"})
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
@@ -179,6 +179,19 @@ class VariableDeclarationsTest implements RewriteTest {
                 assertThat(variables.get(0).getLeadingAnnotations()).hasSize(1);
             })
           )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4702")
+    @Disabled
+    @Test
+    void nestedTypeParameters() {
+        rewriteRun(
+          groovy("""
+            class A {
+                def map = new HashMap<String, List<String>>()
+            }
+            """)
         );
     }
 }

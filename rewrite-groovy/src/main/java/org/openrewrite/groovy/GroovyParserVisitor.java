@@ -302,10 +302,30 @@ public class GroovyParserVisitor {
         J.Block visitClassBlock(ClassNode clazz) {
             NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
             for (MethodNode method : clazz.getMethods()) {
+                // Most synthetic methods do not appear in source code and should be skipped entirely.
                 if (method.isSynthetic()) {
+                    // Static initializer blocks show up as a synthetic method with name <clinit>
+                    // The part that actually appears in source code is a block statement inside the method declaration
+                    if ("<clinit>".equals(method.getName()) && method.getCode() instanceof BlockStatement && ((BlockStatement) method.getCode()).getStatements().size() == 1) {
+                        org.codehaus.groovy.ast.stmt.Statement statement = ((BlockStatement) method.getCode()).getStatements().get(0);
+                        sortedByPosition.computeIfAbsent(pos(statement), i -> new ArrayList<>()).add(statement);
+                    }
+                } else {
+                    sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
+                }
+            }
+            for (org.codehaus.groovy.ast.stmt.Statement objectInitializer : clazz.getObjectInitializerStatements()) {
+                if(!(objectInitializer instanceof BlockStatement)) {
                     continue;
                 }
-                sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
+                // A class initializer BlockStatement will be wrapped in an otherwise empty BlockStatement with the same source positions
+                // No idea why, except speculation that it is for consistency with static intiializers, but we can skip the wrapper and just visit its contents
+                BlockStatement s = (BlockStatement) objectInitializer;
+                if(s.getStatements().size() == 1 && pos(s).equals(pos(s.getStatements().get(0)))) {
+                    s = (BlockStatement) s.getStatements().get(0);
+                }
+                sortedByPosition.computeIfAbsent(pos(s), i -> new ArrayList<>())
+                        .add(s);
             }
             /*
               In certain circumstances the same AST node may appear in multiple places.
@@ -350,12 +370,20 @@ public class GroovyParserVisitor {
                                             visitMethod((MethodNode) ast);
                                         } else if (ast instanceof ClassNode) {
                                             visitClass((ClassNode) ast);
+                                        } else if (ast instanceof BlockStatement) {
+                                            visitBlockStatement((BlockStatement) ast);
                                         }
                                         Statement stat = pollQueue();
                                         return maybeSemicolon(stat);
                                     }))
                             .collect(Collectors.toList()),
                     sourceBefore("}"));
+        }
+
+        @Override
+        public void visitBlockStatement(BlockStatement statement) {
+            queue.add(new RewriteGroovyVisitor(statement, this)
+                    .visit(statement));
         }
 
         @Override
@@ -916,8 +944,14 @@ public class GroovyParserVisitor {
         @Override
         public void visitBlockStatement(BlockStatement block) {
             Space fmt = EMPTY;
+            Space staticInitPadding = EMPTY;
+            boolean isStaticInit = source.substring(indexOfNextNonWhitespace(cursor, source)).startsWith("static");
             Object parent = nodeCursor.getParentOrThrow().getValue();
-            if (!(parent instanceof ClosureExpression)) {
+            if (isStaticInit) {
+                fmt = sourceBefore("static");
+                staticInitPadding = whitespace();
+                skip("{");
+            } else if (!(parent instanceof ClosureExpression)) {
                 fmt = sourceBefore("{");
             }
             List<JRightPadded<Statement>> statements = new ArrayList<>(block.getStatements().size());
@@ -948,11 +982,9 @@ public class GroovyParserVisitor {
 
                 statements.add(stat);
             }
-
-            Space beforeBrace = whitespace();
-            queue.add(new J.Block(randomId(), fmt, Markers.EMPTY, JRightPadded.build(false), statements, beforeBrace));
+            queue.add(new J.Block(randomId(), fmt, Markers.EMPTY, new JRightPadded<>(isStaticInit, staticInitPadding, Markers.EMPTY), statements, whitespace()));
             if (!(parent instanceof ClosureExpression)) {
-                sourceBefore("}");
+                skip("}");
             }
         }
 
@@ -1066,9 +1098,9 @@ public class GroovyParserVisitor {
             boolean parenthesized = false;
             if (source.charAt(cursor) == '(') {
                 parenthesized = true;
-                cursor += 1; // skip '('
+                skip("(");
             } else if (source.charAt(cursor) == '{') {
-                cursor += 1; // skip '{'
+                skip("{");
             }
             JavaType closureType = typeMapping.type(staticType(expression));
             List<JRightPadded<J>> paramExprs;
@@ -1111,7 +1143,7 @@ public class GroovyParserVisitor {
             int saveCursor = cursor;
             Space arrowPrefix = whitespace();
             if (source.startsWith("->", cursor)) {
-                cursor += "->".length();
+                skip("->");
             } else {
                 ls = ls.withArrow(false);
                 cursor = saveCursor;
@@ -1122,9 +1154,7 @@ public class GroovyParserVisitor {
                     arrowPrefix,
                     body,
                     closureType));
-            if (cursor < source.length() && source.charAt(cursor) == '}') {
-                cursor++;
-            }
+            skip("}");
         }
 
         @Override
