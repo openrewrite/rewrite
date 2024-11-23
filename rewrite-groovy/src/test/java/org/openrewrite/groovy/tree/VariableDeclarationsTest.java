@@ -50,6 +50,13 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Test
+    void nestedGenerics() {
+        rewriteRun(
+          groovy("final map = new HashMap<String, List<String>>()")
+        );
+    }
+
+    @Test
     void singleVariableDeclaration() {
         rewriteRun(
           groovy("Integer a = 1")
