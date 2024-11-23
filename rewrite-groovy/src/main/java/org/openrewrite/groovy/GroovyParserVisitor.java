@@ -2696,7 +2696,7 @@ public class GroovyParserVisitor {
             return new J.Empty(randomId(), prefix, Markers.EMPTY);
         }
         cursor = saveCursor;
-        return typeTree(null)
+        return typeTree(genericsType.getType())
                 .withType(typeMapping.type(genericsType));
     }
 

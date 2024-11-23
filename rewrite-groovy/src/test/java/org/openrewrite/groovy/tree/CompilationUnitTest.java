@@ -127,7 +127,8 @@ class CompilationUnitTest implements RewriteTest {
     @Test
     void addingToMaps() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             class Pair {
                 String foo
                 String bar
@@ -144,7 +145,8 @@ class CompilationUnitTest implements RewriteTest {
                     l.add(new Pair("foo", "bar"))
                 }
             }
-            """)
+            """
+          )
         );
     }
 }
