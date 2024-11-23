@@ -1638,8 +1638,13 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         if (idx >= 0) {
             rightPadded = (JRightPadded<J2>) JRightPadded.build(getErroneous(Collections.singletonList(rightPadded)));
         }
+        // Cursor hasn't been updated but points at the end of erroneous node already
+        // This means that error node start position == end position
+        // Therefore ensure that cursor has moved to the end of erroneous node bu adding its length to the cursor
+        // Example `/pet` results in 2 erroeneous nodes: `/` and `pet`. The `/` node would have start and end position the
+        // same from the JC compiler.
         if (endPos(t) == cursor && rightPadded.getElement() instanceof J.Erroneous) {
-            cursor++;
+            cursor += ((J.Erroneous) rightPadded.getElement()).getText().length();
         } else {
             cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
         }
