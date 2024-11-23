@@ -187,11 +187,13 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void nestedTypeParameters() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             class A {
                 def map = new HashMap<String, List<String>>()
             }
-            """)
+            """
+          )
         );
     }
 }

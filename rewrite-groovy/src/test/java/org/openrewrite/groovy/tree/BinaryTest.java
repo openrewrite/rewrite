@@ -206,7 +206,8 @@ class BinaryTest implements RewriteTest {
     @Test
     void extraParensAroundInfixOperator() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             def foo(Map map) {
                 ((map.containsKey("foo"))
                         && ((map.get("foo")).equals("bar")))
@@ -217,7 +218,8 @@ class BinaryTest implements RewriteTest {
             def differenceInDays(int time) {
                 return (int) ((time)/(1000*60*60*24))
             }
-            """)
+            """
+          )
         );
     }
 }

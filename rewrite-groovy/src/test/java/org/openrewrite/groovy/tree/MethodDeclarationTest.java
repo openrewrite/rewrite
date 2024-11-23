@@ -186,11 +186,13 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void functionWithDefAndExplicitReturnType() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             class A {
                 def int one() { 1 }
             }
-            """)
+            """
+          )
         );
     }
 }
