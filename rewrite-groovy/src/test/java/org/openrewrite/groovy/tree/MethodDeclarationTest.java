@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -27,6 +28,7 @@ import java.util.Objects;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
+@SuppressWarnings({"GrUnnecessaryDefModifier", "GrMethodMayBeStatic"})
 class MethodDeclarationTest implements RewriteTest {
 
     @Test
@@ -176,6 +178,19 @@ class MethodDeclarationTest implements RewriteTest {
               'some test scenario description'()
               """
           )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4705")
+    @Disabled
+    @Test
+    void functionWithDefAndExplicitReturnType() {
+        rewriteRun(
+          groovy("""
+            class A {
+                def int one() { 1 }
+            }
+            """)
         );
     }
 }

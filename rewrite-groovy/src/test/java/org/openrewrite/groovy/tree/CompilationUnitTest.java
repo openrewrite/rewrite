@@ -124,20 +124,6 @@ class CompilationUnitTest implements RewriteTest {
         );
     }
 
-    @Disabled
-    @Test
-    void functionWithDefAndExplicitReturnType() {
-        rewriteRun(
-          groovy("""
-            class A {
-                def Map emptyMap() {
-                    return [:]
-                }
-            }
-            """)
-        );
-    }
-
     @Issue("https://github.com/openrewrite/rewrite/issues/4704")
     @Disabled
     @Test
