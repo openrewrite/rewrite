@@ -187,11 +187,11 @@ class MethodDeclarationTest implements RewriteTest {
     void functionWithDefAndExplicitReturnType() {
         rewriteRun(
           groovy(
+                """
+            class A {
+                def int one() { 1 }
+            }
             """
-              class A {
-                  def int one() { 1 }
-              }
-              """
           )
         );
     }
