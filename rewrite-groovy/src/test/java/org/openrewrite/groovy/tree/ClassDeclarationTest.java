@@ -291,6 +291,34 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void instanceInitializerBlock() {
+        rewriteRun(
+          groovy("""
+            class A {
+                int a
+                {
+                    a = 1
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void staticInitializer() {
+        rewriteRun(
+          groovy("""
+            class A {
+                static int a
+                static {
+                    a = 1
+                }
+            }
+            """)
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/pull/4346")
     @Test
     @Disabled("Known issue; still need to explore a fix")

@@ -19,6 +19,9 @@ import lombok.Getter;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
@@ -26,13 +29,15 @@ import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.trait.Reference;
+import org.openrewrite.xml.tree.Xml;
 
 import java.util.regex.Pattern;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 @Getter
-public class TypeMatcher {
+public class TypeMatcher implements Reference.Renamer, Reference.Matcher {
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
 
     @SuppressWarnings("NotNullFieldNotInitialized")
@@ -54,7 +59,7 @@ public class TypeMatcher {
         this(fieldType, false);
     }
 
-    public @Nullable TypeMatcher(@Nullable String fieldType, boolean matchInherited) {
+    public TypeMatcher(@Nullable String fieldType, boolean matchInherited) {
         this.signature = fieldType == null ? ".*" : fieldType;
         this.matchInherited = matchInherited;
 
@@ -109,4 +114,28 @@ public class TypeMatcher {
                context.classNameOrInterface().DOTDOT().isEmpty() &&
                context.classNameOrInterface().WILDCARD().isEmpty();
     }
+
+    @Override
+    public boolean matchesReference(Reference reference) {
+        return reference.getKind().equals(Reference.Kind.TYPE) && matchesTargetTypeName(reference.getValue());
+    }
+
+    @Override
+    public TreeVisitor<Tree, ExecutionContext> rename(String newValue) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (StringUtils.isNotEmpty(newValue)) {
+                    if (tree instanceof Xml.Attribute) {
+                        return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(newValue));
+                    }
+                    if (tree instanceof Xml.Tag) {
+                        return ((Xml.Tag) tree).withValue(newValue);
+                    }
+                }
+                return super.visit(tree, ctx);
+            }
+        };
+    }
+
 }

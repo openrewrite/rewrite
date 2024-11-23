@@ -357,13 +357,20 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
         } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            symbol = ((JCTree.JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCFieldAccess) {
+            symbol = ((JCTree.JCFieldAccess) tree).sym;
         }
 
         return type(((JCTree) tree).type, symbol);
     }
 
-    private @Nullable JavaType type(Type type, Symbol symbol) {
-        if (type instanceof Type.MethodType) {
+    private @Nullable JavaType type(@Nullable Type type, @Nullable Symbol symbol) {
+        if (type == null && symbol != null) {
+            type = symbol.type;
+        }
+        if (type instanceof Type.MethodType || type instanceof Type.ForAll) {
             return methodInvocationType(type, symbol);
         }
         return type(type);
@@ -405,7 +412,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType.@Nullable Variable variableType(@Nullable Symbol symbol,
-            JavaType.@Nullable FullyQualified owner) {
+                                                     JavaType.@Nullable FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
         }
@@ -581,7 +588,11 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                             .map(attr -> attr.getValue().toString())
                             .collect(Collectors.toList());
                 } else {
-                    defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    try {
+                        defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    } catch(UnsupportedOperationException e) {
+                        // not all Attribute implementations define `getValue()`
+                    }
                 }
             }
             JavaType.Method method = new JavaType.Method(

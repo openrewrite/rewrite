@@ -84,6 +84,7 @@ public class MergeYaml extends Recipe {
     }
 
     final static String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
+    final static String REMOVE_PREFIX = "REMOVE_PREFIX";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -96,7 +97,7 @@ public class MergeYaml extends Recipe {
                     .map(docs -> {
                         // Any comments will have been put on the parent Document node, preserve by copying to the mapping
                         Yaml.Document doc = docs.getDocuments().get(0);
-                        if(doc.getBlock() instanceof Yaml.Mapping) {
+                        if (doc.getBlock() instanceof Yaml.Mapping) {
                             Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
                             return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
                         } else if (doc.getBlock() instanceof Yaml.Sequence) {
@@ -110,9 +111,11 @@ public class MergeYaml extends Recipe {
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
                 if ("$".equals(key)) {
-                    return document.withBlock((Yaml.Block) new MergeYamlVisitor<>(document.getBlock(), yaml,
-                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visitNonNull(document.getBlock(),
-                            ctx, getCursor()));
+                    Yaml.Document d = document.withBlock((Yaml.Block)
+                            new MergeYamlVisitor<>(document.getBlock(), yaml, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty)
+                                    .visitNonNull(document.getBlock(), ctx, getCursor())
+                    );
+                    return getCursor().getMessage(REMOVE_PREFIX, false) ? d.withEnd(d.getEnd().withPrefix("")) : d;
                 }
                 Yaml.Document d = super.visitDocument(document, ctx);
                 if (d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {

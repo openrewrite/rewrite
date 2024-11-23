@@ -18,6 +18,7 @@ package org.openrewrite.xml.tree;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -30,6 +31,8 @@ import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
 import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 
+import java.beans.Transient;
+import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -79,7 +82,8 @@ public interface Xml extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    class Document implements Xml, SourceFile {
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Document implements Xml, SourceFileWithReferences {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -160,8 +164,30 @@ public interface Xml extends Tree {
             if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 return (T) new XmlWhitespaceValidationService();
             }
-            return SourceFile.super.service(service);
+            return SourceFileWithReferences.super.service(service);
         }
+
+        @Nullable
+        @NonFinal
+        transient SoftReference<References> references;
+
+        @Transient
+        @Override
+        public References getReferences() {
+            References cache;
+            if (this.references == null) {
+                cache = References.build(this);
+                this.references = new SoftReference<>(cache);
+            } else {
+                cache = this.references.get();
+                if (cache == null || cache.getSourceFile() != this) {
+                    cache = References.build(this);
+                    this.references = new SoftReference<>(cache);
+                }
+            }
+            return cache;
+        }
+
     }
 
     @Value
@@ -304,10 +330,10 @@ public interface Xml extends Tree {
         }
 
         public Tag withName(String name) {
-            if(!name.equals(name.trim())) {
+            if (!name.equals(name.trim())) {
                 throw new IllegalArgumentException("Tag name must not contain leading or trailing whitespace");
             }
-            if(this.name.equals(name)) {
+            if (this.name.equals(name)) {
                 return this;
             }
             return new Tag(id, prefixUnsafe, markers, name, attributes, content,
@@ -654,7 +680,7 @@ public interface Xml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(onConstructor_ = { @JsonCreator })
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator})
     @With
     class DocTypeDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
@@ -675,10 +701,11 @@ public interface Xml extends Tree {
         Markers markers;
         Ident name;
         String documentDeclaration;
+
         // Override lombok default getter to avoid backwards compatibility problems with old LSTs
         public String getDocumentDeclaration() {
             //noinspection ConstantValue
-            if ( documentDeclaration == null) {
+            if (documentDeclaration == null) {
                 return "DOCTYPE";
             }
             return documentDeclaration;
