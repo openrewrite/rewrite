@@ -429,6 +429,93 @@ class JavaTemplateTest implements RewriteTest {
     }
 
     @Test
+    void replaceConstructorWithStaticFactoryMethod() {
+        rewriteRun(recipeSpec -> {
+              //everything works fine when skipping type validation
+              //recipeSpec.afterTypeValidationOptions(TypeValidation.none());
+              recipeSpec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final MethodMatcher FactoryMethod = new MethodMatcher("f.HelloFactory createHello(String, long)");
+
+                    @Override
+                    public J visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
+                        final var result = (J.NewClass) super.visitNewClass(newClass, executionContext);
+                        final Cursor parent = getCursor().getParentOrThrow();
+                        final J.MethodDeclaration methodDeclaration = parent.firstEnclosing(J.MethodDeclaration.class);
+                        final J.ClassDeclaration classDeclaration = parent.firstEnclosing(J.ClassDeclaration.class);
+                        final var isInstantiationInFactoryMethod = FactoryMethod.matches(methodDeclaration, classDeclaration);
+                        if (isInstantiationInFactoryMethod) {
+                            return result;
+                        }
+
+                        final var template = JavaTemplate.builder("createHello(#{any()}, #{any()})")
+                          .doBeforeParseTemplate(System.out::println)
+                          .staticImports("f.HelloFactory.createHello")
+                          .build();
+
+                        maybeRemoveImport("a.Hello");
+                        maybeAddImport("f.HelloFactory", "createHello", false);
+
+                        final var arguments = result.getArguments();
+                        final var methodInvocation = template.apply(getCursor(), result.getCoordinates().replace(), arguments.get(0), arguments.get(1));
+                        if (null != ((J.MethodInvocation) methodInvocation).getMethodType()) {
+                            throw new RuntimeException("JavaTemplate does not attach the MethodType. IMO, it should.");
+                        }
+                        return methodInvocation;
+                    }
+                }
+              ));
+          },
+          java(
+            """
+              package a;
+              
+              public class Hello {
+              
+                  public Hello(String name, long value) {
+                  }
+              }
+              """),
+          java(
+            """
+              package f;
+              
+              import a.Hello;
+              
+              public class HelloFactory {
+              
+                  public static Hello createHello(String name, long value) {
+                      return new Hello(name, value);
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package u;
+              
+              import a.Hello;
+              
+              public class ConstructorUsage {
+              
+                  public void example() {
+                      new Hello("Alice", 42L);
+                  }
+              }
+              """, """
+              package u;
+              
+              import static f.HelloFactory.createHello;
+              
+              public class ConstructorUsage {
+              
+                  public void example() {
+                      createHello("Alice", 42L);
+                  }
+              }
+              """));
+    }
+
+    @Test
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
     void replaceGenericTypedObject() {
         rewriteRun(
