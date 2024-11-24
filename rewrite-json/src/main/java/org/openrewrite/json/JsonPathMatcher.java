@@ -37,6 +37,7 @@ import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 /**
@@ -74,8 +75,14 @@ public class JsonPathMatcher {
         JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
         JsonPathParserJsonVisitor visitor = new JsonPathParserJsonVisitor(startCursor, startCursor.getValue(), stop);
         Object result = visitor.visit(ctx);
-        //noinspection unchecked,ConstantValue
-        return result instanceof List ? (List<Object>) result : result != null ? singletonList(result) : null;
+        if (result instanceof List) {
+            //noinspection unchecked
+            return (List<Object>) result;
+        } else //noinspection ConstantValue
+            if (result != null) {
+                return singletonList(result);
+            }
+        return jsonPath.startsWith("$") ? emptyList() : null;
     }
 
     private boolean isAtDocumentRoot(Cursor cursor) {
