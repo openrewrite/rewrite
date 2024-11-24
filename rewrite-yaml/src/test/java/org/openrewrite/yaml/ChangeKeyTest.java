@@ -157,8 +157,8 @@ class ChangeKeyTest implements RewriteTest {
                       saml2:
                         relyingparty:
                           registration:
-                            idpone:
-                              assertingparty:
+                            assertingparty:
+                              identityprovider:
                                 entity-id: https://idpone.com
                                 sso-url: https://idpone.com
                                 verification:
