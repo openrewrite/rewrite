@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Comparator.comparing;
@@ -1336,6 +1337,47 @@ class JavaTemplateTest implements RewriteTest {
                       new StepBuilder()
                           .<String>method();
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/185")
+    @Test
+    void replaceMethodArgumentsInIfStatementWithoutBraces() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Foo bar(..)").matches(mi) &&
+                      mi.getArguments().get(0) instanceof J.Binary) {
+                      return JavaTemplate.builder("\"Hello, {}\", \"World!\"")
+                        .contextSensitive()
+                        .build()
+                        .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(), new ArrayList<>().toArray());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              class Foo {
+                  void foo(boolean condition) {
+                      if (condition)
+                          bar("Hello, " + "World!");
+                  }
+                  String bar(String... arg){ return null; }
+              }
+              """,
+            """
+              class Foo {
+                  void foo(boolean condition) {
+                      if (condition)
+                          bar("Hello, {}", "World!");
+                  }
+                  String bar(String... arg){ return null; }
               }
               """
           )
