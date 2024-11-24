@@ -43,7 +43,6 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <build>
                       <plugins>
                           <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
                               <configuration>
                                   <annotationProcessorPaths>
@@ -72,7 +71,6 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <build>
                       <plugins>
                           <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
                               <configuration>
                                   <annotationProcessorPaths>
@@ -134,7 +132,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                                       <path>
                                           <groupId>org.projectlombok</groupId>
                                           <artifactId>lombok-mapstruct-binding</artifactId>
-                                          <version>0.2.0</version>
+                                          <version>0.1.0</version>
                                       </path>
                                   </annotationProcessorPaths>
                               </configuration>
