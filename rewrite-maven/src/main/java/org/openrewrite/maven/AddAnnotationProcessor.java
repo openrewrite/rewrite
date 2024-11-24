@@ -68,8 +68,8 @@ public class AddAnnotationProcessor extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag plugins = (Xml.Tag) super.visitTag(tag, ctx);
                 plugins = (Xml.Tag) mavenPlugin().asVisitor(plugin -> {
-                    if (MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(plugin.getGroupId())
-                        && MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getArtifactId())) {
+                    if (MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(plugin.getGroupId()) &&
+                        MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getArtifactId())) {
                         return new XmlIsoVisitor<ExecutionContext>() {
                             @Override
                             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
