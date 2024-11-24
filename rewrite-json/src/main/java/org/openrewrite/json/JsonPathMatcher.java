@@ -40,10 +40,15 @@ import java.util.stream.Collectors;
 import static java.util.Collections.singletonList;
 
 /**
- * Finds all leaf nodes that match a JSONPath expression starting from a given cursor position.
+ * Provides methods for matching the given cursor location to a specific JsonPath expression.
+ * <p>
+ * This is not a full implementation of the JsonPath syntax as linked in the "see also."
+ *
+ * @see <a href="https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html">https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html</a>
  */
 @EqualsAndHashCode
 public class JsonPathMatcher {
+
     private final String jsonPath;
     private JsonPathParser.@Nullable JsonPathContext parsed;
 
@@ -604,31 +609,23 @@ public class JsonPathMatcher {
             Object rhs = ctx.children.get(2);
 
             if (ctx.LOGICAL_OPERATOR() != null) {
-                List<Object> results = new ArrayList<>();
-                List<Object> elements = scope instanceof List ? (List<Object>) scope :
-                        scope != null ? singletonList(scope) : Collections.emptyList();
+                Object originalScope = scope;
+                Object lhsResult = getBinaryExpressionResult(ctx.children.get(0));
+                scope = originalScope;
+                Object rhsResult = getBinaryExpressionResult(ctx.children.get(2));
+                scope = originalScope;
 
-                for (Object element : elements) {
-                    Object originalScope = scope;
-                    scope = element;
-
-                    Object lhsResult = getBinaryExpressionResult(ctx.children.get(0));
-                    scope = element; // Reset scope for RHS
-                    Object rhsResult = getBinaryExpressionResult(ctx.children.get(2));
-
-                    if ("&&".equals(ctx.LOGICAL_OPERATOR().getText())) {
-                        if (lhsResult != null && rhsResult != null) {
-                            results.add(element);
-                        }
-                    } else if ("||".equals(ctx.LOGICAL_OPERATOR().getText())) {
-                        if (lhsResult != null || rhsResult != null) {
-                            results.add(element);
-                        }
+                if ("&&".equals(ctx.LOGICAL_OPERATOR().getText())) {
+                    if (lhsResult != null && rhsResult != null) {
+                        return scope;
                     }
-
-                    scope = originalScope;
+                } else if ("||".equals(ctx.LOGICAL_OPERATOR().getText())) {
+                    if (lhsResult != null || rhsResult != null) {
+                        return scope;
+                    }
                 }
-                return results.isEmpty() ? null : results;
+
+                return null;
             } else if (ctx.EQUALITY_OPERATOR() != null) {
                 // Equality operators may resolve the LHS and RHS without caching scope.
                 Object originalScope = scope;
