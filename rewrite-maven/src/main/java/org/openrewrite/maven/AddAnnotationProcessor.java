@@ -22,9 +22,10 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.maven.trait.MavenPlugin;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
+
+import static org.openrewrite.maven.trait.Traits.mavenPlugin;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -33,28 +34,31 @@ public class AddAnnotationProcessor extends Recipe {
     private static final String MAVEN_COMPILER_PLUGIN_ARTIFACT_ID = "maven-compiler-plugin";
 
     @Option(displayName = "Group",
-            description = "The first part of the coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION' of the processor to add.",
+            description = "The first part of the coordinate 'org.projectlombok:lombok-mapstruct-binding:0.2.0' of the processor to add.",
             example = "org.projectlombok")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION' of the processor to add.",
+            description = "The second part of a coordinate 'org.projectlombok:lombok-mapstruct-binding:0.2.0' of the processor to add.",
             example = "lombok-mapstruct-binding")
     String artifactId;
 
     @Option(displayName = "Version",
-            description = "The third part of a coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION' of the processor to add. Note that an exact version is expected",
+            description = "The third part of a coordinate 'org.projectlombok:lombok-mapstruct-binding:0.2.0' of the processor to add. " +
+                          "Note that an exact version is expected",
             example = "0.2.0")
     String version;
 
     @Override
     public String getDisplayName() {
-        return "Add an annotation processor to the maven compiler plugin";
+        return "Add an annotation processor to `maven-compiler-plugin`";
     }
 
     @Override
     public String getDescription() {
-        return "Add an annotation processor to the maven compiler plugin. Will not do anything if it already exists. Also doesn't add anything when no other annotation processors are defined yet (Perhaps `ChangePluginConfiguration` can be used).";
+        return "Add an annotation processor to the maven compiler plugin. Will not do anything if it already exists. " +
+               "Also doesn't add anything when no other annotation processors are defined yet. " +
+               "(Perhaps `ChangePluginConfiguration` can be used).";
     }
 
     @Override
@@ -63,7 +67,7 @@ public class AddAnnotationProcessor extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag plugins = (Xml.Tag) super.visitTag(tag, ctx);
-                plugins = (Xml.Tag) new MavenPlugin.Matcher().asVisitor(plugin -> {
+                plugins = (Xml.Tag) mavenPlugin().asVisitor(plugin -> {
                     if (MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(plugin.getGroupId())
                         && MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getArtifactId())) {
                         return new XmlIsoVisitor<ExecutionContext>() {
@@ -71,18 +75,15 @@ public class AddAnnotationProcessor extends Recipe {
                             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                                 Xml.Tag tg = super.visitTag(tag, ctx);
                                 if ("annotationProcessorPaths".equals(tg.getName())) {
-                                    boolean found = false;
                                     for (Xml.Tag child : tg.getChildren()) {
-                                        if (groupId.equals(child.getChildValue("groupId").orElse(null))
-                                            && artifactId.equals(child.getChildValue("artifactId").orElse(null))) {
-                                            found = true;
+                                        if (groupId.equals(child.getChildValue("groupId").orElse(null)) &&
+                                            artifactId.equals(child.getChildValue("artifactId").orElse(null))) {
+                                            return tg;
                                         }
                                     }
-                                    if (!found) {
-                                        return tg.withContent(
-                                                ListUtils.concat(tg.getChildren(),
-                                                        Xml.Tag.build(String.format("<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n<version>%s</version>\n</path>", groupId, artifactId, version))));
-                                    }
+                                    return tg.withContent(ListUtils.concat(tg.getChildren(), Xml.Tag.build(String.format(
+                                            "<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n<version>%s</version>\n</path>",
+                                            groupId, artifactId, version))));
                                 }
                                 return tg;
                             }
