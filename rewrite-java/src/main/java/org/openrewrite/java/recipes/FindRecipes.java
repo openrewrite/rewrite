@@ -19,11 +19,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.ValueNode;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -33,9 +31,13 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.RewriteRecipeSource;
+import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.search.FindProperty;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -55,6 +57,67 @@ public class FindRecipes extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        TreeVisitor<?, ExecutionContext> findImperativeRecipes = findImperativeRecipes();
+        TreeVisitor<?, ExecutionContext> findRefasterRecipes = findRefasterRecipes();
+        TreeVisitor<?, ExecutionContext> findYamlRecipes = findYamlRecipes();
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                tree = findImperativeRecipes.visit(tree, ctx);
+                tree = findRefasterRecipes.visit(tree, ctx);
+                tree = findYamlRecipes.visit(tree, ctx);
+                return tree;
+            }
+        };
+    }
+
+    private TreeVisitor<?, ExecutionContext> findRefasterRecipes() {
+        String recipeDescriptor = "org.openrewrite.java.template.RecipeDescriptor";
+        AnnotationMatcher annotationMatcher = new AnnotationMatcher("@" + recipeDescriptor);
+        return Preconditions.check(new UsesType<>(recipeDescriptor, false), new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+                for (J.Annotation annotation : cd.getLeadingAnnotations()) {
+                    if (annotationMatcher.matches(annotation)) {
+                        String name = null;
+                        String description = null;
+                        for (Expression argument : annotation.getArguments()) {
+                            if (argument instanceof J.Assignment) {
+                                J.Assignment assignment = (J.Assignment) argument;
+                                if (assignment.getVariable() instanceof J.Identifier) {
+                                    String simpleName = ((J.Identifier) assignment.getVariable()).getSimpleName();
+                                    if ("name".equals(simpleName)) {
+                                        if (assignment.getAssignment() instanceof J.Literal) {
+                                            name = (String) ((J.Literal) assignment.getAssignment()).getValue();
+                                        }
+                                    } else if ("description".equals(simpleName)) {
+                                        if (assignment.getAssignment() instanceof J.Literal) {
+                                            description = (String) ((J.Literal) assignment.getAssignment()).getValue();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (name != null && description != null) {
+                            recipeSource.insertRow(ctx, new RewriteRecipeSource.Row(
+                                    name,
+                                    description,
+                                    RewriteRecipeSource.RecipeType.Refaster,
+                                    cd.printTrimmed(getCursor()),
+                                    "[]"
+                            ));
+                            return SearchResult.found(cd);
+                        }
+                    }
+                }
+                return cd;
+            }
+        });
+    }
+
+    private TreeVisitor<?, ExecutionContext> findImperativeRecipes() {
         MethodMatcher getDisplayName = new MethodMatcher("org.openrewrite.Recipe getDisplayName()", true);
         MethodMatcher getDescription = new MethodMatcher("org.openrewrite.Recipe getDescription()", true);
         AnnotationMatcher optionAnnotation = new AnnotationMatcher("@org.openrewrite.Option");
@@ -155,5 +218,44 @@ public class FindRecipes extends Recipe {
                 throw new IllegalArgumentException(String.valueOf(value));
             }
         });
+    }
+
+    private TreeVisitor<?, ExecutionContext> findYamlRecipes() {
+        return Preconditions.check(
+                new FindProperty("type", false, "specs.openrewrite.org/v1beta/recipe"),
+                new YamlIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                        Yaml.Document doc = super.visitDocument(document, ctx);
+
+                        if ("specs.openrewrite.org/v1beta/recipe".equals(extractValue(doc, "type"))) {
+                            String displayName = extractValue(doc, "displayName");
+                            String description = extractValue(doc, "description");
+                            if (displayName != null && description != null) {
+                                recipeSource.insertRow(ctx, new RewriteRecipeSource.Row(
+                                        displayName,
+                                        description,
+                                        RewriteRecipeSource.RecipeType.Yaml,
+                                        doc.withPrefix("").printTrimmed(getCursor()),
+                                        "[]"
+                                ));
+                                return SearchResult.found(doc);
+                            }
+                        }
+                        return doc;
+                    }
+
+                    private @Nullable String extractValue(Yaml yaml, String key) {
+                        Set<Yaml.Block> blocks = FindProperty.find(yaml, key, false);
+                        if (!blocks.isEmpty()) {
+                            Yaml.Block first = blocks.iterator().next();
+                            if (first instanceof Yaml.Scalar) {
+                                return ((Yaml.Scalar) first).getValue();
+                            }
+                        }
+                        return null;
+                    }
+                }
+        );
     }
 }

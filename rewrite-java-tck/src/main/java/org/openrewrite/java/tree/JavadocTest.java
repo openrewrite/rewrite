@@ -1662,7 +1662,7 @@ class JavadocTest implements RewriteTest {
         rewriteRun(
           java("" +
             "/**\n" +
-            " * <p>Values are converted to strings using {@link java.util.Arrays#compare(Comparable[], Comparable[])}}.\n" +
+            " * <p>Values are converted to strings using {@link java.util.Arrays#compare(Comparable[], Comparable[])}.\n" +
             " */\n" +
             "class A {}"
           )

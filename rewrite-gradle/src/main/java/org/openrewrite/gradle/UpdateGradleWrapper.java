@@ -15,10 +15,7 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -158,6 +155,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         return gradleWrapper;
     }
 
+    @Data
     public static class GradleWrapperState {
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
