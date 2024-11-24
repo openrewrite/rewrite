@@ -35,8 +35,6 @@ import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.disjoint;
-
 /**
  * Provides methods for matching the given cursor location to a specified JsonPath expression.
  * <p>
@@ -58,8 +56,8 @@ public class JsonPathMatcher {
         return find0(cursor, resolvedAncestors(cursor));
     }
 
-    private <T> Optional<T> find0(Cursor cursor, List<Tree> cursorPath) {
-        if (cursorPath.isEmpty()) {
+    private <T> Optional<T> find0(Cursor cursor, Cursor cursorPath) {
+        if (cursorPath.isRoot()) {
             return Optional.empty();
         }
 
@@ -67,7 +65,7 @@ public class JsonPathMatcher {
         if (jsonPath.startsWith(".") && !jsonPath.startsWith("..")) {
             start = cursor.getValue();
         } else {
-            start = cursorPath.get(0);
+            start = cursorPath.firstEnclosing(Yaml.Document.class);
         }
         JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
@@ -80,24 +78,28 @@ public class JsonPathMatcher {
     }
 
     public boolean matches(Cursor cursor) {
-        List<Tree> cursorPath = resolvedAncestors(cursor);
-        Object cursorValue = cursorPath.get(cursorPath.size() - 1);
+        Cursor cursorPath = resolvedAncestors(cursor);
+        Object cursorValue = cursorPath.getValue();
         return find0(cursor, cursorPath).map(o -> {
             if (o instanceof List) {
                 //noinspection unchecked
                 List<Object> l = (List<Object>) o;
-                return !disjoint(l, cursorPath) && l.contains(cursorValue);
+                return l.contains(cursorValue);
             } else {
                 return Objects.equals(o, cursorValue);
             }
         }).orElse(false);
     }
 
-    private static List<Tree> resolvedAncestors(Cursor cursor) {
+    private static Cursor resolvedAncestors(Cursor cursor) {
         ArrayDeque<Tree> deque = new ArrayDeque<>();
         Map<Tree, Tree> resolved = new IdentityHashMap<>();
-        for (Iterator<Object> it = cursor.getPath(Tree.class::isInstance); it.hasNext(); ) {
-            Tree tree = (Tree) it.next();
+        Cursor newCursor = null;
+        for (; cursor.getParent() != null; cursor = cursor.getParent()) {
+            if (!(cursor.getValue() instanceof Tree)) {
+                continue;
+            }
+            Tree tree = cursor.getValue();
             if (tree instanceof Yaml.Document) {
                 tree = new ReplaceAliasWithAnchorValueVisitor<Integer>() {
                     @Override
@@ -114,20 +116,15 @@ public class JsonPathMatcher {
                     }
                 }.visitNonNull(tree, 0);
                 deque.addFirst(tree);
+                newCursor = cursor.getParent();
                 break;
             }
             deque.addFirst(tree);
         }
-        ArrayList<Tree> list = new ArrayList<>(deque);
-        if (!resolved.isEmpty()) {
-            for (int i = 0; i < list.size(); i++) {
-                Tree tree = list.get(i);
-                if (resolved.containsKey(tree)) {
-                    list.set(i, resolved.get(tree));
-                }
-            }
+        for (Tree tree : deque) {
+            newCursor = new Cursor(newCursor, resolved.getOrDefault(tree, tree));
         }
-        return list;
+        return newCursor;
     }
 
     private JsonPathParser.JsonPathContext parse() {
@@ -144,12 +141,12 @@ public class JsonPathMatcher {
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     private static class JsonPathYamlVisitor extends JsonPathParserBaseVisitor<Object> {
 
-        private final List<Tree> cursorPath;
+        private final Cursor cursorPath;
         protected Object scope;
         private final JsonPathParser.ExpressionContext stop;
         private final boolean isRecursiveDescent;
 
-        public JsonPathYamlVisitor(List<Tree> cursorPath, Object scope, JsonPathParser.ExpressionContext stop, boolean isRecursiveDescent) {
+        public JsonPathYamlVisitor(Cursor cursorPath, Object scope, JsonPathParser.ExpressionContext stop, boolean isRecursiveDescent) {
             this.cursorPath = cursorPath;
             this.scope = scope;
             this.stop = stop;
@@ -175,12 +172,13 @@ public class JsonPathMatcher {
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
             MATCH:
             if (ctx.ROOT() != null || ctx.start.getType() == JsonPathLexer.LBRACK) {
-                Tree first = cursorPath.get(0);
+                Tree first = cursorPath.firstEnclosing(Yaml.Document.class);
                 if (first instanceof Yaml.Document) {
                     scope = ((Yaml.Document) first).getBlock();
                     break MATCH;
                 }
-                for (Tree tree : cursorPath) {
+                for (Cursor c = cursorPath; c.getParent() != null; c = c.getParent()) {
+                    Object tree = c.getValue();
                     if (tree instanceof Yaml.Mapping) {
                         scope = tree;
                         break MATCH;
@@ -211,8 +209,8 @@ public class JsonPathMatcher {
             ParserRuleContext current = ctx.getParent();
             if (previous.indexOf(current) - 1 < 0 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
                 List<Object> results = new ArrayList<>();
-                for (Tree path : cursorPath) {
-                    JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, path, null, false);
+                for (Cursor c = cursorPath; c.getParent() != null; c = c.getParent()) {
+                    JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, c.getValue(), null, false);
                     for (int i = 1; i < ctx.getChildCount(); i++) {
                         result = v.visit(ctx.getChild(i));
                         if (result != null) {
