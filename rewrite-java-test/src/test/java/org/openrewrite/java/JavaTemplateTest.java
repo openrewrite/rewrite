@@ -24,7 +24,6 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Comparator.comparing;
@@ -1356,7 +1355,7 @@ class JavaTemplateTest implements RewriteTest {
                       return JavaTemplate.builder("\"Hello, {}\", \"World!\"")
                         .contextSensitive()
                         .build()
-                        .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(), new ArrayList<>().toArray());
+                        .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments());
                   }
                   return mi;
               }

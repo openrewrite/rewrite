@@ -200,7 +200,7 @@ public class JavaTemplateParser {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor.getParentOrThrow())
                 .replaceAll("\\)$", template + ")");
-        if (!(cursor.getParentTreeCursor().getValue() instanceof J.MethodInvocation)){
+        if (!(cursor.getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
             methodWithReplacementArgs += ';';
         }
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
