@@ -168,12 +168,14 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         List<Yaml.Mapping.Entry> mergedEntries = map(m1.getEntries(), existingEntry -> {
             for (Yaml.Mapping.Entry incomingEntry : m2.getEntries()) {
                 if (keyMatches(existingEntry, incomingEntry)) {
+                    Yaml.Block value = incomingEntry.getValue();
                     if (shouldAutoFormat && incomingEntry.getValue() instanceof Yaml.Scalar && hasLineBreak(((Scalar) incomingEntry.getValue()).getValue())) {
                         incomingEntry = incomingEntry.withValue(((Scalar) incomingEntry.getValue()).withMarkers(incomingEntry.getValue().getMarkers().add(new MultilineScalarChanged(randomId(), false))));
+                        value = autoFormat(incomingEntry.getValue(), p);
                     }
 
                     return existingEntry.withValue((Yaml.Block)
-                            new MergeYamlVisitor<>(existingEntry.getValue(), autoFormat(incomingEntry.getValue(), p), acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
+                            new MergeYamlVisitor<>(existingEntry.getValue(), value, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
                                     .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
                 }
             }
@@ -326,11 +328,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     private String grabAfterFirstLineBreak(Yaml.Mapping.Entry entry) {
-        return grabAfterFirstLineBreak(entry.getPrefix());
-    }
-
-    private String grabAfterFirstLineBreak(String s) {
-        String[] parts = LINE_BREAK.split(s);
+        String[] parts = LINE_BREAK.split(entry.getPrefix());
         return parts.length > 1 ? String.join(linebreak(), Arrays.copyOfRange(parts, 1, parts.length)) : "";
     }
 

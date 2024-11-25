@@ -101,13 +101,13 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         }
 
         if (y instanceof Yaml.Scalar && y.getMarkers().findFirst(MultilineScalarChanged.class).isPresent()) {
-            int valueIndent = indent;
+            int indentValue = indent;
 
             if (!y.getMarkers().findFirst(MultilineScalarChanged.class).get().isAdded() && indent != 0) {
-                valueIndent = indent + style.getIndentSize();
+                indentValue = indent + style.getIndentSize();
             }
 
-            String newValue = ((Yaml.Scalar) y).getValue().replaceAll("\\R", "\n" + StringUtils.repeat(" ", valueIndent));
+            String newValue = ((Yaml.Scalar) y).getValue().replaceAll("\\R", "\n" + StringUtils.repeat(" ", indentValue));
             y = ((Yaml.Scalar) y).withValue(newValue);
         }
 
