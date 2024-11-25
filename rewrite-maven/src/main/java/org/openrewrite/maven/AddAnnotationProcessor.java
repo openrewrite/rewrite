@@ -22,8 +22,12 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.List;
 
 import static org.openrewrite.maven.trait.Traits.mavenPlugin;
 
@@ -75,9 +79,19 @@ public class AddAnnotationProcessor extends Recipe {
                             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                                 Xml.Tag tg = super.visitTag(tag, ctx);
                                 if ("annotationProcessorPaths".equals(tg.getName())) {
-                                    for (Xml.Tag child : tg.getChildren()) {
+                                    for (int i = 0; i < tg.getChildren().size(); i++) {
+                                        Xml.Tag child = tg.getChildren().get(i);
                                         if (groupId.equals(child.getChildValue("groupId").orElse(null)) &&
                                             artifactId.equals(child.getChildValue("artifactId").orElse(null))) {
+                                            if (!version.equals(child.getChildValue("version").orElse(null))) {
+                                                String oldVersion = child.getChildValue("version").orElse("");
+                                                VersionComparator comparator = Semver.validate(oldVersion, null).getValue();
+                                                if (comparator.compare(version, oldVersion) > 0) {
+                                                    List<Xml.Tag> tags = tg.getChildren();
+                                                    tags.set(i, child.withChildValue("version", version));
+                                                    return tg.withContent(tags);
+                                                }
+                                            }
                                             return tg;
                                         }
                                     }
