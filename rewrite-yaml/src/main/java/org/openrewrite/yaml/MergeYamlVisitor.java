@@ -42,14 +42,13 @@ import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 /**
  * Visitor class to merge two yaml files.
  *
+ * @param <P> An input object that is passed to every visit method.
  * @implNote Loops recursively through the documents, for every part a new MergeYamlVisitor instance will be created.
  * As inline comments are put on the prefix of the next element (which can be an item very much higher in the tree),
  * the following solutions are chosen to merge the comments as well:
  * <ul>
  * <li>when an element has new items, the comment of the next element is copied to the previous element
  * <li>the original comment will be removed (either by traversing the children or by using cursor messages)
- *
- * @param <P> An input object that is passed to every visit method.
  */
 @RequiredArgsConstructor
 public class MergeYamlVisitor<P> extends YamlVisitor<P> {
@@ -251,7 +250,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private void removePrefixForDirectChildren(List<Yaml.Mapping.Entry> m1Entries, List<Yaml.Mapping.Entry> mutatedEntries) {
         for (int i = 0; i < m1Entries.size() - 1; i++) {
             if (m1Entries.get(i).getValue() instanceof Yaml.Mapping && mutatedEntries.get(i).getValue() instanceof Yaml.Mapping &&
-                    ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
+                ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
                 mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix(linebreak() + grabAfterFirstLineBreak(mutatedEntries.get(i + 1))));
             }
         }

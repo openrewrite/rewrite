@@ -1416,11 +1416,11 @@ class MergeYamlTest implements RewriteTest {
               "$",
               //language=yaml
               """
-              quarkus:
-                http:
-                  # This property was added
-                  root-path: /api
-              """,
+                quarkus:
+                  http:
+                    # This property was added
+                    root-path: /api
+                """,
               true,
               null,
               null

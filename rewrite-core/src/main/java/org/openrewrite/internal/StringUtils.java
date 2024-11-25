@@ -227,7 +227,7 @@ public class StringUtils {
             return value;
         }
         return Character.toUpperCase(value.charAt(0)) +
-                value.substring(1);
+               value.substring(1);
     }
 
     public static String uncapitalize(String value) {
@@ -423,7 +423,7 @@ public class StringUtils {
                 break;
             }
             if (ch != '?' &&
-                    different(caseSensitive, ch, str.charAt(strIdxStart))) {
+                different(caseSensitive, ch, str.charAt(strIdxStart))) {
                 return false; // Character mismatch
             }
             patIdxStart++;
