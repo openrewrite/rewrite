@@ -37,7 +37,6 @@ import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
-import static org.openrewrite.internal.StringUtils.repeat;
 import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
 /**
@@ -169,16 +168,12 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         List<Yaml.Mapping.Entry> mergedEntries = map(m1.getEntries(), existingEntry -> {
             for (Yaml.Mapping.Entry incomingEntry : m2.getEntries()) {
                 if (keyMatches(existingEntry, incomingEntry)) {
-                    // multiline scalar cannot be formatted automatically, apply indent from existing value
                     if (shouldAutoFormat && incomingEntry.getValue() instanceof Yaml.Scalar && hasLineBreak(((Scalar) incomingEntry.getValue()).getValue())) {
-                        String s = grabAfterFirstLineBreak(((Yaml.Scalar) existingEntry.getValue()).getValue());
-                        int indent = s.length() - s.replaceFirst("^\\s+", "").length();
-                        String x = ((Yaml.Scalar) incomingEntry.getValue()).getValue().replaceAll("\\R *", linebreak() + repeat(" ", indent));
-                        incomingEntry = incomingEntry.withValue(((Scalar) incomingEntry.getValue()).withValue(x));
+                        incomingEntry = incomingEntry.withValue(((Scalar) incomingEntry.getValue()).withMarkers(incomingEntry.getValue().getMarkers().add(new MultilineScalarChanged(randomId(), false))));
                     }
 
                     return existingEntry.withValue((Yaml.Block)
-                            new MergeYamlVisitor<>(existingEntry.getValue(), incomingEntry.getValue(), acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
+                            new MergeYamlVisitor<>(existingEntry.getValue(), autoFormat(incomingEntry.getValue(), p), acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
                                     .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
                 }
             }
@@ -193,11 +188,12 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
             if (shouldAutoFormat && it.getValue() instanceof Yaml.Scalar && hasLineBreak(((Scalar) it.getValue()).getValue())) {
-                it = it.withValue(it.getValue().withMarkers(it.getValue().getMarkers().add(new MultilineScalarAdded(randomId()))));
+                it = it.withValue(it.getValue().withMarkers(it.getValue().getMarkers().add(new MultilineScalarChanged(randomId(), true))));
             }
             return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
         }));
 
+        // copy comment to previous element if needed
         if (m1.getEntries().size() < mutatedEntries.size() && !getCursor().isRoot()) {
             Cursor c = getCursor().dropParentUntil(it -> {
                 if (ROOT_VALUE.equals(it) || it instanceof Document) {

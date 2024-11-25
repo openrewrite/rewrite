@@ -1511,7 +1511,7 @@ class MergeYamlTest implements RewriteTest {
     void addLiteralStyleBlock() {
         rewriteRun(
           spec -> spec
-            .recipe(new MergeYaml("$.some.object",
+            .recipe(new MergeYaml("$.some.very.deep.object",
               // language=yaml
               """
                 script: |
@@ -1523,16 +1523,20 @@ class MergeYamlTest implements RewriteTest {
           yaml(
             """
               some:
-                object:
-                  with: An existing value
+                very:
+                  deep:
+                    object:
+                      with: An existing value
               """,
             """
               some:
-                object:
-                  with: An existing value
-                  script: |
-                    #!/bin/bash
-                    echo "hello"
+                very:
+                  deep:
+                    object:
+                      with: An existing value
+                      script: |
+                        #!/bin/bash
+                        echo "hello"
               """)
         );
     }

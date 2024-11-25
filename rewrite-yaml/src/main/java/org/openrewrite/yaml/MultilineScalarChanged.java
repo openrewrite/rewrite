@@ -26,6 +26,7 @@ import java.util.UUID;
  */
 @Value
 @With
-public class MultilineScalarAdded implements Marker {
+public class MultilineScalarChanged implements Marker {
     UUID id;
+    boolean added;
 }
