@@ -16,7 +16,6 @@
 package org.openrewrite.groovy.tree;
 
 import org.codehaus.groovy.control.customizers.ImportCustomizer;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.groovy.GroovyParser;
@@ -125,11 +124,11 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4704")
-    @Disabled
     @Test
     void addingToMaps() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             class Pair {
                 String foo
                 String bar
@@ -146,7 +145,8 @@ class CompilationUnitTest implements RewriteTest {
                     l.add(new Pair("foo", "bar"))
                 }
             }
-            """)
+            """
+          )
         );
     }
 }

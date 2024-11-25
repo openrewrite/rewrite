@@ -294,28 +294,32 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void instanceInitializerBlock() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             class A {
                 int a
                 {
                     a = 1
                 }
             }
-            """)
+            """
+          )
         );
     }
 
     @Test
     void staticInitializer() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             class A {
                 static int a
                 static {
                     a = 1
                 }
             }
-            """)
+            """
+          )
         );
     }
 
