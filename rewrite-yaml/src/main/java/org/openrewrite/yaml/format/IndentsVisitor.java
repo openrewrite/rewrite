@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 
 public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
-    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(\\s*)(.*\n?)", Pattern.MULTILINE);
+    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(\\s*)(.*\\R?)", Pattern.MULTILINE);
 
     private final IndentsStyle style;
 
@@ -98,9 +98,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             } else {
                 y = y.withPrefix(indentComments(y.getPrefix(), indent));
             }
-        }
-
-        if (y instanceof Yaml.Scalar && y.getMarkers().findFirst(MultilineScalarChanged.class).isPresent()) {
+        } else if (y instanceof Yaml.Scalar && y.getMarkers().findFirst(MultilineScalarChanged.class).isPresent()) {
             int indentValue = indent;
 
             if (!y.getMarkers().findFirst(MultilineScalarChanged.class).get().isAdded() && indent != 0) {
@@ -116,7 +114,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
     private boolean isUnindentedTopLevel() {
         return getCursor().getParentOrThrow().getValue() instanceof Yaml.Document ||
-                getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
+               getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
     }
 
     @Override
