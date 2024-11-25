@@ -15,19 +15,25 @@
  */
 package org.openrewrite.properties.trait;
 
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
-
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.properties.Assertions.properties;
 
 class PropertiesReferenceTest implements RewriteTest {
-    @Test
-    void findJavaReferences() {
+    @ParameterizedTest
+    @CsvSource({
+      "application.test.properties,true",
+      "/foo/bar/application.test.properties,true",
+      "application.properties,true",
+      "other.properties,false",
+      "/foo/bar/other.properties,false"
+    })
+    void findJavaReferences(String filename, boolean isValidFilename) {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new PropertiesReference.Matcher()
             .asVisitor(ref -> SearchResult.found(ref.getTree(), ref.getValue())))),
@@ -42,18 +48,22 @@ class PropertiesReferenceTest implements RewriteTest {
               ~~(java.lang)~~>b.package=java.lang
               c.type=Integer
               """,
-            spec -> spec.afterRecipe(doc -> {
-                assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
-                      assertThat(ref.getValue()).isEqualTo("java.lang.String");
+            spec -> spec.path(filename).afterRecipe(doc -> {
 
-                  },
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
-                      assertThat(ref.getValue()).isEqualTo("java.lang");
-                  }
-                );
+                if (isValidFilename) {
+                    assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(
+                      ref -> {
+                          assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                          assertThat(ref.getValue()).isEqualTo("java.lang.String");
+                      },
+                      ref -> {
+                          assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
+                          assertThat(ref.getValue()).isEqualTo("java.lang");
+                      }
+                    );
+                } else {
+                    assertThat(doc.getReferences().getReferences()).isEmpty();
+                }
             })
           ));
     }

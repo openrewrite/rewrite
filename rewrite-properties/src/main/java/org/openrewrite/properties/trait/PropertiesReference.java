@@ -72,6 +72,8 @@ public class PropertiesReference implements Reference {
 
     @SuppressWarnings("unused")
     public static class Provider implements Reference.Provider {
+        private static final Pattern applicationPropertiesPattern = Pattern.compile("^.*application(\\.\\w*)?\\.properties$");
+
         @Override
         public @NonNull Set<Reference> getReferences(SourceFile sourceFile) {
             Set<Reference> references = new HashSet<>();
@@ -84,7 +86,8 @@ public class PropertiesReference implements Reference {
 
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
-            return sourceFile instanceof Properties.File;
+            return sourceFile instanceof Properties.File &&
+                   applicationPropertiesPattern.matcher(sourceFile.getSourcePath().toString()).matches();
         }
     }
 }
