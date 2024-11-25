@@ -1408,6 +1408,41 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
+    // Mimics `org.openrewrite.quarkus.AddQuarkusProperty`
+    void addPropertyWitCommentAboveLastLine() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$",
+              //language=yaml
+              """
+              quarkus:
+                http:
+                  # This property was added
+                  root-path: /api
+              """,
+              true,
+              null,
+              null
+            )),
+          yaml(
+            """
+              quarkus:
+                http:
+                  port: 9090
+              """,
+            """
+              quarkus:
+                http:
+                  port: 9090
+                  # This property was added
+                  root-path: /api
+              """
+          )
+        );
+    }
+
+    @Test
     void addLiteralStyleBlockAtRoot() {
         rewriteRun(
           spec -> spec
