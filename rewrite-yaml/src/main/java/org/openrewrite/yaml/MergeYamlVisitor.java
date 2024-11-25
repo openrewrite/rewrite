@@ -22,9 +22,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.yaml.tree.Yaml;
-import org.openrewrite.yaml.tree.Yaml.Document;
-import org.openrewrite.yaml.tree.Yaml.Mapping;
-import org.openrewrite.yaml.tree.Yaml.Scalar;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -88,8 +85,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         .findFirst()
                         .map(Yaml.Documents.class::cast)
                         .map(docs -> {
-                            // Any comments will have been put on the parent Document node, preserve by copying to the mapping
-                            Document doc = docs.getDocuments().get(0);
+                            // Any comments will have been put on the parent Yaml.Document node, preserve by copying to the mapping
+                            Yaml.Document doc = docs.getDocuments().get(0);
                             if (doc.getBlock() instanceof Yaml.Mapping) {
                                 Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
                                 return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
@@ -162,14 +159,14 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 .orElse(false);
     }
 
-    private Mapping mergeMapping(Yaml.Mapping m1, Yaml.Mapping m2, P p, Cursor cursor) {
+    private Yaml.Mapping mergeMapping(Yaml.Mapping m1, Yaml.Mapping m2, P p, Cursor cursor) {
         // Merge same key, different value together
         List<Yaml.Mapping.Entry> mergedEntries = map(m1.getEntries(), existingEntry -> {
             for (Yaml.Mapping.Entry incomingEntry : m2.getEntries()) {
                 if (keyMatches(existingEntry, incomingEntry)) {
                     Yaml.Block value = incomingEntry.getValue();
-                    if (shouldAutoFormat && incomingEntry.getValue() instanceof Yaml.Scalar && hasLineBreak(((Scalar) incomingEntry.getValue()).getValue())) {
-                        incomingEntry = incomingEntry.withValue(((Scalar) incomingEntry.getValue()).withMarkers(incomingEntry.getValue().getMarkers().add(new MultilineScalarChanged(randomId(), false))));
+                    if (shouldAutoFormat && incomingEntry.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) incomingEntry.getValue()).getValue())) {
+                        incomingEntry = incomingEntry.withValue(((Yaml.Scalar) incomingEntry.getValue()).withMarkers(incomingEntry.getValue().getMarkers().add(new MultilineScalarChanged(randomId(), false))));
                         value = autoFormat(incomingEntry.getValue(), p);
                     }
 
@@ -188,7 +185,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     return null;
                 }
             }
-            if (shouldAutoFormat && it.getValue() instanceof Yaml.Scalar && hasLineBreak(((Scalar) it.getValue()).getValue())) {
+            if (shouldAutoFormat && it.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) it.getValue()).getValue())) {
                 it = it.withValue(it.getValue().withMarkers(it.getValue().getMarkers().add(new MultilineScalarChanged(randomId(), true))));
             }
             return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
@@ -197,7 +194,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         // copy comment to previous element if needed
         if (m1.getEntries().size() < mutatedEntries.size() && !getCursor().isRoot()) {
             Cursor c = getCursor().dropParentUntil(it -> {
-                if (ROOT_VALUE.equals(it) || it instanceof Document) {
+                if (ROOT_VALUE.equals(it) || it instanceof Yaml.Document) {
                     return true;
                 }
 
@@ -213,11 +210,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 return false;
             });
 
-            if (c.getValue() instanceof Document || c.getValue() instanceof Yaml.Mapping) {
+            if (c.getValue() instanceof Yaml.Document || c.getValue() instanceof Yaml.Mapping) {
                 String comment = null;
 
-                if (c.getValue() instanceof Document) {
-                    comment = ((Document) c.getValue()).getEnd().getPrefix();
+                if (c.getValue() instanceof Yaml.Document) {
+                    comment = ((Yaml.Document) c.getValue()).getEnd().getPrefix();
                 } else {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
 
@@ -331,7 +328,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         return parts.length > 1 ? String.join(linebreak(), Arrays.copyOfRange(parts, 1, parts.length)) : "";
     }
 
-    private Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
+    private Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
         String s1 = y1.getValue();
         String s2 = y2.getValue();
         return !s1.equals(s2) && !acceptTheirs ? y1.withValue(s2) : y1;
