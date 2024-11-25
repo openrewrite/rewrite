@@ -2072,13 +2072,15 @@ class ChangeTypeTest implements RewriteTest {
             """
               root:
                   a: java.lang.String
-                  b: java.lang.test.String
-                  c: String
+                  b: java.lang.StringBuilder
+                  c: java.lang.test.String
+                  d: String
               """, """
               root:
                   a: java.lang.Integer
-                  b: java.lang.test.String
-                  c: String
+                  b: java.lang.StringBuilder
+                  c: java.lang.test.String
+                  d: String
               """
           ));
     }
