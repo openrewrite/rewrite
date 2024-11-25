@@ -128,7 +128,7 @@ public abstract class ScanningRecipe<T> extends Recipe {
         };
     }
 
-    // For now, ScanningRecipes does not support `*RecipeList`, as the accumulator is not evaluated for these methods
+    // For now, ScanningRecipes do not support `*RecipeList`, as the accumulator is not evaluated for these methods
     @Override
     public final List<Recipe> getRecipeList() {
         return super.getRecipeList();
