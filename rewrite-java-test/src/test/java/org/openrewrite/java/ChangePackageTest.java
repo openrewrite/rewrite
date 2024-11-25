@@ -1741,7 +1741,7 @@ class ChangePackageTest implements RewriteTest {
               a.property=java.cool.String
               b.property=java.cool.test.String
               c.property=String
-              """)
+              """, spec -> spec.path("application.properties"))
         );
     }
 }

@@ -29,8 +29,8 @@ import org.openrewrite.test.SourceSpec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.xml.Assertions.xml;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.xml.Assertions.xml;
 
 @SuppressWarnings("ConstantConditions")
 class ChangeTypeTest implements RewriteTest {
@@ -2076,7 +2076,7 @@ class ChangeTypeTest implements RewriteTest {
             """
               a.property=java.lang.Integer
               b.property=String
-              """)
+              """, spec -> spec.path("application.properties"))
         );
     }
 }
