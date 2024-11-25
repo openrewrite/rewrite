@@ -165,14 +165,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             for (Yaml.Mapping.Entry incomingEntry : m2.getEntries()) {
                 if (keyMatches(existingEntry, incomingEntry)) {
                     Yaml.Block value = incomingEntry.getValue();
-                    if (shouldAutoFormat && incomingEntry.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) incomingEntry.getValue()).getValue())) {
-                        incomingEntry = incomingEntry.withValue(((Yaml.Scalar) incomingEntry.getValue()).withMarkers(incomingEntry.getValue().getMarkers().add(new MultilineScalarChanged(randomId(), false))));
-                        value = autoFormat(incomingEntry.getValue(), p);
+                    if (shouldAutoFormat && incomingEntry.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) value).getValue())) {
+                        Yaml.Block newValue = value.withMarkers(value.getMarkers().add(new MultilineScalarChanged(randomId(), false)));
+                        value = autoFormat(newValue, p);
                     }
-
-                    return existingEntry.withValue((Yaml.Block)
-                            new MergeYamlVisitor<>(existingEntry.getValue(), value, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
-                                    .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
+                    Yaml mergedYaml = new MergeYamlVisitor<>(existingEntry.getValue(), value, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
+                            .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry));
+                    return existingEntry.withValue((Yaml.Block) mergedYaml);
                 }
             }
             return existingEntry;
