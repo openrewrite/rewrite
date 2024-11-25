@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
-    private final FindIndentYamlVisitor<P> findIndent = new FindIndentYamlVisitor<>(0);
+    private final FindIndentYamlVisitor<P> findIndent = new FindIndentYamlVisitor<>();
 
     public CoalescePropertiesVisitor() {
     }
@@ -55,8 +55,7 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
                         entries.add(entry.withKey(coalescedKey)
                                 .withValue(subEntry.getValue()));
 
-                        int indentToUse = findIndent.getMostCommonIndent() > 0 ?
-                                findIndent.getMostCommonIndent() : 4;
+                        int indentToUse = findIndent.getMostCommonIndent() > 0 ? findIndent.getMostCommonIndent() : 4;
                         doAfterVisit(new ShiftFormatLeftVisitor<>(subEntry.getValue(), indentToUse));
 
                         changed = true;
