@@ -15,9 +15,11 @@
  */
 package org.openrewrite.trait;
 
+import org.jspecify.annotations.NonNull;
 import org.openrewrite.*;
 
 import java.util.Set;
+import java.util.function.BiFunction;
 
 @Incubating(since = "8.39.0")
 public interface Reference extends Trait<Tree> {
@@ -33,6 +35,14 @@ public interface Reference extends Trait<Tree> {
 
     default boolean supportsRename() {
         return false;
+    }
+
+    default boolean supportsUpdate() {
+        return false;
+    }
+
+    default @NonNull Reference withValueFromString(String value) {
+        throw new UnsupportedOperationException();
     }
 
     default boolean matches(Matcher matcher) {
@@ -58,5 +68,15 @@ public interface Reference extends Trait<Tree> {
         default TreeVisitor<Tree, ExecutionContext> rename(String replacement) {
             throw new UnsupportedOperationException();
         }
+    }
+
+    @FunctionalInterface
+    interface ReferenceUpdateFunction extends BiFunction<Reference, String, Reference> {
+    }
+
+    interface ReferenceUpdateProvider {
+        ReferenceUpdateFunction getReferenceUpdateFunction();
+
+        boolean acceptsReferenceForUpdate(Reference reference);
     }
 }

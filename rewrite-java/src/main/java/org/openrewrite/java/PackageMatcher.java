@@ -17,16 +17,10 @@ package org.openrewrite.java;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.StringUtils;
-import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.trait.Reference;
-import org.openrewrite.xml.tree.Xml;
 
 @Getter
-public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
+public class PackageMatcher implements Reference.Renamer, Reference.Matcher, Reference.ReferenceUpdateProvider {
 
     private final @Nullable String targetPackage;
 
@@ -53,30 +47,6 @@ public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
         return false;
     }
 
-    @Override
-    public TreeVisitor<Tree, ExecutionContext> rename(String newValue) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (StringUtils.isNotEmpty(newValue)) {
-                    if (tree instanceof Properties.Entry) {
-                        Properties.Entry entry = (Properties.Entry) tree;
-                        return entry.withValue(entry.getValue().withText(getReplacement(entry.getValue().getText(), targetPackage, newValue)));
-                    }
-                    if (tree instanceof Xml.Attribute) {
-                        return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(getReplacement(((Xml.Attribute) tree).getValueAsString(), targetPackage, newValue)));
-                    }
-                    if (tree instanceof Xml.Tag) {
-                        if (((Xml.Tag) tree).getValue().isPresent()) {
-                            return ((Xml.Tag) tree).withValue(getReplacement(((Xml.Tag) tree).getValue().get(), targetPackage, newValue));
-                        }
-                    }
-                }
-                return super.visit(tree, ctx);
-            }
-        };
-    }
-
     String getReplacement(String value, @Nullable String oldValue, String newValue) {
         if (oldValue != null) {
             if (recursive) {
@@ -88,4 +58,13 @@ public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
         return value;
     }
 
+    @Override
+    public Reference.ReferenceUpdateFunction getReferenceUpdateFunction() {
+        return (reference, newValue) -> reference.withValueFromString(getReplacement(reference.getValue(), targetPackage, newValue));
+    }
+
+    @Override
+    public boolean acceptsReferenceForUpdate(Reference reference) {
+        return reference.supportsUpdate() && matchesReference(reference);
+    }
 }

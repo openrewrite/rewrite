@@ -16,6 +16,7 @@
 package org.openrewrite.properties.trait;
 
 import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -32,6 +33,7 @@ import java.util.regex.Pattern;
 @Incubating(since = "8.40.3")
 @Value
 public class PropertiesReference implements Reference {
+    @With
     Cursor cursor;
     Kind kind;
 
@@ -49,7 +51,21 @@ public class PropertiesReference implements Reference {
     }
 
     @Override
+    public @NonNull PropertiesReference withValueFromString(String value) {
+        if (getTree() instanceof Properties.Entry) {
+            Properties.Entry entry = (Properties.Entry) getTree();
+            return withCursor(new Cursor(getCursor().getParent(), entry.withValue(entry.getValue().withText(value))));
+        }
+        throw new IllegalArgumentException("getTree() must be an Properties.Entry: " + getTree().getClass());
+    }
+
+    @Override
     public boolean supportsRename() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsUpdate() {
         return true;
     }
 

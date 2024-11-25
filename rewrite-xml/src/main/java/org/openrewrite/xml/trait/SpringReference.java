@@ -17,9 +17,11 @@ package org.openrewrite.xml.trait;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
-import org.openrewrite.trait.SimpleTraitMatcher;
+import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
+import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -58,7 +60,25 @@ class SpringReference implements Reference {
     }
 
     @Override
+    public SpringReference withValueFromString(String newValue) {
+        Tree tree = getTree();
+        if (tree instanceof Xml.Attribute) {
+            Tree newTree = ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(newValue));
+            return new SpringReference(new Cursor(cursor.getParent(), newTree), kind);
+        } else if (tree instanceof Xml.Tag) {
+            Tree newTree = ((Xml.Tag) tree).withValue(newValue);
+            return new SpringReference(new Cursor(cursor.getParent(), newTree), kind);
+        }
+        throw new IllegalArgumentException("getTree() must be an Xml.Attribute or Xml.Tag: " + getTree().getClass());
+    }
+
+    @Override
     public boolean supportsRename() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsUpdate() {
         return true;
     }
 
