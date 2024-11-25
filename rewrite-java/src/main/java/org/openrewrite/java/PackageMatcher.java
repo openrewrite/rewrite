@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.trait.Reference;
 
 @Getter
-public class PackageMatcher implements Reference.Renamer, Reference.Matcher, Reference.ReferenceUpdateProvider {
+public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
 
     private final @Nullable String targetPackage;
 

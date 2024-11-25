@@ -15,9 +15,9 @@
  */
 package org.openrewrite.properties.trait;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
 
@@ -25,46 +25,55 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.properties.Assertions.properties;
 
 class PropertiesReferenceTest implements RewriteTest {
+
+    @Language("properties")
+    private static final String PROPERTIES = """
+      a.fqt=java.lang.String
+      b.package=java.lang
+      c.type=Integer
+      """;
+
     @ParameterizedTest
     @CsvSource({
-      "application.test.properties,true",
-      "/foo/bar/application.test.properties,true",
-      "application.properties,true",
-      "other.properties,false",
-      "/foo/bar/other.properties,false"
+      "application.properties",
+      "application-test.properties",
+      "/foo/bar/application-test.properties",
     })
-    void findJavaReferences(String filename, boolean isValidFilename) {
+    void findJavaReferencesInApplicationProperties(String filename) {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new PropertiesReference.Matcher()
-            .asVisitor(ref -> SearchResult.found(ref.getTree(), ref.getValue())))),
           properties(
-            """
-              a.fqt=java.lang.String
-              b.package=java.lang
-              c.type=Integer
-              """,
-            """
-              ~~(java.lang.String)~~>a.fqt=java.lang.String
-              ~~(java.lang)~~>b.package=java.lang
-              c.type=Integer
-              """,
-            spec -> spec.path(filename).afterRecipe(doc -> {
+            PROPERTIES,
+            spec -> spec.path(filename).afterRecipe(doc ->
+              assertThat(doc.getReferences().getReferences())
+                .satisfiesExactlyInAnyOrder(
+                  ref -> {
+                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                      assertThat(ref.getValue()).isEqualTo("java.lang.String");
+                  },
+                  ref -> {
+                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
+                      assertThat(ref.getValue()).isEqualTo("java.lang");
+                  }
+                )
+            )
+          )
+        );
+    }
 
-                if (isValidFilename) {
-                    assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(
-                      ref -> {
-                          assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
-                          assertThat(ref.getValue()).isEqualTo("java.lang.String");
-                      },
-                      ref -> {
-                          assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
-                          assertThat(ref.getValue()).isEqualTo("java.lang");
-                      }
-                    );
-                } else {
-                    assertThat(doc.getReferences().getReferences()).isEmpty();
-                }
-            })
-          ));
+    @ParameterizedTest
+    @CsvSource({
+      "application-.properties",
+      "application.test.properties",
+      "other-application.properties",
+      "other.properties",
+      "/foo/bar/other.properties"
+    })
+    void noReferencesInMismatchedFilenames(String filename) {
+        rewriteRun(
+          properties(
+            PROPERTIES,
+            spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
+          )
+        );
     }
 }
