@@ -30,6 +30,7 @@ import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.xml.Assertions.xml;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -1743,5 +1744,23 @@ class ChangePackageTest implements RewriteTest {
                   c: String
               """
           ));
+    }
+
+    @Test
+    void changeTypeInPropertiesFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("java.lang", "java.cool", true)),
+          properties(
+            """
+              a.property=java.lang.String
+              b.property=java.lang.test.String
+              c.property=String
+              """,
+            """
+              a.property=java.cool.String
+              b.property=java.cool.test.String
+              c.property=String
+              """, spec -> spec.path("application.properties"))
+        );
     }
 }

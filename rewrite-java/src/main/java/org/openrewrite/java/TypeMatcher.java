@@ -29,6 +29,7 @@ import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 import org.openrewrite.yaml.tree.Yaml;
@@ -39,7 +40,6 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 @Getter
 public class TypeMatcher implements Reference.Renamer, Reference.Matcher {
-    private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     @Getter
@@ -127,6 +127,9 @@ public class TypeMatcher implements Reference.Renamer, Reference.Matcher {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (StringUtils.isNotEmpty(newValue)) {
+                    if (tree instanceof Properties.Entry) {
+                        return ((Properties.Entry) tree).withValue(((Properties.Entry) tree).getValue().withText(newValue));
+                    }
                     if (tree instanceof Xml.Attribute) {
                         return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(newValue));
                     }

@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 import org.openrewrite.yaml.tree.Yaml;
@@ -59,6 +60,10 @@ public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (StringUtils.isNotEmpty(newValue)) {
+                    if (tree instanceof Properties.Entry) {
+                        Properties.Entry entry = (Properties.Entry) tree;
+                        return entry.withValue(entry.getValue().withText(getReplacement(entry.getValue().getText(), targetPackage, newValue)));
+                    }
                     if (tree instanceof Xml.Attribute) {
                         return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(getReplacement(((Xml.Attribute) tree).getValueAsString(), targetPackage, newValue)));
                     }
