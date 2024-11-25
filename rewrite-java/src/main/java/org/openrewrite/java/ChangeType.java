@@ -117,7 +117,7 @@ public class ChangeType extends Recipe {
                     for (Reference ref : references.findMatches(matcher, Reference.Kind.TYPE)) {
                         matches.put(ref.getTree(), ref);
                     }
-                    return new ReferenceChangeTypeVisitor(matches, matcher, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    return new ReferenceChangeTypeVisitor(matches, matcher.renameTo(newFullyQualifiedTypeName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
@@ -560,13 +560,12 @@ public class ChangeType extends Recipe {
     private static class ReferenceChangeTypeVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Map<Tree, Reference> matches;
         Reference.Renamer renamer;
-        String newFullyQualifiedName;
 
         @Override
         public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
             Reference reference = matches.get(tree);
-            if (reference != null && reference.supportsRename()) {
-                return reference.rename(renamer, newFullyQualifiedName).visit(tree, ctx, getCursor().getParent());
+            if (tree != null && reference != null && reference.supportsRename()) {
+                return reference.rename(renamer, getCursor(), ctx);
             }
             return tree;
         }

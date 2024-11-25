@@ -31,16 +31,16 @@ public interface Reference extends Trait<Tree> {
 
     String getValue();
 
-    default boolean supportsRename() {
-        return false;
-    }
-
     default boolean matches(Matcher matcher) {
         return matcher.matchesReference(this);
     }
 
-    default TreeVisitor<Tree, ExecutionContext> rename(Renamer renamer, String replacement) {
-        return renamer.rename(replacement);
+    default boolean supportsRename() {
+        return false;
+    }
+
+    default Tree rename(Renamer rename, Cursor cursor, ExecutionContext ctx) {
+        return cursor.getValue();
     }
 
     interface Provider {
@@ -52,11 +52,13 @@ public interface Reference extends Trait<Tree> {
 
     interface Matcher {
         boolean matchesReference(Reference value);
-    }
-
-    interface Renamer {
-        default TreeVisitor<Tree, ExecutionContext> rename(String replacement) {
+        default Renamer renameTo(String newName) {
             throw new UnsupportedOperationException();
         }
+    }
+
+    @FunctionalInterface
+    interface Renamer {
+        String rename(String oldName);
     }
 }

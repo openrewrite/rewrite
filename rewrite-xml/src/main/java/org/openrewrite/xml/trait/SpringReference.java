@@ -17,9 +17,12 @@ package org.openrewrite.xml.trait;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
-import org.openrewrite.trait.SimpleTraitMatcher;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
+import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -60,6 +63,21 @@ class SpringReference implements Reference {
     @Override
     public boolean supportsRename() {
         return true;
+    }
+
+    @Override
+    public Tree rename(Renamer rename, Cursor cursor, ExecutionContext ctx) {
+        Tree tree = cursor.getValue();
+        if (tree instanceof Xml.Attribute) {
+            Xml.Attribute attribute = (Xml.Attribute) tree;
+            String renamed = rename.rename(attribute.getValue().getValue());
+            return attribute.withValue(attribute.getValue().withValue(renamed));
+        } else if (tree instanceof Xml.Tag && ((Xml.Tag) tree).getValue().isPresent()) {
+            Xml.Tag tag = (Xml.Tag) tree;
+            String renamed = rename.rename(tag.getValue().get());
+            return tag.withValue(renamed);
+        }
+        return tree;
     }
 
     static class Matcher extends SimpleTraitMatcher<SpringReference> {
