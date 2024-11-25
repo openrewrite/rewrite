@@ -1301,18 +1301,18 @@ class MergeYamlTest implements RewriteTest {
     void mergeEmptyStructureFollowedByCopyValue() {
         rewriteRun(
           spec -> spec.recipes(
-            new MergeYaml(
-              "$.spec",
-              //language=yaml
-              """
-                empty:
-                  initially:
-                """,
-              false,
-              null,
-              null
-            ),
-            new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
+              new MergeYaml(
+                "$.spec",
+                //language=yaml
+                """
+                  empty:
+                    initially:
+                  """,
+                false,
+                null,
+                null
+              ),
+              new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
             .expectedCyclesThatMakeChanges(2),
           yaml(
             """
@@ -1339,18 +1339,18 @@ class MergeYamlTest implements RewriteTest {
     void comment() {
         rewriteRun(
           spec -> spec.recipe(
-              new MergeYaml(
-                "$",
-                //language=yaml
-                """
-                  
-                    # new stuff
-                  new-property: value
-                  """,
-                false,
-                null,
-                null
-              )),
+            new MergeYaml(
+              "$",
+              //language=yaml
+              """
+                
+                  # new stuff
+                new-property: value
+                """,
+              false,
+              null,
+              null
+            )),
           yaml(
             """
               # config
@@ -1404,6 +1404,230 @@ class MergeYamlTest implements RewriteTest {
                   foo: bar
               """
           )
+        );
+    }
+
+    @Test
+    // Mimics `org.openrewrite.quarkus.AddQuarkusProperty`
+    void addPropertyWitCommentAboveLastLine() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$",
+              //language=yaml
+              """
+                quarkus:
+                  http:
+                    # This property was added
+                    root-path: /api
+                """,
+              true,
+              null,
+              null
+            )),
+          yaml(
+            """
+              quarkus:
+                http:
+                  port: 9090
+              """,
+            """
+              quarkus:
+                http:
+                  port: 9090
+                  # This property was added
+                  root-path: /api
+              """
+          )
+        );
+    }
+
+    @Test
+    void addLiteralStyleBlockAtRoot() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.",
+              // language=yaml
+              """
+                script: |
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+              script: |
+                #!/bin/bash
+                echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleBlockWhichDoesAlreadyExist() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: |
+                  #!/bin/bash
+                  echo "hellow"
+                something: else
+                """,
+              false, null,
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |
+                    #!/bin/bash
+                    echo "hello"
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |
+                    #!/bin/bash
+                    echo "hellow"
+                  something: else
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.very.deep.object",
+              // language=yaml
+              """
+                script: |
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                very:
+                  deep:
+                    object:
+                      with: An existing value
+              """,
+            """
+              some:
+                very:
+                  deep:
+                    object:
+                      with: An existing value
+                      script: |
+                        #!/bin/bash
+                        echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleMinusBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: |-
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |-
+                    #!/bin/bash
+                    echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addFoldedStyleBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: >
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: >
+                    #!/bin/bash
+                    echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addFoldedStyleMinusBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: >-
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: >-
+                    #!/bin/bash
+                    echo "hello"
+              """)
         );
     }
 }
