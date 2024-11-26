@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -201,17 +200,26 @@ class BinaryTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void extraParenthesesAroundMethodInvocationSelects() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(Map map) {
+                  map.containsKey("foo") && (map.get("foo")).equals("bar")
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
     void extraParensAroundInfixOperator() {
         rewriteRun(
           groovy(
             """
-              def foo(Map map) {
-                  ((map.containsKey("foo"))
-                          && ((map.get("foo")).equals("bar")))
-              }
               def timestamp(int hours, int minutes, int seconds) {
                   (hours) * 60 * 60 + (minutes * 60) + seconds
               }

@@ -1654,6 +1654,9 @@ public class GroovyParserVisitor {
             queue.add(new G.MapLiteral(randomId(), prefix, Markers.EMPTY, entries, typeMapping.type(map.getType())));
         }
 
+        // zero or more ")" AND "?." or "*." or "." AND <rest>
+        private final Pattern MATCH_INVOKE = Pattern.compile("^(\\)*)(\\*?\\??\\.).*", Pattern.DOTALL);
+
         @Override
         public void visitMethodCallExpression(MethodCallExpression call) {
             queue.add(insideParentheses(call, fmt -> {
@@ -1664,9 +1667,13 @@ public class GroovyParserVisitor {
                     Expression selectExpr = visit(call.getObjectExpression());
                     int saveCursor = cursor;
                     Space afterSelect = whitespace();
-                    if (source.charAt(cursor) == '.' || source.charAt(cursor) == '?' || source.charAt(cursor) == '*') {
+                    Matcher matcher = MATCH_INVOKE.matcher(source.substring(cursor));
+                    if (matcher.matches()) {
                         cursor = saveCursor;
-                        afterSelect = sourceBefore(call.isSpreadSafe() ? "*." : call.isSafe() ? "?." : ".");
+                        afterSelect = sourceBefore(matcher.group(1) + matcher.group(2));
+                        if (!matcher.group(1).isEmpty()) {
+                            afterSelect.withWhitespace(matcher.group(1) + afterSelect.getWhitespace());
+                        }
                     } else {
                         implicitDot = new ImplicitDot(randomId());
                     }
