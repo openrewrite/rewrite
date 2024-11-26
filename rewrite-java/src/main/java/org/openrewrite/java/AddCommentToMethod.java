@@ -18,11 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.Comment;
@@ -73,25 +69,28 @@ public class AddCommentToMethod extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
-        return Preconditions.check(
-                new DeclaresMethod<>(methodMatcher),
-                new JavaIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                        J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
-                        J.ClassDeclaration cd = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
-                        List<Comment> comments = md.getComments();
-                        if (methodMatcher.matches(md, cd) && comments.stream()
-                                .filter(TextComment.class::isInstance)
-                                .map(TextComment.class::cast)
-                                .noneMatch(c -> comment.equals(c.getText()))) {
+        return Preconditions.check(new DeclaresMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
+                J.ClassDeclaration cd = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
+                List<Comment> comments = md.getComments();
+                if (methodMatcher.matches(md, cd) && doesNotHaveComment(comments)) {
+                    TextComment textComment = new TextComment(Boolean.TRUE.equals(isMultiline), comment, md.getPrefix().getWhitespace(), Markers.EMPTY);
+                    return md.withComments(ListUtils.concat(comments, textComment));
+                }
+                return md;
+            }
 
-                            TextComment textComment = new TextComment(Boolean.TRUE.equals(isMultiline), comment, md.getPrefix().getWhitespace(), Markers.EMPTY);
-                            return md.withComments(ListUtils.concat(comments, textComment));
-                        }
-                        return md;
+            private boolean doesNotHaveComment(List<Comment> comments) {
+                for (Comment c : comments) {
+                    if (c instanceof TextComment &&
+                        comment.equals(((TextComment) c).getText())) {
+                        return false;
                     }
                 }
-        );
+                return true;
+            }
+        });
     }
 }
