@@ -139,6 +139,38 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void deeplyNestedProjectDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              dependencies {
+                implementation project(":foo:bar:baz:qux:quux")
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              """,
+            spec -> spec.path("foo/bar/baz/qux/quux/build.gradle")
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              include("foo:bar:baz:qux:quux")
+              """
+          )
+        );
+    }
+
+    @Test
     void varargsDependency() {
         rewriteRun(
           buildGradle(
