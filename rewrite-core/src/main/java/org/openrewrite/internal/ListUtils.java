@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -22,7 +23,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -117,7 +117,8 @@ public final class ListUtils {
      * @param <T>      The type of elements in the list.
      * @return A new list with the modified last element, or the original list if unchanged.
      */
-    public static <T> List<T> mapLast(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapLast) {
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> mapLast(@Nullable List<T> ls, Function<T, @Nullable T> mapLast) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
@@ -145,7 +146,8 @@ public final class ListUtils {
      * @param <T>      The type of elements in the list.
      * @return A new list with the modified first element, or the original list if unchanged.
      */
-    public static <T> List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapFirst) {
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> mapFirst(@Nullable List<T> ls, Function<T, @Nullable T> mapFirst) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
@@ -173,7 +175,8 @@ public final class ListUtils {
      * @param <T>  The type of elements in the list.
      * @return A new list with modified elements, or the original list if unchanged.
      */
-    public static <T> List<T> map(@Nullable List<T> ls, BiFunction<Integer, T, @Nullable T> map) {
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> map(@Nullable List<T> ls, BiFunction<Integer, T, @Nullable T> map) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
@@ -198,7 +201,6 @@ public final class ListUtils {
             while (newLs.remove(null)) ;
         }
 
-        //noinspection NullableProblems
         return newLs;
     }
 
@@ -211,7 +213,8 @@ public final class ListUtils {
      * @return A new list with modified elements, or the original list if unchanged.
      */
     // inlined version of `map(List, BiFunction)` for memory efficiency (no overhead for lambda)
-    public static <T> List<T> map(@Nullable List<T> ls, UnaryOperator<@Nullable T> map) {
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> map(@Nullable List<T> ls, Function<T, @Nullable T> map) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
@@ -236,7 +239,6 @@ public final class ListUtils {
             while (newLs.remove(null)) ;
         }
 
-        //noinspection NullableProblems
         return newLs;
     }
 
@@ -250,7 +252,8 @@ public final class ListUtils {
      * @param <T>      The type of elements in the list.
      * @return A new list with expanded or modified elements, or the original list if unchanged.
      */
-    public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, @Nullable Object> flatMap) {
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, @Nullable Object> flatMap) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
@@ -310,7 +313,6 @@ public final class ListUtils {
             }
         }
 
-        //noinspection NullableProblems
         return newLs;
     }
 
@@ -322,7 +324,8 @@ public final class ListUtils {
      * @param <T>      The type of elements in the list.
      * @return A new list with expanded or modified elements, or the original list if unchanged.
      */
-    public static <T> List<T> flatMap(@Nullable List<T> ls, Function<T, Object> flatMap) {
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> flatMap(@Nullable List<T> ls, Function<T, Object> flatMap) {
         return flatMap(ls, (i, t) -> flatMap.apply(t));
     }
 
@@ -355,6 +358,7 @@ public final class ListUtils {
      * @return A new list with the added element at the start, the original list if the element is null or a null
      * object if both element and list are null.
      */
+    @Contract("null, null -> null; !null, _ -> !null; _, !null -> !null")
     public static <T> @Nullable List<T> concat(@Nullable T t, @Nullable List<T> ls) {
         if (t == null && ls == null) {
             //noinspection ConstantConditions
@@ -378,12 +382,11 @@ public final class ListUtils {
      * @param <T>  The type of elements in the lists.
      * @return A new list containing both lists, or one of the lists if the other is null.
      */
+    @Contract("null, null -> null; !null, _ -> !null; _, !null -> !null")
     public static <T> @Nullable List<T> concatAll(@Nullable List<T> ls, @Nullable List<? extends T> t) {
         if (ls == null && t == null) {
-            //noinspection ConstantConditions
             return null;
         } else if (t == null || t.isEmpty()) {
-            //noinspection ConstantConditions
             return ls;
         } else if (ls == null || ls.isEmpty()) {
             //noinspection unchecked
