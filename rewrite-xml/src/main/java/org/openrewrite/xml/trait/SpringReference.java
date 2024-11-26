@@ -70,12 +70,11 @@ class SpringReference implements Reference {
         Tree tree = cursor.getValue();
         if (tree instanceof Xml.Attribute) {
             Xml.Attribute attribute = (Xml.Attribute) tree;
-            String renamed = renamer.rename(attribute.getValue().getValue());
+            String renamed = renamer.rename(this);
             return attribute.withValue(attribute.getValue().withValue(renamed));
         } else if (tree instanceof Xml.Tag && ((Xml.Tag) tree).getValue().isPresent()) {
-            Xml.Tag tag = (Xml.Tag) tree;
-            String renamed = renamer.rename(tag.getValue().get());
-            return tag.withValue(renamed);
+            String renamed = renamer.rename(this);
+            return ((Xml.Tag) tree).withValue(renamed);
         }
         return tree;
     }

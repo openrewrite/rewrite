@@ -117,7 +117,7 @@ public class TypeMatcher implements Reference.Matcher {
 
     @Override
     public Reference.Renamer createRenamer(String newName) {
-        return oldName -> newName;
+        return reference -> newName;
     }
 
 }

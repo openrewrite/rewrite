@@ -34,7 +34,6 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-yaml"))
     api(project(":rewrite-xml"))
-    api(project(":rewrite-properties"))
 
     api("io.micrometer:micrometer-core:1.9.+")
     api("org.jetbrains:annotations:latest.release")

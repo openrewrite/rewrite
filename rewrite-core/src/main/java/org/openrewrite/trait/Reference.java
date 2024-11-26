@@ -69,8 +69,8 @@ public interface Reference extends Trait<Tree> {
     @FunctionalInterface
     interface Renamer {
         /**
-         * Compute a renamed value for a reference, the current value will be provided for context.
+         * Compute a renamed value for a reference.
          */
-        String rename(String currentValue);
+        String rename(Reference reference);
     }
 }

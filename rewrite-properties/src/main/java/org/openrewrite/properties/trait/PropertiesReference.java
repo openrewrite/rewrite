@@ -61,9 +61,8 @@ public class PropertiesReference implements Reference {
         Tree tree = cursor.getValue();
         if (tree instanceof Properties.Entry) {
             Properties.Entry entry = (Properties.Entry) tree;
-            Properties.Value oldValue = entry.getValue();
-            String newValueText = renamer.rename(oldValue.getText());
-            return entry.withValue(oldValue.withText(newValueText));
+            String newValueText = renamer.rename(this);
+            return entry.withValue(entry.getValue().withText(newValueText));
         }
         return tree;
     }

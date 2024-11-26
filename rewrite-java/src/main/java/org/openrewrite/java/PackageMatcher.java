@@ -49,7 +49,7 @@ public class PackageMatcher implements Reference.Matcher {
 
     @Override
     public Reference.Renamer createRenamer(String newName) {
-        return oldName -> getReplacement(oldName, targetPackage, newName);
+        return reference -> getReplacement(reference.getValue(), targetPackage, newName);
     }
 
     String getReplacement(String value, @Nullable String oldValue, String newValue) {
