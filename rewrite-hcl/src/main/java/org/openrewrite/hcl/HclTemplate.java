@@ -166,9 +166,8 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
 
                 return e;
             }
-        }.visit(scope.getValue(), 0, scope.getParentOrThrow());
+        }.visitNonNull(scope.getValue(), 0, scope.getParentOrThrow());
 
-        assert h != null;
         return h;
     }
 
