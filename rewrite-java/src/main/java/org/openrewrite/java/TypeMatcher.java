@@ -19,9 +19,6 @@ import lombok.Getter;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
@@ -30,15 +27,13 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.trait.Reference;
-import org.openrewrite.xml.tree.Xml;
-import org.openrewrite.properties.tree.Properties;
 
 import java.util.regex.Pattern;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 @Getter
-public class TypeMatcher implements Reference.Renamer, Reference.Matcher {
+public class TypeMatcher implements Reference.Matcher {
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     @Getter
@@ -121,24 +116,8 @@ public class TypeMatcher implements Reference.Renamer, Reference.Matcher {
     }
 
     @Override
-    public TreeVisitor<Tree, ExecutionContext> rename(String newValue) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (StringUtils.isNotEmpty(newValue)) {
-                    if (tree instanceof Properties.Entry) {
-                        return ((Properties.Entry) tree).withValue(((Properties.Entry) tree).getValue().withText(newValue));
-                    }
-                    if (tree instanceof Xml.Attribute) {
-                        return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(newValue));
-                    }
-                    if (tree instanceof Xml.Tag) {
-                        return ((Xml.Tag) tree).withValue(newValue);
-                    }
-                }
-                return super.visit(tree, ctx);
-            }
-        };
+    public Reference.Renamer createRenamer(String newName) {
+        return reference -> newName;
     }
 
 }

@@ -18,7 +18,9 @@ package org.openrewrite.properties.trait;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.trait.SimpleTraitMatcher;
@@ -49,6 +51,20 @@ public class PropertiesReference implements Reference {
     @Override
     public boolean supportsRename() {
         return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
+        Tree tree = cursor.getValue();
+        if (tree instanceof Properties.Entry) {
+            Properties.Entry entry = (Properties.Entry) tree;
+            String newValueText = renamer.rename(this);
+            return entry.withValue(entry.getValue().withText(newValueText));
+        }
+        return tree;
     }
 
     public static class Matcher extends SimpleTraitMatcher<PropertiesReference> {
