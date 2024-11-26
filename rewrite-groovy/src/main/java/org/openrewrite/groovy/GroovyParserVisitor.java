@@ -1664,6 +1664,7 @@ public class GroovyParserVisitor {
                 ImplicitDot implicitDot = null;
                 JRightPadded<Expression> select = null;
                 if (!call.isImplicitThis()) {
+                    System.out.println("aaaa");
                     Expression selectExpr = visit(call.getObjectExpression());
                     int saveCursor = cursor;
                     Space afterSelect = whitespace();
@@ -1671,9 +1672,9 @@ public class GroovyParserVisitor {
                     if (matcher.matches()) {
                         cursor = saveCursor;
                         afterSelect = sourceBefore(matcher.group(1) + matcher.group(2));
-                        if (!matcher.group(1).isEmpty()) {
+                        /*if (!matcher.group(1).isEmpty()) {
                             afterSelect.withWhitespace(matcher.group(1) + afterSelect.getWhitespace());
-                        }
+                        }*/
                     } else {
                         implicitDot = new ImplicitDot(randomId());
                     }
@@ -1739,23 +1740,7 @@ public class GroovyParserVisitor {
                             }
                         }
                     }
-                    // handle the obscure case where there are empty parens ahead of a closure
-                    if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
-                        int saveCursor = cursor;
-                        Space argPrefix = whitespace();
-                        if (source.charAt(cursor) == '(') {
-                            cursor += 1;
-                            Space infix = whitespace();
-                            if (source.charAt(cursor) == ')') {
-                                cursor += 1;
-                                markers = markers.add(new EmptyArgumentListPrecedesArgument(randomId(), argPrefix, infix));
-                            } else {
-                                cursor = saveCursor;
-                            }
-                        } else {
-                            cursor = saveCursor;
-                        }
-                    }
+                    markers = handlesCaseWhereEmptyParensAheadOfClosure(args, markers);
                 }
                 JContainer<Expression> args = visit(call.getArguments());
 
@@ -1843,23 +1828,7 @@ public class GroovyParserVisitor {
                         }
                     }
                 }
-                // handle the obscure case where there are empty parens ahead of a closure
-                if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
-                    int saveCursor = cursor;
-                    Space prefix = whitespace();
-                    if (source.charAt(cursor) == '(') {
-                        cursor += 1;
-                        Space infix = whitespace();
-                        if (source.charAt(cursor) == ')') {
-                            cursor += 1;
-                            markers = markers.add(new EmptyArgumentListPrecedesArgument(randomId(), prefix, infix));
-                        } else {
-                            cursor = saveCursor;
-                        }
-                    } else {
-                        cursor = saveCursor;
-                    }
-                }
+                markers = handlesCaseWhereEmptyParensAheadOfClosure(args, markers);
             }
             JContainer<Expression> args = visit(call.getArguments());
 
@@ -2205,6 +2174,27 @@ public class GroovyParserVisitor {
         private <T> T pollQueue() {
             return (T) queue.poll();
         }
+    }
+
+    // handle the obscure case where there are empty parens ahead of a closure
+    private Markers handlesCaseWhereEmptyParensAheadOfClosure(ArgumentListExpression args, Markers markers) {
+        if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
+            int saveCursor = cursor;
+            Space argPrefix = whitespace();
+            if (source.charAt(cursor) == '(') {
+                cursor += 1;
+                Space infix = whitespace();
+                if (source.charAt(cursor) == ')') {
+                    cursor += 1;
+                    markers = markers.add(new EmptyArgumentListPrecedesArgument(randomId(), argPrefix, infix));
+                } else {
+                    cursor = saveCursor;
+                }
+            } else {
+                cursor = saveCursor;
+            }
+        }
+        return markers;
     }
 
     private JRightPadded<Statement> convertTopLevelStatement(SourceUnit unit, ASTNode node) {
