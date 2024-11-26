@@ -65,7 +65,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
         Space.Location loc = coordinates.getSpaceLocation();
 
         //noinspection unchecked
-        H h = (H) new HclVisitor<Integer>() {
+        return (H) new HclVisitor<Integer>() {
             @Override
             public Hcl visitConfigFile(Hcl.ConfigFile configFile, Integer p) {
                 Hcl.ConfigFile c = (Hcl.ConfigFile) super.visitConfigFile(configFile, p);
@@ -166,10 +166,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
 
                 return e;
             }
-        }.visit(scope.getValue(), 0, scope.getParentOrThrow());
-
-        assert h != null;
-        return h;
+        }.visitNonNull(scope.getValue(), 0, scope.getParentOrThrow());
     }
 
     public static Builder builder(String code) {
