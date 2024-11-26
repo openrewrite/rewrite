@@ -562,9 +562,9 @@ public class ChangeType extends Recipe {
         Reference.Renamer renamer;
 
         @Override
-        public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+        public Tree postVisit(Tree tree, ExecutionContext ctx) {
             Reference reference = matches.get(tree);
-            if (tree != null && reference != null && reference.supportsRename()) {
+            if (reference != null && reference.supportsRename()) {
                 return reference.rename(renamer, getCursor(), ctx);
             }
             return tree;

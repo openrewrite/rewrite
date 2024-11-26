@@ -65,9 +65,6 @@ class SpringReference implements Reference {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
         Tree tree = cursor.getValue();
