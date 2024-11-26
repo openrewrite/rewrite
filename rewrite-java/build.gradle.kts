@@ -54,6 +54,10 @@ dependencies {
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 
+    // these are required for now so that `ChangeType` and `ChangePackage` can use the `Reference` trait
+    runtimeOnly(project(":rewrite-properties"))
+    runtimeOnly(project(":rewrite-xml"))
+
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
 
