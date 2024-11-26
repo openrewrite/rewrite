@@ -17,6 +17,8 @@ dependencies {
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
     testRuntimeOnly(project(":rewrite-yaml"))
     testImplementation(project(":rewrite-maven"))
+    testImplementation(project(":rewrite-properties"))
+    testImplementation(project(":rewrite-xml"))
 }
 
 tasks.withType<Javadoc> {

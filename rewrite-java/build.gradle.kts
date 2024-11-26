@@ -60,8 +60,6 @@ dependencies {
     testImplementation("org.yaml:snakeyaml:latest.release")
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))
-    testImplementation(project(":rewrite-properties"))
-    testImplementation(project(":rewrite-xml"))
     testRuntimeOnly(project(":rewrite-java-17"))
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
