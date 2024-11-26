@@ -374,7 +374,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            if ("constraints".equals(method.getSimpleName()) | "project".equals(method.getSimpleName())) {
+            if ("constraints".equals(method.getSimpleName()) || "project".equals(method.getSimpleName())) {
                 // don't mess with anything inside a constraints block, leave that to UpgradeTransitiveDependency version recipe
                 // `project` dependencies should also be skipped
                 return method;
