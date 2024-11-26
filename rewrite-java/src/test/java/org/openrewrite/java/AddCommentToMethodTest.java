@@ -15,24 +15,23 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import static org.openrewrite.java.Assertions.java;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.java.Assertions.java;
+
 class AddCommentToMethodTest implements RewriteTest {
 
-    @Override
-    public void defaults(RecipeSpec spec) {
-    }
+    private static final String SHORT_COMMENT = " Short comment to add";
+    private static final String LONG_COMMENT = " This is a very long comment to add. The comment uses multiline comments, not single line.";
 
     @DocumentExample
     @Test
     void addSingleLineComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod(" Short comment to add", "foo.Foo bar(..)", false)),
+          spec -> spec.recipe(new AddCommentToMethod(SHORT_COMMENT, "foo.Foo bar(..)", false)),
           //language=java
           java(
             """
@@ -52,11 +51,10 @@ class AddCommentToMethodTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void addLongComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod(" This is a very long comment to add. The comment uses multiline comments, not single line.", "foo.Foo bar(..)", true)),
+          spec -> spec.recipe(new AddCommentToMethod(LONG_COMMENT, "foo.Foo bar(..)", true)),
           //language=java
           java(
             """
@@ -76,11 +74,10 @@ class AddCommentToMethodTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void addSingleLineCommentToExistingSingleLineComments() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod(" Short comment to add", "foo.Foo bar(..)", false)),
+          spec -> spec.recipe(new AddCommentToMethod(SHORT_COMMENT, "foo.Foo bar(..)", false)),
           //language=java
           java(
             """
@@ -104,32 +101,30 @@ class AddCommentToMethodTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
-    @Disabled("This test fails due to \\ No newline at end of file https://github.com/openrewrite/rewrite/issues/4344")
     void addSingleLineCommentToExistingMultiLineComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod(" Short comment to add", "foo.Foo bar(..)", false)),
+          spec -> spec.recipe(new AddCommentToMethod(SHORT_COMMENT, "foo.Foo bar(..)", false)),
           //language=java
           java(
             """
               package foo;
               public class Foo {
                   /**
-                  * Existing multi line
-                  * comment
-                  */
+                   * Existing multi line
+                   * comment
+                   */
                   public void bar(String arg) {}
               }
               """,
             """
               package foo;
               public class Foo {
-                    /**
-                    * Existing multi line
-                    * comment
-                    */
-                    // Short comment to add
+                  /**
+                   * Existing multi line
+                   * comment
+                   */
+                  // Short comment to add
                   public void bar(String arg) {}
               }
               """
@@ -137,32 +132,30 @@ class AddCommentToMethodTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
-    @Disabled("This test fails due to \\ No newline at end of file https://github.com/openrewrite/rewrite/issues/4344")
     void addLongCommentToExistingMultiLineComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod(" This is a very long comment to add. The comment uses multiline comments, not single line.", "foo.Foo bar(..)", true)),
+          spec -> spec.recipe(new AddCommentToMethod(LONG_COMMENT, "foo.Foo bar(..)", true)),
           //language=java
           java(
             """
               package foo;
               public class Foo {
                   /**
-                  * Existing multi line
-                  * comment
-                  */
+                   * Existing multi line
+                   * comment
+                   */
                   public void bar(String arg) {}
               }
               """,
             """
               package foo;
               public class Foo {
-                    /**
-                    * Existing multi line
-                    * comment
-                    */
-                    /* This is a very long comment to add. The comment uses multiline comments, not single line.*/
+                  /**
+                   * Existing multi line
+                   * comment
+                   */
+                  /* This is a very long comment to add. The comment uses multiline comments, not single line.*/
                   public void bar(String arg) {}
               }
               """

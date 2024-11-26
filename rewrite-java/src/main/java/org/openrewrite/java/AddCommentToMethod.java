@@ -86,7 +86,7 @@ public class AddCommentToMethod extends Recipe {
                                 .map(TextComment.class::cast)
                                 .noneMatch(c -> comment.equals(c.getText()))) {
 
-                            TextComment textComment = new TextComment(isMultiline, comment, md.getPrefix().getWhitespace(), Markers.EMPTY);
+                            TextComment textComment = new TextComment(Boolean.TRUE.equals(isMultiline), comment, md.getPrefix().getWhitespace(), Markers.EMPTY);
                             return md.withComments(ListUtils.concat(comments, textComment));
                         }
                         return md;
