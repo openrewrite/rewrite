@@ -74,6 +74,56 @@ class AddCommentToMethodTest implements RewriteTest {
     }
 
     @Test
+    void addMultilineComment() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToMethod("\nLine 1\nLine 2\nLine 3\n", "foo.Foo bar(..)", true)),
+          //language=java
+          java(
+            """
+              package foo;
+              public class Foo {
+                  public void bar(String arg) {}
+              }
+              """,
+            """
+              package foo;
+              public class Foo {
+                  /*
+                  Line 1
+                  Line 2
+                  Line 3
+                  */
+                  public void bar(String arg) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addMultilineCommentOnSingleLine() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToMethod("\nLine 1\nLine 2\nLine 3\n", "foo.Foo bar(..)", false)),
+          //language=java
+          java(
+            """
+              package foo;
+              public class Foo {
+                  public void bar(String arg) {}
+              }
+              """,
+            """
+              package foo;
+              public class Foo {
+                  // Line 1 Line 2 Line 3\s
+                  public void bar(String arg) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addSingleLineCommentToExistingSingleLineComments() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToMethod(SHORT_COMMENT, "foo.Foo bar(..)", false)),

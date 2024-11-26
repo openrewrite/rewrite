@@ -27,6 +27,8 @@ import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * This recipe adds a comment to a method in a Java source file. The comment can be a single line or a multiline comment.
@@ -66,6 +68,8 @@ public class AddCommentToMethod extends Recipe {
     @Nullable
     Boolean isMultiline;
 
+    private static final Pattern NEWLINE = Pattern.compile("\\R");
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
@@ -74,18 +78,26 @@ public class AddCommentToMethod extends Recipe {
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
                 J.ClassDeclaration cd = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
-                List<Comment> comments = md.getComments();
-                if (methodMatcher.matches(md, cd) && doesNotHaveComment(comments)) {
-                    TextComment textComment = new TextComment(Boolean.TRUE.equals(isMultiline), comment, md.getPrefix().getWhitespace(), Markers.EMPTY);
-                    return md.withComments(ListUtils.concat(comments, textComment));
+
+                if (methodMatcher.matches(md, cd)) {
+                    String methodPrefixWhitespace = md.getPrefix().getWhitespace();
+
+                    boolean isMultiline = Boolean.TRUE.equals(AddCommentToMethod.this.isMultiline);
+                    Matcher matcher = NEWLINE.matcher(comment);
+                    String newCommentText = matcher.find() ? matcher.replaceAll(isMultiline ? methodPrefixWhitespace: " ") : comment;
+
+                    if (doesNotHaveComment(newCommentText, md.getComments())) {
+                        TextComment textComment = new TextComment(isMultiline, newCommentText, methodPrefixWhitespace, Markers.EMPTY);
+                        return md.withComments(ListUtils.concat(md.getComments(), textComment));
+                    }
                 }
                 return md;
             }
 
-            private boolean doesNotHaveComment(List<Comment> comments) {
+            private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {
                 for (Comment c : comments) {
                     if (c instanceof TextComment &&
-                        comment.equals(((TextComment) c).getText())) {
+                        lookFor.equals(((TextComment) c).getText())) {
                         return false;
                     }
                 }
