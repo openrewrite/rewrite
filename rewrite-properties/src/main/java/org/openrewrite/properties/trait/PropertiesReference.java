@@ -53,13 +53,16 @@ public class PropertiesReference implements Reference {
         return true;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public Tree rename(Renamer rename, Cursor cursor, ExecutionContext ctx) {
+    public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
         Tree tree = cursor.getValue();
         if (tree instanceof Properties.Entry) {
             Properties.Entry entry = (Properties.Entry) tree;
             Properties.Value oldValue = entry.getValue();
-            String newValueText = rename.rename(oldValue.getText());
+            String newValueText = renamer.rename(oldValue.getText());
             return entry.withValue(oldValue.withText(newValueText));
         }
         return tree;

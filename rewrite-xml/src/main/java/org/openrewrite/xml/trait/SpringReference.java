@@ -65,16 +65,19 @@ class SpringReference implements Reference {
         return true;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public Tree rename(Renamer rename, Cursor cursor, ExecutionContext ctx) {
+    public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
         Tree tree = cursor.getValue();
         if (tree instanceof Xml.Attribute) {
             Xml.Attribute attribute = (Xml.Attribute) tree;
-            String renamed = rename.rename(attribute.getValue().getValue());
+            String renamed = renamer.rename(attribute.getValue().getValue());
             return attribute.withValue(attribute.getValue().withValue(renamed));
         } else if (tree instanceof Xml.Tag && ((Xml.Tag) tree).getValue().isPresent()) {
             Xml.Tag tag = (Xml.Tag) tree;
-            String renamed = rename.rename(tag.getValue().get());
+            String renamed = renamer.rename(tag.getValue().get());
             return tag.withValue(renamed);
         }
         return tree;

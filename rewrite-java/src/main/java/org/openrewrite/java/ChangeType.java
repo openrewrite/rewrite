@@ -117,7 +117,7 @@ public class ChangeType extends Recipe {
                     for (Reference ref : references.findMatches(matcher, Reference.Kind.TYPE)) {
                         matches.put(ref.getTree(), ref);
                     }
-                    return new ReferenceChangeTypeVisitor(matches, matcher.renameTo(newFullyQualifiedTypeName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    return new ReferenceChangeTypeVisitor(matches, matcher.createRenamer(newFullyQualifiedTypeName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }

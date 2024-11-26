@@ -148,7 +148,7 @@ public class ChangePackage extends Recipe {
                     for (Reference ref : references.findMatches(matcher)) {
                         matches.put(ref.getTree(), ref);
                     }
-                    return new ReferenceChangePackageVisitor(matches, matcher.renameTo(newPackageName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    return new ReferenceChangePackageVisitor(matches, matcher.createRenamer(newPackageName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
