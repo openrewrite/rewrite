@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,16 +18,14 @@ package org.openrewrite.properties;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.Arrays;
+import java.util.function.Function;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -61,42 +59,33 @@ public class AddPropertyComment extends Recipe {
     }
 
     @Override
-    public PropertiesVisitor<ExecutionContext> getVisitor() {
-        return new PropertiesVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
-                Properties.File p = file;
+                Properties.File p = file.withContent(ListUtils.flatMap(file.getContent(), new Function<Properties.Content, Object>() {
+                            Properties.@Nullable Content previousContent = null;
 
-                Set<Properties.Entry> properties = FindProperties.find(p, propertyKey, false);
-                if (properties.isEmpty()) {
-                    return p;
-                }
-
-                List<Properties.Content> newContentList = new ArrayList<>(p.getContent().size() + 1);
-                Properties.Content previousContent = null;
-                boolean isUpdated = false;
-                for (Properties.Content c : p.getContent()) {
-                    Properties.Content currentContent = c;
-                    if ((c instanceof Properties.Entry) &&
-                        ((Properties.Entry) c).getKey().equals(propertyKey)) {
-                        if (!isCommentAlreadyPresent(previousContent, comment)) {
-                            Properties.Comment commentContent = new Properties.Comment(
-                                    randomId(),
-                                    newContentList.isEmpty() ? "" : "\n",
-                                    Markers.EMPTY,
-                                    Properties.Comment.Delimiter.HASH_TAG,
-                                    " " + comment.trim());
-                            newContentList.add(commentContent);
-                            if (!c.getPrefix().contains("\n")) {
-                                currentContent = (Properties.Content) c.withPrefix("\n" + c.getPrefix());
+                            @Override
+                            public Object apply(Properties.Content c) {
+                                if (c instanceof Properties.Entry &&
+                                    ((Properties.Entry) c).getKey().equals(propertyKey) &&
+                                    !isCommentAlreadyPresent(previousContent, comment)) {
+                                    Properties.Comment commentContent = new Properties.Comment(
+                                            randomId(),
+                                            previousContent == null ? "" : "\n",
+                                            Markers.EMPTY,
+                                            Properties.Comment.Delimiter.HASH_TAG,
+                                            " " + comment.trim());
+                                    previousContent = c;
+                                    return Arrays.asList(commentContent, c.getPrefix().contains("\n") ?
+                                            c : c.withPrefix("\n" + c.getPrefix()));
+                                }
+                                previousContent = c;
+                                return c;
                             }
-                            isUpdated = true;
                         }
-                    }
-                    newContentList.add(currentContent);
-                    previousContent = currentContent;
-                }
-                p = (isUpdated) ? p.withContent(newContentList) : p;
+                ));
                 return super.visitFile(p, ctx);
             }
 
@@ -113,6 +102,7 @@ public class AddPropertyComment extends Recipe {
                 return super.visitEntry(entry, ctx);
             }
         };
+        return Preconditions.check(new FindProperties(propertyKey, false).getVisitor(), propertiesVisitor);
     }
 
     private boolean isCommentAlreadyPresent(Properties.@Nullable Content previousContent, String comment) {
