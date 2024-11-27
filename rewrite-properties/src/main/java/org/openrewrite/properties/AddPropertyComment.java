@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
@@ -62,14 +61,12 @@ public class AddPropertyComment extends Recipe {
     }
 
     @Override
-    public PropertiesIsoVisitor<ExecutionContext> getVisitor() {
-        return new PropertiesIsoVisitor<ExecutionContext>() {
+    public PropertiesVisitor<ExecutionContext> getVisitor() {
+        return new PropertiesVisitor<ExecutionContext>() {
             @Override
-            public Properties.File visitFile(Properties.File file, ExecutionContext ctx) {
-                Properties.File p = super.visitFile(file, ctx);
-                if (StringUtils.isBlank(propertyKey) || StringUtils.isBlank(comment)) {
-                    return p;
-                }
+            public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+                Properties.File p = file;
+
                 Set<Properties.Entry> properties = FindProperties.find(p, propertyKey, false);
                 if (properties.isEmpty()) {
                     return p;
@@ -95,20 +92,25 @@ public class AddPropertyComment extends Recipe {
                             }
                             isUpdated = true;
                         }
-                        if (Boolean.TRUE.equals(commentOutProperty)) {
-                            currentContent = new Properties.Comment(
-                                    randomId(),
-                                    newContentList.isEmpty() ? "" : "\n",
-                                    Markers.EMPTY,
-                                    Properties.Comment.Delimiter.HASH_TAG,
-                                    " " + currentContent.withPrefix("").print(getCursor()));
-                            isUpdated = true;
-                        }
                     }
                     newContentList.add(currentContent);
                     previousContent = currentContent;
                 }
-                return (isUpdated) ? p.withContent(newContentList) : p;
+                p = (isUpdated) ? p.withContent(newContentList) : p;
+                return super.visitFile(p, ctx);
+            }
+
+            @Override
+            public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+                if (Boolean.TRUE.equals(commentOutProperty) && entry.getKey().equals(propertyKey)) {
+                    return new Properties.Comment(
+                            randomId(),
+                            entry.getPrefix(),
+                            entry.getMarkers(),
+                            Properties.Comment.Delimiter.HASH_TAG,
+                            " " + entry.printTrimmed(getCursor()));
+                }
+                return super.visitEntry(entry, ctx);
             }
         };
     }
