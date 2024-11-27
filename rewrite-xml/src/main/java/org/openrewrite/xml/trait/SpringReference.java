@@ -17,9 +17,12 @@ package org.openrewrite.xml.trait;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
-import org.openrewrite.trait.SimpleTraitMatcher;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
+import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -60,6 +63,20 @@ class SpringReference implements Reference {
     @Override
     public boolean supportsRename() {
         return true;
+    }
+
+    @Override
+    public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
+        Tree tree = cursor.getValue();
+        if (tree instanceof Xml.Attribute) {
+            Xml.Attribute attribute = (Xml.Attribute) tree;
+            String renamed = renamer.rename(this);
+            return attribute.withValue(attribute.getValue().withValue(renamed));
+        } else if (tree instanceof Xml.Tag && ((Xml.Tag) tree).getValue().isPresent()) {
+            String renamed = renamer.rename(this);
+            return ((Xml.Tag) tree).withValue(renamed);
+        }
+        return tree;
     }
 
     static class Matcher extends SimpleTraitMatcher<SpringReference> {
@@ -115,9 +132,12 @@ class SpringReference implements Reference {
         public boolean isAcceptable(SourceFile sourceFile) {
             if (sourceFile instanceof Xml.Document) {
                 Xml.Document doc = (Xml.Document) sourceFile;
-                for (Xml.Attribute attrib : doc.getRoot().getAttributes()) {
-                    if (attrib.getKeyAsString().equals("xsi:schemaLocation") && attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
-                        return true;
+                //noinspection ConstantValue
+                if (doc.getRoot() != null) {
+                    for (Xml.Attribute attrib : doc.getRoot().getAttributes()) {
+                        if (attrib.getKeyAsString().equals("xsi:schemaLocation") && attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
+                            return true;
+                        }
                     }
                 }
             }
