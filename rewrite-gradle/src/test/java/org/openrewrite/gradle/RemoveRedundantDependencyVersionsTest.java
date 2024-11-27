@@ -248,4 +248,63 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void transitiveConfiguration() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.apache.commons:commons-lang3")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unmanagedDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              
+                  testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+              }
+              """
+          )
+        );
+    }
 }
