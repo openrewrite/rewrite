@@ -36,13 +36,18 @@ import static org.openrewrite.Tree.randomId;
 public class AddPropertyComment extends Recipe {
 
     @Option(displayName = "Property key",
-            description = "The name of the property key whose value is to be changed. Supports glob patterns.",
-            example = "management.metrics.binders.*.enabled")
+            description = "The name of the property to add comment.",
+            example = "management.metrics.binders")
     String propertyKey;
 
     @Option(example = "comment", displayName = "Comment",
-            description = "The inline comment to be added.")
+            description = "The comment to be added.")
     String comment;
+
+    @Option(example = "true", displayName = "Comment out property",
+            description = "If true, property will be commented out.",
+            required = false)
+    boolean commentOutProperty;
 
     @Override
     public String getDisplayName() {
@@ -70,26 +75,38 @@ public class AddPropertyComment extends Recipe {
 
                 List<Properties.Content> newContentList = new ArrayList<>(p.getContent().size() + 1);
                 Properties.Content previousContent = null;
+                boolean isUpdated = false;
                 for(Properties.Content c : p.getContent()) {
                     Properties.Content currentContent = c;
                     if ((c instanceof Properties.Entry)
-                            && ((Properties.Entry) c).getKey().equals(propertyKey)
-                            && !isCommentAlreadyPresent(previousContent, comment)) {
-                        Properties.Comment commentContent = new Properties.Comment(
-                                randomId(),
-                                newContentList.isEmpty() ? "" : "\n",
-                                Markers.EMPTY,
-                                Properties.Comment.Delimiter.HASH_TAG,
-                                " " + comment.trim());
-                        newContentList.add(commentContent);
-                        if (!c.getPrefix().contains("\n")) {
-                            currentContent = (Properties.Content) c.withPrefix("\n" + c.getPrefix());
+                            && ((Properties.Entry) c).getKey().equals(propertyKey)) {
+                        if (!isCommentAlreadyPresent(previousContent, comment)) {
+                            Properties.Comment commentContent = new Properties.Comment(
+                                    randomId(),
+                                    newContentList.isEmpty() ? "" : "\n",
+                                    Markers.EMPTY,
+                                    Properties.Comment.Delimiter.HASH_TAG,
+                                    " " + comment.trim());
+                            newContentList.add(commentContent);
+                            if (!c.getPrefix().contains("\n")) {
+                                currentContent = (Properties.Content) c.withPrefix("\n" + c.getPrefix());
+                            }
+                            isUpdated = true;
+                        }
+                        if (commentOutProperty) {
+                            currentContent = new Properties.Comment(
+                                    randomId(),
+                                    newContentList.isEmpty() ? "" : "\n",
+                                    Markers.EMPTY,
+                                    Properties.Comment.Delimiter.HASH_TAG,
+                                    " " + currentContent.withPrefix("").print(getCursor()));
+                            isUpdated = true;
                         }
                     }
                     newContentList.add(currentContent);
                     previousContent = currentContent;
                 }
-                return (newContentList.size() > p.getContent().size()) ? p.withContent(newContentList) : p;
+                return (isUpdated) ? p.withContent(newContentList) : p;
             }
         };
     }

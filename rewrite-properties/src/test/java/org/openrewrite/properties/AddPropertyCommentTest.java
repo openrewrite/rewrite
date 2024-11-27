@@ -27,7 +27,8 @@ class AddPropertyCommentTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddPropertyComment(
             "management.metrics.enable.process.files",
-            "myComment"
+            "myComment",
+            false
           )),
           properties(
             """
@@ -48,7 +49,8 @@ class AddPropertyCommentTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddPropertyComment(
             "management.metrics.enable.process.files",
-            "myComment"
+            "myComment",
+            false
           )),
           properties(
             """
@@ -71,7 +73,8 @@ class AddPropertyCommentTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddPropertyComment(
             "management.metrics.enable.process.files",
-            "myComment"
+            "myComment",
+            false
           )),
           properties(
             """
@@ -87,11 +90,96 @@ class AddPropertyCommentTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddPropertyComment(
             "xxx",
-            "myComment"
+            "myComment",
+            false
           )),
           properties(
             """
               yyy=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldCommentOutFirstProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPropertyComment(
+            "management.metrics.enable.process.files",
+            "myComment",
+            true
+          )),
+          properties(
+            """
+              management.metrics.enable.process.files=true
+              yyy=true
+              """,
+            """
+              # myComment
+              # management.metrics.enable.process.files=true
+              yyy=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldCommentOutMiddleProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPropertyComment(
+            "management.metrics.enable.process.files",
+            "myComment",
+            true
+          )),
+          properties(
+            """
+              xxx=true
+              management.metrics.enable.process.files=true
+              yyy=true
+              """,
+            """
+              xxx=true
+              # myComment
+              # management.metrics.enable.process.files=true
+              yyy=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldAcceptExistingCommentAndCommentOutProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPropertyComment(
+            "management.metrics.enable.process.files",
+            "myComment",
+            true
+          )),
+          properties(
+            """
+              # myComment
+              management.metrics.enable.process.files=true
+              """,
+            """
+              # myComment
+              # management.metrics.enable.process.files=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldASkipCommentOutProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPropertyComment(
+            "management.metrics.enable.process.files",
+            "myComment",
+            true
+          )),
+          properties(
+            """
+              # myComment
+              # management.metrics.enable.process.files=true
               """
           )
         );
