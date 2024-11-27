@@ -16,12 +16,14 @@
 package org.openrewrite.properties;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.properties.Assertions.properties;
 
 class AddPropertyCommentTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void shouldAddCommentToFirstProperty() {
         rewriteRun(

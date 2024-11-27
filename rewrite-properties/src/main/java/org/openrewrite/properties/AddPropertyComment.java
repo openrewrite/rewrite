@@ -17,6 +17,7 @@ package org.openrewrite.properties;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -47,16 +48,17 @@ public class AddPropertyComment extends Recipe {
     @Option(example = "true", displayName = "Comment out property",
             description = "If true, property will be commented out.",
             required = false)
-    boolean commentOutProperty;
+    @Nullable
+    Boolean commentOutProperty;
 
     @Override
     public String getDisplayName() {
-        return "Add comment";
+        return "Add comment before property key";
     }
 
     @Override
     public String getDescription() {
-        return "Add comment leaving the key and value intact.";
+        return "Add a new comment before a property key if not already present, optionally commenting out the property.";
     }
 
     @Override
@@ -76,10 +78,10 @@ public class AddPropertyComment extends Recipe {
                 List<Properties.Content> newContentList = new ArrayList<>(p.getContent().size() + 1);
                 Properties.Content previousContent = null;
                 boolean isUpdated = false;
-                for(Properties.Content c : p.getContent()) {
+                for (Properties.Content c : p.getContent()) {
                     Properties.Content currentContent = c;
-                    if ((c instanceof Properties.Entry)
-                            && ((Properties.Entry) c).getKey().equals(propertyKey)) {
+                    if ((c instanceof Properties.Entry) &&
+                        ((Properties.Entry) c).getKey().equals(propertyKey)) {
                         if (!isCommentAlreadyPresent(previousContent, comment)) {
                             Properties.Comment commentContent = new Properties.Comment(
                                     randomId(),
@@ -93,7 +95,7 @@ public class AddPropertyComment extends Recipe {
                             }
                             isUpdated = true;
                         }
-                        if (commentOutProperty) {
+                        if (Boolean.TRUE.equals(commentOutProperty)) {
                             currentContent = new Properties.Comment(
                                     randomId(),
                                     newContentList.isEmpty() ? "" : "\n",
@@ -111,8 +113,8 @@ public class AddPropertyComment extends Recipe {
         };
     }
 
-    private boolean isCommentAlreadyPresent(Properties.Content previousContent, String comment) {
-        return ((previousContent instanceof Properties.Comment)
-                && ((Properties.Comment) previousContent).getMessage().contains(comment.trim()));
+    private boolean isCommentAlreadyPresent(Properties.@Nullable Content previousContent, String comment) {
+        return previousContent instanceof Properties.Comment &&
+               ((Properties.Comment) previousContent).getMessage().contains(comment.trim());
     }
 }
