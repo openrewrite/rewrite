@@ -24,7 +24,7 @@ import org.openrewrite.yaml.tree.Yaml;
 
 public class Autodetect {
     public static IndentsStyle tabsAndIndents(Yaml yaml, IndentsStyle orElse) {
-        FindIndentYamlVisitor<Integer> findIndent = new FindIndentYamlVisitor<>(0);
+        FindIndentYamlVisitor<Integer> findIndent = new FindIndentYamlVisitor<>();
 
         //noinspection ConstantConditions
         findIndent.visit(yaml, 0);

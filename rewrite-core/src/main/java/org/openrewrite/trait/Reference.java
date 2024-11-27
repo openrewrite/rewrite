@@ -31,16 +31,23 @@ public interface Reference extends Trait<Tree> {
 
     String getValue();
 
-    default boolean supportsRename() {
-        return false;
-    }
-
     default boolean matches(Matcher matcher) {
         return matcher.matchesReference(this);
     }
 
-    default TreeVisitor<Tree, ExecutionContext> rename(Renamer renamer, String replacement) {
-        return renamer.rename(replacement);
+    default boolean supportsRename() {
+        return false;
+    }
+
+    /**
+     * Applies the {@link org.openrewrite.trait.Reference.Renamer} to the provided cursor to compute a new reference value.
+     * Note that this method only provides the logic for computing a new {@link org.openrewrite.Tree} with a renamed value,
+     * specific to the reference type. Hence, the reference itself is not changed, nor are the reference cursor
+     * {@link org.openrewrite.trait.Reference#getCursor()} or value {@link org.openrewrite.trait.Reference#getValue()}
+     * used to compute the new value.
+     */
+    default Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
+        throw new UnsupportedOperationException();
     }
 
     interface Provider {
@@ -51,12 +58,19 @@ public interface Reference extends Trait<Tree> {
     }
 
     interface Matcher {
-        boolean matchesReference(Reference value);
-    }
 
-    interface Renamer {
-        default TreeVisitor<Tree, ExecutionContext> rename(String replacement) {
+        boolean matchesReference(Reference value);
+
+        default Renamer createRenamer(String newName) {
             throw new UnsupportedOperationException();
         }
+    }
+
+    @FunctionalInterface
+    interface Renamer {
+        /**
+         * Compute a renamed value for a reference.
+         */
+        String rename(Reference reference);
     }
 }
