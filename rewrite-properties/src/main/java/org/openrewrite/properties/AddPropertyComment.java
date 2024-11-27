@@ -89,7 +89,7 @@ public class AddPropertyComment extends Recipe {
                     newContentList.add(currentContent);
                     previousContent = currentContent;
                 }
-                return p.withContent(newContentList.size() > p.getContent().size() ? newContentList : p.getContent());
+                return (newContentList.size() > p.getContent().size()) ? p.withContent(newContentList) : p;
             }
         };
     }
