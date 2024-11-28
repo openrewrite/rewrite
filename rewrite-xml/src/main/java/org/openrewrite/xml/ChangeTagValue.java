@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -24,8 +25,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+
 @Value
 @EqualsAndHashCode(callSuper = false)
+@AllArgsConstructor
 public class ChangeTagValue extends Recipe {
 
     @Option(displayName = "Element name",
@@ -44,6 +47,12 @@ public class ChangeTagValue extends Recipe {
             description = "The new value for the tag.",
             example = "user")
     String newValue;
+
+    @Option(displayName = "Regex",
+            description = "Default false. If true, `find` will be interpreted as a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression), and capture group contents will be available in `replace`.",
+            required = false)
+    @Nullable
+    Boolean regex;
 
     @Override
     public String getDisplayName() {
@@ -65,12 +74,22 @@ public class ChangeTagValue extends Recipe {
                 if (xPathMatcher.matches(getCursor())) {
                     // if either no oldValue is supplied OR oldValue equals the value of this tag
                     // then change the value to the newValue supplied
-                    if (oldValue == null || oldValue.equals(tag.getValue().orElse(null))) {
-                        doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+                    if (!Boolean.TRUE.equals(regex) &&
+                            (oldValue == null || oldValue.equals(tag.getValue().orElse(null)))) {
+                        doAfterVisit(new ChangeTagValueVisitor<>(tag, oldValue, newValue, Boolean.FALSE));
+                    } else if(Boolean.TRUE.equals(regex) && oldValue != null) {
+                        doAfterVisit(new ChangeTagValueVisitor<>(tag, oldValue, newValue, Boolean.TRUE));
                     }
                 }
                 return super.visitTag(tag, ctx);
             }
         };
+    }
+
+    public ChangeTagValue(String elementName, @javax.annotation.Nullable String oldValue, String newValue) {
+        this.elementName = elementName;
+        this.oldValue = oldValue;
+        this.regex = Boolean.FALSE;
+        this.newValue = newValue;
     }
 }
