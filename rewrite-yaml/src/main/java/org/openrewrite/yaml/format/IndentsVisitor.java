@@ -24,10 +24,13 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static org.openrewrite.internal.StringUtils.LINE_BREAK;
 
 public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
@@ -105,9 +108,9 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             }
             indentValue += y.getMarkers().findFirst(MultilineScalarChanged.class).get().getIndent();
 
-            String oldValue = ((Yaml.Scalar) y).getValue();
-            String newValue = StringUtils.substringOfBeforeFirstLineBreak(oldValue) +
-                    ("\n" + StringUtils.trimIndent(StringUtils.substringOfAfterFirstLineBreak(oldValue)))
+            String[] lines = LINE_BREAK.split(((Yaml.Scalar) y).getValue());
+            String newValue = lines[0] +
+                    ("\n" + StringUtils.trimIndent(String.join("\n", Arrays.copyOfRange(lines, 1, lines.length))))
                             .replaceAll("\\R", "\n" + StringUtils.repeat(" ", indentValue));
 
             y = ((Yaml.Scalar) y).withValue(newValue);

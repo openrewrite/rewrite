@@ -25,6 +25,7 @@ import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
 import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
+import static org.openrewrite.internal.StringUtils.LINE_BREAK;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
 import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
@@ -132,7 +134,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             if (getCursor().getMessage(REMOVE_PREFIX, false)) {
                 List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) getCursor().getValue()).getEntries();
                 return mapping.withEntries(mapLast(mapping.getEntries(), it ->
-                        it.withPrefix(linebreak() + StringUtils.substringOfAfterFirstLineBreak(entries.get(entries.size() - 1).getPrefix()))));
+                        it.withPrefix(linebreak() + substringOfAfterFirstLineBreak(entries.get(entries.size() - 1).getPrefix()))));
             }
 
             return mapping;
@@ -219,13 +221,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     // get comment from next element in same mapping block
                     for (int i = 0; i < entries.size() - 1; i++) {
                         if (entries.get(i).getValue().equals(getCursor().getValue())) {
-                            comment = StringUtils.substringOfBeforeFirstLineBreak(entries.get(i + 1).getPrefix());
+                            comment = substringOfBeforeFirstLineBreak(entries.get(i + 1).getPrefix());
                             break;
                         }
                     }
                     // or retrieve it for last item from next element (could potentially be much higher in the tree)
                     if (comment == null && hasLineBreak(entries.get(entries.size() - 1).getPrefix())) {
-                        comment = StringUtils.substringOfBeforeFirstLineBreak(entries.get(entries.size() - 1).getPrefix());
+                        comment = substringOfBeforeFirstLineBreak(entries.get(entries.size() - 1).getPrefix());
                     }
                 }
 
@@ -247,7 +249,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             if (m1Entries.get(i).getValue() instanceof Yaml.Mapping && mutatedEntries.get(i).getValue() instanceof Yaml.Mapping &&
                 ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
                 mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix(
-                        linebreak() + StringUtils.substringOfAfterFirstLineBreak(mutatedEntries.get(i + 1).getPrefix())));
+                        linebreak() + substringOfAfterFirstLineBreak(mutatedEntries.get(i + 1).getPrefix())));
             }
         }
     }
@@ -323,9 +325,20 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         return !s1.equals(s2) && !acceptTheirs ? y1.withValue(s2) : y1;
     }
 
+    public String substringOfBeforeFirstLineBreak(String s) {
+        String[] lines = LINE_BREAK.split(s);
+        return lines.length > 0 ? lines[0] : "";
+    }
+
+    public String substringOfAfterFirstLineBreak(String s) {
+        String[] lines = LINE_BREAK.split(s);
+        return lines.length > 1 ? String.join(linebreak(), Arrays.copyOfRange(lines, 1, lines.length)) : "";
+    }
+
     private int calculateMultilineIndent(Yaml.Mapping.Entry entry) {
-        int keyIndent  = StringUtils.substringOfAfterLastLineBreak(entry.getPrefix()).length();
-        int indent = StringUtils.minCommonIndentLevel(StringUtils.substringOfAfterFirstLineBreak(((Yaml.Scalar) entry.getValue()).getValue()));
+        String[] lines = LINE_BREAK.split(entry.getPrefix());
+        int keyIndent  = (lines.length > 1 ? lines[lines.length - 1] : "").length();
+        int indent = StringUtils.minCommonIndentLevel(substringOfAfterFirstLineBreak(((Yaml.Scalar) entry.getValue()).getValue()));
         return Math.max(indent - keyIndent, 0);
     }
 }
