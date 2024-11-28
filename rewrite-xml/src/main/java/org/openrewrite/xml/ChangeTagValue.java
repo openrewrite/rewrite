@@ -15,8 +15,10 @@
  */
 package org.openrewrite.xml;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.NoArgsConstructor;
+import lombok.Data;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -24,8 +26,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-@Value
+@AllArgsConstructor
 @EqualsAndHashCode(callSuper = false)
+@NoArgsConstructor
+@Data
 public class ChangeTagValue extends Recipe {
 
     @Option(displayName = "Element name",
@@ -34,16 +38,23 @@ public class ChangeTagValue extends Recipe {
     String elementName;
 
     @Option(displayName = "Old value",
-            description = "The old value of the tag.",
+            description = "The old value of the tag. Interpreted as pattern if regex is enabled.",
             required = false,
             example = "user")
     @Nullable
     String oldValue;
 
     @Option(displayName = "New value",
-            description = "The new value for the tag.",
+            description = "The new value for the tag. Supports capture groups when regex is enabled. " +
+                          " If literal $,\\ characters are needed in newValue, with regex true, then it should be escaped.",
             example = "user")
     String newValue;
+
+    @Option(displayName = "Regex",
+            description = "Default false. If true, `oldValue` will be interpreted as a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression), and capture group contents will be available in `newValue`.",
+            required = false)
+    @Nullable
+    Boolean regex;
 
     @Override
     public String getDisplayName() {
@@ -52,7 +63,8 @@ public class ChangeTagValue extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Alters the value of XML tags matching the provided expression.";
+        return "Alters the value of XML tags matching the provided expression. " +
+               "When regex is enabled the replacement happens only for text nodes provided the pattern matches.";
     }
 
     @Override
@@ -65,12 +77,23 @@ public class ChangeTagValue extends Recipe {
                 if (xPathMatcher.matches(getCursor())) {
                     // if either no oldValue is supplied OR oldValue equals the value of this tag
                     // then change the value to the newValue supplied
-                    if (oldValue == null || oldValue.equals(tag.getValue().orElse(null))) {
-                        doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+                    if (!Boolean.TRUE.equals(regex) &&
+                            (oldValue == null || oldValue.equals(tag.getValue().orElse(null)))) {
+                        doAfterVisit(new ChangeTagValueVisitor<>(tag, oldValue, newValue, Boolean.FALSE));
+                    } else if (Boolean.TRUE.equals(regex) && oldValue != null) {
+                        doAfterVisit(new ChangeTagValueVisitor<>(tag, oldValue, newValue, Boolean.TRUE));
                     }
                 }
                 return super.visitTag(tag, ctx);
             }
         };
+    }
+
+    public ChangeTagValue(final String elementName, final @Nullable String oldValue,
+                          final String newValue) {
+        this.elementName = elementName;
+        this.oldValue = oldValue;
+        this.regex = Boolean.FALSE;
+        this.newValue = newValue;
     }
 }
