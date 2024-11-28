@@ -32,6 +32,7 @@ public class GitRemoteTest {
     @CsvSource(textBlock = """
       https://github.com/org/repo, github.com, org/repo, org, repo
       git@github.com:org/repo.git, github.com, org/repo, org, repo
+      git@github.com:8451LLC/helm.git, github.com, 8451LLC/helm, 8451LLC, helm
       ssh://github.com/org/repo.git, github.com, org/repo, org, repo
       
       https://gitlab.com/group/repo.git, gitlab.com, group/repo, group, repo
