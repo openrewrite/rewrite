@@ -22,37 +22,42 @@ import java.util.regex.Pattern;
 
 public class JavaNamingService implements NamingService {
 
+    private static final Pattern STANDARD_METHOD_NAME = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
     private static final Pattern SNAKE_CASE = Pattern.compile("^[a-zA-Z0-9]+_\\w+$");
 
     @Override
-    public String getMethodName(String oldMethodName) {
-        StringBuilder result = new StringBuilder();
-        if (SNAKE_CASE.matcher(oldMethodName).matches()) {
-            result.append(NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL, oldMethodName));
-        } else {
-            int nameLength = oldMethodName.length();
-            for (int i = 0; i < nameLength; i++) {
-                char c = oldMethodName.charAt(i);
+    public String standardizeMethodName(String oldMethodName) {
+        if (!oldMethodName.startsWith("_") &&
+            !STANDARD_METHOD_NAME.matcher(oldMethodName).matches()) {
+            StringBuilder result = new StringBuilder();
+            if (SNAKE_CASE.matcher(oldMethodName).matches()) {
+                result.append(NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL, oldMethodName));
+            } else {
+                int nameLength = oldMethodName.length();
+                for (int i = 0; i < nameLength; i++) {
+                    char c = oldMethodName.charAt(i);
 
-                if (i == 0) {
-                    // the java specification requires identifiers to start with [a-zA-Z$_]
-                    if (c != '$' && c != '_') {
-                        result.append(Character.toLowerCase(c));
-                    }
-                } else {
-                    if (!Character.isLetterOrDigit(c)) {
-                        while (i < nameLength && (!Character.isLetterOrDigit(c) || c > 'z')) {
-                            c = oldMethodName.charAt(i++);
-                        }
-                        if (i < nameLength) {
-                            result.append(Character.toUpperCase(c));
+                    if (i == 0) {
+                        // the java specification requires identifiers to start with [a-zA-Z$_]
+                        if (c != '$' && c != '_') {
+                            result.append(Character.toLowerCase(c));
                         }
                     } else {
-                        result.append(c);
+                        if (!Character.isLetterOrDigit(c)) {
+                            while (i < nameLength && (!Character.isLetterOrDigit(c) || c > 'z')) {
+                                c = oldMethodName.charAt(i++);
+                            }
+                            if (i < nameLength) {
+                                result.append(Character.toUpperCase(c));
+                            }
+                        } else {
+                            result.append(c);
+                        }
                     }
                 }
             }
+            return result.toString();
         }
-        return result.toString();
+        return oldMethodName;
     }
 }
