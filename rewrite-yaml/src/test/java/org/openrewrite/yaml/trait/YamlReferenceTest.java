@@ -15,7 +15,9 @@
  */
 package org.openrewrite.yaml.trait;
 
-import org.junit.jupiter.api.Test;
+import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
 
@@ -23,21 +25,32 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class YamlReferenceTest implements RewriteTest {
+    @Language("yml")
+    private static final String YAML = """
+      root:
+          a: java.lang.String
+          b: java.lang
+          c: String
+          recipelist:
+            - org.openrewrite.java.DoSomething:
+                option: 'org.foo.Bar'
+      """;
 
-    @Test
-    void findJavaReferences() {
+
+    @ParameterizedTest
+    @CsvSource({
+      "application.yaml",
+      "application.yml",
+      "application-test.yaml",
+      "application-test.yml",
+      "/foo/bar/application-test.yaml",
+      "/foo/bar/application-test.yml",
+    })
+    void findJavaReferencesInYamlProperties(String filename) {
         rewriteRun(
           yaml(
-            """
-              root:
-                  a: java.lang.String
-                  b: java.lang
-                  c: String
-                  recipelist:
-                    - org.openrewrite.java.DoSomething:
-                        option: 'org.foo.Bar'
-              """,
-            spec -> spec.afterRecipe(doc -> {
+            YAML,
+            spec -> spec.path(filename).afterRecipe(doc -> {
                 assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(
                   ref -> {
                       assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
@@ -56,6 +69,28 @@ class YamlReferenceTest implements RewriteTest {
                       assertThat(ref.getValue()).isEqualTo("org.foo.Bar");
                   });
             }))
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+      "application-.yaml",
+      "application-.yml",
+      "application.test.yaml",
+      "application.test.yml",
+      "other-application.yaml",
+      "other-application.yml",
+      "other.yaml",
+      "other.yml",
+      "/foo/bar/other.yaml",
+      "/foo/bar/other.yml"
+    })
+    void noReferencesInMismatchedFilenames(String filename) {
+        rewriteRun(
+          yaml(
+            YAML,
+            spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
+          )
         );
     }
 }
