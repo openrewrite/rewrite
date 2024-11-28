@@ -140,9 +140,8 @@ public final class ListUtils {
     }
 
     /**
-     * @deprecated Use {@link #mapLast(List, Function)} instead.
+     * For backwards compatibility; prefer {@link #mapLast(List, Function)}.
      */
-    @Deprecated
     public static <T> @Nullable List<T> mapLast(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapLast) {
         return mapLast(ls, (Function<T, T>) mapLast);
     }
@@ -177,9 +176,8 @@ public final class ListUtils {
     }
 
     /**
-     * @deprecated Use {@link #mapFirst(List, Function)} instead.
+     * For backwards compatibility; prefer {@link #mapFirst(List, Function)}.
      */
-    @Deprecated
     public static <T> @Nullable List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapFirst) {
         return mapFirst(ls, (Function<T, T>) mapFirst);
     }
@@ -261,9 +259,8 @@ public final class ListUtils {
     }
 
     /**
-     * @deprecated Use {@link #map(List, Function)} instead.
+     * For backwards compatibility; prefer {@link #map(List, Function)}.
      */
-    @Deprecated
     public static <T> @Nullable List<T> map(@Nullable List<T> ls, UnaryOperator<@Nullable T> map) {
         return map(ls, (Function<T, T>) map);
     }
