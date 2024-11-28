@@ -327,12 +327,12 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         return !s1.equals(s2) && !acceptTheirs ? y1.withValue(s2) : y1;
     }
 
-    public String substringOfBeforeFirstLineBreak(String s) {
+    private String substringOfBeforeFirstLineBreak(String s) {
         String[] lines = LINE_BREAK.split(s);
         return lines.length > 0 ? lines[0] : "";
     }
 
-    public String substringOfAfterFirstLineBreak(String s) {
+    private String substringOfAfterFirstLineBreak(String s) {
         String[] lines = LINE_BREAK.split(s);
         return lines.length > 1 ? String.join(linebreak(), Arrays.copyOfRange(lines, 1, lines.length)) : "";
     }
