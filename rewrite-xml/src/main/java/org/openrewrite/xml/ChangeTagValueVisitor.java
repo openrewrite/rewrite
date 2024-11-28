@@ -34,14 +34,15 @@ public class ChangeTagValueVisitor<P> extends XmlVisitor<P> {
     private final String oldValue;
     private final boolean regexp;
 
-    public ChangeTagValueVisitor(Xml.Tag scope, @javax.annotation.Nullable String oldValue, String newValue, Boolean regexp) {
+    public ChangeTagValueVisitor(final Xml.Tag scope, final @javax.annotation.Nullable String oldValue,
+                                 final String newValue, final Boolean regexp) {
         this.scope = scope;
         this.oldValue = oldValue;
         this.newValue = newValue;
         this.regexp = Boolean.TRUE.equals(regexp);
     }
 
-    public ChangeTagValueVisitor(Xml.Tag scope, String newValue) {
+    public ChangeTagValueVisitor(final Xml.Tag scope, final String newValue) {
         this.scope = scope;
         this.oldValue = null;
         this.newValue = newValue;
@@ -60,10 +61,10 @@ public class ChangeTagValueVisitor<P> extends XmlVisitor<P> {
             String prefix = "";
             String afterText = "";
             if (t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
-                Xml.CharData existingValue = (Xml.CharData) t.getContent().get(0);
-                String text = existingValue.getText();
+                final Xml.CharData existingValue = (Xml.CharData) t.getContent().get(0);
+                final String text = existingValue.getText();
 
-                boolean alreadyProcessed = this.regexp && existingValue.getMarkers()
+                final boolean alreadyProcessed = this.regexp && existingValue.getMarkers()
                         .findAll(AlreadyReplaced.class)
                         .stream()
                         .anyMatch(m -> m.getFind().equals(oldValue) && newValue.equals(m.getReplace()));
@@ -77,8 +78,10 @@ public class ChangeTagValueVisitor<P> extends XmlVisitor<P> {
                 afterText = existingValue.getAfterText();
 
                 if(regexp && oldValue != null && Pattern.compile(oldValue).matcher(text).find()) {
-                    String newContent = text.replaceAll(oldValue, Matcher.quoteReplacement(newValue));
-                    Markers markers = Markers.build(singletonList( new AlreadyReplaced(randomId(),oldValue, newValue)));
+                    final String newContent = text.replaceAll(oldValue, Matcher.quoteReplacement(newValue));
+                    final Markers markers = Markers.build(
+                            singletonList( new AlreadyReplaced(randomId(),oldValue, newValue))
+                    );
                     t = t.withContent(singletonList(new Xml.CharData(randomId(),
                             prefix, markers, false, newContent, afterText)));
                 }

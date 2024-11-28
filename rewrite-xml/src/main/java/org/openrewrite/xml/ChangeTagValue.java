@@ -77,7 +77,7 @@ public class ChangeTagValue extends Recipe {
                     if (!Boolean.TRUE.equals(regex) &&
                             (oldValue == null || oldValue.equals(tag.getValue().orElse(null)))) {
                         doAfterVisit(new ChangeTagValueVisitor<>(tag, oldValue, newValue, Boolean.FALSE));
-                    } else if(Boolean.TRUE.equals(regex) && oldValue != null) {
+                    } else if (Boolean.TRUE.equals(regex) && oldValue != null) {
                         doAfterVisit(new ChangeTagValueVisitor<>(tag, oldValue, newValue, Boolean.TRUE));
                     }
                 }
@@ -86,7 +86,8 @@ public class ChangeTagValue extends Recipe {
         };
     }
 
-    public ChangeTagValue(String elementName, @javax.annotation.Nullable String oldValue, String newValue) {
+    public ChangeTagValue(final String elementName, final @javax.annotation.Nullable String oldValue,
+                          final String newValue) {
         this.elementName = elementName;
         this.oldValue = oldValue;
         this.regex = Boolean.FALSE;
