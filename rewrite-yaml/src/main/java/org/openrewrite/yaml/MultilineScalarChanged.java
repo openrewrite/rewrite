@@ -13,31 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.trait;
+package org.openrewrite.yaml;
 
-import org.openrewrite.Incubating;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.marker.Marker;
 
-import java.util.Set;
+import java.util.UUID;
 
-@Incubating(since = "8.39.0")
-public interface TypeReference extends Trait<Tree> {
-
-    String getName();
-
-    default boolean matches(Matcher matcher) {
-        return matcher.matchesName(getName());
-    }
-
-    interface Provider {
-
-        Set<TypeReference> getTypeReferences(SourceFile sourceFile);
-
-        boolean isAcceptable(SourceFile sourceFile);
-    }
-
-    interface Matcher {
-        boolean matchesName(String name);
-    }
+/**
+ * Multiline scalars are added directly to the tree, which leads to a wrong ident level.
+ */
+@Value
+@With
+public class MultilineScalarChanged implements Marker {
+    UUID id;
+    boolean added;
 }

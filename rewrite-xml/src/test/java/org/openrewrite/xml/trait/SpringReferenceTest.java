@@ -23,12 +23,12 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
-class SpringTypeReferenceTest implements RewriteTest {
+class SpringReferenceTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(RewriteTest.toRecipe(() -> new SpringTypeReference.Matcher()
-          .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getName()))));
+        spec.recipe(RewriteTest.toRecipe(() -> new SpringReference.Matcher()
+          .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getValue()))));
     }
 
     @SuppressWarnings("SpringXmlModelInspection")
@@ -50,6 +50,12 @@ class SpringTypeReferenceTest implements RewriteTest {
                           <property name="someName">
                               <value>java.lang.String</value>
                           </property>
+                          <property name="someOtherName">
+                              <value>java.lang</value>
+                          </property>
+                          <property name="nameMap">
+                              <map key-type="java.lang.String" value-type="java.lang.String"/>
+                          </property>
                       </bean>
                   </property>
                 </bean>
@@ -67,6 +73,12 @@ class SpringTypeReferenceTest implements RewriteTest {
                           <property name="age" value="11" <!--~~(java.lang.Integer)~~>-->class="java.lang.Integer"/>
                           <property name="someName">
                               <!--~~(java.lang.String)~~>--><value>java.lang.String</value>
+                          </property>
+                          <property name="someOtherName">
+                              <!--~~(java.lang)~~>--><value>java.lang</value>
+                          </property>
+                          <property name="nameMap">
+                              <map <!--~~(java.lang.String)~~>-->key-type="java.lang.String" <!--~~(java.lang.String)~~>-->value-type="java.lang.String"/>
                           </property>
                       </bean>
                   </property>

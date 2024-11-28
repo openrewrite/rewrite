@@ -24,6 +24,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
@@ -120,7 +121,7 @@ class XmlParserTest implements RewriteTest {
     }
 
     @Test
-    void javaTypeReferenceDocument() {
+    void javaReferenceDocument() {
         rewriteRun(
           xml(
             """
@@ -135,13 +136,18 @@ class XmlParserTest implements RewriteTest {
                           <property name="someName">
                               <value>java.lang.String</value>
                           </property>
+                          <property name="someOtherName">
+                              <value>java.lang</value>
+                          </property>
                       </bean>
                   </property>
                 </bean>
               </beans>
               """,
             spec -> spec.afterRecipe(doc -> {
-                assertThat(doc.getTypeReferences().getTypeReferences().stream().anyMatch(typeRef -> typeRef.getName().equals("java.lang.String")));
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getValue().equals("java.lang.String"))).isTrue();
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.TYPE))).isTrue();
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.PACKAGE))).isTrue();
             })
           )
         );

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+@NullMarked
+@NonNullFields
+package org.openrewrite.properties.trait;
 
-import org.openrewrite.trait.TypeReference;
-
-import java.util.Set;
-
-public interface TypeReferenceProvider {
-
-    Set<TypeReference> getTypeReferences(SourceFile sourceFile);
-
-    boolean isAcceptable(SourceFile sourceFile);
-}
+import org.jspecify.annotations.NullMarked;
+import org.openrewrite.internal.lang.NonNullFields;

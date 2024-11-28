@@ -30,6 +30,8 @@ import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.xml.Assertions.xml;
 
 @SuppressWarnings("ConstantConditions")
 class ChangePackageTest implements RewriteTest {
@@ -1700,6 +1702,46 @@ class ChangePackageTest implements RewriteTest {
                 assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty();
             })
           )
+        );
+    }
+
+    @Test
+    void changePackageInSpringXml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true)),
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="abc" class="test.type.A"/>
+              </beans>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="abc" class="test.test.type.A"/>
+              </beans>
+              """
+          )
+        );
+
+    }
+
+    @Test
+    void changeTypeInPropertiesFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("java.lang", "java.cool", true)),
+          properties(
+            """
+              a.property=java.lang.String
+              b.property=java.lang.test.String
+              c.property=String
+              """,
+            """
+              a.property=java.cool.String
+              b.property=java.cool.test.String
+              c.property=String
+              """, spec -> spec.path("application.properties"))
         );
     }
 }
