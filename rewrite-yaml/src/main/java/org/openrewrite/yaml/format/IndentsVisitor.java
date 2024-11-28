@@ -100,12 +100,16 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             }
         } else if (y instanceof Yaml.Scalar && y.getMarkers().findFirst(MultilineScalarChanged.class).isPresent()) {
             int indentValue = indent;
-
             if (!y.getMarkers().findFirst(MultilineScalarChanged.class).get().isAdded() && indent != 0) {
-                indentValue = indent + style.getIndentSize();
+                indentValue += style.getIndentSize();
             }
+            indentValue += y.getMarkers().findFirst(MultilineScalarChanged.class).get().getIndent();
 
-            String newValue = ((Yaml.Scalar) y).getValue().replaceAll("\\R", "\n" + StringUtils.repeat(" ", indentValue));
+            String oldValue = ((Yaml.Scalar) y).getValue();
+            String newValue = StringUtils.substringOfBeforeFirstLineBreak(oldValue) +
+                    ("\n" + StringUtils.trimIndent(StringUtils.substringOfAfterFirstLineBreak(oldValue)))
+                            .replaceAll("\\R", "\n" + StringUtils.repeat(" ", indentValue));
+
             y = ((Yaml.Scalar) y).withValue(newValue);
         }
 
@@ -114,7 +118,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
     private boolean isUnindentedTopLevel() {
         return getCursor().getParentOrThrow().getValue() instanceof Yaml.Document ||
-               getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
+                getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
     }
 
     @Override

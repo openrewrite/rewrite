@@ -131,7 +131,7 @@ public class StringUtils {
      * @param text A string with zero or more line breaks.
      * @return The minimum count of white space characters preceding each line of content.
      */
-    private static int minCommonIndentLevel(String text) {
+    public static int minCommonIndentLevel(String text) {
         int minIndent = Integer.MAX_VALUE;
         int whiteSpaceCount = 0;
         boolean contentEncountered = false;
@@ -719,5 +719,20 @@ public class StringUtils {
 
     public static boolean hasLineBreak(@Nullable String s) {
         return s != null && LINE_BREAK.matcher(s).find();
+    }
+
+    public static String substringOfBeforeFirstLineBreak(String s) {
+        String[] lines = LINE_BREAK.split(s);
+        return lines.length > 0 ? lines[0] : "";
+    }
+
+    public static String substringOfAfterFirstLineBreak(String s) {
+        String[] lines = LINE_BREAK.split(s);
+        return lines.length > 1 ? String.join("\n", Arrays.copyOfRange(lines, 1, lines.length)) : "";
+    }
+
+    public static String substringOfAfterLastLineBreak(String s) {
+        String[] parts = LINE_BREAK.split(s);
+        return parts.length > 1 ? parts[parts.length - 1] : "";
     }
 }
