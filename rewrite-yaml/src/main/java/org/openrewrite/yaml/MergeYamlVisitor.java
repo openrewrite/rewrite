@@ -28,12 +28,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
-import static org.openrewrite.internal.StringUtils.LINE_BREAK;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
 import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
@@ -50,6 +50,8 @@ import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
  */
 @RequiredArgsConstructor
 public class MergeYamlVisitor<P> extends YamlVisitor<P> {
+
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     private final Yaml existing;
     private final Yaml incoming;

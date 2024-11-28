@@ -30,10 +30,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.internal.StringUtils.LINE_BREAK;
-
 public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(\\s*)(.*\\R?)", Pattern.MULTILINE);
 
     private final IndentsStyle style;

@@ -29,7 +29,7 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 public class StringUtils {
-    public static final Pattern LINE_BREAK = Pattern.compile("\\R");
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     private StringUtils() {
     }
