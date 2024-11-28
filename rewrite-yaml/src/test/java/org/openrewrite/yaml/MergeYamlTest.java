@@ -1542,6 +1542,58 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
+    // Mimics `org.openrewrite.github.UpgradeSlackNotificationVersion2Test`
+    void upgradeSlackNotificationVersion2() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$..steps[?(@.uses =~ 'slackapi/slack-github-action@v1.*')]",
+              // language=yaml
+              """
+                with:
+                  method: chat.postMessage
+                  token: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+                  payload: |
+                    channel: "##foo-alerts"
+                    text: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: Send notification on error
+                      if: failure() && inputs.send-notification
+                      uses: slackapi/slack-github-action@v1.27.0
+                      with:
+                        channel-id: "##foo-alerts"
+                        slack-message: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                      env:
+                        SLACK_BOT_TOKEN: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: Send notification on error
+                      if: failure() && inputs.send-notification
+                      uses: slackapi/slack-github-action@v1.27.0
+                      with:
+                        channel-id: "##foo-alerts"
+                        slack-message: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                        method: chat.postMessage
+                        token: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+                        payload: |
+                          channel: "##foo-alerts"
+                          text: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                      env:
+                        SLACK_BOT_TOKEN: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+              """)
+        );
+    }
+
+    @Test
     void addLiteralStyleMinusBlock() {
         rewriteRun(
           spec -> spec
