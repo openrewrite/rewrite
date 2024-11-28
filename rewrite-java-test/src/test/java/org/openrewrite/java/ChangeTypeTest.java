@@ -2098,7 +2098,7 @@ class ChangeTypeTest implements RewriteTest {
                   b: java.lang.StringBuilder
                   c: java.lang.test.String
                   d: String
-              """
+              """, spec -> spec.path("application.yaml")
           ));
     }
 }

@@ -1742,7 +1742,7 @@ class ChangePackageTest implements RewriteTest {
                   a: java.cool.String
                   b: java.cool.test.String
                   c: String
-              """
+              """, spec -> spec.path("application.yaml")
           ));
     }
 
