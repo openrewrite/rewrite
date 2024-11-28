@@ -18,9 +18,7 @@ package org.openrewrite.yaml.trait;
 import lombok.Value;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.yaml.tree.Yaml;
@@ -31,7 +29,7 @@ import java.util.regex.Pattern;
 
 @Incubating(since = "8.40.3")
 @Value
-class YamlReference implements Reference {
+public class YamlReference implements Reference {
     Cursor cursor;
     Kind kind;
 
@@ -51,6 +49,18 @@ class YamlReference implements Reference {
     @Override
     public boolean supportsRename() {
         return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
+        Tree tree = cursor.getValue();
+        if (tree instanceof Yaml.Scalar) {
+            return ((Yaml.Scalar) tree).withValue(renamer.rename(this));
+        }
+        throw new IllegalArgumentException("cursor.getValue() must be an Yaml.Scalar but is: " + tree.getClass());
     }
 
     public static class Matcher extends SimpleTraitMatcher<YamlReference> {
