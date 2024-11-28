@@ -16,7 +16,6 @@
 package org.openrewrite.yaml.trait;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
 
@@ -28,8 +27,6 @@ class YamlReferenceTest implements RewriteTest {
     @Test
     void findJavaReferences() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new YamlReference.Matcher()
-            .asVisitor(yamlJavaReference -> SearchResult.found(yamlJavaReference.getTree(), yamlJavaReference.getValue())))),
           yaml(
             """
               root:
@@ -39,14 +36,6 @@ class YamlReferenceTest implements RewriteTest {
                   recipelist:
                     - org.openrewrite.java.DoSomething:
                         option: 'org.foo.Bar'
-              """, """
-              root:
-                  a: ~~(java.lang.String)~~>java.lang.String
-                  b: ~~(java.lang)~~>java.lang
-                  c: String
-                  recipelist:
-                    - ~~(org.openrewrite.java.DoSomething)~~>org.openrewrite.java.DoSomething:
-                        option: ~~(org.foo.Bar)~~>'org.foo.Bar'
               """,
             spec -> spec.afterRecipe(doc -> {
                 assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(

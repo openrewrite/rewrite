@@ -34,12 +34,12 @@ public class YamlReference implements Reference {
     Kind kind;
 
     @Override
-    public @NonNull Kind getKind() {
+    public Kind getKind() {
         return kind;
     }
 
     @Override
-    public @NonNull String getValue() {
+    public String getValue() {
         if (getTree() instanceof Yaml.Scalar) {
             return ((Yaml.Scalar) getTree()).getValue();
         }
