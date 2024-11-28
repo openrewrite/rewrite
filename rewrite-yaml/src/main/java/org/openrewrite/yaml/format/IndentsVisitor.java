@@ -118,7 +118,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
     private boolean isUnindentedTopLevel() {
         return getCursor().getParentOrThrow().getValue() instanceof Yaml.Document ||
-                getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
+               getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
     }
 
     @Override
