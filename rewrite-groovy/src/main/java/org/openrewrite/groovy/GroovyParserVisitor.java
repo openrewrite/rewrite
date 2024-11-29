@@ -577,35 +577,35 @@ public class GroovyParserVisitor {
         }
 
         @Override
-        public void visitConstructor(ConstructorNode ctor) {
+        public void visitConstructor(ConstructorNode constructor_) {
             Space fmt = whitespace();
 
-            List<J.Annotation> annotations = visitAndGetAnnotations(ctor);
-            List<J.Modifier> modifiers = visitModifiers(ctor.getModifiers());
+            List<J.Annotation> annotations = visitAndGetAnnotations(constructor_);
+            List<J.Modifier> modifiers = visitModifiers(constructor_.getModifiers());
 
             // Constructor name might be in quotes
             Space namePrefix = whitespace();
-            String ctorName;
-            if (source.startsWith(ctor.getDeclaringClass().getName(), cursor)) {
-                ctorName = ctor.getDeclaringClass().getName();
+            String constructorName;
+            if (source.startsWith(constructor_.getDeclaringClass().getName(), cursor)) {
+                constructorName = constructor_.getDeclaringClass().getName();
             } else {
                 char openingQuote = source.charAt(cursor);
-                ctorName = openingQuote + ctor.getName() + openingQuote;
+                constructorName = openingQuote + constructor_.getName() + openingQuote;
             }
-            cursor += ctorName.length();
+            cursor += constructorName.length();
             J.Identifier name = new J.Identifier(randomId(),
                     namePrefix,
                     Markers.EMPTY,
                     emptyList(),
-                    ctorName,
+                    constructorName,
                     null, null);
 
-            RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(ctor, this);
+            RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(constructor_, this);
 
             // Parameter has no visit implementation, so we've got to do this by hand
             Space beforeParen = sourceBefore("(");
-            List<JRightPadded<Statement>> params = new ArrayList<>(ctor.getParameters().length);
-            Parameter[] unparsedParams = ctor.getParameters();
+            List<JRightPadded<Statement>> params = new ArrayList<>(constructor_.getParameters().length);
+            Parameter[] unparsedParams = constructor_.getParameters();
             for (int i = 0; i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
 
@@ -644,14 +644,14 @@ public class GroovyParserVisitor {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
-            JContainer<NameTree> throws_ = ctor.getExceptions().length == 0 ? null : JContainer.build(
+            JContainer<NameTree> throws_ = constructor_.getExceptions().length == 0 ? null : JContainer.build(
                     sourceBefore("throws"),
-                    bodyVisitor.visitRightPadded(ctor.getExceptions(), null),
+                    bodyVisitor.visitRightPadded(constructor_.getExceptions(), null),
                     Markers.EMPTY
             );
 
-            J.Block body = ctor.getCode() == null ? null :
-                    bodyVisitor.visit(ctor.getCode());
+            J.Block body = constructor_.getCode() == null ? null :
+                    bodyVisitor.visit(constructor_.getCode());
 
             queue.add(new J.MethodDeclaration(
                     randomId(), fmt, Markers.EMPTY,
@@ -664,7 +664,7 @@ public class GroovyParserVisitor {
                     throws_,
                     body,
                     null,
-                    typeMapping.methodType(ctor)
+                    typeMapping.methodType(constructor_)
             ));
         }
 
