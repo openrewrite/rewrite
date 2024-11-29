@@ -1630,27 +1630,20 @@ public class GroovyParserVisitor {
             queue.add(new G.MapLiteral(randomId(), prefix, Markers.EMPTY, entries, typeMapping.type(map.getType())));
         }
 
-        // zero or more ")" AND "?." or "*." or "." AND <rest>
-        private final Pattern MATCH_INVOKE = Pattern.compile("^(\\)*)(\\*?\\??\\.).*", Pattern.DOTALL);
-
         @Override
         public void visitMethodCallExpression(MethodCallExpression call) {
             queue.add(insideParentheses(call, fmt -> {
+                Markers markers = Markers.EMPTY;
 
                 ImplicitDot implicitDot = null;
                 JRightPadded<Expression> select = null;
                 if (!call.isImplicitThis()) {
-                    System.out.println("aaaa");
                     Expression selectExpr = visit(call.getObjectExpression());
                     int saveCursor = cursor;
                     Space afterSelect = whitespace();
-                    Matcher matcher = MATCH_INVOKE.matcher(source.substring(cursor));
-                    if (matcher.matches()) {
+                    if (source.charAt(cursor) == '.' || source.charAt(cursor) == '?' || source.charAt(cursor) == '*') {
                         cursor = saveCursor;
-                        afterSelect = sourceBefore(matcher.group(1) + matcher.group(2));
-                        /*if (!matcher.group(1).isEmpty()) {
-                            afterSelect.withWhitespace(matcher.group(1) + afterSelect.getWhitespace());
-                        }*/
+                        afterSelect = sourceBefore(call.isSpreadSafe() ? "*." : call.isSafe() ? "?." : ".");
                     } else {
                         implicitDot = new ImplicitDot(randomId());
                     }
@@ -1691,7 +1684,6 @@ public class GroovyParserVisitor {
                     name = name.withMarkers(name.getMarkers().add(implicitDot));
                 }
                 // Method invocations may have type information that can enrich the type information of its parameters
-                Markers markers = Markers.EMPTY;
                 if (call.getArguments() instanceof ArgumentListExpression) {
                     ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
                     if (call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
@@ -1764,6 +1756,16 @@ public class GroovyParserVisitor {
                 } else {
                     methodType = typeMapping.methodType(methodNode);
                 }
+
+                if (source.charAt(cursor) == ')') {
+                    int closingParenthese = 0;
+                    while (source.charAt(cursor) == ')') {
+                        closingParenthese++;
+                        cursor++;
+                    }
+                    markers = markers.add(new ClosingParenthese(randomId(), closingParenthese));
+                }
+
                 return new J.MethodInvocation(randomId(), fmt, markers,
                         select, null, name, args, methodType);
             }));

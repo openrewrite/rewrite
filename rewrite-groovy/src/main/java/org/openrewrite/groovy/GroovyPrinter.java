@@ -24,6 +24,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.groovy.tree.GContainer;
 import org.openrewrite.groovy.tree.GRightPadded;
 import org.openrewrite.groovy.tree.GSpace;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -378,6 +379,12 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 if (i == args.size() - 1 && !omitParens) {
                     p.append(')');
                 }
+            }
+
+            if (method.getMarkers().findFirst(ClosingParenthese.class).isPresent()) {
+                System.out.println(method);
+                System.out.println("PRESENT");
+                p.append(StringUtils.repeat(")", method.getMarkers().findFirst(ClosingParenthese.class).get().getAmount()));
             }
 
             afterSyntax(method, p);

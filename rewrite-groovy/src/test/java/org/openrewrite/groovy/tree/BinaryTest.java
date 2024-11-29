@@ -206,8 +206,8 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def foo(Map map) {
-                  map.containsKey("foo") && (map.get("foo")).equals("bar")
+              def foo(Map someMap) {
+                  (someMap.get("bar")).equals("baz")
               }
               """
           )
