@@ -29,4 +29,5 @@ import java.util.UUID;
 public class MultilineScalarChanged implements Marker {
     UUID id;
     boolean added;
+    int indent;
 }

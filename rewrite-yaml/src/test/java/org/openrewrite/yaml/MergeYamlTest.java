@@ -1511,12 +1511,16 @@ class MergeYamlTest implements RewriteTest {
     void addLiteralStyleBlock() {
         rewriteRun(
           spec -> spec
-            .recipe(new MergeYaml("$.some.very.deep.object",
+            .recipe(new MergeYaml("$.some.very",
               // language=yaml
               """
-                script: |
-                  #!/bin/bash
-                  echo "hello"
+                deep:
+                  object:
+                
+                    script: | # yaml comment
+                       #!/bin/bash
+                        echo "hello"
+                           echo "hello"
                 """,
               false, "name",
               null)),
@@ -1534,9 +1538,63 @@ class MergeYamlTest implements RewriteTest {
                   deep:
                     object:
                       with: An existing value
-                      script: |
-                        #!/bin/bash
-                        echo "hello"
+              
+                      script: | # yaml comment
+                         #!/bin/bash
+                          echo "hello"
+                             echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    // Mimics `org.openrewrite.github.UpgradeSlackNotificationVersion2Test`
+    void upgradeSlackNotificationVersion2() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$..steps[?(@.uses =~ 'slackapi/slack-github-action@v1.*')]",
+              // language=yaml
+              """
+                with:
+                  method: chat.postMessage
+                  token: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+                  payload: |
+                    channel: "##foo-alerts"
+                    text: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: Send notification on error
+                      if: failure() && inputs.send-notification
+                      uses: slackapi/slack-github-action@v1.27.0
+                      with:
+                        channel-id: "##foo-alerts"
+                        slack-message: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                      env:
+                        SLACK_BOT_TOKEN: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: Send notification on error
+                      if: failure() && inputs.send-notification
+                      uses: slackapi/slack-github-action@v1.27.0
+                      with:
+                        channel-id: "##foo-alerts"
+                        slack-message: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                        method: chat.postMessage
+                        token: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+                        payload: |
+                          channel: "##foo-alerts"
+                          text: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                      env:
+                        SLACK_BOT_TOKEN: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
               """)
         );
     }

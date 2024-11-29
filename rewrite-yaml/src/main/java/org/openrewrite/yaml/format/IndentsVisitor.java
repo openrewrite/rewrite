@@ -24,6 +24,7 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
@@ -31,6 +32,7 @@ import java.util.regex.Pattern;
 
 public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(\\s*)(.*\\R?)", Pattern.MULTILINE);
 
     private final IndentsStyle style;
@@ -100,12 +102,16 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             }
         } else if (y instanceof Yaml.Scalar && y.getMarkers().findFirst(MultilineScalarChanged.class).isPresent()) {
             int indentValue = indent;
-
             if (!y.getMarkers().findFirst(MultilineScalarChanged.class).get().isAdded() && indent != 0) {
-                indentValue = indent + style.getIndentSize();
+                indentValue += style.getIndentSize();
             }
+            indentValue += y.getMarkers().findFirst(MultilineScalarChanged.class).get().getIndent();
 
-            String newValue = ((Yaml.Scalar) y).getValue().replaceAll("\\R", "\n" + StringUtils.repeat(" ", indentValue));
+            String[] lines = LINE_BREAK.split(((Yaml.Scalar) y).getValue());
+            String newValue = lines[0] +
+                    ("\n" + StringUtils.trimIndent(String.join("\n", Arrays.copyOfRange(lines, 1, lines.length))))
+                            .replaceAll("\\R", "\n" + StringUtils.repeat(" ", indentValue));
+
             y = ((Yaml.Scalar) y).withValue(newValue);
         }
 
