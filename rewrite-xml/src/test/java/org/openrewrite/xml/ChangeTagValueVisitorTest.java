@@ -128,4 +128,84 @@ class ChangeTagValueVisitorTest implements RewriteTest {
           xml("<tag>1.2.3-SNAPSHOT</tag>", "<tag>1.2.3-RELEASE</tag>")
         );
     }
+
+    @Test
+    void doNothingIfPatternNotProvided() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  doAfterVisit(new ChangeTagValueVisitor<>(
+                    (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                    null,
+                    "2.0",
+                    Boolean.TRUE)
+                  );
+                  return super.visitDocument(x, ctx);
+              }
+          })),
+          xml(
+            """
+              <dependency>
+                   <version>2.0</version>
+              </dependency>
+              """
+          )
+        );
+    }
+
+    @Test
+    void alwaysReplaceChild() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  doAfterVisit(new ChangeTagValueVisitor<>(
+                    (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                    null,
+                    "2.0",
+                    Boolean.FALSE)
+                  );
+                  return super.visitDocument(x, ctx);
+              }
+          })),
+          xml(
+            """
+              <dependency>
+                   <version><invalid/></version>
+              </dependency>
+              """,
+            """
+             <dependency>
+                  <version>2.0</version>
+             </dependency>
+             """
+          )
+        );
+    }
+
+    @Test
+    void regexSkipsChild() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  doAfterVisit(new ChangeTagValueVisitor<>(
+                    (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                    "invalid",
+                    "2.0",
+                    Boolean.TRUE)
+                  );
+                  return super.visitDocument(x, ctx);
+              }
+          })),
+          xml(
+            """
+              <dependency>
+                   <version><invalid/></version>
+              </dependency>
+              """
+          )
+        );
+    }
 }

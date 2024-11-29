@@ -17,7 +17,8 @@ package org.openrewrite.xml;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.NoArgsConstructor;
+import lombok.Data;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -25,10 +26,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-
-@Value
-@EqualsAndHashCode(callSuper = false)
 @AllArgsConstructor
+@EqualsAndHashCode(callSuper = false)
+@NoArgsConstructor
+@Data
 public class ChangeTagValue extends Recipe {
 
     @Option(displayName = "Element name",
