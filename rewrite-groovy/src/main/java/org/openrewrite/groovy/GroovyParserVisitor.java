@@ -36,7 +36,9 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
@@ -708,14 +710,14 @@ public class GroovyParserVisitor {
             List<JRightPadded<T>> ts = new ArrayList<>(nodes.length);
             for (int i = 0; i < nodes.length; i++) {
                 ASTNode node = nodes[i];
-                @SuppressWarnings("unchecked") JRightPadded<T> converted = JRightPadded.build(
-                        node instanceof ClassNode ? (T) visitTypeTree((ClassNode) node) : visit(node));
+                @SuppressWarnings("unchecked")
+                JRightPadded<T> converted = JRightPadded.build(node instanceof ClassNode ? (T) visitTypeTree((ClassNode) node) : visit(node));
                 if (i == nodes.length - 1) {
                     converted = converted.withAfter(whitespace());
                     if (',' == source.charAt(cursor)) {
                         // In Groovy trailing "," are allowed
                         cursor += 1;
-                        converted = converted.withMarkers(Markers.EMPTY.add(new org.openrewrite.java.marker.TrailingComma(randomId(), whitespace())));
+                        converted = converted.withMarkers(Markers.EMPTY.add(new TrailingComma(randomId(), whitespace())));
                     }
                     ts.add(converted);
                     if (afterLast != null && source.startsWith(afterLast, cursor)) {
@@ -772,11 +774,11 @@ public class GroovyParserVisitor {
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
 
-            org.openrewrite.java.marker.OmitParentheses omitParentheses = null;
+            OmitParentheses omitParentheses = null;
             if (source.charAt(cursor) == '(') {
                 cursor++;
             } else {
-                omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
+                omitParentheses = new OmitParentheses(randomId());
                 beforeOpenParen = EMPTY;
                 cursor = saveCursor;
             }
@@ -806,9 +808,8 @@ public class GroovyParserVisitor {
                 // If it is wrapped in "[]" then this isn't a named arguments situation, and we should not lift the parameters out of the enclosing MapExpression
                 saveCursor = cursor;
                 whitespace();
-                boolean isOpeningBracketPresent = '[' == source.charAt(cursor);
                 cursor = saveCursor;
-                if (!isOpeningBracketPresent) {
+                if ('[' != source.charAt(cursor)) {
                     // Bring named parameters out of their containing MapExpression so that they can be parsed correctly
                     MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
                     unparsedArgs =
@@ -839,7 +840,7 @@ public class GroovyParserVisitor {
                         after = whitespace();
                         if (source.charAt(cursor) == ')') {
                             // the next argument will have an OmitParentheses marker
-                            omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
+                            omitParentheses = new OmitParentheses(randomId());
                         }
                         cursor++;
                     }
@@ -1934,11 +1935,11 @@ public class GroovyParserVisitor {
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
 
-            org.openrewrite.java.marker.OmitParentheses omitParentheses = null;
+            OmitParentheses omitParentheses = null;
             if (source.charAt(cursor) == '(') {
                 cursor++;
             } else {
-                omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
+                omitParentheses = new OmitParentheses(randomId());
                 beforeOpenParen = EMPTY;
                 cursor = saveCursor;
             }
@@ -1962,7 +1963,7 @@ public class GroovyParserVisitor {
                         after = whitespace();
                         if (source.charAt(cursor) == ')') {
                             // the next argument will have an OmitParentheses marker
-                            omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
+                            omitParentheses = new OmitParentheses(randomId());
                         }
                         cursor++;
                     }
