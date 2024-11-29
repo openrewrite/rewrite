@@ -279,7 +279,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
             private Xml.Tag upgradeDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
                 ResolvedDependency d = findDependency(t);
-                System.out.println("Upgrading dependency ");
                 if (d != null && d.getRepository() != null) {
                     // if the resolved dependency exists AND it does not represent an artifact that was parsed
                     // as a source file, attempt to find a new version.

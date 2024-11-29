@@ -916,7 +916,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeVersionDefinedViaExplicitPropertyInDependencyManagement() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.30", "", false, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.30", "", true, null)),
           pomXml(
             """
               <project>
