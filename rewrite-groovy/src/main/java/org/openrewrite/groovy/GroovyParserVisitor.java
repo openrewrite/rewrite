@@ -218,16 +218,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitClass(ClassNode clazz) {
             Space fmt = whitespace();
-            List<J.Annotation> leadingAnnotations;
-            if (clazz.getAnnotations().isEmpty()) {
-                leadingAnnotations = emptyList();
-            } else {
-                leadingAnnotations = new ArrayList<>(clazz.getAnnotations().size());
-                for (AnnotationNode annotation : clazz.getAnnotations()) {
-                    visitAnnotation(annotation);
-                    leadingAnnotations.add(pollQueue());
-                }
-            }
+            List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(clazz);
             List<J.Modifier> modifiers = visitModifiers(clazz.getModifiers());
 
             Space kindPrefix = whitespace();
@@ -412,13 +403,7 @@ public class GroovyParserVisitor {
         private void visitVariableField(FieldNode field) {
             RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
 
-            List<J.Annotation> annotations = field.getAnnotations().stream()
-                    .map(a -> {
-                        visitAnnotation(a);
-                        return (J.Annotation) pollQueue();
-                    })
-                    .collect(Collectors.toList());
-
+            List<J.Annotation> annotations = visitAndGetAnnotations(field);
             List<J.Modifier> modifiers = visitModifiers(field.getModifiers());
             TypeTree typeExpr = visitTypeTree(field.getOriginType());
 
@@ -502,15 +487,8 @@ public class GroovyParserVisitor {
         public void visitMethod(MethodNode method) {
             Space fmt = whitespace();
 
-            List<J.Annotation> annotations = method.getAnnotations().stream()
-                    .map(a -> {
-                        visitAnnotation(a);
-                        return (J.Annotation) pollQueue();
-                    })
-                    .collect(Collectors.toList());
-
+            List<J.Annotation> annotations = visitAndGetAnnotations(method);
             List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
-
             TypeTree returnType = visitTypeTree(method.getReturnType());
 
             // Method name might be in quotes
@@ -539,12 +517,7 @@ public class GroovyParserVisitor {
             for (int i = 0; i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
 
-                List<J.Annotation> paramAnnotations = param.getAnnotations().stream()
-                        .map(a -> {
-                            visitAnnotation(a);
-                            return (J.Annotation) pollQueue();
-                        })
-                        .collect(Collectors.toList());
+                List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param);
 
                 TypeTree paramType;
                 if (param.isDynamicTyped()) {
@@ -607,13 +580,7 @@ public class GroovyParserVisitor {
         public void visitConstructor(ConstructorNode ctor) {
             Space fmt = whitespace();
 
-            List<J.Annotation> annotations = ctor.getAnnotations().stream()
-                    .map(a -> {
-                        visitAnnotation(a);
-                        return (J.Annotation) pollQueue();
-                    })
-                    .collect(Collectors.toList());
-
+            List<J.Annotation> annotations = visitAndGetAnnotations(ctor);
             List<J.Modifier> modifiers = visitModifiers(ctor.getModifiers());
 
             // Constructor name might be in quotes
@@ -642,12 +609,7 @@ public class GroovyParserVisitor {
             for (int i = 0; i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
 
-                List<J.Annotation> paramAnnotations = param.getAnnotations().stream()
-                        .map(a -> {
-                            visitAnnotation(a);
-                            return (J.Annotation) pollQueue();
-                        })
-                        .collect(Collectors.toList());
+                List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param);
 
                 TypeTree paramType;
                 if (param.isDynamicTyped()) {
@@ -704,6 +666,19 @@ public class GroovyParserVisitor {
                     null,
                     typeMapping.methodType(ctor)
             ));
+        }
+
+        public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node) {
+            if (node.getAnnotations().isEmpty()) {
+                return emptyList();
+            }
+
+            List<J.Annotation> paramAnnotations = new ArrayList<>(node.getAnnotations().size());
+            for (AnnotationNode annotationNode : node.getAnnotations()) {
+                visitAnnotation(annotationNode);
+                paramAnnotations.add(pollQueue());
+            }
+            return paramAnnotations;
         }
 
         @SuppressWarnings({"ConstantConditions", "unchecked"})
