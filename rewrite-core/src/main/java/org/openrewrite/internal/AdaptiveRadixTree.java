@@ -591,7 +591,7 @@ public class AdaptiveRadixTree<V> {
     }
 
     private static class Node256<V> extends InternalNode<V> {
-        private final @Nullable Node<V>[] children;
+        private final Node<V> @Nullable[] children;
 
         @SuppressWarnings("unchecked")
         Node256(byte[] partialKey) {

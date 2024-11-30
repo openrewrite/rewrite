@@ -148,7 +148,7 @@ public class ChangePackage extends Recipe {
                     for (Reference ref : references.findMatches(matcher)) {
                         matches.put(ref.getTree(), ref);
                     }
-                    return new ReferenceChangePackageVisitor(matches, matcher, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    return new ReferenceChangePackageVisitor(matches, matcher.createRenamer(newPackageName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
                 return tree;
             }
@@ -390,13 +390,12 @@ public class ChangePackage extends Recipe {
     private static class ReferenceChangePackageVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Map<Tree, Reference> matches;
         Reference.Renamer renamer;
-        String newPackageName;
 
         @Override
-        public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+        public Tree postVisit(Tree tree, ExecutionContext ctx) {
             Reference reference = matches.get(tree);
             if (reference != null && reference.supportsRename()) {
-                return reference.rename(renamer, newPackageName).visit(tree, ctx, getCursor().getParent());
+                return reference.rename(renamer, getCursor(), ctx);
             }
             return tree;
         }
