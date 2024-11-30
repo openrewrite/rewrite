@@ -77,4 +77,4 @@ jobs:
               annotationPattern: '@org.jetbrains.annotations.NotNull'
           - org.openrewrite.java.RemoveAnnotation:
               annotationPattern: '@jakarta.annotation.Nonnull'
-          - org.openrewrite.java.jspecify.MigrateToJspecify
+          #- org.openrewrite.java.jspecify.MigrateToJspecify

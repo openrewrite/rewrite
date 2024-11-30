@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -33,6 +34,7 @@ import static java.util.Collections.singletonList;
  * <p>
  * If the transformation does not involve modifying LST elements or broader set of stream operations
  * is needed, the Java Streams API may be more suitable.
+ *
  * @implNote Most transformation methods in this class accept endomorphic mapping functions, i.e., functions
  * of the form {@code f: T -> T}. The primary goal of these methods is to produce minimal change in a list’s structure,
  * ensuring unnecessary memory allocations are avoided,
@@ -89,10 +91,10 @@ public final class ListUtils {
      * Insert element to a list at the specified position in the list.
      * Throws the same exceptions as List.add()
      *
-     * @param ls The original list.
-     * @param t The element to add.
+     * @param ls    The original list.
+     * @param t     The element to add.
      * @param index index at which the specified element is to be inserted
-     * @param <T> The type of elements in the list.
+     * @param <T>   The type of elements in the list.
      * @return A new list with the element inserted at the specified position.
      */
     public static <T> List<T> insert(@Nullable List<T> ls, @Nullable T t, int index) {
@@ -103,7 +105,7 @@ public final class ListUtils {
             return ls;
         }
 
-        List<T> newLs = ls == null ?  new ArrayList<>(1) : new ArrayList<>(ls);
+        List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls);
         newLs.add(index, t);
         return newLs;
     }
@@ -112,9 +114,9 @@ public final class ListUtils {
      * Applies the specified mapping function to the last element of the list.
      * If the resulting element is null, the last element is removed from the list.
      *
-     * @param ls       The list to modify.
-     * @param mapLast  The mapping function to apply to the last element.
-     * @param <T>      The type of elements in the list.
+     * @param ls      The list to modify.
+     * @param mapLast The mapping function to apply to the last element.
+     * @param <T>     The type of elements in the list.
      * @return A new list with the modified last element, or the original list if unchanged.
      */
     @Contract("null, _ -> null; !null, _ -> !null")
@@ -135,6 +137,13 @@ public final class ListUtils {
             return newLs;
         }
         return ls;
+    }
+
+    /**
+     * For backwards compatibility; prefer {@link #mapLast(List, Function)}.
+     */
+    public static <T> @Nullable List<T> mapLast(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapLast) {
+        return mapLast(ls, (Function<T, T>) mapLast);
     }
 
     /**
@@ -167,12 +176,19 @@ public final class ListUtils {
     }
 
     /**
+     * For backwards compatibility; prefer {@link #mapFirst(List, Function)}.
+     */
+    public static <T> @Nullable List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapFirst) {
+        return mapFirst(ls, (Function<T, T>) mapFirst);
+    }
+
+    /**
      * Applies a mapping function to each element in the list along with its index.
      * If any mapped element is null, it will be removed from the resulting list.
      *
-     * @param ls   The list to modify.
-     * @param map  The mapping function that takes an index and an element.
-     * @param <T>  The type of elements in the list.
+     * @param ls  The list to modify.
+     * @param map The mapping function that takes an index and an element.
+     * @param <T> The type of elements in the list.
      * @return A new list with modified elements, or the original list if unchanged.
      */
     @Contract("null, _ -> null; !null, _ -> !null")
@@ -207,9 +223,9 @@ public final class ListUtils {
     /**
      * Applies a mapping function to each element in the list. If any mapped element is null, it will be removed.
      *
-     * @param ls   The list to modify.
-     * @param map  The mapping function to apply to each element.
-     * @param <T>  The type of elements in the list.
+     * @param ls  The list to modify.
+     * @param map The mapping function to apply to each element.
+     * @param <T> The type of elements in the list.
      * @return A new list with modified elements, or the original list if unchanged.
      */
     // inlined version of `map(List, BiFunction)` for memory efficiency (no overhead for lambda)
@@ -243,13 +259,20 @@ public final class ListUtils {
     }
 
     /**
+     * For backwards compatibility; prefer {@link #map(List, Function)}.
+     */
+    public static <T> @Nullable List<T> map(@Nullable List<T> ls, UnaryOperator<@Nullable T> map) {
+        return map(ls, (Function<T, T>) map);
+    }
+
+    /**
      * Applies a flat-mapping function to each element in the list with its index.
      * Each element may map to a single object or an iterable of objects.
      * If any mapped element is null, it will be removed from the list.
      *
-     * @param ls       The list to modify.
-     * @param flatMap  The flat-mapping function that takes an index and an element.
-     * @param <T>      The type of elements in the list.
+     * @param ls      The list to modify.
+     * @param flatMap The flat-mapping function that takes an index and an element.
+     * @param <T>     The type of elements in the list.
      * @return A new list with expanded or modified elements, or the original list if unchanged.
      */
     @Contract("null, _ -> null; !null, _ -> !null")
@@ -319,9 +342,9 @@ public final class ListUtils {
     /**
      * Applies a flat-mapping function to each element in the list. Each element may map to a single object or an iterable.
      *
-     * @param ls       The list to modify.
-     * @param flatMap  The flat-mapping function to apply to each element.
-     * @param <T>      The type of elements in the list.
+     * @param ls      The list to modify.
+     * @param flatMap The flat-mapping function to apply to each element.
+     * @param <T>     The type of elements in the list.
      * @return A new list with expanded or modified elements, or the original list if unchanged.
      */
     @Contract("null, _ -> null; !null, _ -> !null")
@@ -332,9 +355,9 @@ public final class ListUtils {
     /**
      * Concatenates a single element to the end of the list. If the element is null, returns the original list.
      *
-     * @param ls   The original list.
-     * @param t    The element to concatenate.
-     * @param <T>  The type of elements in the list.
+     * @param ls  The original list.
+     * @param t   The element to concatenate.
+     * @param <T> The type of elements in the list.
      * @return A new list with the added element, or an empty list if the element or list is null.
      */
     public static <T> List<T> concat(@Nullable List<T> ls, @Nullable T t) {
@@ -352,9 +375,9 @@ public final class ListUtils {
     /**
      * Concatenates a single element to the beginning of the list. If the element is null, returns the original list.
      *
-     * @param t    The element to add.
-     * @param ls   The original list.
-     * @param <T>  The type of elements in the list.
+     * @param t   The element to add.
+     * @param ls  The original list.
+     * @param <T> The type of elements in the list.
      * @return A new list with the added element at the start, the original list if the element is null or a null
      * object if both element and list are null.
      */
@@ -377,9 +400,9 @@ public final class ListUtils {
     /**
      * Concatenates two lists. If both are null, returns null. If only one is null, returns the other.
      *
-     * @param ls   The original list.
-     * @param t    The list to concatenate.
-     * @param <T>  The type of elements in the lists.
+     * @param ls  The original list.
+     * @param t   The list to concatenate.
+     * @param <T> The type of elements in the lists.
      * @return A new list containing both lists, or one of the lists if the other is null.
      */
     @Contract("null, null -> null; !null, _ -> !null; _, !null -> !null")
@@ -427,8 +450,8 @@ public final class ListUtils {
     /**
      * Returns null if the list is empty; otherwise, returns the list.
      *
-     * @param ls   The list to check.
-     * @param <T>  The type of elements in the list.
+     * @param ls  The list to check.
+     * @param <T> The type of elements in the list.
      * @return Null if the list is empty; otherwise, the list.
      */
     public static <T> @Nullable List<T> nullIfEmpty(@Nullable List<T> ls) {
@@ -454,7 +477,7 @@ public final class ListUtils {
      * Returns null if the array is empty; otherwise, returns the array.
      *
      * @param array The array to check.
-     * @param <T>  The type of elements in the array.
+     * @param <T>   The type of elements in the array.
      * @return Null if the array is empty; otherwise, the array.
      */
     public static <T> T @Nullable [] nullIfEmpty(T @Nullable [] array) {

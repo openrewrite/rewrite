@@ -279,7 +279,7 @@ public class GitRemote {
                     .replaceFirst("^/", "");
         }
 
-        private static final Pattern PORT_PATTERN = Pattern.compile(":\\d+[^-\\w]"); // Allow orgs with numbers in name
+        private static final Pattern PORT_PATTERN = Pattern.compile(":\\d+(/.+)(/.+)+");
 
         static URI normalize(String url) {
             try {
