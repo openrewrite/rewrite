@@ -81,6 +81,103 @@ class ChangeParentPomTest implements RewriteTest {
     }
 
     @Test
+    void changeParentShouldResolveDependenciesMangementWithMavenProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom(
+            "org.jenkins-ci.plugins",
+            "org.jenkins-ci.plugins",
+            "plugin",
+            "plugin",
+            "5.3",
+            null,
+            null,
+            null,
+            false
+          )),
+          pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>org.jenkins-ci.plugins</groupId>
+                      <artifactId>plugin</artifactId>
+                      <version>4.86</version>
+                      <relativePath/>
+                  </parent>
+                  <artifactId>example-plugin</artifactId>
+                  <version>0.8-SNAPSHOT</version>
+                  <properties>
+                      <jenkins.baseline>2.462</jenkins.baseline>
+                      <jenkins.version>${jenkins.baseline}.3</jenkins.version>
+                  </properties>
+                  <dependencyManagement>
+                     <dependencies>
+                         <dependency>
+                             <groupId>io.jenkins.tools.bom</groupId>
+                             <artifactId>bom-${jenkins.baseline}.x</artifactId>
+                             <version>3722.vcc62e7311580</version>
+                             <type>pom</type>
+                             <scope>import</scope>
+                         </dependency>
+                     </dependencies>
+                 </dependencyManagement>
+                 <dependencies>
+                     <dependency>
+                         <groupId>org.jenkins-ci.plugins</groupId>
+                         <artifactId>scm-api</artifactId>
+                     </dependency>
+                 </dependencies>
+                  <repositories>
+                      <repository>
+                          <id>repo.jenkins-ci.org</id>
+                          <url>https://repo.jenkins-ci.org/public/</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            """
+              <project>
+                  <parent>
+                      <groupId>org.jenkins-ci.plugins</groupId>
+                      <artifactId>plugin</artifactId>
+                      <version>5.3</version>
+                      <relativePath/>
+                  </parent>
+                  <artifactId>example-plugin</artifactId>
+                  <version>0.8-SNAPSHOT</version>
+                  <properties>
+                      <jenkins.baseline>2.462</jenkins.baseline>
+                      <jenkins.version>${jenkins.baseline}.3</jenkins.version>
+                  </properties>
+                  <dependencyManagement>
+                     <dependencies>
+                         <dependency>
+                             <groupId>io.jenkins.tools.bom</groupId>
+                             <artifactId>bom-${jenkins.baseline}.x</artifactId>
+                             <version>3722.vcc62e7311580</version>
+                             <type>pom</type>
+                             <scope>import</scope>
+                         </dependency>
+                     </dependencies>
+                 </dependencyManagement>
+                 <dependencies>
+                     <dependency>
+                         <groupId>org.jenkins-ci.plugins</groupId>
+                         <artifactId>scm-api</artifactId>
+                     </dependency>
+                 </dependencies>
+                  <repositories>
+                      <repository>
+                          <id>repo.jenkins-ci.org</id>
+                          <url>https://repo.jenkins-ci.org/public/</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void changeParentWithRelativePath() {
         rewriteRun(
           spec -> spec.recipe(new ChangeParentPom(

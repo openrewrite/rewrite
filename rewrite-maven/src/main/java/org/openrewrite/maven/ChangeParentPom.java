@@ -343,7 +343,19 @@ public class ChangeParentPom extends Recipe {
                 .filter(dep -> dep.getVersion() == null)
                 // Dependencies explicitly managed by the current pom require no changes
                 .filter(dep -> locallyManaged.stream()
-                        .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getGroupId()) && localManagedDep.getArtifactId().equals(dep.getArtifactId())))
+                        .noneMatch(localManagedDep -> {
+                            String resolvedGroupId = resolvedPom.getValue(localManagedDep.getGroupId());
+                            String resolvedArtifactId = resolvedPom.getValue(localManagedDep.getArtifactId());
+                            if (resolvedArtifactId.contains("${")) {
+                                Map<String, String> properties = resolvedPom.getProperties();
+                                resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedArtifactId, properties::get);
+                            }
+                            if (resolvedGroupId.contains("${")) {
+                                Map<String, String> properties = resolvedPom.getProperties();
+                                resolvedGroupId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedGroupId, properties::get);
+                            }
+                            return resolvedGroupId.equals(dep.getGroupId()) && resolvedArtifactId.equals(dep.getArtifactId());
+                        }))
                 .map(dep -> new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), null))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
@@ -355,7 +367,19 @@ public class ChangeParentPom extends Recipe {
                 .filter(dep -> requestedWithoutExplicitVersion.contains(dep.getGav().withVersion(null)))
                 // Exclude dependencies managed by a bom imported by the current pom
                 .filter(dep -> dep.getBomGav() == null || locallyManaged.stream()
-                        .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getBomGav().getGroupId()) && localManagedDep.getArtifactId().equals(dep.getBomGav().getArtifactId())))
+                        .noneMatch(localManagedDep -> {
+                            String resolvedGroupId = resolvedPom.getValue(localManagedDep.getGroupId());
+                            String resolvedArtifactId = resolvedPom.getValue(localManagedDep.getArtifactId());
+                            if (resolvedArtifactId.contains("${")) {
+                                Map<String, String> properties = resolvedPom.getProperties();
+                                resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedArtifactId, properties::get);
+                            }
+                            if (resolvedGroupId.contains("${")) {
+                                Map<String, String> properties = resolvedPom.getProperties();
+                                resolvedGroupId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedGroupId, properties::get);
+                            }
+                            return resolvedGroupId.equals(dep.getBomGav().getGroupId()) && resolvedArtifactId.equals(dep.getBomGav().getArtifactId());
+                        }))
                 .collect(Collectors.toList());
 
         if(depsWithoutExplicitVersion.isEmpty()) {
