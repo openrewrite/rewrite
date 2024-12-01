@@ -54,8 +54,9 @@ public class DeleteKey extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
+
             @Override
-            public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
+            public  Yaml.Sequence.@Nullable Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
                 if (matcher.matches(getCursor()) || matcher.matches(new Cursor(getCursor(), entry.getBlock()))) {
                     //noinspection ConstantConditions
                     return null;

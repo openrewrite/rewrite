@@ -182,7 +182,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationOnUnknownType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodDeclarations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodDeclarations(false).constructorInvocations(false).build()),
           java(
             """
               import java.util.ArrayList;

@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
@@ -112,7 +113,10 @@ public class ChangeDependencyGroupId extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!dependencyDsl.matches(m) || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
+
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
+
+                if (!((gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m)) && (StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration)))) {
                     return m;
                 }
 
@@ -147,8 +151,8 @@ public class ChangeDependencyGroupId extends Recipe {
                     if (strings.size() >= 2 &&
                             strings.get(0) instanceof J.Literal) {
                         Dependency dependency = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) strings.get(0)).getValue()));
-                        if (dependency != null && !newGroupId.equals(dependency.getGroupId())
-                                && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                        if (dependency != null && !newGroupId.equals(dependency.getGroupId()) &&
+                                depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                             Dependency newDependency = dependency.withGroupId(newGroupId);
                             updatedDependencies.put(dependency.getGav().asGroupArtifact(), newDependency.getGav().asGroupArtifact());
                             String replacement = newDependency.toStringNotation();
@@ -192,9 +196,9 @@ public class ChangeDependencyGroupId extends Recipe {
                             version = valueValue;
                         }
                     }
-                    if (groupId == null || artifactId == null
-                            || (version == null && !depMatcher.matches(groupId, artifactId))
-                            || (version != null && !depMatcher.matches(groupId, artifactId, version))) {
+                    if (groupId == null || artifactId == null ||
+                            (version == null && !depMatcher.matches(groupId, artifactId)) ||
+                            (version != null && !depMatcher.matches(groupId, artifactId, version))) {
                         return m;
                     }
                     String delimiter = versionStringDelimiter;

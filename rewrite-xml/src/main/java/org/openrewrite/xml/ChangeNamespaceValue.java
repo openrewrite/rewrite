@@ -225,8 +225,8 @@ public class ChangeNamespaceValue extends Recipe {
                 Map<String, String> namespaces = n.getNamespaces();
                 for (Xml.Attribute attribute : n.getAttributes()) {
                     String attributeNamespace = namespaces.get(Namespaced.extractNamespacePrefix(attribute.getKeyAsString()));
-                    if(XML_SCHEMA_INSTANCE_URI.equals(attributeNamespace)
-                       && attribute.getKeyAsString().endsWith("schemaLocation")) {
+                    if(XML_SCHEMA_INSTANCE_URI.equals(attributeNamespace) &&
+                       attribute.getKeyAsString().endsWith("schemaLocation")) {
                         return Optional.of(attribute);
                     }
                 }
@@ -280,9 +280,9 @@ public class ChangeNamespaceValue extends Recipe {
                         if (attributeByKey.containsKey(key)) {
                             Xml.Attribute attribute = attributeByKey.get(key);
                             if (!ns.getValue().equals(attribute.getValueAsString())) {
-                                ListUtils.map(attributes, a -> a.getKeyAsString().equals(key)
-                                        ? attribute.withValue(new Xml.Attribute.Value(randomId(), "", Markers.EMPTY, Xml.Attribute.Value.Quote.Double, ns.getValue()))
-                                        : a
+                                ListUtils.map(attributes, a -> a.getKeyAsString().equals(key) ?
+                                        attribute.withValue(new Xml.Attribute.Value(randomId(), "", Markers.EMPTY, Xml.Attribute.Value.Quote.Double, ns.getValue())) :
+                                        a
                                 );
                             }
                         } else {

@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -33,7 +34,15 @@ import java.util.UUID;
  * @param <T> The type of the accumulator where scanning data is held until the transformation phase.
  */
 public abstract class ScanningRecipe<T> extends Recipe {
-    private final String recipeAccMessage = "org.openrewrite.recipe.acc." + UUID.randomUUID();
+    @Nullable
+    private String recipeAccMessage;
+
+    private String getRecipeAccMessage() {
+        if (recipeAccMessage == null) {
+            recipeAccMessage = "org.openrewrite.recipe.acc." + UUID.randomUUID();
+        }
+        return recipeAccMessage;
+    }
 
     /**
      * @return The initial value of the accumulator before any source files have been iterated over.
@@ -86,7 +95,7 @@ public abstract class ScanningRecipe<T> extends Recipe {
     }
 
     public T getAccumulator(Cursor cursor, ExecutionContext ctx) {
-        return cursor.getRoot().computeMessageIfAbsent(recipeAccMessage, m -> getInitialValue(ctx));
+        return cursor.getRoot().computeMessageIfAbsent(getRecipeAccMessage(), m -> getInitialValue(ctx));
     }
 
     @Override
@@ -117,5 +126,16 @@ public abstract class ScanningRecipe<T> extends Recipe {
                 return delegate(ctx).visit(tree, ctx);
             }
         };
+    }
+
+    // For now, ScanningRecipes do not support `*RecipeList`, as the accumulator is not evaluated for these methods
+    @Override
+    public final List<Recipe> getRecipeList() {
+        return super.getRecipeList();
+    }
+
+    @Override
+    public final void buildRecipeList(RecipeList list) {
+        super.buildRecipeList(list);
     }
 }

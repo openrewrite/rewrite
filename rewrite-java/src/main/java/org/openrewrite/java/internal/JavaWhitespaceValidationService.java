@@ -27,8 +27,8 @@ public class JavaWhitespaceValidationService implements WhitespaceValidationServ
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public Space visitSpace(Space space, Space.Location loc, ExecutionContext executionContext) {
-                if(!StringUtils.isBlank(space.getWhitespace())) {
+            public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
+                if (!StringUtils.isBlank(space.getWhitespace())) {
                     return space.withWhitespace("~~(non-whitespace)~~>" + space.getWhitespace() + "<~~");
                 }
                 return space;

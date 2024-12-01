@@ -19,20 +19,15 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
-import org.openrewrite.internal.StringUtils;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.XsltTransformation;
-import org.openrewrite.xml.XsltTransformationVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.Charset;
 import java.util.Optional;
-import java.util.stream.Stream;
 
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterChildren;
 
@@ -42,18 +37,20 @@ public class ChangePluginConfiguration extends Recipe {
     private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
+            description = "The first part of the coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION' of the plugin to modify.",
             example = "org.openrewrite.maven")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
+            description = "The second part of a coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION' of the plugin to modify.",
             example = "rewrite-maven-plugin")
     String artifactId;
 
     @Language("xml")
     @Option(displayName = "Configuration",
-            description = "Plugin configuration provided as raw XML. Supplying `null` will remove any existing configuration.",
+            description = "Plugin configuration provided as raw XML overriding any existing configuration. " +
+                          "Configuration inside `<executions>` blocks will not be altered. " +
+                          "Supplying `null` will remove any existing configuration.",
             example = "<foo>bar</foo>",
             required = false)
     @Nullable

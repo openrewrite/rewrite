@@ -15,13 +15,14 @@
  */
 package org.openrewrite.groovy.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon", "UnnecessaryQualifiedReference"})
+@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon", "UnnecessaryQualifiedReference", "GrMethodMayBeStatic"})
 class BinaryTest implements RewriteTest {
 
     @SuppressWarnings("GroovyConstantConditional")
@@ -175,6 +176,50 @@ class BinaryTest implements RewriteTest {
               }
               [ new A() ].findAll { it -> it.value == 1 } *. value = 2
               """)
+        );
+    }
+
+    @Test
+    void stringMultiplied() {
+        rewriteRun(
+          groovy(
+            """
+              def foo = "-" * 4
+              """
+          )
+        );
+    }
+
+    @Test
+    void stringMultipliedInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo = ("-" * 4)
+              """
+          )
+        );
+    }
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void extraParensAroundInfixOperator() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(Map map) {
+                  ((map.containsKey("foo"))
+                          && ((map.get("foo")).equals("bar")))
+              }
+              def timestamp(int hours, int minutes, int seconds) {
+                  (hours) * 60 * 60 + (minutes * 60) + seconds
+              }
+              def differenceInDays(int time) {
+                  return (int) ((time)/(1000*60*60*24))
+              }
+              """
+          )
         );
     }
 }

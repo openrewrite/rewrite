@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -27,6 +28,18 @@ import java.util.function.UnaryOperator;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
+/**
+ * Utility class for list transformations and manipulations, providing a variety of methods to modify or
+ * extend lists in a functional style while preserving immutability principles.
+ * <p>
+ * If the transformation does not involve modifying LST elements or broader set of stream operations
+ * is needed, the Java Streams API may be more suitable.
+ *
+ * @implNote Most transformation methods in this class accept endomorphic mapping functions, i.e., functions
+ * of the form {@code f: T -> T}. The primary goal of these methods is to produce minimal change in a list’s structure,
+ * ensuring unnecessary memory allocations are avoided,
+ * See also <a href="https://docs.openrewrite.org/authoring-recipes/recipe-conventions-and-best-practices#recipes-must-not-mutate-lsts">Recipes must not mutate LSTs</a>.
+ */
 public final class ListUtils {
     private ListUtils() {
     }
@@ -77,10 +90,11 @@ public final class ListUtils {
     /**
      * Insert element to a list at the specified position in the list.
      * Throws the same exceptions as List.add()
-     * @param ls The original list.
-     * @param t The element to add.
+     *
+     * @param ls    The original list.
+     * @param t     The element to add.
      * @param index index at which the specified element is to be inserted
-     * @param <T> The type of elements in the list.
+     * @param <T>   The type of elements in the list.
      * @return A new list with the element inserted at the specified position.
      */
     public static <T> List<T> insert(@Nullable List<T> ls, @Nullable T t, int index) {
@@ -91,12 +105,22 @@ public final class ListUtils {
             return ls;
         }
 
-        List<T> newLs = ls == null ?  new ArrayList<>(1) : new ArrayList<>(ls);
+        List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls);
         newLs.add(index, t);
         return newLs;
     }
 
-    public static <T> List<T> mapLast(@Nullable List<T> ls, UnaryOperator<T> mapLast) {
+    /**
+     * Applies the specified mapping function to the last element of the list.
+     * If the resulting element is null, the last element is removed from the list.
+     *
+     * @param ls      The list to modify.
+     * @param mapLast The mapping function to apply to the last element.
+     * @param <T>     The type of elements in the list.
+     * @return A new list with the modified last element, or the original list if unchanged.
+     */
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> mapLast(@Nullable List<T> ls, Function<T, @Nullable T> mapLast) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
@@ -115,7 +139,24 @@ public final class ListUtils {
         return ls;
     }
 
-    public static <T> List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<T> mapFirst) {
+    /**
+     * For backwards compatibility; prefer {@link #mapLast(List, Function)}.
+     */
+    public static <T> @Nullable List<T> mapLast(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapLast) {
+        return mapLast(ls, (Function<T, T>) mapLast);
+    }
+
+    /**
+     * Applies the specified mapping function to the first element of the list.
+     * If the resulting element is null, the first element is removed from the list.
+     *
+     * @param ls       The list to modify.
+     * @param mapFirst The mapping function to apply to the first element.
+     * @param <T>      The type of elements in the list.
+     * @return A new list with the modified first element, or the original list if unchanged.
+     */
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> mapFirst(@Nullable List<T> ls, Function<T, @Nullable T> mapFirst) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
@@ -134,13 +175,30 @@ public final class ListUtils {
         return ls;
     }
 
-    public static <T> List<T> map(@Nullable List<T> ls, BiFunction<Integer, T, T> map) {
+    /**
+     * For backwards compatibility; prefer {@link #mapFirst(List, Function)}.
+     */
+    public static <T> @Nullable List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapFirst) {
+        return mapFirst(ls, (Function<T, T>) mapFirst);
+    }
+
+    /**
+     * Applies a mapping function to each element in the list along with its index.
+     * If any mapped element is null, it will be removed from the resulting list.
+     *
+     * @param ls  The list to modify.
+     * @param map The mapping function that takes an index and an element.
+     * @param <T> The type of elements in the list.
+     * @return A new list with modified elements, or the original list if unchanged.
+     */
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> map(@Nullable List<T> ls, BiFunction<Integer, T, @Nullable T> map) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
         }
 
-        List<T> newLs = ls;
+        List<@Nullable T> newLs = ls;
         boolean nullEncountered = false;
         for (int i = 0; i < ls.size(); i++) {
             T tree = ls.get(i);
@@ -162,14 +220,23 @@ public final class ListUtils {
         return newLs;
     }
 
+    /**
+     * Applies a mapping function to each element in the list. If any mapped element is null, it will be removed.
+     *
+     * @param ls  The list to modify.
+     * @param map The mapping function to apply to each element.
+     * @param <T> The type of elements in the list.
+     * @return A new list with modified elements, or the original list if unchanged.
+     */
     // inlined version of `map(List, BiFunction)` for memory efficiency (no overhead for lambda)
-    public static <T> List<T> map(@Nullable List<T> ls, UnaryOperator<T> map) {
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> map(@Nullable List<T> ls, Function<T, @Nullable T> map) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
         }
 
-        List<T> newLs = ls;
+        List<@Nullable T> newLs = ls;
         boolean nullEncountered = false;
         for (int i = 0; i < ls.size(); i++) {
             T tree = ls.get(i);
@@ -191,12 +258,30 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, Object> flatMap) {
+    /**
+     * For backwards compatibility; prefer {@link #map(List, Function)}.
+     */
+    public static <T> @Nullable List<T> map(@Nullable List<T> ls, UnaryOperator<@Nullable T> map) {
+        return map(ls, (Function<T, T>) map);
+    }
+
+    /**
+     * Applies a flat-mapping function to each element in the list with its index.
+     * Each element may map to a single object or an iterable of objects.
+     * If any mapped element is null, it will be removed from the list.
+     *
+     * @param ls      The list to modify.
+     * @param flatMap The flat-mapping function that takes an index and an element.
+     * @param <T>     The type of elements in the list.
+     * @return A new list with expanded or modified elements, or the original list if unchanged.
+     */
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, @Nullable Object> flatMap) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
         }
-        List<T> newLs = ls;
+        List<@Nullable T> newLs = ls;
         int j = 0;
         for (int i = 0; i < ls.size(); i++, j++) {
             T tree = ls.get(i);
@@ -254,10 +339,27 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> flatMap(@Nullable List<T> ls, Function<T, Object> flatMap) {
+    /**
+     * Applies a flat-mapping function to each element in the list. Each element may map to a single object or an iterable.
+     *
+     * @param ls      The list to modify.
+     * @param flatMap The flat-mapping function to apply to each element.
+     * @param <T>     The type of elements in the list.
+     * @return A new list with expanded or modified elements, or the original list if unchanged.
+     */
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> flatMap(@Nullable List<T> ls, Function<T, Object> flatMap) {
         return flatMap(ls, (i, t) -> flatMap.apply(t));
     }
 
+    /**
+     * Concatenates a single element to the end of the list. If the element is null, returns the original list.
+     *
+     * @param ls  The original list.
+     * @param t   The element to concatenate.
+     * @param <T> The type of elements in the list.
+     * @return A new list with the added element, or an empty list if the element or list is null.
+     */
     public static <T> List<T> concat(@Nullable List<T> ls, @Nullable T t) {
         //noinspection DuplicatedCode
         if (t == null && ls == null) {
@@ -270,7 +372,17 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> concat(@Nullable T t, @Nullable List<T> ls) {
+    /**
+     * Concatenates a single element to the beginning of the list. If the element is null, returns the original list.
+     *
+     * @param t   The element to add.
+     * @param ls  The original list.
+     * @param <T> The type of elements in the list.
+     * @return A new list with the added element at the start, the original list if the element is null or a null
+     * object if both element and list are null.
+     */
+    @Contract("null, null -> null; !null, _ -> !null; _, !null -> !null")
+    public static <T> @Nullable List<T> concat(@Nullable T t, @Nullable List<T> ls) {
         if (t == null && ls == null) {
             //noinspection ConstantConditions
             return null;
@@ -285,12 +397,19 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> concatAll(@Nullable List<T> ls, @Nullable List<? extends T> t) {
+    /**
+     * Concatenates two lists. If both are null, returns null. If only one is null, returns the other.
+     *
+     * @param ls  The original list.
+     * @param t   The list to concatenate.
+     * @param <T> The type of elements in the lists.
+     * @return A new list containing both lists, or one of the lists if the other is null.
+     */
+    @Contract("null, null -> null; !null, _ -> !null; _, !null -> !null")
+    public static <T> @Nullable List<T> concatAll(@Nullable List<T> ls, @Nullable List<? extends T> t) {
         if (ls == null && t == null) {
-            //noinspection ConstantConditions
             return null;
         } else if (t == null || t.isEmpty()) {
-            //noinspection ConstantConditions
             return ls;
         } else if (ls == null || ls.isEmpty()) {
             //noinspection unchecked
@@ -303,6 +422,15 @@ public final class ListUtils {
         return newLs;
     }
 
+    /**
+     * Inserts all elements of a list at the specified position in another list.
+     *
+     * @param ls    The original list.
+     * @param index The position to insert the elements.
+     * @param t     The list of elements to insert.
+     * @param <T>   The type of elements in the list.
+     * @return A new list with the elements inserted, or the original list if `t` is null or empty.
+     */
     public static <T> List<T> insertAll(@Nullable List<T> ls, int index, @Nullable List<T> t) {
         if (ls == null && t == null) {
             return emptyList();
@@ -319,10 +447,25 @@ public final class ListUtils {
         return newLs;
     }
 
+    /**
+     * Returns null if the list is empty; otherwise, returns the list.
+     *
+     * @param ls  The list to check.
+     * @param <T> The type of elements in the list.
+     * @return Null if the list is empty; otherwise, the list.
+     */
     public static <T> @Nullable List<T> nullIfEmpty(@Nullable List<T> ls) {
         return ls == null || ls.isEmpty() ? null : ls;
     }
 
+    /**
+     * Converts a list to an array if the list is non-empty; otherwise, returns null.
+     *
+     * @param list  The list to convert.
+     * @param array The array type to populate.
+     * @param <T>   The type of elements in the list.
+     * @return The array representation of the list, or null if the list is empty.
+     */
     public static <T> T @Nullable [] arrayOrNullIfEmpty(@Nullable List<T> list, T[] array) {
         if (list == null || list.isEmpty()) {
             return null;
@@ -330,8 +473,15 @@ public final class ListUtils {
         return list.toArray(array);
     }
 
-    public static <T> T @Nullable [] nullIfEmpty(T @Nullable [] list) {
-        return list == null || list.length == 0 ? null : list;
+    /**
+     * Returns null if the array is empty; otherwise, returns the array.
+     *
+     * @param array The array to check.
+     * @param <T>   The type of elements in the array.
+     * @return Null if the array is empty; otherwise, the array.
+     */
+    public static <T> T @Nullable [] nullIfEmpty(T @Nullable [] array) {
+        return array == null || array.length == 0 ? null : array;
     }
 
 }

@@ -37,11 +37,10 @@ class RenameFileTest implements RewriteTest {
           text(
             "hello world",
             "hello world",
-            spec -> {
+            spec ->
                 spec
                   .path("a/b/hello.txt")
-                  .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("a/b/goodbye.txt")));
-            }
+                  .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("a/b/goodbye.txt")))
           )
         );
     }

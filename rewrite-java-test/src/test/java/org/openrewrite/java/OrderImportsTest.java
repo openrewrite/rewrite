@@ -53,7 +53,7 @@ class OrderImportsTest implements RewriteTest {
             """
               import java.awt.List;
               import java.util.List;
-                            
+              
               class Test {}
               """
           )
@@ -87,9 +87,9 @@ class OrderImportsTest implements RewriteTest {
           java(
             """
               import java.util.List;
-                            
+              
               import static java.util.Collections.*;
-                            
+              
               class A {}
               """
           )
@@ -133,7 +133,7 @@ class OrderImportsTest implements RewriteTest {
           java(
             """
               import java.util.*;
-                            
+              
               class A {
                   List<Integer> list;
                   List<Integer> list2;
@@ -141,7 +141,7 @@ class OrderImportsTest implements RewriteTest {
               """,
             """
               import java.util.List;
-                            
+              
               class A {
                   List<Integer> list;
                   List<Integer> list2;
@@ -158,7 +158,7 @@ class OrderImportsTest implements RewriteTest {
           java(
             """
               import java.util.*;
-                            
+              
               class A {
                   List<Integer> list;
                   Map<Integer, Integer> map;
@@ -167,7 +167,7 @@ class OrderImportsTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.Map;
-                            
+              
               class A {
                   List<Integer> list;
                   Map<Integer, Integer> map;
@@ -196,18 +196,18 @@ class OrderImportsTest implements RewriteTest {
           java(
             """
               import java.util.List;
-                            
+              
               import static java.util.Collections.*;
-                            
+              
               class A {
                   List<Integer> list = emptyList();
               }
               """,
             """
               import java.util.List;
-                            
+              
               import static java.util.Collections.emptyList;
-                            
+              
               class A {
                   List<Integer> list = emptyList();
               }
@@ -243,54 +243,49 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void springCloudFormat() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                randomId(), "spring", "spring", "spring", emptySet(), singletonList(
-                ImportLayoutStyle.builder()
-                  .classCountToUseStarImport(999)
-                  .nameCountToUseStarImport(999)
-                  .importPackage("java.*")
-                  .blankLine()
-                  .importPackage("javax.*")
-                  .blankLine()
-                  .importAllOthers()
-                  .blankLine()
-                  .importPackage("org.springframework.*")
-                  .blankLine()
-                  .importStaticAllOthers()
-                  .build()
-              )
-              )
-            )
-          )),
           java(
             """
               import java.io.ByteArrayOutputStream;
               import java.nio.charset.StandardCharsets;
               import java.util.Collections;
               import java.util.zip.GZIPOutputStream;
-                            
+              
               import javax.servlet.ReadListener;
               import javax.servlet.ServletInputStream;
               import javax.servlet.ServletOutputStream;
-                            
+              
               import com.fasterxml.jackson.databind.ObjectMapper;
               import org.apache.commons.logging.Log;
               import reactor.core.publisher.Mono;
-                            
+              
               import org.springframework.core.io.buffer.DataBuffer;
               import org.springframework.core.io.buffer.DataBufferFactory;
               import org.springframework.http.HttpHeaders;
               import org.springframework.util.MultiValueMap;
               import org.springframework.web.bind.annotation.PathVariable;
               import org.springframework.web.server.ServerWebExchange;
-                            
+              
               import static java.util.Arrays.stream;
               import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.toAsyncPredicate;
-                            
+              
               class A {}
-              """
+              """,
+            spec -> spec.markers(new NamedStyles(
+              randomId(), "spring", "Spring", "Spring", emptySet(), singletonList(
+              ImportLayoutStyle.builder()
+                .classCountToUseStarImport(999)
+                .nameCountToUseStarImport(999)
+                .importPackage("java.*")
+                .blankLine()
+                .importPackage("javax.*")
+                .blankLine()
+                .importAllOthers()
+                .blankLine()
+                .importPackage("org.springframework.*")
+                .blankLine()
+                .importStaticAllOthers()
+                .build()
+            )))
           )
         );
     }
@@ -340,7 +335,7 @@ class OrderImportsTest implements RewriteTest {
           java(
             """
               import static java.util.Collections.*;
-                            
+              
               class Test {
                   Object[] o = new Object[] { emptyList(), emptyMap(), emptySet() };
               }
@@ -362,7 +357,7 @@ class OrderImportsTest implements RewriteTest {
           java(
             """
               import static my.MyCollections.*;
-                            
+              
               class Test {
                   Object[] o = new Object[] { emptyList(), emptyMap(), emptySet() };
               }
@@ -378,7 +373,7 @@ class OrderImportsTest implements RewriteTest {
           java(
             """
               import static java.util.Collections.*;
-                            
+              
               class Test {
                   Object[] o = new Object[] { emptyList(), emptyMap(), emptySet() };
               }
@@ -441,26 +436,6 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void blankLinesBetweenImports() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                randomId(),
-                "custom",
-                "custom style",
-                null,
-                emptySet(),
-                singletonList(
-                  ImportLayoutStyle.builder()
-                    .classCountToUseStarImport(9999)
-                    .nameCountToUseStarImport(9999)
-                    .importStaticAllOthers()
-                    .blankLine()
-                    .importAllOthers()
-                    .blankLine()
-                    .build()
-                )
-              )
-            ))),
           java(
             """
               import java.util.List;
@@ -470,12 +445,28 @@ class OrderImportsTest implements RewriteTest {
               """,
             """
               import static java.util.Collections.singletonList;
-                            
+              
               import java.util.List;
-                            
+              
               class Test {
               }
-              """
+              """,
+            spec -> spec.markers(new NamedStyles(
+              randomId(),
+              "Custom",
+              "Custom style",
+              null,
+              emptySet(),
+              singletonList(
+                ImportLayoutStyle.builder()
+                  .classCountToUseStarImport(9999)
+                  .nameCountToUseStarImport(9999)
+                  .importStaticAllOthers()
+                  .blankLine()
+                  .importAllOthers()
+                  .blankLine()
+                  .build()))
+            )
           )
         );
     }
@@ -510,10 +501,10 @@ class OrderImportsTest implements RewriteTest {
               // org.slf4j should be detected as a block pattern, and not be moved to all other imports.
               import org.slf4j.Logger;
               import org.slf4j.LoggerFactory;
-                            
+              
               import java.util.Arrays;
               import java.util.List;
-                            
+              
               public class C {
               }
               """
@@ -524,29 +515,6 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void doNotFoldImports() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                randomId(),
-                "custom",
-                "custom style",
-                null,
-                emptySet(),
-                singletonList(
-                  ImportLayoutStyle.builder()
-                    .classCountToUseStarImport(2147483647)
-                    .nameCountToUseStarImport(2147483647)
-                    .importPackage("java.*")
-                    .blankLine()
-                    .importPackage("javax.*")
-                    .blankLine()
-                    .importAllOthers()
-                    .blankLine()
-                    .importStaticAllOthers()
-                    .build()
-                )
-              )
-            ))),
           java(
             """
               import java.util.ArrayList;
@@ -554,17 +522,36 @@ class OrderImportsTest implements RewriteTest {
               import java.util.HashSet;
               import java.util.List;
               import java.util.Set;
-                            
+              
               import javax.persistence.Entity;
               import javax.persistence.FetchType;
               import javax.persistence.JoinColumn;
               import javax.persistence.JoinTable;
               import javax.persistence.ManyToMany;
               import javax.persistence.Table;
-                            
+              
               public class C {
               }
-              """
+              """,
+            spec -> spec.markers(new NamedStyles(
+              randomId(),
+              "custom",
+              "Custom style",
+              null,
+              emptySet(),
+              singletonList(
+                ImportLayoutStyle.builder()
+                  .classCountToUseStarImport(2147483647)
+                  .nameCountToUseStarImport(2147483647)
+                  .importPackage("java.*")
+                  .blankLine()
+                  .importPackage("javax.*")
+                  .blankLine()
+                  .importAllOthers()
+                  .blankLine()
+                  .importStaticAllOthers()
+                  .build()))
+            )
           )
         );
     }
@@ -664,24 +651,60 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void foldPackageWithExistingImports() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                randomId(), "test", "test", "test", emptySet(), singletonList(
-                  ImportLayoutStyle.builder()
-                    .packageToFold("java.util.*", false)
-                    .importAllOthers()
-                    .importStaticAllOthers()
-                    .build()
-                )
-              )
-            ))),
           java(
             """
               import java.util.List;
               """,
             """
               import java.util.*;
+              """,
+            spec -> spec.markers(new NamedStyles(
+              randomId(), "test", "Test", "Test", emptySet(), singletonList(
+              ImportLayoutStyle.builder()
+                .packageToFold("java.util.*", false)
+                .importAllOthers()
+                .importStaticAllOthers()
+                .build()))
+            )
+          )
+        );
+    }
+
+    @Test
+    void nestedInnerClass() {
+        // language=java
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true)),
+          java(
+            """
+              import org.openrewrite.java.tree.JContainer;
+              import org.openrewrite.java.tree.JLeftPadded;
+              import org.openrewrite.java.tree.JRightPadded;
+              import org.openrewrite.java.tree.JavaType;
+              import org.openrewrite.java.tree.JavaType.Variable;
+              import org.openrewrite.java.tree.Space;
+              
+              public class Foo {
+                  Variable myVariable = null;
+                  JLeftPadded<JavaType> myLeftPadded = null;
+                  JRightPadded<JavaType> myRightPadded = null;
+                  JContainer<JavaType> myContainer = null;
+                  Space mySpace = null;
+                  JavaType.Variable myVariable = null;
+              }
+              """,
+            """
+              import org.openrewrite.java.tree.*;
+              import org.openrewrite.java.tree.JavaType.Variable;
+              
+              public class Foo {
+                  Variable myVariable = null;
+                  JLeftPadded<JavaType> myLeftPadded = null;
+                  JRightPadded<JavaType> myRightPadded = null;
+                  JContainer<JavaType> myContainer = null;
+                  Space mySpace = null;
+                  JavaType.Variable myVariable = null;
+              }
               """
           )
         );

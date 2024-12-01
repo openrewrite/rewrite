@@ -170,4 +170,13 @@ class FindSourceFilesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void negation() {
+        rewriteRun(
+          spec -> spec.recipe(new FindSourceFiles("!(**/not-this.txt)")),
+          text("not-this", spec -> spec.path("not-this.txt")),
+          text("this", "~~>this", spec -> spec.path("this.txt"))
+        );
+    }
 }

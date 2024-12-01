@@ -16,13 +16,11 @@
 // Generated from java-escape by ANTLR 4.11.1
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.CharStream;
-import org.antlr.v4.runtime.Lexer;
-import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.atn.*;
+import org.antlr.v4.runtime.atn.ATN;
+import org.antlr.v4.runtime.atn.ATNDeserializer;
+import org.antlr.v4.runtime.atn.LexerATNSimulator;
+import org.antlr.v4.runtime.atn.PredictionContextCache;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
 public class AnnotationSignatureLexer extends Lexer {
@@ -32,9 +30,9 @@ public class AnnotationSignatureLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4, 
-		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11, 
-		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19, 
+		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4,
+		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11,
+		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19,
 		DOTDOT=20, SPACE=21, Identifier=22;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
@@ -46,18 +44,18 @@ public class AnnotationSignatureLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"IntegerLiteral", "DecimalIntegerLiteral", "HexIntegerLiteral", "OctalIntegerLiteral", 
-			"BinaryIntegerLiteral", "IntegerTypeSuffix", "DecimalNumeral", "Digits", 
-			"Digit", "NonZeroDigit", "DigitOrUnderscore", "Underscores", "HexNumeral", 
-			"HexDigits", "HexDigit", "HexDigitOrUnderscore", "OctalNumeral", "OctalDigits", 
-			"OctalDigit", "OctalDigitOrUnderscore", "BinaryNumeral", "BinaryDigits", 
-			"BinaryDigit", "BinaryDigitOrUnderscore", "FloatingPointLiteral", "DecimalFloatingPointLiteral", 
-			"ExponentPart", "ExponentIndicator", "SignedInteger", "Sign", "FloatTypeSuffix", 
-			"HexadecimalFloatingPointLiteral", "HexSignificand", "BinaryExponent", 
-			"BinaryExponentIndicator", "BooleanLiteral", "CharacterLiteral", "SingleCharacter", 
-			"StringLiteral", "StringCharacters", "StringCharacter", "EscapeSequence", 
-			"OctalEscape", "UnicodeEscape", "ZeroToThree", "LPAREN", "RPAREN", "LBRACK", 
-			"RBRACK", "COMMA", "DOT", "ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", 
+			"IntegerLiteral", "DecimalIntegerLiteral", "HexIntegerLiteral", "OctalIntegerLiteral",
+			"BinaryIntegerLiteral", "IntegerTypeSuffix", "DecimalNumeral", "Digits",
+			"Digit", "NonZeroDigit", "DigitOrUnderscore", "Underscores", "HexNumeral",
+			"HexDigits", "HexDigit", "HexDigitOrUnderscore", "OctalNumeral", "OctalDigits",
+			"OctalDigit", "OctalDigitOrUnderscore", "BinaryNumeral", "BinaryDigits",
+			"BinaryDigit", "BinaryDigitOrUnderscore", "FloatingPointLiteral", "DecimalFloatingPointLiteral",
+			"ExponentPart", "ExponentIndicator", "SignedInteger", "Sign", "FloatTypeSuffix",
+			"HexadecimalFloatingPointLiteral", "HexSignificand", "BinaryExponent",
+			"BinaryExponentIndicator", "BooleanLiteral", "CharacterLiteral", "SingleCharacter",
+			"StringLiteral", "StringCharacters", "StringCharacter", "EscapeSequence",
+			"OctalEscape", "UnicodeEscape", "ZeroToThree", "LPAREN", "RPAREN", "LBRACK",
+			"RBRACK", "COMMA", "DOT", "ASSIGN", "COLON", "ADD", "SUB", "AND", "OR",
 			"AT", "ELLIPSIS", "DOTDOT", "SPACE", "Identifier", "JavaLetter", "JavaLetterOrDigit"
 		};
 	}
@@ -65,17 +63,17 @@ public class AnnotationSignatureLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, null, null, null, "'('", "')'", "'['", "']'", "','", 
-			"'.'", "'='", "':'", "'+'", "'-'", "'&&'", "'||'", "'@'", "'...'", "'..'", 
+			null, null, null, null, null, null, "'('", "')'", "'['", "']'", "','",
+			"'.'", "'='", "':'", "'+'", "'-'", "'&&'", "'||'", "'@'", "'...'", "'..'",
 			"' '"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral", 
-			"StringLiteral", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT", 
-			"ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", "AT", "ELLIPSIS", "DOTDOT", 
+			null, "IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral",
+			"StringLiteral", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT",
+			"ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", "AT", "ELLIPSIS", "DOTDOT",
 			"SPACE", "Identifier"
 		};
 	}

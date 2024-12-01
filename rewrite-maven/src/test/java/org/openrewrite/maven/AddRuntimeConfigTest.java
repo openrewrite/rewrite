@@ -24,7 +24,11 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
-import static org.openrewrite.maven.AddRuntimeConfig.*;
+import static org.openrewrite.maven.AddRuntimeConfig.JVM_CONFIG_FILENAME;
+import static org.openrewrite.maven.AddRuntimeConfig.JVM_CONFIG_PATH;
+import static org.openrewrite.maven.AddRuntimeConfig.MAVEN_CONFIG_FILENAME;
+import static org.openrewrite.maven.AddRuntimeConfig.MAVEN_CONFIG_PATH;
+import static org.openrewrite.maven.AddRuntimeConfig.Separator;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -154,7 +158,7 @@ class AddRuntimeConfigTest implements RewriteTest {
           POM_XML_SOURCE_SPEC,
           text(
             existingConfig,
-            existingConfig + System.lineSeparator() + "-T=3",
+            existingConfig + "\n-T=3",
             spec -> spec.path(MAVEN_CONFIG_PATH)
           )
         );

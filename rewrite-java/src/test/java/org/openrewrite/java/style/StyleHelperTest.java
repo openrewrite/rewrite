@@ -24,7 +24,7 @@ class StyleHelperTest {
 
     @Test
     void mergeTabsAndIndentsStyles() {
-        var merged = StyleHelper.merge(IntelliJ.tabsAndIndents(), 
+        var merged = StyleHelper.merge(IntelliJ.tabsAndIndents(),
                 new TabsAndIndentsStyle(true, 1, 1, 2, true, new TabsAndIndentsStyle.MethodDeclarationParameters(true)));
         assertThat(merged.getUseTabCharacter()).isTrue();
         assertThat(merged.getTabSize()).isEqualTo(1);

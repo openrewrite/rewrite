@@ -216,8 +216,7 @@ public class JavaSourceSet implements SourceSet {
      * If no GAV can be determined returns null.
      *
      */
-    @Nullable
-    static String gavFromPath(Path path) {
+    static @Nullable String gavFromPath(Path path) {
         String pathStr = PathUtils.separatorsToUnix(path.toString());
         List<String> pathParts = Arrays.asList(pathStr.split("/"));
         // Example maven path: ~/.m2/repository/org/openrewrite/rewrite-core/8.32.0/rewrite-core-8.32.0.jar

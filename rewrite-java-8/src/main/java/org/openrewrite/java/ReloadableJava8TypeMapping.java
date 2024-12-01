@@ -35,7 +35,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
 
 @RequiredArgsConstructor
 class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
@@ -197,7 +199,12 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType generic(Type.TypeVar type, String signature) {
-        String name = type.tsym.name.toString();
+        String name;
+        if (type instanceof Type.CapturedType && ((Type.CapturedType) type).wildcard.kind == BoundKind.UNBOUND) {
+            name = "?";
+        } else {
+            name = type.tsym.name.toString();
+        }
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
                 name, INVARIANT, null);
         typeCache.put(signature, gtv);
@@ -339,7 +346,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
 
     @Override
     @SuppressWarnings("ConstantConditions")
-    public JavaType type(@Nullable Tree tree) {
+    public @Nullable JavaType type(@Nullable Tree tree) {
         if (tree == null) {
             return null;
         }
@@ -359,7 +366,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private @Nullable JavaType type(Type type, Symbol symbol) {
-        if (type instanceof Type.MethodType) {
+        if (type instanceof Type.MethodType || type instanceof Type.ForAll) {
             return methodInvocationType(type, symbol);
         }
         return type(type);
@@ -574,7 +581,11 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                             .map(attr -> attr.getValue().toString())
                             .collect(Collectors.toList());
                 } else {
-                    defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    try {
+                        defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    } catch(UnsupportedOperationException e) {
+                        // not all Attribute implementations define `getValue()`
+                    }
                 }
             }
             JavaType.Method method = new JavaType.Method(

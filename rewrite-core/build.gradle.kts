@@ -25,5 +25,6 @@ dependencies {
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
 
+    testImplementation("org.assertj:assertj-core:latest.release")
     testImplementation(project(":rewrite-test"))
 }

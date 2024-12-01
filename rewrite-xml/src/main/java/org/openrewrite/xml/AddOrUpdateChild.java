@@ -42,11 +42,10 @@ public class AddOrUpdateChild<P> extends XmlVisitor<P> {
                 }
                 t = mapChildren(t, it -> {
                     if (it == maybeChild.get()) {
-                        return child.withPrefix(maybeChild.get().getPrefix());
+                        return autoFormat(child.withPrefix(maybeChild.get().getPrefix()), p, getCursor());
                     }
                     return it;
                 });
-                t = autoFormat(t, p, getCursor().getParentOrThrow());
             } else {
                 t = addToTag(t, child, getCursor().getParentOrThrow());
             }
@@ -79,6 +78,6 @@ public class AddOrUpdateChild<P> extends XmlVisitor<P> {
      */
     public static Xml.Tag addOrUpdateChild(Xml.Tag parentScope, Xml.Tag parent, Xml.Tag child, Cursor parentCursor) {
         //noinspection ConstantConditions
-        return (Xml.Tag) new AddOrUpdateChild<Void>(parent, child).visitNonNull(parentScope, null, parentCursor);
+        return (Xml.Tag) new AddOrUpdateChild<Integer>(parent, child).visitNonNull(parentScope, 0, parentCursor);
     }
 }

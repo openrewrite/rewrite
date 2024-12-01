@@ -17,6 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
@@ -48,8 +49,8 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
         J.MethodInvocation m = getCursor().firstEnclosing(J.MethodInvocation.class);
         if (m != null && buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)) {
             b = b.withStatements(ListUtils.map(b.getStatements(), statement -> {
-                if (!(statement instanceof J.MethodInvocation
-                        || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation))) {
+                if (!(statement instanceof J.MethodInvocation ||
+                        (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation))) {
                     return statement;
                 }
 
@@ -59,24 +60,24 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                         return null;
                     }
                 } else if (buildPluginWithVersionMatcher.matches(m2) || settingsPluginWithVersionMatcher.matches(m2)) {
-                    if (m2.getSelect() instanceof J.MethodInvocation
-                            && ((J.MethodInvocation) m2.getSelect()).getArguments().get(0) instanceof J.Literal
-                            && pluginId.equals(((J.Literal) ((J.MethodInvocation) m2.getSelect()).getArguments().get(0)).getValue())) {
+                    if (m2.getSelect() instanceof J.MethodInvocation &&
+                            ((J.MethodInvocation) m2.getSelect()).getArguments().get(0) instanceof J.Literal &&
+                            pluginId.equals(((J.Literal) ((J.MethodInvocation) m2.getSelect()).getArguments().get(0)).getValue())) {
                         return null;
                     }
                 } else if (buildPluginWithApplyMatcher.matches(m2) || settingsPluginWithApplyMatcher.matches(m2)) {
                     if (buildPluginMatcher.matches(m2.getSelect()) || settingsPluginMatcher.matches(m2.getSelect())) {
-                        if (m2.getSelect() instanceof J.MethodInvocation
-                                && ((J.MethodInvocation) m2.getSelect()).getArguments().get(0) instanceof J.Literal
-                                && pluginId.equals(((J.Literal) ((J.MethodInvocation) m2.getSelect()).getArguments().get(0)).getValue())) {
+                        if (m2.getSelect() instanceof J.MethodInvocation &&
+                                ((J.MethodInvocation) m2.getSelect()).getArguments().get(0) instanceof J.Literal &&
+                                pluginId.equals(((J.Literal) ((J.MethodInvocation) m2.getSelect()).getArguments().get(0)).getValue())) {
                             return null;
                         }
                     } else if (buildPluginWithVersionMatcher.matches(m2.getSelect()) || settingsPluginWithVersionMatcher.matches(m2.getSelect())) {
-                        if (m2.getSelect() instanceof J.MethodInvocation
-                                && (buildPluginMatcher.matches(((J.MethodInvocation) m2.getSelect()).getSelect()) || settingsPluginMatcher.matches(((J.MethodInvocation) m2.getSelect()).getSelect()))) {
-                            if (((J.MethodInvocation) m2.getSelect()).getSelect() instanceof J.MethodInvocation
-                                    && ((J.MethodInvocation) ((J.MethodInvocation) m2.getSelect()).getSelect()).getArguments().get(0) instanceof J.Literal
-                                    && pluginId.equals(((J.Literal) ((J.MethodInvocation) ((J.MethodInvocation) m2.getSelect()).getSelect()).getArguments().get(0)).getValue())) {
+                        if (m2.getSelect() instanceof J.MethodInvocation &&
+                                (buildPluginMatcher.matches(((J.MethodInvocation) m2.getSelect()).getSelect()) || settingsPluginMatcher.matches(((J.MethodInvocation) m2.getSelect()).getSelect()))) {
+                            if (((J.MethodInvocation) m2.getSelect()).getSelect() instanceof J.MethodInvocation &&
+                                    ((J.MethodInvocation) ((J.MethodInvocation) m2.getSelect()).getSelect()).getArguments().get(0) instanceof J.Literal &&
+                                    pluginId.equals(((J.Literal) ((J.MethodInvocation) ((J.MethodInvocation) m2.getSelect()).getSelect()).getArguments().get(0)).getValue())) {
                                 return null;
                             }
                         }
@@ -91,13 +92,13 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     }
 
     @Override
-    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+    public  J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
         J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
 
         if (buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)) {
-            if (m.getArguments().get(0) instanceof J.Lambda
-                    && ((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block
-                    && ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
+            if (m.getArguments().get(0) instanceof J.Lambda &&
+                    ((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block &&
+                    ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
                 //noinspection DataFlowIssue
                 return null;
             }

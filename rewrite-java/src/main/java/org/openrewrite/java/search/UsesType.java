@@ -17,21 +17,25 @@ package org.openrewrite.java.search;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
+import org.openrewrite.SourceFileWithReferences;
 import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.trait.Reference;
 
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
-public class UsesType<P> extends JavaIsoVisitor<P> {
+public class UsesType<P> extends TreeVisitor<Tree, P> {
 
     @Nullable
     @Getter
@@ -40,6 +44,9 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     @Nullable
     @Getter
     private final Predicate<JavaType> typePattern;
+
+    @Nullable
+    private final TypeMatcher typeMatcher;
 
     @Nullable
     private final Boolean includeImplicit;
@@ -59,15 +66,22 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
             } else {
                 this.typePattern = genericPattern(Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType)));
             }
+            this.typeMatcher = new TypeMatcher(fullyQualifiedType);
         } else {
             this.fullyQualifiedType = fullyQualifiedType;
             this.typePattern = null;
+            this.typeMatcher = null;
         }
         this.includeImplicit = includeImplicit;
     }
 
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
+        return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithReferences;
+    }
+
+    @Override
+    public @Nullable Tree visit(@Nullable Tree tree, P p) {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
             JavaSourceFile c = cu;
@@ -105,8 +119,15 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
                     }
                 }
             }
+        } else if (tree instanceof SourceFileWithReferences) {
+            SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
+            SourceFileWithReferences.References references = sourceFile.getReferences();
+            TypeMatcher matcher = typeMatcher != null ? typeMatcher : new TypeMatcher(fullyQualifiedType);
+            for (Reference ignored : references.findMatches(matcher, Reference.Kind.TYPE)) {
+                return SearchResult.found(sourceFile);
+            }
         }
-        return (J) tree;
+        return tree;
     }
 
     private JavaSourceFile maybeMark(JavaSourceFile c, @Nullable JavaType type) {
@@ -114,8 +135,8 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
             return c;
         }
 
-        if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type)
-            || fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
+        if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type) ||
+            fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
             return SearchResult.found(c);
         }
 

@@ -77,7 +77,7 @@ public class MavenParser implements Parser {
                 Pom pom = RawPom.parse(source.getSource(ctx), null)
                         .toPom(pomPath, null);
 
-                if (pom.getProperties() == null || pom.getProperties().isEmpty()) {
+                if (pom.getProperties().isEmpty()) {
                     pom = pom.withProperties(new LinkedHashMap<>());
                 }
                 String baseDir = pomPath.toAbsolutePath().getParent().toString();
@@ -117,15 +117,22 @@ public class MavenParser implements Parser {
                 }
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
             } catch (MavenDownloadingExceptions e) {
-                ParseExceptionResult parseExceptionResult = new ParseExceptionResult(
-                        randomId(),
-                        MavenParser.class.getSimpleName(),
-                        e.getClass().getSimpleName(),
-                        e.warn(docToPom.getKey()).printAll(), // Shows any underlying MavenDownloadingException
-                        null);
-                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(parseExceptionResult)));
+                if (e.getExceptions().size() == 1) {
+                    // If there is only a single MavenDownloadingException, report just that as no additional debugging value is gleaned from its wrapper
+                    MavenDownloadingException e2 = e.getExceptions().get(0);
+                    String message = e2.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
+                    parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e2, message))));
+                    ctx.getOnError().accept(e2);
+                } else {
+                    String message = e.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
+                    parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e, message))));
+                    ctx.getOnError().accept(e);
+                }
+            } catch (MavenDownloadingException e) {
+                String message = e.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
+                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e, message))));
                 ctx.getOnError().accept(e);
-            } catch (MavenDownloadingException | UncheckedIOException e) {
+            } catch (UncheckedIOException e) {
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e))));
                 ctx.getOnError().accept(e);
             }

@@ -29,9 +29,9 @@ import static java.util.Collections.emptyList;
 public class QualifyThisVisitor extends JavaVisitor<ExecutionContext> {
     @Override
     public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
-        if (ident.getSimpleName().equals("this")
-                && !isAlreadyQualified(ident)
-                && ident.getType() instanceof JavaType.Class) {
+        if (ident.getSimpleName().equals("this") &&
+                !isAlreadyQualified(ident) &&
+                ident.getType() instanceof JavaType.Class) {
             JavaType.Class type = (JavaType.Class) ident.getType();
             return new J.FieldAccess(
                     Tree.randomId(),

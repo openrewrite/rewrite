@@ -41,11 +41,11 @@ class RemovePropertyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <properties>
                   <a.version>a</a.version>
                   <bla.version>b</bla.version>
@@ -55,24 +55,23 @@ class RemovePropertyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <properties>
                   <a.version>a</a.version>
                 </properties>
               </project>
               """,
-            sourceSpecs -> {
+            sourceSpecs ->
                 sourceSpecs.afterRecipe(d -> {
                     MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                     Map<String, String> properties = resolution.getPom().getRequested().getProperties();
                     assertThat(properties.get("a.version")).isEqualTo("a");
                     assertThat(properties.get("bla.version")).isNull();
-                });
-            }
+                })
           )
         );
     }
@@ -84,11 +83,11 @@ class RemovePropertyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <properties>
                   <bla.version>b</bla.version>
                 </properties>
@@ -97,19 +96,124 @@ class RemovePropertyTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            sourceSpecs -> {
+            sourceSpecs ->
                 sourceSpecs.afterRecipe(d -> {
                     MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                     Map<String, String> properties = resolution.getPom().getRequested().getProperties();
                     assertThat(properties.isEmpty()).isTrue();
-                });
-            }
+                })
+          )
+        );
+    }
+
+    @Test
+    void removePropertyWithComment() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <properties>
+                  <a.version>a</a.version>
+                  <!-- I should remove this property -->
+                  <bla.version>b</bla.version>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <properties>
+                  <a.version>a</a.version>
+                </properties>
+              </project>
+              """,
+            sourceSpecs ->
+              sourceSpecs.afterRecipe(d -> {
+                  MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  Map<String, String> properties = resolution.getPom().getRequested().getProperties();
+                  assertThat(properties.get("a.version")).isEqualTo("a");
+                  assertThat(properties.get("bla.version")).isNull();
+              })
+          )
+        );
+    }
+
+    @Test
+    void removePropertyWithCommentAndEmptyParents() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <properties>
+                  <!-- I should remove this property -->
+                  <bla.version>b</bla.version>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removePropertyWithTwoComments() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <properties>
+                  <!-- And also remove this comment -->
+                  <!-- I should remove this property -->
+                  <bla.version>b</bla.version>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
           )
         );
     }

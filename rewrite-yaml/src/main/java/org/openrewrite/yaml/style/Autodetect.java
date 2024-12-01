@@ -24,10 +24,10 @@ import org.openrewrite.yaml.tree.Yaml;
 
 public class Autodetect {
     public static IndentsStyle tabsAndIndents(Yaml yaml, IndentsStyle orElse) {
-        FindIndentYamlVisitor<Void> findIndent = new FindIndentYamlVisitor<>(0);
+        FindIndentYamlVisitor<Integer> findIndent = new FindIndentYamlVisitor<>();
 
         //noinspection ConstantConditions
-        findIndent.visit(yaml, null);
+        findIndent.visit(yaml, 0);
 
         return findIndent.nonZeroIndents() > 0 ?
                 new IndentsStyle(findIndent.getMostCommonIndent()) :
@@ -35,10 +35,10 @@ public class Autodetect {
     }
 
     public static GeneralFormatStyle generalFormat(Yaml yaml) {
-        FindLineFormatJavaVisitor<Void> findLineFormat = new FindLineFormatJavaVisitor<>();
+        FindLineFormatJavaVisitor<Integer> findLineFormat = new FindLineFormatJavaVisitor<>();
 
         //noinspection ConstantConditions
-        findLineFormat.visit(yaml, null);
+        findLineFormat.visit(yaml, 0);
 
         return new GeneralFormatStyle(!findLineFormat.isIndentedWithLFNewLines());
     }

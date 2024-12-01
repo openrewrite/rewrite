@@ -169,7 +169,7 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependencyTag() && isDependencyTag(groupPattern, artifactPattern)) {
-                tag.getChild("version").ifPresent(versionTag -> doAfterVisit(new RemoveContentVisitor<>(versionTag, false)));
+                tag.getChild("version").ifPresent(versionTag -> doAfterVisit(new RemoveContentVisitor<>(versionTag, false, true)));
                 return tag;
             }
             return super.visitTag(tag, ctx);

@@ -21,10 +21,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.ResolvedManagedDependency;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -153,9 +150,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
             @Nullable
             private Collection<String> availableVersions;
+            private boolean isNewDependencyPresent;
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+                isNewDependencyPresent = checkIfNewDependencyPresents(newGroupId, newArtifactId, newVersion);
                 // Any managed dependency change is unlikely to use the same version, so only update selectively.
                 if ((changeManagedDependency == null || changeManagedDependency) && newVersion != null || versionPattern != null) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
@@ -170,7 +169,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-                if (isDependencyTag(oldGroupId, oldArtifactId)) {
+                boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
+                if (isOldDependencyTag && isNewDependencyPresent) {
+                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
+                    maybeUpdateModel();
+                    return t;
+                }
+                if (isOldDependencyTag) {
                     String groupId = newGroupId;
                     if (groupId != null) {
                         t = changeChildTagValue(t, "groupId", groupId, ctx);
@@ -200,7 +205,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             if (versionTagPresent) {
                                 // If the previous dependency had a version but the new artifact is managed, removed the version tag.
                                 if (!configuredToOverrideManageVersion && newDependencyManaged || (oldDependencyManaged && configuredToChangeManagedDependency)) {
-                                    t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false).visit(t, ctx);
+                                    t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
                                     // Otherwise, change the version to the new value.
                                     t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
@@ -222,6 +227,16 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
                 //noinspection ConstantConditions
                 return t;
+            }
+
+            private boolean checkIfNewDependencyPresents(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
+                if ((groupId == null) || (artifactId == null)) {
+                    return false;
+                }
+                List<ResolvedDependency> dependencies = findDependencies(groupId, artifactId);
+                return dependencies.stream()
+                        .filter(ResolvedDependency::isDirect)
+                        .anyMatch(rd -> (version == null) || version.equals(rd.getVersion()));
             }
 
             private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {

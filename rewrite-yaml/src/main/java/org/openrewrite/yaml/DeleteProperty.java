@@ -42,8 +42,8 @@ public class DeleteProperty extends Recipe {
 
     @Deprecated
     @Option(displayName = "Coalesce",
-            description = "(Deprecated: in a future version, this recipe will always use the `false` behavior)"
-                    + " Simplify nested map hierarchies into their simplest dot separated property form.",
+            description = "(Deprecated: in a future version, this recipe will always use the `false` behavior)" +
+                    " Simplify nested map hierarchies into their simplest dot separated property form.",
             required = false)
     @Nullable
     Boolean coalesce;

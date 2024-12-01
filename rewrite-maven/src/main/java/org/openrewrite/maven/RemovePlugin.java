@@ -60,7 +60,7 @@ public class RemovePlugin extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 for (Xml.Tag plugin : FindPlugin.find(document, groupId, artifactId)) {
-                    doAfterVisit(new RemoveContentVisitor<>(plugin, true));
+                    doAfterVisit(new RemoveContentVisitor<>(plugin, true, true));
                 }
                 return super.visitDocument(document, ctx);
             }

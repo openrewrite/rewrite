@@ -65,6 +65,9 @@ public class MethodMatcher {
     private static final Pattern ANY_ARGUMENTS_PATTERN = Pattern.compile(".*");
 
     @Nullable
+    private String targetTypeAspectJ;
+
+    @Nullable
     private Pattern targetTypePattern;
 
     @Nullable
@@ -95,10 +98,12 @@ public class MethodMatcher {
                 CharStreams.fromString(signature))));
 
         new MethodSignatureParserBaseVisitor<Void>() {
+
             @Override
-            public Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
+            public @Nullable Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
                 MethodSignatureParser.TargetTypePatternContext targetTypePatternContext = ctx.targetTypePattern();
                 String pattern = new TypeVisitor().visitTargetTypePattern(targetTypePatternContext);
+                targetTypeAspectJ = pattern;
                 if (isPlainIdentifier(targetTypePatternContext)) {
                     targetType = pattern;
                 } else {
@@ -133,7 +138,7 @@ public class MethodMatcher {
     }
 
     private static boolean matchAllArguments(MethodSignatureParser.FormalsPatternContext context) {
-        return context.dotDot() != null && context.formalsPatternAfterDotDot() == null;
+        return context.dotDot() != null && context.formalsPatternAfterDotDot().isEmpty();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
@@ -185,7 +190,7 @@ public class MethodMatcher {
     }
 
     boolean matchesTargetType(JavaType.@Nullable FullyQualified type) {
-        return TypeUtils.isOfTypeWithName(
+        return ((type == null || type instanceof JavaType.Unknown) && "*..*".equals(targetTypeAspectJ)) || TypeUtils.isOfTypeWithName(
                 type,
                 matchOverrides,
                 this::matchesTargetTypeName
@@ -248,8 +253,8 @@ public class MethodMatcher {
 
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
-        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern()))
-                                    || matchesTargetType(enclosing.getType());
+        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern())) ||
+                                    matchesTargetType(enclosing.getType());
         if (!matchesTargetType) {
             return false;
         }
@@ -275,8 +280,8 @@ public class MethodMatcher {
 
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
-        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern()))
-                                    || TypeUtils.isAssignableTo(targetType, enclosing.getType());
+        boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern())) ||
+                                    TypeUtils.isAssignableTo(targetType, enclosing.getType());
         if (!matchesTargetType) {
             return false;
         }
@@ -333,10 +338,14 @@ public class MethodMatcher {
             return false;
         }
 
-        if (method.getSelect() != null
-            && method.getSelect() instanceof J.Identifier
-            && !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
+        if (method.getSelect() != null &&
+            method.getSelect() instanceof J.Identifier &&
+            !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
+        }
+
+        if (argumentPattern == ANY_ARGUMENTS_PATTERN) {
+            return true;
         }
 
         final String argumentSignature = argumentsFromExpressionTypes(method);
@@ -362,9 +371,9 @@ public class MethodMatcher {
         StringJoiner joiner = new StringJoiner(",");
         for (Expression expr : method.getArguments()) {
             final JavaType exprType = expr.getType();
-            String s = exprType == null
-                    ? JavaType.Unknown.getInstance().getFullyQualifiedName()
-                    : typePattern(exprType);
+            String s = exprType == null ?
+                    JavaType.Unknown.getInstance().getFullyQualifiedName() :
+                    typePattern(exprType);
             joiner.add(s);
         }
         return joiner.toString();
@@ -389,7 +398,7 @@ public class MethodMatcher {
         Expression target = fieldAccess.getTarget();
         if (target instanceof J.Identifier) {
             return targetType != null && targetType.equals(((J.Identifier) target).getSimpleName()) ||
-                    targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
+                   targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
         } else if (target instanceof J.FieldAccess) {
             return ((J.FieldAccess) target).isFullyQualifiedClassReference(targetType != null ? targetType : targetTypePattern.pattern());
         }
@@ -442,43 +451,6 @@ public class MethodMatcher {
 }
 
 class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
-    private static final Set<String> COMMON_JAVA_LANG_TYPES =
-            new HashSet<>(Arrays.asList(
-                    "Appendable",
-                    "AutoCloseable",
-                    "Boolean",
-                    "Byte",
-                    "Character",
-                    "CharSequence",
-                    "Class",
-                    "ClassLoader",
-                    "Cloneable",
-                    "Comparable",
-                    "Double",
-                    "Enum",
-                    "Error",
-                    "Exception",
-                    "Float",
-                    "FunctionalInterface",
-                    "Integer",
-                    "Iterable",
-                    "Long",
-                    "Math",
-                    "Number",
-                    "Object",
-                    "Readable",
-                    "Record",
-                    "Runnable",
-                    "Short",
-                    "String",
-                    "StringBuffer",
-                    "StringBuilder",
-                    "System",
-                    "Thread",
-                    "Throwable",
-                    "Void"
-            ));
-
     @Override
     public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
         StringBuilder classNameBuilder = new StringBuilder();
@@ -493,7 +465,7 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
             if (Character.isLowerCase(beforeArr.charAt(0)) && JavaType.Primitive.fromKeyword(beforeArr) != null) {
                 return className;
             } else {
-                if (COMMON_JAVA_LANG_TYPES.contains(beforeArr)) {
+                if (TypeUtils.findQualifiedJavaLangTypeName(beforeArr) != null) {
                     return "java.lang." + className;
                 }
             }

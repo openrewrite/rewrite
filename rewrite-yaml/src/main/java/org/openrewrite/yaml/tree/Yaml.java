@@ -90,7 +90,7 @@ public interface Yaml extends Tree {
             return withCharsetName(charset.name());
         }
 
-        List<? extends Document> documents;
+        List<Document> documents;
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -153,7 +153,7 @@ public interface Yaml extends Tree {
                     Markers.EMPTY,
                     explicit,
                     block.copyPaste(),
-                    end == null ? null : end.copyPaste()
+                    end.copyPaste()
             );
         }
 

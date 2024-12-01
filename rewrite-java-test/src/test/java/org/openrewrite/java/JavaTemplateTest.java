@@ -26,12 +26,43 @@ import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
 
+import static java.util.Comparator.comparing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnnecessaryBoxing", "StatementWithEmptyBody", "UnusedAssignment", "SizeReplaceableByIsEmpty", "ResultOfMethodCallIgnored", "RedundantOperationOnEmptyContainer"})
 class JavaTemplateTest implements RewriteTest {
+
+    @Test
+    void addAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              private final JavaTemplate template = JavaTemplate.builder("@SuppressWarnings({\"ALL\"})").build();
+
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  J.ClassDeclaration cd = classDecl;
+                  if (!cd.getLeadingAnnotations().isEmpty()) {
+                      return cd;
+                  }
+                  cd = template.apply(updateCursor(cd), cd.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                  return cd;
+              }
+          })),
+          java(
+            """
+              public class A {
+              }
+              """,
+            """
+              @SuppressWarnings({"ALL"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
@@ -64,6 +95,47 @@ class JavaTemplateTest implements RewriteTest {
                   void foo() {
                       double value = 0;
                       if ((value = 0) == 0) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/550")
+    @Test
+    void genericTypeVariable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getTypeExpression() instanceof J.Identifier && "var".equals(((J.Identifier) multiVariable.getTypeExpression()).getSimpleName())) {
+                      return multiVariable;
+                  }
+                  J.VariableDeclarations.NamedVariable var0 = multiVariable.getVariables().get(0);
+                  return JavaTemplate.builder("var #{} = #{any()}")
+                    .contextSensitive()
+                    .build()
+                    .apply(getCursor(), multiVariable.getCoordinates().replace(), var0.getSimpleName(), var0.getInitializer());
+              }
+          })),
+          java(
+            """
+              import java.io.Serializable;
+              
+              abstract class Outer<T extends Serializable> {
+                  abstract T doIt();
+                  void trigger() {
+                      T x = doIt();
+                  }
+              }
+              """, """
+              import java.io.Serializable;
+              
+              abstract class Outer<T extends Serializable> {
+                  abstract T doIt();
+                  void trigger() {
+                      var x = doIt();
                   }
               }
               """
@@ -298,7 +370,7 @@ class JavaTemplateTest implements RewriteTest {
                   void m() {
                       hashCode();
                   }
-
+              
                   void m2() {
                       hashCode();
                   }
@@ -330,7 +402,7 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import java.util.Arrays;
-
+              
               class T {
                   void m() {
                       Object l = Arrays.asList(new java.util.HashMap<String, String>() {
@@ -342,7 +414,7 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Collections;
-
+              
               class T {
                   void m() {
                       Object l = Collections.singletonList(new java.util.HashMap<String, String>() {
@@ -386,7 +458,7 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import java.util.Arrays;
-
+              
               class T<T> {
                   void m(T o) {
                       Object l = Arrays.asList(o);
@@ -395,7 +467,7 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Collections;
-
+              
               class T<T> {
                   void m(T o) {
                       Object l = Collections.singletonList(o);
@@ -439,7 +511,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.util.Arrays;
               import java.util.Collection;
-
+              
               class T<T> {
                   void m(Collection<T> o) {
                       Object l = Arrays.asList(o);
@@ -449,7 +521,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.util.Collection;
               import java.util.Collections;
-
+              
               class T<T> {
                   void m(Collection<T> o) {
                       Object l = Collections.singletonList(o);
@@ -522,7 +594,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.math.BigDecimal;
               import java.math.RoundingMode;
-
+              
               class A {
                   void m() {
                       StringBuilder sb = new StringBuilder();
@@ -533,7 +605,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.math.BigDecimal;
               import java.math.RoundingMode;
-
+              
               class A {
                   void m() {
                       StringBuilder sb = new StringBuilder();
@@ -721,20 +793,20 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   public enum Type {
                       One;
-
+              
                       public Type(String t) {
                       }
-
+              
                       String t;
-
+              
                       public static Type fromType(String type) {
                           return null;
                       }
                   }
-
+              
                   public A(Type type) {}
                   public A() {}
-
+              
                   public void method(Type type) {
                       new A(type);
                   }
@@ -744,20 +816,20 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   public enum Type {
                       One;
-
+              
                       public Type(String t) {
                       }
-
+              
                       String t;
-
+              
                       public static Type fromType(String type) {
                           return null;
                       }
                   }
-
+              
                   public A(Type type) {}
                   public A() {}
-
+              
                   public void method(Type type) {
                       new A();
                   }
@@ -789,7 +861,7 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               package abc;
-
+              
               public class ArrayHelper {
                   public static Object[] of(Object... objects){ return null;}
               }
@@ -799,7 +871,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import abc.ArrayHelper;
               import java.util.Arrays;
-
+              
               class A {
                   Object[] o = new Object[] {
                       ArrayHelper.of(1, 2, 3)
@@ -809,7 +881,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import abc.ArrayHelper;
               import java.util.Arrays;
-
+              
               class A {
                   Object[] o = new Object[] {
                           Arrays.asList(1, 2, 3)
@@ -865,7 +937,7 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import java.util.Collection;
-
+              
               class Test {
                   void doSomething(Collection<Object> c) {
                       assert c.size() > 0;
@@ -874,7 +946,7 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Collection;
-
+              
               class Test {
                   void doSomething(Collection<Object> c) {
                       assert !c.isEmpty();
@@ -899,13 +971,13 @@ class JavaTemplateTest implements RewriteTest {
             """
               enum Outer {
                   A, B;
-
+              
                   enum Inner {
                       C, D
                   }
-
+              
                   private final String s;
-
+              
                   Outer() {
                       s = "a" + "b";
                   }
@@ -914,13 +986,13 @@ class JavaTemplateTest implements RewriteTest {
             """
               enum Outer {
                   A, B;
-
+              
                   enum Inner {
                       C, D
                   }
-
+              
                   private final String s;
-
+              
                   Outer() {
                       s = "ab";
                   }
@@ -1084,7 +1156,7 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.util.Map;
               import org.junit.jupiter.api.Assertions;
-
+              
               class T {
                   void m(String one, Map<String, ?> map) {
                       Assertions.assertEquals(one, map.get("one"));
@@ -1093,9 +1165,9 @@ class JavaTemplateTest implements RewriteTest {
               """,
             """
               import java.util.Map;
-
+              
               import static org.assertj.core.api.Assertions.assertThat;
-
+              
               class T {
                   void m(String one, Map<String, ?> map) {
                       assertThat(map.get("one")).isEqualTo(one);
@@ -1140,7 +1212,7 @@ class JavaTemplateTest implements RewriteTest {
               import java.util.Objects;
               import java.util.Map;
               import java.util.HashMap;
-
+              
               class T {
               	void m() {
               		Map<String, ?> map = new HashMap<>();
@@ -1151,10 +1223,10 @@ class JavaTemplateTest implements RewriteTest {
             """
               import java.util.Objects;
               import java.util.Map;
-
+              
               import static java.util.Objects.requireNonNull;
               import java.util.HashMap;
-
+              
               class T {
               	void m() {
               		Map<String, ?> map = new HashMap<>();
@@ -1182,13 +1254,13 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               interface Test {
-
+              
                   String a;
               }
               """,
             """
               interface Test {
-
+              
                   String a();
               }
               """
@@ -1203,13 +1275,13 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import org.jetbrains.annotations.NotNull;
-
+              
               class A {
                   String testMethod(@NotNull final String test) {}
               }
               """, """
               import lombok.NonNull;
-
+              
               class A {
                   String testMethod(@NonNull final String test) {}
               }
@@ -1264,6 +1336,47 @@ class JavaTemplateTest implements RewriteTest {
                       new StepBuilder()
                           .<String>method();
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/185")
+    @Test
+    void replaceMethodArgumentsInIfStatementWithoutBraces() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Foo bar(..)").matches(mi) &&
+                      mi.getArguments().get(0) instanceof J.Binary) {
+                      return JavaTemplate.builder("\"Hello, {}\", \"World!\"")
+                        .contextSensitive()
+                        .build()
+                        .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              class Foo {
+                  void foo(boolean condition) {
+                      if (condition)
+                          bar("Hello, " + "World!");
+                  }
+                  String bar(String... arg){ return null; }
+              }
+              """,
+            """
+              class Foo {
+                  void foo(boolean condition) {
+                      if (condition)
+                          bar("Hello, {}", "World!");
+                  }
+                  String bar(String... arg){ return null; }
               }
               """
           )

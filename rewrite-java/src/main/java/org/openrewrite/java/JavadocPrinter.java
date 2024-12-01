@@ -22,7 +22,6 @@ import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.SearchResult;
 
 import java.util.List;
 import java.util.function.UnaryOperator;
@@ -67,7 +66,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Javadoc visitDocComment(Javadoc.DocComment javadoc, PrintOutputCapture<P> p) {
-        beforeSyntax(javadoc, p);
+        beforeSyntax(javadoc, p, JAVA_MARKER_WRAPPER);
         p.append("/**");
         visit(javadoc.getBody(), p);
         p.append("*/");
@@ -77,7 +76,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Javadoc visitDocRoot(Javadoc.DocRoot docRoot, PrintOutputCapture<P> p) {
-        beforeSyntax(docRoot, p);
+        beforeSyntax(docRoot, p, JAVA_MARKER_WRAPPER);
         p.append("{@docRoot");
         visit(docRoot.getEndBrace(), p);
         afterSyntax(docRoot, p);
@@ -106,7 +105,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Javadoc visitErroneous(Javadoc.Erroneous erroneous, PrintOutputCapture<P> p) {
-        beforeSyntax(erroneous, p);
+        beforeSyntax(erroneous, p, JAVA_MARKER_WRAPPER);
         visit(erroneous.getText(), p);
         afterSyntax(erroneous, p);
         return erroneous;
@@ -114,7 +113,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Javadoc visitHidden(Javadoc.Hidden hidden, PrintOutputCapture<P> p) {
-        beforeSyntax(hidden, p);
+        beforeSyntax(hidden, p, JAVA_MARKER_WRAPPER);
         p.append("@hidden");
         visit(hidden.getBody(), p);
         afterSyntax(hidden, p);
@@ -123,7 +122,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Javadoc visitIndex(Javadoc.Index index, PrintOutputCapture<P> p) {
-        beforeSyntax(index, p);
+        beforeSyntax(index, p, JAVA_MARKER_WRAPPER);
         p.append("{@index");
         visit(index.getSearchTerm(), p);
         visit(index.getDescription(), p);
@@ -154,7 +153,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, PrintOutputCapture<P> p) {
-        beforeSyntax(lineBreak, p);
+        beforeSyntax(lineBreak, p, JAVA_MARKER_WRAPPER);
         p.append(lineBreak.getMargin());
         afterSyntax(lineBreak, p);
         return lineBreak;
@@ -464,18 +463,6 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             return space;
         }
 
-        @Override
-        public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-            if (marker instanceof SearchResult) {
-                String description = ((SearchResult) marker).getDescription();
-                p.append("~~")
-                        .append(description == null ? "" : "(" + description + ")~~")
-                        .append(">");
-            }
-            //noinspection unchecked
-            return (M) marker;
-        }
-
         private void visitLineBreak(Javadoc.LineBreak lineBreak, PrintOutputCapture<P> p) {
             beforeSyntax(Space.EMPTY, lineBreak.getMarkers(), null, p);
             p.append(lineBreak.getMargin());
@@ -545,14 +532,21 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     private static final UnaryOperator<String> JAVADOC_MARKER_WRAPPER =
             out -> "~~" + out + (out.isEmpty() ? "" : "~~") + ">";
 
+    private static final UnaryOperator<String> JAVA_MARKER_WRAPPER =
+            out -> "/*~~" + out + (out.isEmpty() ? "" : "~~") + ">*/";
+
     private void beforeSyntax(Javadoc j, PrintOutputCapture<P> p) {
-        beforeSyntax(j.getMarkers(), p);
+        beforeSyntax(j, p, JAVADOC_MARKER_WRAPPER);
     }
 
-    private void beforeSyntax(Markers markers, PrintOutputCapture<P> p) {
+    private void beforeSyntax(Javadoc j, PrintOutputCapture<P> p, UnaryOperator<String> commentWrapper) {
+        beforeSyntax(j.getMarkers(), p, commentWrapper);
+    }
+
+    private void beforeSyntax(Markers markers, PrintOutputCapture<P> p, UnaryOperator<String> commentWrapper) {
         visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {
-            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), commentWrapper));
         }
     }
 

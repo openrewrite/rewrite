@@ -193,26 +193,16 @@ class SemanticallyEqualTest {
         assertExpressionsEqual(
           """
             class T {
-                Number a = (java.lang.Number) "";
-                Number b = (java.lang.Number) "";
+                Number a = (java.lang.Number) null;
+                Number b = (java.lang.Number) null;
             }
             """
         );
         assertExpressionsEqual(
           """
             class T {
-                Number a = (java.lang.Number) "";
-                Number b = (Number) "";
-            }
-            """
-        );
-        assertExpressionsEqual(
-          """
-            import java.util.List;
-            import java.util.UUID;
-            class T {
-                Number a = (List<UUID>) "";
-                Number b = (List<java.util.UUID>) "";
+                Number a = (java.lang.Number) null;
+                Number b = (Number) null;
             }
             """
         );
@@ -221,8 +211,18 @@ class SemanticallyEqualTest {
             import java.util.List;
             import java.util.UUID;
             class T {
-                Number a = (List<java.util.UUID>) "";
-                Number b = (java.util.List<UUID>) "";
+                List a = (List<UUID>) null;
+                List b = (List<java.util.UUID>) null;
+            }
+            """
+        );
+        assertExpressionsEqual(
+          """
+            import java.util.List;
+            import java.util.UUID;
+            class T {
+                List a = (List<java.util.UUID>) null;
+                List b = (java.util.List<UUID>) null;
             }
             """
         );
@@ -294,6 +294,28 @@ class SemanticallyEqualTest {
                 int n = 1;
                 int a = n;
                 int b = t1.n;
+            }
+            """
+        );
+    }
+
+    @Test
+    void lambdaParameterNames() {
+        assertExpressionsEqual(
+          """
+            import java.util.Comparator;
+            class T {
+                Comparator<Integer> a = (x1, y1) -> x1 - y1;
+                Comparator<Integer> b = (x2, y2) -> x2 - y2;
+            }
+            """
+        );
+        assertExpressionsNotEqual(
+          """
+            import java.util.Comparator;
+            class T {
+                Comparator<Integer> a = (x1, y1) -> x1 - y1;
+                Comparator<Integer> b = (x2, y2) -> y2 - x2;
             }
             """
         );
