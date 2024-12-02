@@ -33,5 +33,4 @@ class JavaNamingServiceTest {
         String actual = new JavaNamingService().standardizeMethodName(before);
         assertThat(actual).isEqualTo(after);
     }
-
 }
