@@ -1757,9 +1757,9 @@ public class GroovyParserVisitor {
                     methodType = typeMapping.methodType(methodNode);
                 }
 
-                if (source.charAt(cursor) == ')') {
+                if (source.length() > cursor && source.charAt(cursor) == ')') {
                     int closingParenthese = 0;
-                    while (source.charAt(cursor) == ')') {
+                    while (source.length() > cursor && source.charAt(cursor) == ')') {
                         closingParenthese++;
                         cursor++;
                     }
